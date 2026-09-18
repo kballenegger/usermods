@@ -78,16 +78,47 @@ pre,
   overflow: hidden;
 }
 
+/*
+ * The top bar: two groups with the host between them.
+ *
+ * Left: Chat and Mods, the two screens you move between while working. Right: Settings, Dashboard
+ * and the theme toggle, as one family of compact controls. The host takes whatever is left over.
+ *
+ * `container-type: inline-size` makes the bar itself the query container, so the narrow layout is
+ * chosen from the bar's own width rather than from the viewport. That is the right measure here:
+ * the panel is a side panel whose width the user drags, and in the screenshot harness it is a tab
+ * at an arbitrary size. No JavaScript is involved — nothing measures, nothing re-renders.
+ */
 .tabs {
+  container-type: inline-size;
+  container-name: tabbar;
   flex: none;
   display: flex;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: var(--sp-1);
+  gap: var(--sp-2);
   padding: var(--sp-3) var(--sp-4) var(--sp-2);
   border-bottom: 1px solid var(--border-hair);
 }
 
+/* The two ends of the bar. Neither may shrink: the host gives way first, then truncates. */
+.tabs .tab-group {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+
+/*
+ * The tabs share the right-hand controls' 28px box, so the two groups sit on one line and read as
+ * the same size of thing. 28px is also the hit target the bar is held to throughout.
+ */
 .tabs button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
   background: none;
   border: 0;
   border-radius: var(--r-pill);
@@ -95,7 +126,7 @@ pre,
   font: 600 var(--fs-label) / 1 var(--font-ui);
   letter-spacing: var(--lbl-tracking);
   text-transform: uppercase;
-  padding: 7px 11px;
+  padding: 0 11px;
   cursor: pointer;
   transition: color 160ms ease, background 160ms ease, box-shadow 160ms ease;
 }
@@ -133,9 +164,6 @@ pre,
   }
 }
 
-.tabs .spacer {
-  flex: 1;
-}
 
 /*
  * The theme toggle: a quiet ◐ that cycles Dark → Light → System.
@@ -180,12 +208,34 @@ pre,
   opacity: 0.65;
 }
 
-/* The host of the page in view: an identifier, so mono. */
+/*
+ * The host of the page in view: an identifier, so mono.
+ *
+ * It owns the slack between the two groups (`flex: 1 1 auto` with `min-width: 0`), so it shows in
+ * full whenever there is room and only ellipsises when the panel is genuinely too narrow for it.
+ * The old `max-width: 45%` is gone: that was what truncated en.wikipedia.org to "en.…" at the
+ * default side panel width even though the bar had space to spare.
+ *
+ * The full URL is on the title attribute, so the truncated case is still readable on hover.
+ */
 .tabs .status {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
   font-family: var(--font-mono);
   font-size: var(--fs-label);
   color: var(--text-2);
-  max-width: 45%;
+}
+
+/* The dot keeps its size while the host text is what gives way. */
+.tabs .status .dot {
+  flex: none;
+}
+
+.tabs .status-host {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -972,24 +1022,152 @@ input[type='checkbox']:checked::after {
 }
 
 /* ---------------------------------------------------------------------------
- * The one control that leaves the panel
+ * The bar's right-hand controls: Settings, Dashboard, and the theme toggle
  * ------------------------------------------------------------------------ */
 
-/* Opens the full-tab dashboard. An outlined pill beside the host label rather than a fourth tab:
-   it navigates away, so it must not read as another section of this panel. Everything else the
-   panel wears is styled above; this is the only rule the dashboard added. */
+/*
+ * One family of three. Same 28px box, same radius, same hover, so the eye reads them as a group of
+ * utilities rather than as three unrelated affordances that happened to end up side by side.
+ *
+ * 28px is the minimum hit target the brief asks for, and it is also what lets the 16px icons keep
+ * 6px of breathing room on every side.
+ */
 .tabs button.tab-action {
-  align-self: center;
-  border: 1px solid var(--border-hair);
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-1);
+  min-width: 28px;
+  min-height: 28px;
+  padding: var(--sp-1) var(--sp-2);
+  /* --border-card, not --border-hair: the hairline is a separator tone and at 1px on a 28px pill
+     it disappears in light, leaving two naked icons where there should be two buttons. */
+  border: 1px solid var(--border-card);
   border-radius: var(--r-pill);
-  padding: var(--sp-1) var(--sp-3);
+  background: none;
   font: 600 var(--fs-label) / 1 var(--font-ui);
   letter-spacing: var(--lbl-tracking);
+  text-transform: uppercase;
   color: var(--text-3);
+  cursor: pointer;
+  transition: color 160ms ease, background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+/* The theme toggle joins the family: it was a 24px borderless circle, and beside two bordered
+   28px pills that read as a mistake. Scoped to the bar so the dashboard and install headers, which
+   mount the same component in a different context, keep the size they were designed with. */
+.tabs .theme-toggle {
+  width: 28px;
+  height: 28px;
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
 }
 
 .tabs button.tab-action:hover {
-  color: var(--volt);
+  color: var(--accent-text);
   border-color: var(--volt-a28);
+  background: var(--volt-a12);
+}
+
+.tabs .theme-toggle:hover {
+  border-color: var(--volt-a28);
+}
+
+/* The icons sit on the text colour, so every state above moves the mark with the label. */
+.tabs button.tab-action .ico {
+  flex: none;
+  display: block;
+}
+
+/*
+ * Settings selected. It is a view of this panel, so it wears the tabs' volt treatment rather than
+ * a second, quieter idea of "active" — and it is distinguishable without colour: the border goes
+ * solid accent where the resting state is a hairline, and the label/mark step up to full weight
+ * against a tinted fill. In dark the glow adds a third, non-colour cue.
+ */
+.tabs button.tab-action.active {
+  color: var(--accent-text);
+  background: var(--volt-a12);
+  border-color: var(--volt-a28);
+  box-shadow: var(--glow-tab);
+}
+
+.tabs button.tab-action.active:hover {
+  color: var(--accent-text);
+}
+
+/* Light has no --glow-tab, so the selected border carries the weight on its own. */
+:root[data-theme='light'] .tabs button.tab-action.active {
+  border-color: var(--accent-text);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) .tabs button.tab-action.active {
+    border-color: var(--accent-text);
+  }
+}
+
+/*
+ * The breakpoint: 520px of bar, measured on the container's CONTENT box.
+ *
+ * Measured, not guessed — see the numbers, all taken from the built panel:
+ *
+ *   labelled     icon-only
+ *   Settings   107px       34px
+ *   Dashboard  123px       34px
+ *   toggle      28px       28px
+ *   ---------------------------------
+ *   right      267px      104px
+ *   Chat+Mods  118px      118px
+ *   host       106px (en.wikipedia.org in full, the case the old bar got wrong)
+ *   gaps        16px
+ *
+ * 118 + 267 + 106 + 16 = 507px of content box before the host has to give up a character. 520
+ * takes that with a little headroom for a longer hostname, and because the container query is
+ * evaluated on the content box, it corresponds to a ~552px panel: the bar carries 32px of its own
+ * horizontal padding.
+ *
+ * That is the point of the number. Below it the labelled bar cannot show both its labels and a
+ * real hostname, which is the exact failure being fixed here — at 512px the labels fit but
+ * en.wikipedia.org truncates again. Chrome's default side panel is ~400px and users routinely drag
+ * it narrower, so the entire side-panel range sits on the icon-only side by design; the labels are
+ * for a deliberately widened panel, where there is genuinely room for them.
+ *
+ * Stated as the narrow case in a max-width query so the icon-only layout is also what a browser
+ * without container query support would fall back to... except that it would not, so the labels
+ * are hidden by default and REVEALED above the breakpoint instead: an engine that does not
+ * understand the query simply keeps the compact bar, which fits everywhere, rather than the wide
+ * one, which does not.
+ *
+ * Hidden the visually-hidden way — clipped to a 1px box — and never with `display: none`, which
+ * would take the name out of the accessibility tree along with the pixels and leave the button
+ * announced by nothing but its aria-label.
+ */
+.tabs button.tab-action .tab-action-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+@container tabbar (min-width: 520px) {
+  .tabs button.tab-action {
+    padding: var(--sp-1) var(--sp-3);
+  }
+
+  .tabs button.tab-action .tab-action-label {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip-path: none;
+  }
 }
 
