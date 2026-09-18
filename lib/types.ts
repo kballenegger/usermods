@@ -5,13 +5,47 @@ export interface Mod {
   id: string;
   name: string;
   description: string;
+  version: string;
   /** Chrome match patterns, e.g. "*://*.example.com/*". */
   matches: string[];
+  excludeMatches: string[];
+  /** Glob-style @include / @exclude lines that are not valid match patterns. */
+  includeGlobs: string[];
+  excludeGlobs: string[];
+  runAt: 'document_start' | 'document_end' | 'document_idle';
+  /** MAIN when the script needs page globals (@grant none / unsafeWindow); otherwise the isolated user-script world. */
+  world: 'USER_SCRIPT' | 'MAIN';
+  allFrames: boolean;
+  grants: string[];
+  /** @require scripts, fetched at install time and prepended to the code. */
+  requires: Array<{ url: string; code: string }>;
+  /** @resource entries, fetched at install time. */
+  resources: Array<{ name: string; url: string; mime: string; text: string; base64: string }>;
+  /** Where the script came from, for updates. */
+  downloadUrl?: string;
   /** Full userscript source including the ==UserScript== header. */
   source: string;
   enabled: boolean;
   createdAt: number;
   updatedAt: number;
+}
+
+/** What the install screen shows before the user commits. */
+export interface ScriptPreview {
+  source: string;
+  name: string;
+  description: string;
+  version: string;
+  matches: string[];
+  includeGlobs: string[];
+  grants: string[];
+  requires: string[];
+  resources: string[];
+  world: Mod['world'];
+  runAt: Mod['runAt'];
+  downloadUrl?: string;
+  /** Header lines we could not honour. */
+  warnings: string[];
 }
 
 export type ProviderKind = 'anthropic' | 'openai-compatible' | 'chatgpt' | 'xai';
