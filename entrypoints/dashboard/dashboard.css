@@ -3,17 +3,18 @@
  * shared pieces (.card, .btn, .chip, .row, install preview, Tampermonkey migration), so a mod card
  * looks the same here as it does in the panel.
  *
- * Colors are written against the Volt OS custom properties, each with a fallback to the palette the
- * panel uses today: var(--surface-card, var(--card)). A visual restyle landing those tokens on
- * :root makes this page follow along with no edit here; until it does, every one of these resolves
- * to the current palette. Do not hard-code a hex in this file — that is the thing the fallbacks
- * exist to avoid.
+ * Colors come from the Volt OS tokens in sidepanel/tokens.css, which styles.css imports, so this
+ * page is dressed by the same palette as the panel and follows it through a restyle with no edit
+ * here. These were written with fallbacks to an older palette while those tokens were still
+ * landing; the tokens are here now and the fallbacks are gone. Do not hard-code a hex in this file
+ * — the one exception is the ink on a volt-filled button, which styles.css spells the same way,
+ * because it is the colour of the text ON the accent rather than a colour of its own.
  */
 
 .dash {
   min-height: 100vh;
-  background: var(--bg-app, var(--bg));
-  color: var(--text-1, var(--fg));
+  background: var(--bg-app);
+  color: var(--text-1);
   display: flex;
   flex-direction: column;
 }
@@ -41,28 +42,28 @@
   letter-spacing: -0.01em;
 }
 .dash-head .sub {
-  color: var(--text-3, var(--muted));
+  color: var(--text-3);
   font-size: 12px;
 }
 
 .dash-tabs {
   display: flex;
   gap: 4px;
-  border-bottom: 1px solid var(--border-hair, var(--border));
+  border-bottom: 1px solid var(--border-hair);
   margin-bottom: 16px;
 }
 .dash-tabs button {
   background: none;
   border: 0;
   border-bottom: 2px solid transparent;
-  color: var(--text-3, var(--muted));
+  color: var(--text-3);
   padding: 8px 12px 7px;
   font: inherit;
   cursor: pointer;
 }
 .dash-tabs button.active {
-  color: var(--text-1, var(--fg));
-  border-bottom-color: var(--volt, var(--accent));
+  color: var(--text-1);
+  border-bottom-color: var(--volt);
 }
 
 /* ---------- section labels: uppercase, tracked, small ---------- */
@@ -71,7 +72,7 @@
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--text-3, var(--muted));
+  color: var(--text-3);
   margin: 0 0 6px;
   font-weight: 500;
 }
@@ -85,22 +86,22 @@
   margin-bottom: 16px;
 }
 .stat {
-  background: var(--surface-card, var(--card));
-  border: 1px solid var(--border-card, var(--border));
-  border-radius: var(--r-card, 12px);
+  background: var(--surface-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--r-card);
   padding: 12px 14px;
 }
 .stat .n {
   font-size: 22px;
   font-variant-numeric: tabular-nums;
-  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-family: var(--font-mono);
   line-height: 1.1;
 }
 .stat .k {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--text-3, var(--muted));
+  color: var(--text-3);
   margin-top: 4px;
 }
 
@@ -110,15 +111,15 @@
   flex-wrap: wrap;
   gap: 8px 20px;
   align-items: center;
-  background: var(--surface-card, var(--card));
-  border: 1px solid var(--border-card, var(--border));
-  border-radius: var(--r-card, 12px);
+  background: var(--surface-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--r-card);
   padding: 10px 14px;
   margin-bottom: 18px;
   font-size: 12px;
 }
 .overview-notes .sep {
-  color: var(--text-3, var(--muted));
+  color: var(--text-3);
 }
 
 /* Status dots: a filled dot plus a word, no emoji. */
@@ -129,11 +130,11 @@
   border-radius: 50%;
   margin-right: 6px;
   vertical-align: baseline;
-  background: var(--text-3, var(--muted));
+  background: var(--text-3);
 }
-.dot.ok { background: var(--volt, var(--accent)); }
-.dot.warn { background: var(--warn, var(--accent)); }
-.dot.bad { background: var(--error, var(--danger)); }
+.dot.ok { background: var(--volt); }
+.dot.warn { background: var(--warn-text); }
+.dot.bad { background: var(--error-text); }
 
 /* ---------- toolbar above a list ---------- */
 
@@ -149,10 +150,10 @@
 .dash-toolbar select {
   font: inherit;
   padding: 6px 10px;
-  border: 1px solid var(--border-card, var(--border));
-  border-radius: var(--r-field, 8px);
-  background: var(--surface-card, var(--card));
-  color: var(--text-1, var(--fg));
+  border: 1px solid var(--border-card);
+  border-radius: var(--r-field);
+  background: var(--surface-card);
+  color: var(--text-1);
 }
 .dash-toolbar input[type='search'] {
   flex: 1;
@@ -165,9 +166,9 @@
   gap: 8px;
   align-items: center;
   flex-wrap: wrap;
-  background: var(--surface-card, var(--card));
-  border: 1px solid var(--border-card, var(--border));
-  border-radius: var(--r-field, 8px);
+  background: var(--surface-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--r-field);
   padding: 7px 10px;
   margin-bottom: 10px;
   font-size: 12px;
@@ -207,13 +208,13 @@
   margin-bottom: 6px;
 }
 .hostgroup-head .host {
-  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-family: var(--font-mono);
   font-size: 12px;
-  color: var(--text-2, var(--fg));
+  color: var(--text-2);
 }
 .hostgroup-head .count {
   font-size: 11px;
-  color: var(--text-3, var(--muted));
+  color: var(--text-3);
 }
 
 .rows { display: flex; flex-direction: column; gap: 6px; }
@@ -222,9 +223,9 @@
   display: flex;
   gap: 10px;
   align-items: flex-start;
-  background: var(--surface-card, var(--card));
-  border: 1px solid var(--border-card, var(--border));
-  border-radius: var(--r-field, 10px);
+  background: var(--surface-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--r-field);
   padding: 9px 11px;
   cursor: pointer;
   text-align: left;
@@ -232,8 +233,8 @@
   font: inherit;
   color: inherit;
 }
-.rowcard:hover { border-color: var(--volt, var(--accent)); }
-.rowcard.selected { border-color: var(--volt, var(--accent)); }
+.rowcard:hover { border-color: var(--volt); }
+.rowcard.selected { border-color: var(--volt); }
 .rowcard.dimmed { opacity: 0.62; }
 .rowcard .body { flex: 1; min-width: 0; }
 .rowcard .title {
@@ -244,7 +245,7 @@
 }
 .rowcard .meta {
   font-size: 11px;
-  color: var(--text-3, var(--muted));
+  color: var(--text-3);
   margin-top: 3px;
   display: flex;
   gap: 6px;
@@ -266,33 +267,33 @@
 button.pill {
   font: inherit;
   font-size: 11px;
-  border: 1px solid var(--border-card, var(--border));
+  border: 1px solid var(--border-card);
   background: transparent;
-  color: var(--text-2, var(--fg));
-  border-radius: var(--r-pill, 999px);
+  color: var(--text-2);
+  border-radius: var(--r-pill);
   padding: 3px 10px;
   cursor: pointer;
   white-space: nowrap;
 }
-button.pill:hover { border-color: var(--volt, var(--accent)); color: var(--text-1, var(--fg)); }
+button.pill:hover { border-color: var(--volt); color: var(--text-1); }
 button.pill.primary {
-  background: var(--volt, var(--accent));
-  color: var(--accent-fg, #fff);
+  background: var(--volt);
+  color: #0a0d0b;
   border-color: transparent;
 }
-button.pill.danger { color: var(--error, var(--danger)); }
+button.pill.danger { color: var(--error-text); }
 button.pill:disabled { opacity: 0.45; cursor: default; }
 
 .badge {
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  border: 1px solid var(--border-hair, var(--border));
-  border-radius: var(--r-pill, 999px);
+  border: 1px solid var(--border-hair);
+  border-radius: var(--r-pill);
   padding: 1px 7px;
-  color: var(--text-3, var(--muted));
+  color: var(--text-3);
 }
-.badge.warn { color: var(--warn, var(--accent)); border-color: var(--warn, var(--accent)); }
+.badge.warn { color: var(--warn-text); border-color: var(--warn-text); }
 
 /* Inline rename: an input that sits exactly where the title was. */
 .rename-input {
@@ -300,18 +301,18 @@ button.pill:disabled { opacity: 0.45; cursor: default; }
   font-size: 13px;
   width: 100%;
   padding: 2px 6px;
-  border: 1px solid var(--volt, var(--accent));
-  border-radius: var(--r-field, 6px);
-  background: var(--bg-app, var(--bg));
-  color: var(--text-1, var(--fg));
+  border: 1px solid var(--volt);
+  border-radius: var(--r-field);
+  background: var(--bg-app);
+  color: var(--text-1);
 }
 
 /* ---------- detail pane ---------- */
 
 .detail {
-  background: var(--surface-card, var(--card));
-  border: 1px solid var(--border-card, var(--border));
-  border-radius: var(--r-card, 12px);
+  background: var(--surface-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--r-card);
   padding: 14px;
 }
 .detail h3 {
@@ -321,7 +322,7 @@ button.pill:disabled { opacity: 0.45; cursor: default; }
 }
 .detail .detail-meta {
   font-size: 11px;
-  color: var(--text-3, var(--muted));
+  color: var(--text-3);
   margin-bottom: 12px;
   word-break: break-word;
 }
@@ -337,8 +338,8 @@ button.pill:disabled { opacity: 0.45; cursor: default; }
 }
 .preview .msg.user {
   align-self: flex-end;
-  background: var(--bg-app, var(--bg));
-  border: 1px solid var(--border-hair, var(--border));
+  background: var(--bg-app);
+  border: 1px solid var(--border-hair);
   border-radius: 12px 12px 2px 12px;
   padding: 7px 10px;
   max-width: 92%;
@@ -352,17 +353,17 @@ button.pill:disabled { opacity: 0.45; cursor: default; }
 }
 .preview .prev-note {
   font-size: 11px;
-  color: var(--text-3, var(--muted));
+  color: var(--text-3);
   text-align: center;
 }
 .preview .prev-tool {
   font-size: 11.5px;
-  color: var(--text-3, var(--muted));
-  border-left: 2px solid var(--border-hair, var(--border));
+  color: var(--text-3);
+  border-left: 2px solid var(--border-hair);
   padding: 2px 8px;
-  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-family: var(--font-mono);
 }
-.preview .prev-tool.is-error { border-left-color: var(--error, var(--danger)); }
+.preview .prev-tool.is-error { border-left-color: var(--error-text); }
 .preview .prev-tool summary { cursor: pointer; list-style: none; }
 .preview .prev-tool pre {
   margin: 4px 0 0;
@@ -371,8 +372,8 @@ button.pill:disabled { opacity: 0.45; cursor: default; }
   overflow: auto;
 }
 .preview .prev-proposal {
-  border: 1px solid var(--border-hair, var(--border));
-  border-radius: var(--r-field, 10px);
+  border: 1px solid var(--border-hair);
+  border-radius: var(--r-field);
   padding: 9px 11px;
   display: flex;
   flex-direction: column;
@@ -380,7 +381,7 @@ button.pill:disabled { opacity: 0.45; cursor: default; }
 }
 .preview .prev-proposal h4 { margin: 0; font-size: 13px; }
 .preview pre {
-  background: var(--code-bg, var(--bg-ambient, var(--bg)));
+  background: var(--surface-lo);
   border-radius: 6px;
   padding: 8px;
   font-size: 11.5px;
@@ -394,21 +395,21 @@ button.pill:disabled { opacity: 0.45; cursor: default; }
 .editor {
   width: 100%;
   min-height: 340px;
-  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-family: var(--font-mono);
   font-size: 12px;
   line-height: 1.5;
   tab-size: 2;
   padding: 10px;
-  border: 1px solid var(--border-card, var(--border));
-  border-radius: var(--r-field, 8px);
-  background: var(--bg-ambient, var(--code-bg));
-  color: var(--text-1, var(--fg));
+  border: 1px solid var(--border-card);
+  border-radius: var(--r-field);
+  background: var(--bg-ambient);
+  color: var(--text-1);
   resize: vertical;
   white-space: pre;
   overflow-wrap: normal;
   overflow-x: auto;
 }
-.editor:focus { outline: 1px solid var(--volt, var(--accent)); outline-offset: -1px; }
+.editor:focus { outline: 1px solid var(--volt); outline-offset: -1px; }
 
 .editor-bar {
   display: flex;
@@ -427,7 +428,7 @@ button.pill:disabled { opacity: 0.45; cursor: default; }
   margin-bottom: 10px;
 }
 .kv dt {
-  color: var(--text-3, var(--muted));
+  color: var(--text-3);
   text-transform: uppercase;
   font-size: 10px;
   letter-spacing: 0.06em;
@@ -436,11 +437,11 @@ button.pill:disabled { opacity: 0.45; cursor: default; }
 .kv dd { margin: 0; word-break: break-word; }
 
 .dash-empty {
-  color: var(--text-3, var(--muted));
+  color: var(--text-3);
   text-align: center;
   padding: 36px 12px;
-  border: 1px dashed var(--border-hair, var(--border));
-  border-radius: var(--r-card, 12px);
+  border: 1px dashed var(--border-hair);
+  border-radius: var(--r-card);
 }
 
 /*
@@ -452,21 +453,21 @@ button.pill:disabled { opacity: 0.45; cursor: default; }
 .error,
 .ok,
 .notice {
-  border: 1px solid var(--border-hair, var(--border));
-  border-radius: var(--r-card, 12px);
+  border: 1px solid var(--border-hair);
+  border-radius: var(--r-card);
   padding: 10px 12px;
   font-size: 12px;
   line-height: 1.5;
 }
 .error {
-  color: var(--error, var(--danger));
-  border-color: var(--error, var(--danger));
+  color: var(--error-text);
+  border-color: var(--error-text);
 }
-.ok { color: var(--text-2, var(--fg)); }
+.ok { color: var(--text-2); }
 /* The notice is the one that interrupts, so it is the one that gets the accent edge. */
 .notice {
-  color: var(--text-1, var(--fg));
-  border-color: var(--volt, var(--accent));
+  color: var(--text-1);
+  border-color: var(--volt);
 }
 
 /* The install / import / migrate block reuses the panel's .card, but at page width it should not
