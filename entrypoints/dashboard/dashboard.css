@@ -443,6 +443,32 @@ button.pill:disabled { opacity: 0.45; cursor: default; }
   border-radius: var(--r-card, 12px);
 }
 
+/*
+ * The three inline banners: a failure, a success, and the editor's "this changed elsewhere" notice.
+ * They were written against the side panel's stylesheet, which this page does not load, so they
+ * rendered as bare text — the conflict notice especially, which asks the user to choose between two
+ * versions and needs to read as something that wants an answer.
+ */
+.error,
+.ok,
+.notice {
+  border: 1px solid var(--border-hair, var(--border));
+  border-radius: var(--r-card, 12px);
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.error {
+  color: var(--error, var(--danger));
+  border-color: var(--error, var(--danger));
+}
+.ok { color: var(--text-2, var(--fg)); }
+/* The notice is the one that interrupts, so it is the one that gets the accent edge. */
+.notice {
+  color: var(--text-1, var(--fg));
+  border-color: var(--volt, var(--accent));
+}
+
 /* The install / import / migrate block reuses the panel's .card, but at page width it should not
    stretch the whole 1100px: it reads better as a column. */
 .install-col { max-width: 560px; display: flex; flex-direction: column; gap: 10px; }
