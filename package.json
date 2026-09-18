@@ -13,7 +13,9 @@
     "zip": "wxt zip",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test test/*.test.ts",
-    "postinstall": "wxt prepare"
+    "postinstall": "wxt prepare",
+    "screenshots": "wxt build && node scripts/screenshots.mjs",
+    "smoke": "wxt build && node scripts/screenshots.mjs --smoke"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.126.0",
@@ -27,6 +29,7 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@wxt-dev/module-react": "^1.2.2",
+    "playwright": "^1.63.0",
     "typescript": "^5.9.0",
     "wxt": "^0.21.4"
   }

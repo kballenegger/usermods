@@ -6,6 +6,10 @@ Open the side panel on any page, describe what you want changed, and usermods in
 
 Userscripts, userstyles, usermods.
 
+<p align="center">
+  <img src="docs/screenshots/01-chat-proposal.png" alt="The usermods side panel on a Wikipedia article: the model reads the page, checks its selectors, and proposes a full-width mod with Try and Save buttons." width="420">
+</p>
+
 ## Why
 
 - **Any backend.** Anthropic's API, OpenAI, OpenRouter, or anything OpenAI-compatible: Ollama, LM Studio, vLLM, mlx_lm. Your key, your machine, no account, no hosted service.
@@ -17,6 +21,41 @@ Userscripts, userstyles, usermods.
 ## Status
 
 Early. The core loop works end to end: chat, page inspection, live testing, propose, save, run on load, import and export. Outside userscripts install from a URL, a `.user.js` link or a file, with the `GM_*` API and `@require`/`@resource` support they expect, and a Tampermonkey backup imports in one step. See [Roadmap](#roadmap).
+
+## Screenshots
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/01-chat-proposal-dark.png" alt="The same proposal conversation in dark mode.">
+      <sub><b>Dark mode.</b> The panel follows the browser's color scheme.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/02-chat-refs.png" alt="The composer holding an @img.mw-file-element chip produced by the element picker.">
+      <sub><b>Point at an element.</b> Clicking one on the page drops an <code>@reference</code> into your message, so you can say "this" and mean it.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/03-mods.png" alt="The Mods view listing three saved mods, split into the ones matching this site and the rest.">
+      <sub><b>Mods.</b> Saved scripts, split by whether they match the page you are on. Toggle, run, export or delete each one.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/04-settings.png" alt="Settings showing provider presets and the ChatGPT subscription card, not signed in.">
+      <sub><b>Settings.</b> Presets for the common backends, and a sign-in card for the two subscriptions that work without an API key.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/05-install.png" alt="The install page previewing a script fetched from Greasy Fork, with its matches, GM permissions and required library.">
+      <sub><b>Installing an outside script.</b> A <code>.user.js</code> link shows what it matches, what it is granted and what it loads, before anything is saved.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/06-migrate.png" alt="The Migrate from Tampermonkey card expanded, showing the four export steps.">
+      <sub><b>Migrating.</b> One Tampermonkey backup file brings the whole library across, on/off state and stored values included.</sub>
+    </td>
+  </tr>
+</table>
 
 ## Install (from source)
 
@@ -34,6 +73,8 @@ Then in Chrome:
 3. Click the usermods icon to open the side panel. Go to **Settings**, pick a provider, paste a key (or a local server URL), and save.
 
 For development, `npm run dev` starts WXT with hot reload and opens a Chrome profile with the extension loaded. `npm run typecheck` type-checks, and `npm test` runs the header/backup parser tests (Node's built-in runner, no browser needed).
+
+`npm run screenshots` regenerates the images above, and `npm run smoke` runs the same flow headless as an end-to-end check of the chat loop. Both build the extension, load it into Playwright's Chromium, and drive the real side panel against `scripts/mock-llm.mjs` — a local server that plays scripted conversations over the OpenAI wire protocol, so neither needs an API key or a live model. The page-inspection tools run for real against live pages, and the smoke run asserts that the reply streams, that `get_page`, `find_elements` and `get_styles` all succeed, that the proposal card appears with the expected name and match pattern, and that saving it writes a userscript to storage. See the comments at the top of `scripts/screenshots.mjs` for how the side panel is driven without a real side panel.
 
 ## Providers
 
