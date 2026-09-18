@@ -140,16 +140,20 @@ Both export shapes work: the JSON document (an object with a `scripts` array) an
 |---|---|
 | `GM_info` / `GM.info` | Supported |
 | `GM_addStyle`, `GM_addElement` | Supported |
-| `GM_getValue`, `GM_setValue`, `GM_deleteValue`, `GM_listValues` (and `GM.*`) | Supported. Reads come from a snapshot taken when the script was registered; writes persist and re-register the script, so the new value is visible on the next page load. |
+| `GM_getValue`, `GM_setValue`, `GM_deleteValue`, `GM_listValues` (and `GM.*`) | Supported. Reads come from a snapshot taken when the script was registered; writes persist immediately and are pushed live to the script's other open tabs. |
 | `GM_getResourceText`, `GM_getResourceURL` | Supported, from `@resource` files fetched at install time |
-| `GM_xmlhttpRequest` / `GM.xmlHttpRequest` | Supported, cross-origin, via the background worker. `onload`, `onerror`, `onloadend` and `abort()` work; streaming and upload progress events do not. |
-| `GM_openInTab` / `GM.openInTab` | Supported. The returned handle is a stub: `close()` does nothing. |
+| `GM_xmlhttpRequest` / `GM.xmlHttpRequest` | Supported, cross-origin, via the background worker, subject to `@connect`. `responseType` `arraybuffer`, `blob`, `json`, `document` and text all work, with `responseXML` for `document`. `onload`, `onerror`, `onloadend` and `abort()` work; streaming and upload progress events do not. |
+| `GM_openInTab` / `GM.openInTab` | Supported, with Tampermonkey's focus rules: `GM_openInTab(url)` opens in the foreground, `GM_openInTab(url, true)` and the object form without `active: true` open in the background. The returned handle is a stub: `close()` does nothing. |
 | `GM_setClipboard`, `GM_log` | Supported |
 | `GM_registerMenuCommand`, `GM_unregisterMenuCommand` | **Stub.** Commands are recorded but there is no menu UI to invoke them. |
 | `GM_notification` / `GM.notification` | **Stub.** Logs to the console instead of showing a desktop notification. |
 | `GM_getTab`, `GM_saveTab`, `GM_getTabs` | **Stub.** Return empty objects. |
-| `GM_addValueChangeListener`, `GM_removeValueChangeListener` | **Stub.** Never fire. |
+| `GM_addValueChangeListener`, `GM_removeValueChangeListener` | Supported. Fire for this script's own writes and for writes from its other open tabs, with `(key, oldValue, newValue, remote)`. In the page world (`@grant none`) only local writes fire. |
 | `GM_download`, `GM_cookie`, `GM_webRequest` | Not implemented |
+
+`@connect` is enforced for `GM_xmlhttpRequest`: a request is allowed when its host equals or is a subdomain of a `@connect` entry, when the script declares `@connect *`, or when the host is one the script already matches (`@connect self`). Anything else is rejected with an error naming the host and the `// @connect` line to add. The install preview lists what a script declares.
+
+Scripts and their `@require` libraries are evaluated in their own function scopes, not in one shared strict-mode closure, so sloppy-mode libraries and scripts behave as they do under Tampermonkey. A script gets strict mode only from its own `'use strict'` directive.
 
 `@grant none` and `unsafeWindow` scripts run in the page's **MAIN** world, where they share globals with the page — which is what those scripts want. The trade-off is that extension messaging is unavailable there, so `GM_setValue` writes from a MAIN-world script update the in-page copy but **cannot be persisted**. Mod cards and the install preview mark those scripts with a *page world* badge. Everything else runs in Chrome's isolated `USER_SCRIPT` world.
 

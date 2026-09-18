@@ -3,7 +3,7 @@
 //   npm test
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { parseHeader, previewFromSource, toMatchPattern, urlMatches } from '../lib/mods.ts';
+import { modFromSource, normalizeMod, parseHeader, previewFromSource, toMatchPattern, urlMatches } from '../lib/mods.ts';
 import { normalizeValues, parseTampermonkeyJson, parseTampermonkeyZipEntries, scriptFromEntry } from '../lib/tampermonkey.ts';
 
 const SCRIPT = `// ==UserScript==
@@ -22,6 +22,8 @@ const SCRIPT = `// ==UserScript==
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_fancyUnsupportedThing
+// @connect      api.example.com
+// @connect      self
 // @run-at       document-start
 // @noframes
 // @downloadURL  https://example.com/helper.user.js
@@ -41,6 +43,7 @@ test('parseHeader reads the full Tampermonkey header', () => {
   assert.deepEqual(h.requires, ['https://cdn.example.com/lib.js']);
   assert.deepEqual(h.resources, [{ name: 'css', url: 'https://cdn.example.com/style.css' }]);
   assert.deepEqual(h.grants, ['GM_setValue', 'GM_getValue', 'GM_fancyUnsupportedThing']);
+  assert.deepEqual(h.connect, ['api.example.com', 'self']);
   assert.equal(h.runAt, 'document_start');
   assert.equal(h.noFrames, true);
   assert.equal(h.downloadUrl, 'https://example.com/helper.user.js');
@@ -178,4 +181,104 @@ test('a zip entry with unparsable JSON is skipped, not fatal', () => {
   assert.equal(r.scripts.length, 1);
   assert.equal(r.skipped.length, 1);
   assert.ok(r.skipped[0]!.startsWith('a.options.json'));
+});
+
+// ---------- regressions ----------
+
+// Finding 5: the unsuffixed key is canonical however the lines are ordered.
+test('locale-suffixed header keys are fallbacks, never overriding the bare key', () => {
+  const h = parseHeader(
+    ['// ==UserScript==', '// @name:fr        Nom francais', '// @name            Real Name', '// @description:fr Description francaise', '// @description     Real description', '// @match           https://a.example/*', '// ==/UserScript=='].join('\n'),
+  );
+  assert.equal(h.name, 'Real Name');
+  assert.equal(h.description, 'Real description');
+  // The locale variants are still recorded under the bare key for GM_info.
+  assert.deepEqual(h.raw['name'], ['Nom francais', 'Real Name']);
+  assert.deepEqual(h.raw['description'], ['Description francaise', 'Real description']);
+});
+
+test('a locale-only key is used as a fallback when no bare key exists', () => {
+  const h = parseHeader(['// ==UserScript==', '// @name:fr Seulement en francais', '// @description:de Nur deutsch', '// ==/UserScript=='].join('\n'));
+  assert.equal(h.name, 'Seulement en francais');
+  assert.equal(h.description, 'Nur deutsch');
+});
+
+test('a locale-suffixed key never contributes to list-valued fields', () => {
+  const h = parseHeader(['// ==UserScript==', '// @name X', '// @match:fr https://fr.example/*', '// @grant:fr GM_setValue', '// @connect:fr fr.example.com', '// ==/UserScript=='].join('\n'));
+  assert.deepEqual(h.matches, []);
+  assert.deepEqual(h.grants, []);
+  assert.deepEqual(h.connect, []);
+});
+
+// Finding 6: a wildcard inside the host means glob semantics; do not widen it into a match pattern.
+test('@include host wildcards stay globs, plain and *.sub hosts are promoted', () => {
+  const inc = (v: string) => parseHeader(['// ==UserScript==', '// @name X', `// @include ${v}`, '// ==/UserScript=='].join('\n'));
+  // Promotable: no host wildcard, leading "*." only, or a bare "*" host.
+  assert.deepEqual(inc('https://example.com/*').matches, ['https://example.com/*']);
+  assert.deepEqual(inc('https://*.example.com/*').matches, ['https://*.example.com/*']);
+  assert.deepEqual(inc('*://*/*').matches, ['*://*/*']);
+  assert.deepEqual(inc('*').matches, ['*://*/*']);
+  // Not promotable: the wildcard is inside the host, so glob semantics must be kept.
+  assert.deepEqual(inc('https://*.example.*/*').matches, []);
+  assert.deepEqual(inc('https://*.example.*/*').includeGlobs, ['https://*.example.*/*']);
+  assert.deepEqual(inc('*://*example*.com/*').includeGlobs, ['*://*example*.com/*']);
+  assert.deepEqual(inc('https://example.*/path').includeGlobs, ['https://example.*/path']);
+  // @match is unaffected: it is match-pattern syntax already.
+  const m = parseHeader(['// ==UserScript==', '// @name X', '// @match https://*.example.com/*', '// ==/UserScript=='].join('\n'));
+  assert.deepEqual(m.matches, ['https://*.example.com/*']);
+});
+
+// Finding 8: @connect flows into the header, the mod and the install preview.
+test('@connect is parsed, deduped and carried into the preview', () => {
+  const h = parseHeader(
+    ['// ==UserScript==', '// @name X', '// @match https://a.example/*', '// @connect api.example.com', '// @connect api.example.com', '// @connect *', '// @connect self', '// @connect localhost', '// ==/UserScript=='].join('\n'),
+  );
+  assert.deepEqual(h.connect, ['api.example.com', '*', 'self', 'localhost']);
+  const p = previewFromSource(SCRIPT);
+  assert.deepEqual(p.connect, ['api.example.com', 'self']);
+  const mod = modFromSource(SCRIPT);
+  assert.deepEqual(mod.connect, ['api.example.com', 'self']);
+  // A script with no @connect gets an empty list, not undefined.
+  assert.deepEqual(previewFromSource('// ==UserScript==\n// @name X\n// ==/UserScript==\n').connect, []);
+  assert.deepEqual(normalizeMod({ id: 'x', source: SCRIPT }).connect, ['api.example.com', 'self']);
+});
+
+// Finding 16: "?" is a regex metacharacter and must be escaped; only "*" is a wildcard.
+test('urlMatches escapes every metacharacter except the "*" wildcard', () => {
+  // Without escaping "?", the "m" would be optional and this would wrongly match.
+  assert.equal(urlMatches('https://example.co/a', ['https://example.com/*']), false);
+  // A literal "?" in the pattern matches only a literal "?" in the URL.
+  assert.equal(urlMatches('https://example.com/a?b=1', ['https://example.com/a?b=1']), true);
+  assert.equal(urlMatches('https://example.com/ab=1', ['https://example.com/a?b=1']), false);
+  // "/" stays literal, and the leading "*:" scheme wildcard still works.
+  assert.equal(urlMatches('https://example.com/a/b', ['*://example.com/a/b']), true);
+  assert.equal(urlMatches('https://example.com/x', ['*://example.com/*']), true);
+});
+
+// Finding 3: ZIP entries are keyed by full path, so same-named scripts in different folders survive.
+test('parseTampermonkeyZipEntries keys by path, not basename', () => {
+  const a = SCRIPT.replace('@name         Example Helper', '@name         Helper A');
+  const b = SCRIPT.replace('@name         Example Helper', '@name         Helper B');
+  const r = parseTampermonkeyZipEntries({
+    'scripts/tool.user.js': a,
+    'scripts/tool.storage.json': JSON.stringify({ data: { which: { origin: 'normal', value: 'scripts' } } }),
+    'scripts/tool.options.json': JSON.stringify({ enabled: true }),
+    'archive/tool.user.js': b,
+    'archive/tool.storage.json': JSON.stringify({ data: { which: { origin: 'normal', value: 'archive' } } }),
+    'archive/tool.options.json': JSON.stringify({ enabled: false }),
+  });
+  assert.equal(r.scripts.length, 2, 'both scripts survive');
+  const byName = Object.fromEntries(r.scripts.map((s) => [s.name, s]));
+  assert.deepEqual(Object.keys(byName).sort(), ['Helper A', 'Helper B']);
+  assert.deepEqual(byName['Helper A']!.values, { which: 'scripts' }, 'sidecars do not cross-attach');
+  assert.deepEqual(byName['Helper B']!.values, { which: 'archive' });
+  assert.equal(byName['Helper A']!.enabled, true);
+  assert.equal(byName['Helper B']!.enabled, false);
+});
+
+test('a nested script falls back to its basename for the display name', () => {
+  const headerless = '// ==UserScript==\n// @match https://a.example/*\n// ==/UserScript==\nvoid 0;\n';
+  const r = parseTampermonkeyZipEntries({ 'some/deep/folder/My Tool.user.js': headerless });
+  assert.equal(r.scripts.length, 1);
+  assert.equal(r.scripts[0]!.name, 'My Tool', 'the folder does not leak into the name');
 });

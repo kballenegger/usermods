@@ -15,6 +15,8 @@ export interface Header {
   includeGlobs: string[];
   excludeGlobs: string[];
   grants: string[];
+  /** Raw @connect values, in header order. */
+  connect: string[];
   requires: string[];
   resources: Array<{ name: string; url: string }>;
   runAt: Mod['runAt'];
@@ -30,16 +32,24 @@ export interface Header {
 export function parseHeader(source: string): Header {
   const h: Header = {
     name: '', description: '', version: '', matches: [], excludeMatches: [], includeGlobs: [], excludeGlobs: [],
-    grants: [], requires: [], resources: [], runAt: 'document_idle', noFrames: false, warnings: [], raw: {},
+    grants: [], connect: [], requires: [], resources: [], runAt: 'document_idle', noFrames: false, warnings: [], raw: {},
   };
   const m = source.match(/\/\/\s*==UserScript==([\s\S]*?)\/\/\s*==\/UserScript==/);
   if (!m) return h;
+  // Locale-suffixed keys (@name:fr) are fallbacks only: the unsuffixed key is canonical however the
+  // lines are ordered, matching Tampermonkey. They are still recorded in `raw` under their bare key.
+  const localized: Record<string, string> = {};
   for (const line of m[1]!.split('\n')) {
     const kv = line.match(/^\s*\/\/\s*@([\w:-]+)\s*(.*?)\s*$/);
     if (!kv) continue;
     const [, keyRaw, value] = kv as [string, string, string];
+    const suffixed = keyRaw.includes(':');
     const key = keyRaw.replace(/:.*$/, ''); // @name:en → @name
     (h.raw[key] ??= []).push(value);
+    if (suffixed) {
+      if (!(key in localized)) localized[key] = value;
+      continue; // a locale variant never sets a canonical field, nor counts as a @match/@grant/…
+    }
     switch (key) {
       case 'name': if (!h.name) h.name = value; break;
       case 'description': if (!h.description) h.description = value; break;
@@ -51,7 +61,9 @@ export function parseHeader(source: string): Header {
         break;
       }
       case 'include': {
-        const p = toMatchPattern(value);
+        // @include is glob-semantics in Tampermonkey; only promote to a match pattern when doing so
+        // cannot widen it, i.e. when the host carries no wildcard beyond a leading "*." or a bare "*".
+        const p = includeHostIsPromotable(value) ? toMatchPattern(value) : null;
         if (p) h.matches.push(p);
         else if (/^\/.*\/$/.test(value)) h.warnings.push(`Ignored regex @include ${value} (not supported)`);
         else h.includeGlobs.push(value);
@@ -64,6 +76,7 @@ export function parseHeader(source: string): Header {
         break;
       }
       case 'grant': if (value && value !== 'none') h.grants.push(value); else if (value === 'none') h.grants.push('none'); break;
+      case 'connect': if (value && !h.connect.includes(value)) h.connect.push(value); break;
       case 'require': if (value) h.requires.push(value); break;
       case 'resource': {
         const r = value.match(/^(\S+)\s+(\S+)/);
@@ -78,7 +91,24 @@ export function parseHeader(source: string): Header {
       case 'updateURL': h.updateUrl = value; break;
     }
   }
+  if (!h.name && localized['name']) h.name = localized['name']!;
+  if (!h.description && localized['description']) h.description = localized['description']!;
   return h;
+}
+
+/**
+ * True when an @include value's host part is safe to turn into a Chrome match pattern: either no
+ * wildcard at all, a bare "*" host, or the leading "*." subdomain form. `*.foo.*` or `*example*`
+ * mean something wider as globs than any pattern would, so those stay globs.
+ */
+function includeHostIsPromotable(v: string): boolean {
+  const s = v.trim();
+  if (!s || /^\/.*\/$/.test(s)) return false;
+  if (s === '*' || s === '*://*' || s === '*://*/') return true;
+  const m = s.match(/^(?:\*|https?\*?|file|ftp):\/\/([^/]*)/);
+  if (!m) return false;
+  const host = m[1]!;
+  return host === '*' || !host.replace(/^\*\./, '').includes('*');
 }
 
 /**
@@ -147,6 +177,7 @@ export function modFromSource(source: string, existing?: Mod, overrides: Partial
     world: worldFor(h),
     allFrames: !h.noFrames,
     grants: h.grants,
+    connect: h.connect,
     requires: existing?.requires ?? [],
     resources: existing?.resources ?? [],
     downloadUrl: h.downloadUrl ?? existing?.downloadUrl,
@@ -172,6 +203,7 @@ export function previewFromSource(source: string, downloadUrl?: string): ScriptP
     matches: h.matches,
     includeGlobs: h.includeGlobs,
     grants: h.grants,
+    connect: h.connect,
     requires: h.requires,
     resources: h.resources.map((r) => r.name),
     world: worldFor(h),
@@ -193,7 +225,7 @@ export const SUPPORTED_GRANTS = new Set([
 /** Fill defaults for mods saved by older versions. */
 export function normalizeMod(m: Partial<Mod> & { id: string; source: string }): Mod {
   const fresh = modFromSource(m.source, undefined);
-  return { ...fresh, ...m, requires: m.requires ?? [], resources: m.resources ?? [], grants: m.grants ?? fresh.grants, world: m.world ?? fresh.world, runAt: m.runAt ?? fresh.runAt, allFrames: m.allFrames ?? fresh.allFrames, excludeMatches: m.excludeMatches ?? [], includeGlobs: m.includeGlobs ?? [], excludeGlobs: m.excludeGlobs ?? [], version: m.version ?? fresh.version };
+  return { ...fresh, ...m, requires: m.requires ?? [], resources: m.resources ?? [], grants: m.grants ?? fresh.grants, connect: m.connect ?? fresh.connect, world: m.world ?? fresh.world, runAt: m.runAt ?? fresh.runAt, allFrames: m.allFrames ?? fresh.allFrames, excludeMatches: m.excludeMatches ?? [], includeGlobs: m.includeGlobs ?? [], excludeGlobs: m.excludeGlobs ?? [], version: m.version ?? fresh.version };
 }
 
 export async function loadMods(): Promise<Mod[]> {
@@ -239,8 +271,9 @@ export function urlMatches(url: string, patterns: string[]): boolean {
     const re = new RegExp(
       '^' +
         p
-          .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-          .replace(/^\*:/, '[a-z]+:')
+          // escape every regex metacharacter except "*", which is the glob wildcard
+          .replace(/[.+^${}()|[\]\\?\/]/g, '\\$&')
+          .replace(/^\\?\*:/, '[a-z]+:')
           .replace(/\*/g, '.*') +
         '$',
     );
