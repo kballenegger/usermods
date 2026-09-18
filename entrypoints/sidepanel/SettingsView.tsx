@@ -16,7 +16,7 @@ const PRESETS: Array<{ label: string; apply: Partial<Settings> }> = [
   { label: 'Custom OpenAI API', apply: { provider: 'openai-compatible', baseUrl: 'http://localhost:', model: '' } },
 ];
 
-export function SettingsView() {
+export function SettingsView({ onReviewNotice }: { onReviewNotice?: () => void } = {}) {
   const [s, setS] = useState<Settings | null>(null);
   const [saved, setSaved] = useState(true);
   const [models, setModels] = useState<string[]>([]);
@@ -107,6 +107,12 @@ export function SettingsView() {
         {subscription
           ? "Sign-in tokens are stored in this extension's local storage on this device and sent only to the vendor. Usage counts against your plan limits."
           : "Keys are stored in this extension's local storage on this device and sent only to the endpoint above."}
+        {onReviewNotice && (
+          <>
+            {' '}
+            <button className="linklike" onClick={onReviewNotice}>Review data notice</button>
+          </>
+        )}
       </p>
     </div>
   );
