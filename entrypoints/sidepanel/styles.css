@@ -26,15 +26,15 @@
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
 body { background: var(--bg); color: var(--fg); }
-.app { display: flex; flex-direction: column; height: 100%; }
-.tabs { display: flex; border-bottom: 1px solid var(--border); padding: 0 8px; gap: 2px; }
+.app { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+.tabs { flex: none; display: flex; border-bottom: 1px solid var(--border); padding: 0 8px; gap: 2px; }
 .tabs button { background: none; border: 0; border-bottom: 2px solid transparent; color: var(--muted); padding: 10px 10px 8px; font: inherit; cursor: pointer; }
 .tabs button.active { color: var(--fg); border-bottom-color: var(--accent); }
 .tabs .spacer { flex: 1; }
 .tabs .status { align-self: center; font-size: 11px; color: var(--muted); padding-right: 6px; }
-.view { flex: 1; overflow: auto; padding: 12px; }
-.chat { display: flex; flex-direction: column; height: 100%; }
-.messages { flex: 1; overflow: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.view { flex: 1; min-height: 0; overflow: auto; padding: 12px; }
+.chat { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.messages { flex: 1; min-height: 0; overflow: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
 .msg { max-width: 100%; white-space: pre-wrap; word-break: break-word; }
 .msg.user { align-self: flex-end; background: var(--card); border: 1px solid var(--border); border-radius: 12px 12px 2px 12px; padding: 8px 10px; max-width: 90%; }
 .msg.user.queued { opacity: 0.6; border-style: dashed; }
@@ -43,7 +43,7 @@ body { background: var(--bg); color: var(--fg); }
 .tool.error { border-left-color: var(--danger); }
 .tool summary { cursor: pointer; list-style: none; }
 .tool pre { margin: 4px 0 0; white-space: pre-wrap; max-height: 200px; overflow: auto; }
-.composer { border-top: 1px solid var(--border); padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+.composer { flex: none; border-top: 1px solid var(--border); padding: 8px; display: flex; flex-direction: column; gap: 6px; }
 .composer textarea { width: 100%; resize: none; font: inherit; background: var(--card); color: var(--fg); border: 1px solid var(--border); border-radius: 8px; padding: 8px; min-height: 60px; }
 .row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .row .grow { flex: 1; }
@@ -63,4 +63,4 @@ button.btn:disabled { opacity: 0.5; cursor: default; }
 .list { display: flex; flex-direction: column; gap: 8px; }
 label.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; font-size: 12px; color: var(--muted); }
 label.field input, label.field select { font: inherit; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); color: var(--fg); }
-.notice { background: var(--card); border: 1px solid var(--accent); border-radius: 8px; padding: 10px; margin-bottom: 10px; font-size: 12px; white-space: pre-wrap; }
+.notice { flex: none; background: var(--card); border: 1px solid var(--accent); border-radius: 8px; padding: 10px; margin-bottom: 10px; font-size: 12px; white-space: pre-wrap; }
