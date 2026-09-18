@@ -480,37 +480,65 @@ async function shotMigrate(b, composer) {
 
 /**
  * Both promo images are the same composition at two aspect ratios: the icon, the name, the
- * tagline, on the UI's charcoal with the volt accent. `scale` moves every dimension together
- * so the 440x280 tile is not just the marquee with smaller text in a big empty field.
+ * tagline. `scale` moves every dimension together so the 440x280 tile is not just the marquee
+ * with smaller text in a big empty field.
+ *
+ * These wear the BBS Underground brand (docs/branding.md), not the app's charcoal-and-volt UI:
+ * they sit next to docs/banner.png in the listing, and the store is the one place the brand
+ * speaks before the product does. That means the electric blue field, lime wordmark, a cyan
+ * lower edge and a hard offset ink shadow — the same construction as the icon's own "u", scaled
+ * up. Deliberately:
+ *
+ *  - The ICON IS DRAWN AT A WHOLE MULTIPLE OF 16px and gets image-rendering:pixelated, for the
+ *    reason spelled out in scripts/render-icons.mjs. A promo tile with a softened icon on it
+ *    would undo the whole point of rendering the icon crisply in the first place.
+ *  - The background is the brand blue with a faint square-pixel grid rather than a smooth glow.
+ *    A radial gradient is the one thing that reads as "not pixel art" at any size, and the grid
+ *    does the same job of keeping the field from going flat.
+ *  - Body copy stays white-ish on blue rather than lime. Lime on #1008C8 is a vibrating pair at
+ *    small sizes; it carries the wordmark and the rule, and nothing that has to be read as a
+ *    sentence.
  */
 async function promo(browser, { size, out, scale, tagline, sub }) {
   const page = await browser.newPage({ viewport: size, deviceScaleFactor: 1 });
   const px = (n) => `${Math.round(n * scale)}px`;
+  // Whole multiples of the 16-unit grid, so the mark never lands on a half block. Rounded UP:
+  // at the tile's 0.52 scale, rounding to nearest gives 48px, and a 48px mark under a 32px
+  // wordmark reads as an afterthought rather than as the logo. 64 and 128 balance the type.
+  const icon = Math.max(32, Math.ceil((116 * scale) / 16) * 16);
+  const shadow = Math.max(2, Math.round(4 * scale));
+  // The background grid is drawn in real pixels, not scaled ones: tying it to `scale` makes the
+  // tile's mesh half the size of the marquee's, which reads as noise at 440x280.
+  const mesh = 32;
 
   await page.setContent(`<!doctype html><html><head><meta charset="utf-8"><style>
       *{box-sizing:border-box}
       html,body{margin:0;padding:0;width:${size.width}px;height:${size.height}px;overflow:hidden}
-      /* A grid with one centered cell fills the frame exactly, so the block is optically
-         centered at both aspect ratios rather than floating above a dead band.
-         The volt glow is centred on the composition rather than the top-left corner: an
-         off-centre wash pulls the eye up and makes the lower half read as dead space. */
-      body{font-family:${FONT};background:#0A0D0B;color:#E8EDE8;display:grid;place-items:center;
+      /* Electric blue field. The grid is two 1px repeating-linear-gradients at the pixel scale of
+         the artwork: texture that is made of squares, so it belongs to the same language. */
+      body{font-family:${FONT};background:#1008C8;color:#EAF3FF;display:grid;place-items:center;
            background-image:
-             radial-gradient(70% 90% at 50% 46%, rgba(200,255,46,0.15), transparent 70%),
-             radial-gradient(90% 70% at 8% 4%, rgba(200,255,46,0.08), transparent 60%);}
+             repeating-linear-gradient(0deg, rgba(0,229,242,0.07) 0 1px, transparent 1px ${mesh}px),
+             repeating-linear-gradient(90deg, rgba(0,229,242,0.07) 0 1px, transparent 1px ${mesh}px);}
       .stack{display:flex;flex-direction:column;align-items:center;text-align:center;
              padding:0 ${px(28)}}
-      img{width:${px(104)};height:${px(104)};display:block;margin-bottom:${px(22)}}
-      h1{margin:0;font-size:${px(60)};font-weight:650;letter-spacing:-0.025em;line-height:1}
-      /* The tagline is the one volt line: the accent carries it, and only it. */
-      p{margin:${px(14)} 0 0;font-size:${px(26)};font-weight:450;color:#C8FF2E;line-height:1.25;
+      img{width:${icon}px;height:${icon}px;display:block;margin-bottom:${px(20)};
+          image-rendering:pixelated}
+      /* Lime wordmark with the icon's own ink shadow, offset square — no blur radius. */
+      h1{margin:0;font-size:${px(62)};font-weight:700;letter-spacing:-0.02em;line-height:1;
+         color:#AEFF24;text-shadow:${shadow}px ${shadow}px 0 #030B16}
+      /* The cyan rule echoes the cyan underside of the "u". */
+      .rule{width:${px(120)};height:${Math.max(2, Math.round(5 * scale))}px;background:#00E5F2;
+            margin:${px(16)} 0 ${px(14)}}
+      p{margin:0;font-size:${px(26)};font-weight:500;color:#FFF345;line-height:1.25;
         max-width:${px(860)}}
-      small{display:block;margin-top:${px(16)};font-size:${px(17)};color:#8A948B;line-height:1.4;
+      small{display:block;margin-top:${px(14)};font-size:${px(17)};color:#BFD4F5;line-height:1.45;
             max-width:${px(680)}}
     </style></head><body>
       <div class="stack">
         <img src="${b64(path.join(ROOT, 'public', 'icon', '128.png'))}">
         <h1>usermods</h1>
+        <div class="rule"></div>
         <p>${tagline}</p>
         ${sub ? `<small>${sub}</small>` : ''}
       </div>

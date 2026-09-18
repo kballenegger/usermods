@@ -108,6 +108,15 @@ All graphic assets are built and checked in. Regenerate them with `npm run store
 (`scripts/store-assets.mjs`); the icon itself is `assets/icon.svg`, rasterized to `public/icon/*.png`
 by `scripts/render-icons.mjs`.
 
+The mark is the BBS Underground pixel **u** — a lime letterform with a cyan underside and an ink
+shadow on an electric-blue tile — drawn on a 16×16 grid. `assets/icon-source.png` is the owner's
+original artwork and the reference every rendering is checked against; see [branding](../branding.md).
+Because it is pixel art it is only ever scaled by whole multiples of 16 with nearest-neighbour
+sampling: `render-icons.mjs` fails the build if any output pixel is a colour that is not in the
+source, which is what an interpolated (blurred) rescale would produce. The promo images wear the
+same brand rather than the app's in-product charcoal, since they sit beside the banner in the
+listing.
+
 | Asset | Requirement | Status |
 |---|---|---|
 | Store icon | 128×128 PNG | **Done.** `public/icon/128.png`, rendered from `assets/icon.svg`. |
