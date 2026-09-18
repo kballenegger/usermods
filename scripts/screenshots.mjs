@@ -4,12 +4,15 @@
 //
 //   npm run screenshots      capture everything into docs/screenshots/
 //   npm run smoke            headless: the chat, guardrails, activity, chats, isolation,
-//                            compaction and dashboard flows, all asserted
+//                            compaction, dashboard, theme and tab bar flows, all asserted
 //   npm run smoke:chats      headless: the chats flow alone (restore, New chat, archive/unarchive)
 //   npm run smoke:isolation  headless: the isolation flow alone (two chats running at once, no bleed)
 //   npm run smoke:compaction headless: the compaction flow alone (both tiers, on a shrunken budget)
 //   npm run smoke:dashboard  headless: the dashboard flow alone (grouping, search, handoff, mods)
+//   npm run smoke:tabbar     headless: the top bar alone, at 320/360/420/640 in both themes
 //   node scripts/screenshots.mjs --dashboard-capture   that flow, also writing 07-dashboard.png
+//   node scripts/screenshots.mjs --tabbar-capture      the bar flow, also writing the bar at 360
+//                                                      and 640 into $TABBAR_SHOT_DIR
 //
 // Every flow ends by asserting that the mock backend received zero structurally invalid requests
 // (see "History validity" below).
@@ -72,9 +75,19 @@ const DASHBOARD = process.argv.includes('--dashboard');
 /** The dashboard flow, asserted AND capturing 07-dashboard.png, without re-running the other flows. */
 const DASHBOARD_SHOT = process.argv.includes('--dashboard-capture');
 const THEME = process.argv.includes('--theme');
+const TABBAR = process.argv.includes('--tabbar');
+
+/**
+ * Where the tab bar's captures go when --tabbar is asked to write them (`--tabbar-capture`). These
+ * are not README assets — they are for looking at the bar while working on it — so they land in a
+ * scratch directory rather than in docs/screenshots.
+ */
+const TABBAR_SHOT_DIR = process.env.TABBAR_SHOT_DIR ?? path.join(os.tmpdir(), 'usermods-tabbar');
+const TABBAR_SHOT = process.argv.includes('--tabbar-capture');
 
 /** True when this run is capturing screenshots rather than asserting behaviour (see MASK below). */
-const CAPTURING = !SMOKE && !CHATS && !ISOLATION && !COMPACTION && !DASHBOARD && !DASHBOARD_SHOT && !THEME;
+const CAPTURING =
+  !SMOKE && !CHATS && !ISOLATION && !COMPACTION && !DASHBOARD && !DASHBOARD_SHOT && !THEME && !TABBAR && !TABBAR_SHOT;
 
 /** See note 4: a first-run setup instruction, not the steady state the README should show. */
 const HIDE_SETUP_NOTICE = '.app > .notice, .dash-inner > .notice { display: none !important; }';
@@ -430,7 +443,7 @@ async function mods(theme = 'dark', name = '03-mods.png') {
     const panel = await openPanel(b.ctx, b.extId, { settings: { theme }, storage: { mods: seedMods() } });
     await openSite(b.ctx, 'https://en.wikipedia.org/wiki/Common_kingfisher');
     await panel.waitForTimeout(1000);
-    await panel.locator('.tabs button', { hasText: 'Mods' }).click();
+    await panel.locator('.tab-group [data-view="mods"]').click();
     await panel.waitForTimeout(600);
     return await shot(panel, name);
   } finally {
@@ -447,7 +460,7 @@ async function settings(theme = 'dark', name = '04-settings.png') {
     });
     await openSite(b.ctx, 'https://en.wikipedia.org/wiki/Common_kingfisher');
     await panel.waitForTimeout(800);
-    await panel.locator('.tabs button', { hasText: 'Settings' }).click();
+    await panel.locator('[data-action="settings"]').click();
     await panel.waitForTimeout(600);
     return await shot(panel, name);
   } finally {
@@ -497,7 +510,7 @@ async function migrate(theme = 'dark') {
     const panel = await openPanel(b.ctx, b.extId, { settings: { theme }, storage: { mods: seedMods() } });
     await openSite(b.ctx, 'https://en.wikipedia.org/wiki/Common_kingfisher');
     await panel.waitForTimeout(800);
-    await panel.locator('.tabs button', { hasText: 'Mods' }).click();
+    await panel.locator('.tab-group [data-view="mods"]').click();
     await panel.locator('.card', { hasText: 'Migrate from Tampermonkey' }).locator('button.btn', { hasText: 'Show' }).click();
     await panel.waitForTimeout(400);
     return await shot(panel, '06-migrate.png');
@@ -2234,11 +2247,269 @@ async function dashboardFlow({ capture = false } = {}) {
 }
 
 // ---------------------------------------------------------------------------
+// Tab bar: the top bar holds together at every width a side panel can be
+// ---------------------------------------------------------------------------
+//
+// The bar is responsive with no JavaScript at all — a container query on .tabs swaps Settings and
+// Dashboard between icon+label and icon-only. That is exactly the kind of thing a unit test cannot
+// see and a single-width screenshot will not catch, so it is asserted here, in a real engine, at
+// the widths a side panel actually gets dragged to.
+//
+// What is checked, at 320 / 360 / 420 / 640 in both themes:
+//
+//   * The bar does not overflow and does not wrap. One row, scrollWidth <= clientWidth.
+//   * No control is clipped: every one of them is inside the bar's box and at least 28x28.
+//   * Narrow (320/360/420): the Settings and Dashboard labels are not visible, and both buttons
+//     still expose their accessible names. Icon-only must not mean nameless.
+//   * Wide (640): the labels are visible.
+//   * The hostname is not thrown away to make room. At 360 at least 10 characters of
+//     "en.wikipedia.org" are legible; at 420 the whole thing is. (The bar this replaced showed
+//     "en.…" at 420.)
+//   * Settings is a view of the panel, not a link: clicking it shows the settings view and marks
+//     the control current; clicking Chat comes back.
+
+const TABBAR_WIDTHS = [320, 360, 420, 640];
+const TABBAR_HOST = 'en.wikipedia.org';
+
+/** The accessible name of a control, the way a screen reader resolves it: aria-label wins, else text. */
+async function accessibleName(page, selector) {
+  return await page.evaluate((sel) => {
+    const el = document.querySelector(sel);
+    if (!el) return null;
+    return (el.getAttribute('aria-label') || el.textContent || '').trim();
+  }, selector);
+}
+
+/** How much of the host label is actually legible, in characters, from its rendered width. */
+async function visibleHostChars(page) {
+  return await page.evaluate(() => {
+    const el = document.querySelector('.status-host');
+    if (!el) return { text: '', shown: 0, full: false };
+    const text = (el.textContent ?? '').trim();
+    const full = el.scrollWidth <= el.clientWidth + 1;
+    if (full) return { text, shown: text.length, full };
+    // Truncated: measure how many leading characters fit in the box the element actually has.
+    const probe = document.createElement('span');
+    const cs = getComputedStyle(el);
+    probe.style.cssText = `position:absolute;visibility:hidden;white-space:pre;font:${cs.font}`;
+    document.body.appendChild(probe);
+    let shown = 0;
+    // The ellipsis takes room of its own, so the budget is the box minus one character's worth.
+    probe.textContent = '…';
+    const budget = el.clientWidth - probe.getBoundingClientRect().width;
+    for (let i = 1; i <= text.length; i++) {
+      probe.textContent = text.slice(0, i);
+      if (probe.getBoundingClientRect().width > budget) break;
+      shown = i;
+    }
+    probe.remove();
+    return { text, shown, full };
+  });
+}
+
+async function tabbarFlow({ capture = false } = {}) {
+  const fail = (m) => {
+    throw new Error(`tabbar: ${m}`);
+  };
+
+  if (capture) fs.mkdirSync(TABBAR_SHOT_DIR, { recursive: true });
+
+  for (const theme of ['dark', 'light']) {
+    const b = await launch(theme);
+    try {
+      const panel = await openPanel(b.ctx, b.extId, { settings: { theme } });
+      // A real site tab, so the bar shows a real hostname rather than an empty status.
+      //
+      // The site tab stays in front deliberately (note 3): the panel targets whatever tab is
+      // active, so bringing the panel forward would make the panel its own target and the bar
+      // would show the extension's host instead. The panel behind it still renders and screenshots
+      // normally.
+      await openSite(b.ctx, `https://${TABBAR_HOST}/wiki/Common_kingfisher`);
+      await panel.locator('.tabs').waitFor({ timeout: 20_000 });
+      await panel.waitForFunction(
+        (h) => document.querySelector('.status-host')?.textContent?.trim() === h,
+        TABBAR_HOST,
+        { timeout: 20_000 },
+      );
+
+      for (const width of TABBAR_WIDTHS) {
+        const at = `${theme} @ ${width}px`;
+        await panel.setViewportSize({ width, height: PANEL.height });
+        await panel.waitForTimeout(250);
+
+        // --- The bar itself: one row, no overflow, nothing clipped -----------
+        const box = await panel.evaluate(() => {
+          const bar = document.querySelector('.tabs');
+          const r = bar.getBoundingClientRect();
+          const kids = [...bar.querySelectorAll('button, .status')];
+          return {
+            scrollWidth: bar.scrollWidth,
+            clientWidth: bar.clientWidth,
+            height: Math.round(r.height),
+            top: r.top,
+            bottom: r.bottom,
+            left: r.left,
+            right: r.right,
+            /*
+             * Wrapping, detected by vertical overlap rather than by distinct top edges.
+             *
+             * The controls are deliberately different heights — a 28px pill next to a line of 11px
+             * mono — so they do not share a top edge even when they are plainly on the same line.
+             * What "one row" really means is that every control's vertical span overlaps every
+             * other's; a wrapped control sits entirely below its neighbours.
+             */
+            rows: (() => {
+              const bands = [];
+              for (const k of kids) {
+                const kr = k.getBoundingClientRect();
+                const band = bands.find((bd) => kr.top < bd.bottom - 1 && kr.bottom > bd.top + 1);
+                if (band) {
+                  band.top = Math.min(band.top, kr.top);
+                  band.bottom = Math.max(band.bottom, kr.bottom);
+                } else {
+                  bands.push({ top: kr.top, bottom: kr.bottom });
+                }
+              }
+              return bands.length;
+            })(),
+            controls: kids.map((k) => {
+              const kr = k.getBoundingClientRect();
+              return {
+                what: k.className || k.tagName,
+                w: Math.round(kr.width),
+                h: Math.round(kr.height),
+                left: kr.left,
+                right: kr.right,
+                top: kr.top,
+                bottom: kr.bottom,
+                isButton: k.tagName === 'BUTTON',
+              };
+            }),
+          };
+        });
+
+        if (box.scrollWidth > box.clientWidth) {
+          fail(`${at}: the bar overflows — scrollWidth ${box.scrollWidth} > clientWidth ${box.clientWidth}`);
+        }
+        if (box.rows !== 1) fail(`${at}: the bar wrapped onto ${box.rows} rows`);
+
+        for (const c of box.controls) {
+          if (c.left < box.left - 0.5 || c.right > box.right + 0.5) {
+            fail(`${at}: ${c.what} is clipped horizontally (${c.left}–${c.right} outside ${box.left}–${box.right})`);
+          }
+          if (c.top < box.top - 0.5 || c.bottom > box.bottom + 0.5) {
+            fail(`${at}: ${c.what} is clipped vertically`);
+          }
+          // Hit targets: every button in the bar must be at least 28x28.
+          if (c.isButton && (c.w < 28 || c.h < 28)) {
+            fail(`${at}: ${c.what} is only ${c.w}x${c.h}, under the 28x28 hit target`);
+          }
+        }
+
+        // --- Labels: hidden when narrow, shown when wide ---------------------
+        const labels = await panel.evaluate(() =>
+          ['settings', 'dashboard'].map((a) => {
+            const el = document.querySelector(`[data-action="${a}"] .tab-action-label`);
+            const r = el.getBoundingClientRect();
+            return { a, text: (el.textContent ?? '').trim(), visible: r.width > 1 && r.height > 1 };
+          }),
+        );
+        const wide = width >= 640;
+        for (const l of labels) {
+          if (wide && !l.visible) fail(`${at}: the ${l.a} label should be visible at this width`);
+          if (!wide && l.visible) fail(`${at}: the ${l.a} label is still visible — the bar did not go icon-only`);
+          // Hidden or not, the text stays in the DOM: it is the accessible name.
+          if (!l.text) fail(`${at}: the ${l.a} label has no text content`);
+        }
+
+        // Icon-only must still be named, and the icon itself must be there and drawn.
+        for (const [action, expected] of [['settings', 'Settings'], ['dashboard', 'Dashboard']]) {
+          const name = await accessibleName(panel, `[data-action="${action}"]`);
+          if (name !== expected) fail(`${at}: ${action} exposes the accessible name ${JSON.stringify(name)}, not ${JSON.stringify(expected)}`);
+          const title = await panel.getAttribute(`[data-action="${action}"]`, 'title');
+          if (!title) fail(`${at}: ${action} has no title tooltip`);
+          const icon = await panel.evaluate((a) => {
+            const svg = document.querySelector(`[data-action="${a}"] svg.ico`);
+            if (!svg) return null;
+            const r = svg.getBoundingClientRect();
+            return { w: Math.round(r.width), h: Math.round(r.height) };
+          }, action);
+          if (!icon) fail(`${at}: ${action} has no inline icon`);
+          if (icon.w < 12 || icon.h < 12) fail(`${at}: the ${action} icon rendered at ${icon.w}x${icon.h}`);
+        }
+
+        // --- The hostname is not sacrificed to make room ---------------------
+        const host = await visibleHostChars(panel);
+        if (host.text !== TABBAR_HOST) fail(`${at}: the bar shows host ${JSON.stringify(host.text)}`);
+        if (width >= 420 && !host.full) {
+          fail(`${at}: "${TABBAR_HOST}" is truncated (${host.shown} of ${host.text.length} chars) — it should fit whole here`);
+        }
+        if (width >= 360 && host.shown < 10) {
+          fail(`${at}: only ${host.shown} characters of "${TABBAR_HOST}" are legible; at least 10 are required`);
+        }
+
+        if (capture && (width === 360 || width === 640)) {
+          const file = path.join(TABBAR_SHOT_DIR, `tabbar-${theme}-${width}.png`);
+          await panel.screenshot({ path: file, clip: { x: 0, y: 0, width, height: box.height + 2 } });
+          log(`tabbar capture ${path.basename(file)}`);
+        }
+      }
+
+      // --- Settings is a view of the panel, and selecting it says so ---------
+      await panel.setViewportSize({ width: 360, height: PANEL.height });
+      await panel.waitForTimeout(200);
+
+      await panel.locator('[data-action="settings"]').click();
+      await panel.locator('.view', { hasText: 'Provider' }).first().waitFor({ timeout: 10_000 });
+      const current = await panel.getAttribute('[data-action="settings"]', 'aria-current');
+      if (current !== 'page') fail(`${theme}: selecting Settings left aria-current=${JSON.stringify(current)}`);
+      if (!(await panel.locator('[data-action="settings"].active').count())) {
+        fail(`${theme}: the selected Settings control carries no active class`);
+      }
+      // Distinguishable without relying on colour alone: the selected control changes its border,
+      // which is a shape cue a colour-blind user (or a greyscale display) still gets.
+      const borders = await panel.evaluate(() => {
+        const el = document.querySelector('[data-action="settings"]');
+        const dash = document.querySelector('[data-action="dashboard"]');
+        const g = (n) => {
+          const cs = getComputedStyle(n);
+          return { color: cs.borderTopColor, width: cs.borderTopWidth, shadow: cs.boxShadow };
+        };
+        return { on: g(el), off: g(dash) };
+      });
+      if (borders.on.color === borders.off.color && borders.on.shadow === borders.off.shadow) {
+        fail(`${theme}: the selected Settings control is indistinguishable from the unselected Dashboard control`);
+      }
+
+      // And back. Chat is the left group's first tab.
+      await panel.locator('.tab-group [data-view="chat"]').click();
+      await waitForComposer(panel);
+      if ((await panel.getAttribute('[data-action="settings"]', 'aria-current')) != null) {
+        fail(`${theme}: Settings still reported itself current after returning to Chat`);
+      }
+      if (!(await panel.locator('[data-view="chat"].active').count())) {
+        fail(`${theme}: Chat is not marked active after returning to it`);
+      }
+    } finally {
+      await b.close();
+    }
+  }
+
+  console.log(
+    `tabbar: OK — no overflow or wrap at ${TABBAR_WIDTHS.join('/')}px in both themes, icon-only below the breakpoint with accessible names intact, labels at 640, "${TABBAR_HOST}" legible, Settings selects the view and Chat returns`,
+  );
+}
+
+// ---------------------------------------------------------------------------
 
 async function main() {
   fs.mkdirSync(OUT_DIR, { recursive: true });
   const mock = await startMock();
   try {
+    if (TABBAR || TABBAR_SHOT) {
+      await tabbarFlow({ capture: TABBAR_SHOT });
+      return;
+    }
     if (THEME) {
       await themeFlow();
       return;
@@ -2268,6 +2539,7 @@ async function main() {
       await compactionFlow();
       await dashboardFlow();
       await themeFlow();
+      await tabbarFlow();
       return;
     }
     // The dark set: the design system's own palette, and what the README leads with.
