@@ -33,6 +33,8 @@ export type RpcRequest =
   | { type: 'chats.list'; host: string }
   | { type: 'chats.create'; host: string }
   | { type: 'chats.delete'; id: string }
+  /** Archive (or unarchive) a chat: it leaves the main switcher list but stays readable. */
+  | { type: 'chats.archive'; id: string; archived: boolean }
   | { type: 'chats.rename'; id: string; title: string }
   | { type: 'oauth.status'; kind: OAuthKind }
   | { type: 'oauth.start'; kind: OAuthKind }

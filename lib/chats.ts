@@ -17,6 +17,14 @@ export interface Chat {
   title: string;
   createdAt: number;
   updatedAt: number;
+  /** When the user archived this chat. Archived chats are hidden from the main switcher list and
+   *  are never auto-selected, but they are still readable and writable; sending unarchives. */
+  archivedAt?: number;
+}
+
+/** Archived chats are the ones with a timestamp; everything else is live. */
+export function isArchived(chat: Chat): boolean {
+  return typeof chat.archivedAt === 'number';
 }
 
 export const messagesKey = (id: string) => `chat:${id}:messages`;
@@ -59,13 +67,46 @@ export function sortChats(chats: Chat[]): Chat[] {
 }
 
 /**
- * Trim the index to MAX_CHATS, oldest first. Returns the survivors and the ids that were dropped,
- * so the caller can delete their message and item keys too.
+ * Trim the index to MAX_CHATS. Returns the survivors (newest activity first) and the ids that were
+ * dropped, so the caller can delete their message and item keys too.
+ *
+ * Archived chats are evicted before live ones — the user said they were done with those — and
+ * within each group the oldest goes first. Only once every archived chat is gone does a live chat
+ * get dropped.
  */
 export function capChats(chats: Chat[], max = MAX_CHATS): { kept: Chat[]; dropped: string[] } {
   const sorted = sortChats(chats);
   if (sorted.length <= max) return { kept: sorted, dropped: [] };
-  return { kept: sorted.slice(0, max), dropped: sorted.slice(max).map((c) => c.id) };
+  // Eviction order: archived before live, oldest before newest. The tail of this list is what goes.
+  const byEviction = [...sorted].sort((a, b) => {
+    const arch = Number(isArchived(a)) - Number(isArchived(b));
+    if (arch !== 0) return -arch; // archived first
+    return a.updatedAt - b.updatedAt; // oldest first
+  });
+  const dropped = new Set(byEviction.slice(0, sorted.length - max).map((c) => c.id));
+  return { kept: sorted.filter((c) => !dropped.has(c.id)), dropped: [...dropped] };
+}
+
+/** The live chats for the switcher's main list, newest activity first. */
+export function liveChats(chats: Chat[]): Chat[] {
+  return sortChats(chats).filter((c) => !isArchived(c));
+}
+
+/** The archived chats for the switcher's "Archived" group, most recently archived first. */
+export function archivedChats(chats: Chat[]): Chat[] {
+  return chats.filter(isArchived).sort((a, b) => (b.archivedAt ?? 0) - (a.archivedAt ?? 0));
+}
+
+/**
+ * Which chat the panel should show when it opens on a host: the most recently updated chat that is
+ * not archived. Null means show an empty composer, because there is nothing live to come back to.
+ *
+ * The owner's rule is "always show the last chat until the user creates a new one or explicitly
+ * archives the chat", so archiving is the only thing (besides deleting) that takes a chat out of
+ * this lookup.
+ */
+export function pickChatToShow(chats: Chat[]): Chat | null {
+  return liveChats(chats)[0] ?? null;
 }
 
 async function readIndex(): Promise<Chat[]> {
@@ -96,13 +137,27 @@ export async function createChat(host: string): Promise<Chat> {
   return chat;
 }
 
-/** Bump updatedAt, and set the title if one is supplied and the chat has no real title yet. */
+/**
+ * Bump updatedAt, and set the title if one is supplied and the chat has no real title yet.
+ * Activity in an archived chat unarchives it: sending a message means the user is using it again.
+ */
 export async function touchChat(id: string, patch: { title?: string } = {}): Promise<void> {
   const chats = await readIndex();
   const chat = chats.find((c) => c.id === id);
   if (!chat) return;
   chat.updatedAt = Date.now();
+  delete chat.archivedAt;
   if (patch.title && (!chat.title || chat.title === 'New chat')) chat.title = titleFromText(patch.title);
+  await writeIndex(chats);
+}
+
+/** Archive or unarchive a chat. Reversible, so the UI does not confirm it. */
+export async function archiveChat(id: string, archived: boolean): Promise<void> {
+  const chats = await readIndex();
+  const chat = chats.find((c) => c.id === id);
+  if (!chat) return;
+  if (archived) chat.archivedAt = Date.now();
+  else delete chat.archivedAt;
   await writeIndex(chats);
 }
 

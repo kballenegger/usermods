@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { loadItems, relativeTime, saveItems, type Chat as ChatRecord } from '@/lib/chats';
+import { archivedChats, isArchived, liveChats, loadItems, pickChatToShow, relativeTime, saveItems, titleFromText, type Chat as ChatRecord } from '@/lib/chats';
 import { findByName } from '@/lib/modmatch';
 import { modFromProposal } from '@/lib/mods';
 import { rpc, type AgentPortRequest } from '@/lib/rpc';
@@ -11,6 +11,7 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
   const [chats, setChats] = useState<ChatRecord[]>([]);
   const [chatId, setChatId] = useState<string | null>(null);
   const [items, setItems] = useState<ChatItem[]>([]);
+  /** False while the panel is still working out which chat to show, so nothing flashes. */
   const [loaded, setLoaded] = useState(false);
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
@@ -23,63 +24,58 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
   const portChatRef = useRef<string | null>(null);
   /** Set when the restored transcript looks like it was cut off mid-run, so the next port event says so. */
   const reconnectRef = useRef(false);
-  /** A chat id this panel just created, so the restore effect leaves its in-progress transcript alone. */
-  const freshRef = useRef<string | null>(null);
+  /**
+   * Bumped by every host change and every deliberate chat switch. Async work captures the value it
+   * started under and drops its result if the number has moved on, so a slow lookup for one host
+   * can never land on top of a later one's.
+   */
+  const genRef = useRef(0);
+  /** Whether the title-refetch after the first accepted turn has already been done for this run. */
+  const titleFixRef = useRef(false);
+  /** The current host, readable from the port listener, which is registered once and outlives renders. */
+  const hostRef = useRef(host);
+  hostRef.current = host;
 
-  // Pick up this site's chats and select the most recent one. A chat is only created on first send,
-  // so opening the panel on a new site does not litter storage with empty chats.
+  // Pick up this site's chats and show the most recently updated live one, transcript and all. A
+  // chat is only created on first send, so opening the panel on a new site does not litter storage
+  // with empty chats. The list and the transcript are fetched together and committed in one go:
+  // that way the panel never renders a chat id with someone else's items, and never shows the
+  // empty state for a host that turns out to have a chat.
   useEffect(() => {
-    let cancelled = false;
+    const gen = ++genRef.current;
+    const live = () => genRef.current === gen;
     setLoaded(false);
+    setItems([]);
+    setChatId(null);
+    setChats([]);
     if (!host) {
-      setChats([]);
-      setChatId(null);
-      setItems([]);
       setLoaded(true);
       return;
     }
-    void rpc({ type: 'chats.list', host })
-      .then((list) => {
-        if (cancelled) return;
-        setChats(list);
-        setChatId(list[0]?.id ?? null);
-        if (!list.length) {
-          setItems([]);
+    void (async () => {
+      try {
+        const list = await rpc({ type: 'chats.list', host });
+        if (!live()) return;
+        const show = pickChatToShow(list);
+        // Nothing to restore: land on an empty composer.
+        if (!show) {
+          setChats(list);
           setLoaded(true);
+          return;
         }
-      })
-      .catch(() => !cancelled && setLoaded(true));
-    return () => {
-      cancelled = true;
-    };
-  }, [host]);
-
-  // Restore a chat's transcript when it becomes the active one. Until it has loaded, `loaded` stays
-  // false so the save effect below cannot write the previous chat's items under this chat's key.
-  useEffect(() => {
-    let cancelled = false;
-    if (!chatId) return;
-    // A chat this panel just created is already on screen (the message that created it); there is
-    // nothing stored to restore, and reloading would wipe it.
-    if (freshRef.current === chatId) {
-      freshRef.current = null;
-      return;
-    }
-    setLoaded(false);
-    setItems([]);
-    void loadItems(chatId)
-      .then((stored) => {
-        if (cancelled) return;
+        const stored = await loadItems(show.id);
+        if (!live()) return;
+        setChats(list);
+        setChatId(show.id);
         setItems(stored);
         reconnectRef.current = looksUnfinished(stored);
         setLoaded(true);
         requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ block: 'end' }));
-      })
-      .catch(() => !cancelled && setLoaded(true));
-    return () => {
-      cancelled = true;
-    };
-  }, [chatId]);
+      } catch {
+        if (live()) setLoaded(true);
+      }
+    })();
+  }, [host]);
 
   // Persist the transcript, debounced so a streaming turn does not write on every delta.
   useEffect(() => {
@@ -142,6 +138,13 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
             next.push({ kind: 'proposal', proposal: e.proposal });
             return next;
           case 'accepted':
+            // The background has now run touchChat, so the stored title and updatedAt are real.
+            // Reading them back once per run keeps the switcher honest even if the optimistic
+            // title above guessed differently (e.g. a chat that already had a title).
+            if (!titleFixRef.current) {
+              titleFixRef.current = true;
+              void refreshChats();
+            }
             return next.map((it) => (it.kind === 'user' && it.id === e.id ? { ...it, queued: false } : it));
           case 'unqueued': {
             const dropped = next.find((it) => it.kind === 'user' && it.id === e.id) as Extract<ChatItem, { kind: 'user' }> | undefined;
@@ -200,10 +203,17 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
     // The chat is created lazily, on the first message that actually goes out.
     let id = chatId;
     if (!id) {
+      // Creating it is a round trip, and the user can switch tabs during it. If the panel has moved
+      // to another host (or another chat) by the time it lands, filing the message under the new
+      // view would be wrong, so the text goes back in the composer for the user to resend.
+      const gen = genRef.current;
       try {
         const chat = await rpc({ type: 'chats.create', host });
+        if (genRef.current !== gen) {
+          setText((cur) => (cur.trim() ? cur : t));
+          return;
+        }
         id = chat.id;
-        freshRef.current = chat.id;
         setChats((prev) => [chat, ...prev]);
         setChatId(chat.id);
         setLoaded(true);
@@ -221,13 +231,65 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
     setBusy(true);
     const req: AgentPortRequest = { type: 'send', tabId, chatId: id, id: msgId, text: t, refs: used.length ? used : undefined };
     portChatRef.current = id;
+    titleFixRef.current = false;
     connect().postMessage(req);
-    // Reflect the new activity (and the title, on the first message) in the switcher.
-    void rpc({ type: 'chats.list', host }).then(setChats).catch(() => {});
+    // Reflect the new activity in the switcher right away. The background derives the title from
+    // this same first message (touchChat), but it writes it only once the run has started — after
+    // a refetch here would have read the index — so the title is set optimistically by the same
+    // rule the background uses, and confirmed by the refetch on the first 'accepted' event below.
+    // Without this the switcher said "New chat" until the panel was reloaded.
+    setChats((prev) =>
+      prev.map((c) => (c.id !== id ? c : { ...c, updatedAt: Date.now(), archivedAt: undefined, title: c.title && c.title !== 'New chat' ? c.title : titleFromText(t) })),
+    );
+    void refreshChats();
+  }
+
+  /** Re-read this host's chat index into the switcher, guarded against a host switch mid-flight. */
+  async function refreshChats() {
+    const h = hostRef.current;
+    if (!h) return;
+    const gen = genRef.current;
+    try {
+      const list = await rpc({ type: 'chats.list', host: h });
+      if (genRef.current === gen) setChats(list);
+    } catch {
+      /* the switcher keeps what it had */
+    }
   }
 
   function abort() {
     portRef.current?.postMessage({ type: 'abort' } satisfies AgentPortRequest);
+  }
+
+  /** Stop any run and forget the port's chat, before the view lands somewhere else. */
+  function detach() {
+    if (busy) abort();
+    portChatRef.current = null;
+    reconnectRef.current = false;
+    titleFixRef.current = false;
+  }
+
+  /**
+   * Show a stored chat: load its transcript, then commit id and items together. Generation-guarded
+   * like the host effect, so a slow load cannot overwrite a chat the user has since moved on from.
+   */
+  function openChat(id: string) {
+    const gen = ++genRef.current;
+    detach();
+    setLoaded(false);
+    setItems([]);
+    setChatId(id);
+    void loadItems(id)
+      .then((stored) => {
+        if (genRef.current !== gen) return;
+        setItems(stored);
+        reconnectRef.current = looksUnfinished(stored);
+        setLoaded(true);
+        requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ block: 'end' }));
+      })
+      .catch(() => {
+        if (genRef.current === gen) setLoaded(true);
+      });
   }
 
   /**
@@ -236,44 +298,61 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
    */
   function switchTo(id: string | null) {
     if (id === chatId) return;
-    if (id === null) {
-      newChat();
-      return;
-    }
-    if (busy) abort();
-    portChatRef.current = null;
-    reconnectRef.current = false;
-    setChatId(id);
+    if (id === null) newChat();
+    else openChat(id);
   }
 
   /**
    * Clear the view and wait. The chat record itself is created by the first send, so hitting
-   * "New chat" and changing your mind leaves nothing behind.
+   * "New chat" and changing your mind leaves nothing behind — reopening the panel comes back to
+   * the last real chat, which is what the owner asked for.
    */
   function newChat() {
     if (!host) return;
-    if (busy) abort();
-    portChatRef.current = null;
-    reconnectRef.current = false;
+    ++genRef.current;
+    detach();
     setChatId(null);
     setItems([]);
     setLoaded(true);
+  }
+
+  /** Where to land after the current chat leaves the live list: its most recent live sibling. */
+  function fallBackTo(rest: ChatRecord[]) {
+    const next = pickChatToShow(rest);
+    if (next) openChat(next.id);
+    else newChat();
   }
 
   async function removeChat() {
     if (!chatId) return;
     const current = chats.find((c) => c.id === chatId);
     if (!confirm(`Delete "${current?.title ?? 'this chat'}"?`)) return;
-    abort();
+    detach();
     await rpc({ type: 'chats.delete', id: chatId });
     const rest = chats.filter((c) => c.id !== chatId);
-    portChatRef.current = null;
-    reconnectRef.current = false;
     setChats(rest);
-    setItems([]);
-    // Fall through to the site's next most recent chat, or to the empty "New chat" state.
-    setChatId(rest[0]?.id ?? null);
-    if (!rest.length) setLoaded(true);
+    fallBackTo(rest);
+  }
+
+  /**
+   * Archive is the switcher's primary "I'm done with this" action. It is reversible — the chat
+   * moves to the Archived group, still readable and writable — so it asks for no confirmation.
+   */
+  async function setArchived(id: string, archived: boolean) {
+    const at = Date.now();
+    // Optimistic, so the switcher regroups immediately rather than after a refetch.
+    const next = chats.map((c) => (c.id === id ? { ...c, archivedAt: archived ? at : undefined } : c));
+    setChats(next);
+    try {
+      await rpc({ type: 'chats.archive', id, archived });
+    } catch {
+      setChats(chats); // put it back where it was
+      return;
+    }
+    if (archived && id === chatId) {
+      detach();
+      fallBackTo(next);
+    }
   }
 
   async function pick() {
@@ -305,6 +384,10 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
   }
 
   const unsupported = !pageUrl || /^(chrome|edge|about|chrome-extension|devtools):/.test(pageUrl);
+  const live = liveChats(chats);
+  const archived = archivedChats(chats);
+  const current = chatId ? chats.find((c) => c.id === chatId) : undefined;
+  const viewingArchived = !!current && isArchived(current);
 
   return (
     <div className="chat">
@@ -312,17 +395,39 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
         <div className="chatbar">
           <select value={chatId ?? ''} onChange={(e) => switchTo(e.target.value || null)} title={`Chats on ${host}`}>
             <option value="">New chat…</option>
-            {chats.map((c) => (
+            {live.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.title} · {relativeTime(c.updatedAt)}
               </option>
             ))}
+            {archived.length > 0 && (
+              <optgroup label="Archived">
+                {archived.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.title} · {relativeTime(c.updatedAt)}
+                  </option>
+                ))}
+              </optgroup>
+            )}
           </select>
-          <button className="btn danger" onClick={() => void removeChat()} disabled={!chatId} title="Delete this chat">Delete</button>
+          {viewingArchived ? (
+            <>
+              <button className="btn" onClick={() => void setArchived(chatId!, false)} title="Move this chat back to the main list">Unarchive</button>
+              <button className="btn danger" onClick={() => void removeChat()} title="Delete this chat for good">Delete</button>
+            </>
+          ) : (
+            <button className="btn danger" onClick={() => void setArchived(chatId!, true)} disabled={!chatId} title="Archive this chat: it moves to the Archived group and stops opening by default">
+              Archive
+            </button>
+          )}
         </div>
       )}
       <div className="messages">
-        {items.length === 0 && (
+        {/* Until the lookup resolves we do not know whether this host has a chat to restore, so
+            neither the empty state nor a transcript is shown — the panel must not flash "describe
+            how you want this page to change" over a conversation that is about to appear. */}
+        {!loaded && !unsupported && <div className="empty muted">Loading…</div>}
+        {loaded && items.length === 0 && (
           <div className="empty">
             {unsupported ? (
               <>Open a regular web page to start.</>

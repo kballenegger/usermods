@@ -7,7 +7,7 @@ import { scriptIdentity } from '@/lib/installurl';
 import { resyncPlan } from '@/lib/resync';
 import { shouldUpdate } from '@/lib/version';
 import { loadMods, modFromSource, parseHeader, previewFromSource, upsertMod, deleteMod, saveMods } from '@/lib/mods';
-import { appendTurn, createChat, deleteChat, listChats, loadMessages, renameChat, saveMessages, touchChat } from '@/lib/chats';
+import { appendTurn, archiveChat, createChat, deleteChat, listChats, loadMessages, renameChat, saveMessages, touchChat } from '@/lib/chats';
 import {
   CHATGPT_CODEX_BASE,
   XAI_PROXY_BASE,
@@ -237,6 +237,9 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
       return createChat(req.host);
     case 'chats.delete':
       await deleteChat(req.id);
+      return { ok: true };
+    case 'chats.archive':
+      await archiveChat(req.id, req.archived);
       return { ok: true };
     case 'chats.rename':
       await renameChat(req.id, req.title);
