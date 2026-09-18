@@ -1,5 +1,6 @@
 import { createProvider } from '../providers';
-import type { AgentEventBody, ElementRef, ModProposal, Msg, Part, Settings, UserTurn } from '../types';
+import { DEFAULT_CONTEXT_BUDGET, type AgentEventBody, type ElementRef, type ModProposal, type Msg, type Part, type Settings, type UserTurn } from '../types';
+import { compact, needsCompaction } from './compact';
 import { SYSTEM_PROMPT } from './prompt';
 import { TOOLS } from './tools';
 
@@ -22,6 +23,16 @@ export interface AgentInput {
   env: AgentEnv;
   emit: (e: AgentEventBody) => void;
   signal: AbortSignal;
+  /**
+   * One tool-free model call, used for the compaction summary. Supplied by the background so the
+   * loop stays free of provider plumbing; omitted, tier 2 degrades to dropping the oldest turns.
+   */
+  complete?: (system: string, user: string, signal?: AbortSignal) => Promise<string>;
+  /**
+   * Called whenever compaction rewrote the history, so the caller can persist the smaller version
+   * immediately rather than only at the end of the turn. Failures here are ignored.
+   */
+  onCompacted?: (messages: Msg[]) => void | Promise<void>;
 }
 
 function renderTurn(turn: UserTurn, page: { url: string; title: string } | null, injected: boolean): string {
@@ -58,8 +69,34 @@ export async function runAgent(input: AgentInput): Promise<Msg[]> {
   }
   return signal.aborted ? trimUnanswered(messages) : messages;
 
+  /**
+   * Keep the history inside the context budget before every provider call.
+   *
+   * Compaction rewrites `messages` in place (splice, not reassign) because the array is the one
+   * the caller gets back and the one every closure below reads. Each tier emits its own event, so
+   * a turn that both elided and summarised shows two notes — which is the honest picture.
+   */
+  async function maybeCompact() {
+    const budget = settings.contextBudget ?? DEFAULT_CONTEXT_BUDGET;
+    if (!needsCompaction(messages, budget)) return;
+    const res = await compact(messages, {
+      budget,
+      signal,
+      summarise: input.complete ? (system, user) => input.complete!(system, user, signal) : undefined,
+    });
+    if (!res.steps.length) return;
+    messages.splice(0, messages.length, ...res.messages);
+    // One event per tier, each reporting the sizes that tier actually saw.
+    for (const step of res.steps) emit({ type: 'compacted', tier: step.tier, before: step.before, after: step.after });
+    await Promise.resolve(input.onCompacted?.(messages)).catch(() => {});
+  }
+
   async function loop() {
   for (let i = 0; i < MAX_ITERATIONS; i++) {
+    if (signal.aborted) break;
+    // Compaction runs before the status line, so "waiting for model" is not shown while the
+    // summariser's own call is in flight — that would read as the user's turn hanging.
+    await maybeCompact();
     if (signal.aborted) break;
     // The panel's activity line is driven entirely by these: it has no other way to tell a model
     // that is thinking from one that has hung.

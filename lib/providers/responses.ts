@@ -16,7 +16,8 @@ export interface ResponsesConfig {
 
 type Item = Record<string, unknown>;
 
-function toInput(messages: Msg[], tag: string): Item[] {
+/** Exported for test/compact.test.ts, which asserts that a compacted history still converts cleanly. */
+export function toInput(messages: Msg[], tag: string): Item[] {
   const input: Item[] = [];
   for (const m of messages) {
     if (m.role === 'assistant') {

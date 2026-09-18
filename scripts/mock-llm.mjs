@@ -13,6 +13,8 @@
 //        DELETE /__requests    in order; the isolation flow reads this back to prove that one
 //                              chat's user text never entered another chat's model conversation.
 //                              DELETE empties the log.
+//   GET  /__violations        -> {violations: [{at, kind, detail, script}, ...]}  every request
+//        DELETE /__violations  that was structurally invalid. See "Validation" below.
 //
 // Scripting. A conversation is picked by matching the FIRST user message in the request against
 // a script's `match` regex; the agent prefixes each turn with "[Current page: <title> — <url>]",
@@ -37,6 +39,9 @@ import http from 'node:http';
  */
 export const SLOW_MARKER = 'SLOWMARKER-6f3a';
 export const FAST_MARKER = 'FASTMARKER-b21c';
+
+/** The compaction flow's marker, so its transcript is identifiable the same way. */
+export const COMPACT_MARKER = 'COMPACTMARKER-9d4e';
 
 /** How long the slow conversation holds its first byte, so a run is demonstrably still in flight. */
 const FIRST_BYTE_MS = Number(process.env.MOCK_LLM_SLOW_MS ?? 4000);
@@ -238,6 +243,66 @@ setTimeout(() => observer.disconnect(), 10000);`,
     ],
   },
 
+  // ---------------------------------------------------------------------------
+  // The compaction flow (screenshots.mjs --compaction). Several USER TURNS, each reading the page
+  // again, so the history crosses a shrunken contextBudget and BOTH tiers have something to do.
+  //
+  // Turns, not just tool rounds, are what tier 2 needs: it cuts only at user-turn boundaries, so a
+  // single long turn — however many get_page calls it makes — can only ever be elided. The flow
+  // sends four messages, and each one is a separate script below, matched on its own words.
+  //
+  // The SIZE comes from the page itself: get_page at max_chars against a real Wikipedia article is
+  // tens of thousands of characters per call, and the history keeps every one of them.
+  // ---------------------------------------------------------------------------
+  {
+    name: 'compaction-1',
+    match: /trace every heading on this page/i,
+    steps: [
+      { text: `${COMPACT_MARKER} turn 1: reading the page.`, calls: [{ name: 'get_page', args: { max_chars: 60000 } }] },
+      { text: `${COMPACT_MARKER} turn 1: and again, scoped to the content.`, calls: [{ name: 'get_page', args: { max_chars: 60000, selector: '#content' } }] },
+      { text: `${COMPACT_MARKER} turn 1: the headings are h2 inside .mw-heading.`, calls: [] },
+    ],
+  },
+  {
+    name: 'compaction-2',
+    match: /now check the infobox/i,
+    steps: [
+      { text: `${COMPACT_MARKER} turn 2: reading the page again for the infobox.`, calls: [{ name: 'get_page', args: { max_chars: 60000 } }] },
+      { text: `${COMPACT_MARKER} turn 2: the infobox is a table.tab.`, calls: [{ name: 'find_elements', args: { selector: 'table.infobox, h2', limit: 100 } }] },
+      { text: `${COMPACT_MARKER} turn 2: got it.`, calls: [] },
+    ],
+  },
+  {
+    name: 'compaction-3',
+    match: /and the references section/i,
+    steps: [
+      { text: `${COMPACT_MARKER} turn 3: another full read for the references.`, calls: [{ name: 'get_page', args: { max_chars: 60000 } }] },
+      { text: `${COMPACT_MARKER} turn 3: and the body once more.`, calls: [{ name: 'get_page', args: { max_chars: 60000, selector: 'body' } }] },
+      { text: `${COMPACT_MARKER} turn 3: references live under #References.`, calls: [] },
+    ],
+  },
+  {
+    name: 'compaction-4',
+    match: /now write the mod/i,
+    steps: [
+      { text: `${COMPACT_MARKER} turn 4: one last look.`, calls: [{ name: 'get_page', args: { max_chars: 60000 } }] },
+      {
+        text: `${COMPACT_MARKER} done — here is the mod.`,
+        calls: [
+          {
+            name: 'propose_mod',
+            args: {
+              name: 'Wikipedia: numbered headings',
+              description: 'Numbers the section headings of an article.',
+              matches: ['*://*.wikipedia.org/wiki/*'],
+              code: "document.querySelectorAll('.mw-heading h2').forEach((h, i) => { h.prepend(`${i + 1}. `); });",
+            },
+          },
+        ],
+      },
+    ],
+  },
+
   {
     name: 'isolation-fast',
     match: /name the fast marker/i,
@@ -279,6 +344,147 @@ function isTitleRequest(body) {
 }
 
 // ---------------------------------------------------------------------------
+// Compaction summaries
+// ---------------------------------------------------------------------------
+//
+// Tier 2 of lib/agent/compact.ts makes a second tool-free call with its own system prompt, asking
+// for a summary of the earlier conversation. It is answered here with a fixed string shaped like a
+// real answer — the sections the prompt demands, and a code block — so the browser flow can see
+// that the summary reached the history rather than just that a call happened.
+
+const SUMMARY_SYSTEM = /you compress the earlier part of a conversation/i;
+
+export const SUMMARY_MARKER = 'SUMMARYMARKER-4c81';
+
+const SUMMARY_REPLY = [
+  `${SUMMARY_MARKER}`,
+  'GOALS: the user wants every section heading on this Wikipedia article numbered.',
+  'DECISIONS: a CSS counter was rejected because the headings are wrapped in .mw-heading; prepending text in JS works.',
+  'SELECTORS: ".mw-heading h2" — stable, verified on this article. "#content" — stable. "h1, h2, h3" — stable.',
+  'CURRENT PROPOSAL: none yet.',
+  'OPEN PROBLEMS: none.',
+  'LATEST REQUEST: trace every heading on this page.',
+].join('\n');
+
+/** A compaction-summary request: no tools, and the compaction system prompt. */
+function isSummaryRequest(body) {
+  if ((body.tools ?? []).length) return false;
+  return (body.messages ?? []).some((m) => m.role === 'system' && SUMMARY_SYSTEM.test(messageText(m)));
+}
+
+// ---------------------------------------------------------------------------
+// Validation
+// ---------------------------------------------------------------------------
+//
+// A real backend answers an invalid history with a 400 the extension surfaces as a chat error; this
+// mock used to answer anything at all, so a dangling tool call or an orphan tool message went
+// unnoticed until someone ran the extension against a real provider. Every request is now checked
+// against the shape /v1/chat/completions actually requires, and the browser flows assert that the
+// server saw zero violations — which is how the pairing invariant stays honest as the loop and the
+// compactor rewrite history underneath it.
+
+/** Every structural problem seen, in order. The screenshots flows read this back and fail on it. */
+const violations = [];
+
+/**
+ * Check one chat-completions body. Returns a list of {kind, detail}; empty means valid.
+ *
+ * The rules are the ones OpenAI, and every compatible backend, enforce:
+ *   - every assistant tool_call id is answered by exactly one following `tool` message;
+ *   - every `tool` message answers a tool_call that came before it, and only once;
+ *   - roles are known, and a message that carries tool_calls is an assistant message;
+ *   - content is present where the API forbids omitting it (user, system, and a tool reply);
+ *   - a `tools` array is present whenever the history contains tool calls, because a model cannot
+ *     be asked to continue a conversation whose tools it was never shown.
+ */
+export function validateChatRequest(body) {
+  const out = [];
+  const messages = body?.messages;
+  if (!Array.isArray(messages) || !messages.length) {
+    return [{ kind: 'no-messages', detail: 'request has no messages array' }];
+  }
+
+  /** tool_call id -> index of the assistant message that made it. */
+  const calls = new Map();
+  /** tool_call id -> how many `tool` messages answered it. */
+  const answers = new Map();
+  let sawToolCall = false;
+
+  messages.forEach((m, i) => {
+    const where = `messages[${i}]`;
+    if (!m || typeof m !== 'object') {
+      out.push({ kind: 'bad-message', detail: `${where} is not an object` });
+      return;
+    }
+    if (!['system', 'user', 'assistant', 'tool'].includes(m.role)) {
+      out.push({ kind: 'bad-role', detail: `${where} has role ${JSON.stringify(m.role)}` });
+      return;
+    }
+    if (m.tool_calls && m.role !== 'assistant') {
+      out.push({ kind: 'tool-calls-on-non-assistant', detail: `${where} is a ${m.role} message carrying tool_calls` });
+    }
+
+    if (m.role === 'assistant') {
+      for (const c of m.tool_calls ?? []) {
+        sawToolCall = true;
+        if (!c || typeof c.id !== 'string' || !c.id) {
+          out.push({ kind: 'tool-call-no-id', detail: `${where} has a tool_call with no id` });
+          continue;
+        }
+        if (calls.has(c.id)) out.push({ kind: 'duplicate-tool-call-id', detail: `tool_call id ${c.id} appears twice (${where})` });
+        calls.set(c.id, i);
+        if (!c.function || typeof c.function.name !== 'string' || !c.function.name) {
+          out.push({ kind: 'tool-call-no-name', detail: `${where} tool_call ${c.id} has no function name` });
+        }
+        if (typeof c.function?.arguments !== 'string') {
+          out.push({ kind: 'tool-call-bad-arguments', detail: `${where} tool_call ${c.id} arguments is not a string` });
+        }
+      }
+      // An assistant message may have null content, but only when it is making a tool call.
+      if (!(m.tool_calls ?? []).length && !hasContent(m.content)) {
+        out.push({ kind: 'empty-assistant', detail: `${where} is an assistant message with neither content nor tool_calls` });
+      }
+      return;
+    }
+
+    if (m.role === 'tool') {
+      if (typeof m.tool_call_id !== 'string' || !m.tool_call_id) {
+        out.push({ kind: 'tool-message-no-id', detail: `${where} is a tool message with no tool_call_id` });
+        return;
+      }
+      if (!calls.has(m.tool_call_id)) {
+        out.push({ kind: 'orphan-tool-message', detail: `${where} answers tool_call ${m.tool_call_id}, which no earlier assistant message made` });
+      }
+      answers.set(m.tool_call_id, (answers.get(m.tool_call_id) ?? 0) + 1);
+      if (!hasContent(m.content)) out.push({ kind: 'empty-tool-content', detail: `${where} (tool ${m.tool_call_id}) has empty content` });
+      return;
+    }
+
+    // system / user
+    if (!hasContent(m.content)) out.push({ kind: 'empty-content', detail: `${where} is a ${m.role} message with empty content` });
+  });
+
+  for (const [id, at] of calls) {
+    const n = answers.get(id) ?? 0;
+    if (n === 0) out.push({ kind: 'unanswered-tool-call', detail: `tool_call ${id} (messages[${at}]) was never answered by a tool message` });
+    else if (n > 1) out.push({ kind: 'duplicate-tool-answer', detail: `tool_call ${id} was answered by ${n} tool messages` });
+  }
+
+  if (sawToolCall && !(body.tools ?? []).length) {
+    out.push({ kind: 'no-tools-array', detail: 'the history contains tool calls but the request offered no tools' });
+  }
+
+  return out;
+}
+
+/** Content the API will accept: a non-empty string, or a non-empty array of parts. */
+function hasContent(content) {
+  if (typeof content === 'string') return content.length > 0;
+  if (Array.isArray(content)) return content.length > 0;
+  return false;
+}
+
+// ---------------------------------------------------------------------------
 // Protocol
 // ---------------------------------------------------------------------------
 
@@ -289,15 +495,34 @@ function messageText(m) {
   return '';
 }
 
+/**
+ * Which script this request belongs to.
+ *
+ * The LAST user message that matches a script wins, not the first. A multi-turn conversation (the
+ * compaction flow) sends a different message each turn, and each one has its own script; matching
+ * on the first user message would replay turn 1 forever. Single-turn scripts are unaffected,
+ * because their only matching message is also the last one.
+ *
+ * A user message carrying tool results is skipped: only a real turn can start a script.
+ */
 function pickScript(messages) {
-  const firstUser = messages.find((m) => m.role === 'user');
-  const text = firstUser ? messageText(firstUser) : '';
-  return SCRIPTS.find((s) => s.match.test(text)) ?? FALLBACK;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (m.role !== 'user') continue;
+    const text = messageText(m);
+    const hit = SCRIPTS.find((s) => s.match.test(text));
+    if (hit) return { script: hit, from: i };
+  }
+  return { script: FALLBACK, from: 0 };
 }
 
-/** The step index is how many assistant turns have already happened in this conversation. */
-function stepFor(script, messages) {
-  const turns = messages.filter((m) => m.role === 'assistant').length;
+/**
+ * The step index is how many assistant turns have happened SINCE this script's own user message.
+ * Counting from the start of the history would make a later turn resume at the end of an earlier
+ * script's step list.
+ */
+function stepFor(script, messages, from = 0) {
+  const turns = messages.slice(from).filter((m) => m.role === 'assistant').length;
   return script.steps[Math.min(turns, script.steps.length - 1)];
 }
 
@@ -366,6 +591,20 @@ function readBody(req) {
   });
 }
 
+/**
+ * Validate a body and log anything wrong with it, tagged with the script it belongs to so a failure
+ * message says which conversation produced it.
+ */
+function recordViolations(body, messages) {
+  const problems = validateChatRequest(body);
+  if (!problems.length) return;
+  const script = isSummaryRequest(body) ? 'summary' : isTitleRequest(body) ? 'title' : (pickScript(messages).script.name ?? 'fallback');
+  for (const p of problems) {
+    violations.push({ at: Date.now(), script, kind: p.kind, detail: p.detail });
+    console.error(`[mock-llm] INVALID REQUEST (${script}): ${p.kind} — ${p.detail}`);
+  }
+}
+
 const server = http.createServer(async (req, res) => {
   // The extension calls this from a page origin, so CORS has to be permissive.
   res.setHeader('access-control-allow-origin', '*');
@@ -377,6 +616,18 @@ const server = http.createServer(async (req, res) => {
   }
 
   const url = new URL(req.url, 'http://localhost');
+
+  // Every request that was structurally invalid. The browser flows assert this is empty.
+  if (url.pathname === '/__violations') {
+    if (req.method === 'DELETE') {
+      violations.length = 0;
+      res.writeHead(204).end();
+      return;
+    }
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ violations }));
+    return;
+  }
 
   // The recorded request log, for the isolation flow's cross-conversation assertions.
   if (url.pathname === '/__requests') {
@@ -406,6 +657,10 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     const messages = body.messages ?? [];
+    // Validate BEFORE answering, and answer anyway: a mock that refuses an invalid history would
+    // stall the flow at the first breakage and hide every later one. The flows read /__violations
+    // at the end and fail there, with the whole list.
+    recordViolations(body, messages);
     res.writeHead(200, {
       'content-type': 'text/event-stream',
       'cache-control': 'no-cache',
@@ -414,18 +669,24 @@ const server = http.createServer(async (req, res) => {
     // The title call is a one-shot, tool-free request; it never takes a step out of a script. It
     // is still recorded, because the isolation flow's "no chat's text entered another chat's model
     // conversation" assertion has to hold for the title call too.
+    if (isSummaryRequest(body)) {
+      requests.push({ at: Date.now(), script: 'summary', messages });
+      if (process.env.MOCK_LLM_VERBOSE) console.error('[mock-llm] compaction summary');
+      await streamStep(res, { text: SUMMARY_REPLY, calls: [] }, body.model ?? 'demo');
+      return;
+    }
     if (isTitleRequest(body)) {
       requests.push({ at: Date.now(), script: 'title', messages });
-      if (process.env.MOCK_LLM_VERBOSE) console.log(`[mock-llm] title -> ${TITLE_REPLY}`);
+      if (process.env.MOCK_LLM_VERBOSE) console.error(`[mock-llm] title -> ${TITLE_REPLY}`);
       await streamStep(res, { text: TITLE_REPLY, calls: [] }, body.model ?? 'demo');
       return;
     }
-    const script = pickScript(messages);
-    const step = stepFor(script, messages);
+    const { script, from } = pickScript(messages);
+    const step = stepFor(script, messages, from);
     // Recorded before anything is streamed, so a hung run still leaves its evidence behind.
     requests.push({ at: Date.now(), script: script.name ?? 'fallback', messages });
     if (process.env.MOCK_LLM_VERBOSE) {
-      console.log(`[mock-llm] ${script.name ?? 'fallback'} step ${script.steps.indexOf(step)}: ${(step.calls ?? []).map((c) => c.name).join(', ') || 'text only'}`);
+      console.error(`[mock-llm] ${script.name ?? 'fallback'} step ${script.steps.indexOf(step)}: ${(step.calls ?? []).map((c) => c.name).join(', ') || 'text only'}`);
     }
     await streamStep(res, step, body.model ?? 'demo', { slowFirstByte: !!script.slowFirstByte });
     return;

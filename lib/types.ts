@@ -69,7 +69,19 @@ export interface Settings {
    */
   autoNameChats?: boolean;
   theme: ThemeChoice;
+  /**
+   * How many tokens of conversation to send the model before compacting (lib/agent/compact.ts).
+   * Optional so a profile saved before this existed reads as the default.
+   */
+  contextBudget?: number;
 }
+
+/**
+ * Default context budget, in estimated tokens. Well under the 200k window of the models this ships
+ * with, so a long chat compacts before any provider refuses it, and low enough that the resend cost
+ * of a long session stays sane.
+ */
+export const DEFAULT_CONTEXT_BUDGET = 120_000;
 
 export const DEFAULT_SETTINGS: Settings = {
   provider: 'anthropic',
@@ -79,6 +91,7 @@ export const DEFAULT_SETTINGS: Settings = {
   autoNameChats: true,
   // Dark is the design system's default, so it is this extension's default too.
   theme: 'dark',
+  contextBudget: DEFAULT_CONTEXT_BUDGET,
 };
 
 // Provider-neutral conversation format. Adapters translate to each API's wire shape.
@@ -145,6 +158,12 @@ export type AgentEventBody =
    * at postAgentEvent(), and the panel renames that chat.
    */
   | { type: 'chat_title'; title: string }
+  /**
+   * The model history was compacted before a provider call: `tier` says which tier did it and the
+   * two numbers are estimated tokens before and after. The panel renders a muted note; the
+   * transcript the user reads is never rewritten, only the history the model sees.
+   */
+  | { type: 'compacted'; tier: 'elided' | 'summarised'; before: number; after: number }
   | { type: 'error'; message: string };
 
 /** An event as it travels over the port: a body plus the chat it belongs to. */

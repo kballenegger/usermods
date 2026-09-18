@@ -3,7 +3,7 @@ import { STORE_BUILD, migrateSettingsForBuild } from '@/lib/buildflags';
 import { rpc, type OAuthKind, type OAuthLoginState } from '@/lib/rpc';
 import { loadSettings, saveSettings } from '@/lib/settings';
 import { applyTheme } from '@/lib/theme';
-import { DEFAULT_SETTINGS, type Settings, type ThemeChoice } from '@/lib/types';
+import { DEFAULT_CONTEXT_BUDGET, DEFAULT_SETTINGS, type Settings, type ThemeChoice } from '@/lib/types';
 
 const THEMES: Array<{ value: ThemeChoice; label: string }> = [
   { value: 'system', label: 'System' },
@@ -161,6 +161,22 @@ export function SettingsView({ onReviewNotice }: { onReviewNotice?: () => void }
           After the first reply, usermods asks the model above for a short name for the chat — one
           extra, small request per chat. Off, a chat keeps the first thing you typed as its name.
           Renaming a chat yourself always sticks either way.
+        </span>
+      </label>
+
+      <label className="field">
+        Context budget (tokens)
+        <input
+          type="number"
+          min={10000}
+          step={10000}
+          value={s.contextBudget ?? DEFAULT_CONTEXT_BUDGET}
+          onChange={(e) => update({ contextBudget: Math.max(10_000, Number(e.target.value) || DEFAULT_CONTEXT_BUDGET) })}
+        />
+        <span>
+          How much conversation to send the model before usermods compacts it: first by trimming old
+          page snapshots and tool output, then by summarising the earlier part of the chat. Lower is
+          cheaper and faster; higher keeps more of the chat in front of the model.
         </span>
       </label>
 

@@ -3,13 +3,14 @@
 import type { Msg, Part, Settings, ToolDef } from '../types';
 import type { Provider, ProviderResponse } from './types';
 
-type OAIMessage =
+export type OAIMessage =
   | { role: 'system'; content: string }
   | { role: 'user'; content: string | Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }> }
   | { role: 'assistant'; content: string | null; tool_calls?: Array<{ id: string; type: 'function'; function: { name: string; arguments: string } }> }
   | { role: 'tool'; tool_call_id: string; content: string };
 
-function toOpenAIMessages(system: string, messages: Msg[]): OAIMessage[] {
+/** Exported for test/compact.test.ts, which asserts that a compacted history still converts cleanly. */
+export function toOpenAIMessages(system: string, messages: Msg[]): OAIMessage[] {
   const out: OAIMessage[] = [{ role: 'system', content: system }];
   for (const m of messages) {
     if (m.role === 'assistant') {

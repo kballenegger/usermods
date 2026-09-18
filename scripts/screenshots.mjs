@@ -3,9 +3,13 @@
 // scripted mock backend in scripts/mock-llm.mjs. No API key and no network model call.
 //
 //   npm run screenshots     capture everything into docs/screenshots/
-//   npm run smoke           headless: the chat, activity, chats and isolation flows, all asserted
-//   npm run smoke:chats     headless: the chats flow alone (restore, New chat, archive/unarchive)
-//   npm run smoke:isolation headless: the isolation flow alone (two chats running at once, no bleed)
+//   npm run smoke            headless: the chat, activity, chats, isolation and compaction flows
+//   npm run smoke:chats      headless: the chats flow alone (restore, New chat, archive/unarchive)
+//   npm run smoke:isolation  headless: the isolation flow alone (two chats running at once, no bleed)
+//   npm run smoke:compaction headless: the compaction flow alone (both tiers, on a shrunken budget)
+//
+// Every flow ends by asserting that the mock backend received zero structurally invalid requests
+// (see "History validity" below).
 //
 // ---------------------------------------------------------------------------
 // How this works, and why it is shaped this way
@@ -39,7 +43,7 @@
 
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
-import { FAST_MARKER, SLOW_MARKER } from './mock-llm.mjs';
+import { COMPACT_MARKER, FAST_MARKER, SLOW_MARKER, SUMMARY_MARKER } from './mock-llm.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -58,6 +62,7 @@ const SCALE = 2;
 const SMOKE = process.argv.includes('--smoke');
 const CHATS = process.argv.includes('--chats');
 const ISOLATION = process.argv.includes('--isolation');
+const COMPACTION = process.argv.includes('--compaction');
 
 /** See note 4: a first-run setup instruction, not the steady state the README should show. */
 const HIDE_SETUP_NOTICE = '.app > .notice { display: none !important; }';
@@ -186,6 +191,44 @@ async function runConversation(panel, text, { refreshTitle = false } = {}) {
       .catch(() => {});
     await panel.waitForTimeout(500);
   }
+}
+
+// ---------------------------------------------------------------------------
+// History validity
+// ---------------------------------------------------------------------------
+//
+// The mock backend checks every chat-completions body it receives against the shape the real API
+// requires — tool_call ids answered exactly once, no orphan tool messages, no empty content where
+// the API forbids it, a tools array whenever the history has tool calls — and records anything
+// wrong at /__violations. A dangling tool call is a 400 from a real provider and an error row for
+// the user, but against a permissive mock it is invisible, so every flow below ends by asserting
+// that the server saw none. Compaction rewrites old messages, which makes this the assertion that
+// keeps it honest.
+
+const CONTROL_BASE = BASE_URL.replace(/\/v1$/, '');
+
+/** Ask the mock what it thinks of the requests it has seen. Run from node, not the browser. */
+async function fetchViolations() {
+  const res = await fetch(`${CONTROL_BASE}/__violations`);
+  return (await res.json()).violations ?? [];
+}
+
+async function clearViolations() {
+  await fetch(`${CONTROL_BASE}/__violations`, { method: 'DELETE' }).catch(() => {});
+}
+
+/** Fail with the whole list, because the first violation is rarely the only one. */
+async function assertNoViolations(flow) {
+  const found = await fetchViolations();
+  if (!found.length) return;
+  const lines = found.map((v) => `  ${v.script}: ${v.kind} — ${v.detail}`).join('\n');
+  throw new Error(`${flow}: the backend received ${found.length} structurally invalid request(s):\n${lines}`);
+}
+
+/** Every chat-completions body the mock recorded, so a flow can measure how big they got. */
+async function fetchRequests() {
+  const res = await fetch(`${CONTROL_BASE}/__requests`);
+  return (await res.json()).requests ?? [];
 }
 
 // ---------------------------------------------------------------------------
@@ -382,6 +425,7 @@ async function migrate() {
 async function smoke() {
   const b = await launch('light');
   try {
+    await clearViolations();
     const panel = await openPanel(b.ctx, b.extId);
     await openSite(b.ctx, 'https://en.wikipedia.org/wiki/Common_kingfisher');
     await panel.waitForTimeout(1200);
@@ -419,7 +463,8 @@ async function smoke() {
     if (saved.length !== 1) fail(`expected 1 saved mod, got ${saved.length}`);
     if (!saved[0].source.includes('==UserScript==')) fail('saved mod has no userscript header');
 
-    console.log('smoke: OK — streamed reply, 3 page-inspection tools, proposal card, save to storage');
+    await assertNoViolations('smoke');
+    console.log('smoke: OK — streamed reply, 3 page-inspection tools, proposal card, save to storage, zero invalid requests');
   } finally {
     await b.close();
   }
@@ -442,6 +487,7 @@ async function activityFlow() {
     throw new Error(`activity: ${m}`);
   };
   try {
+    await clearViolations();
     const panel = await openPanel(b.ctx, b.extId);
     await openSite(b.ctx, 'https://en.wikipedia.org/wiki/Common_kingfisher');
     await panel.waitForTimeout(1200);
@@ -494,6 +540,7 @@ async function activityFlow() {
     if (!replies.some((t) => t.includes('article title'))) fail(`the scripted conversation did not finish (assistant said: ${replies.join(' | ')})`);
 
     if (process.env.ACTIVITY_VERBOSE) console.log('[activity] the line showed:', await recorded(panel));
+    await assertNoViolations('activity');
     console.log('activity: OK — appears <500ms, waiting label with a ticking timer, tool label, gone after done');
   } finally {
     await b.close();
@@ -595,6 +642,7 @@ async function chatsFlow() {
     throw new Error(`chats: ${m}`);
   };
   try {
+    await clearViolations();
     const panel = await openPanel(b.ctx, b.extId);
     await openSite(b.ctx, 'https://en.wikipedia.org/wiki/Common_kingfisher');
     await panel.waitForTimeout(1200);
@@ -713,6 +761,7 @@ async function chatsFlow() {
     if (finalRecord?.title !== MY_NAME) fail(`the stored title was changed after a user rename (now ${JSON.stringify(finalRecord?.title)})`);
     if (finalRecord?.titleSource !== 'user') fail(`titleSource fell back to ${JSON.stringify(finalRecord?.titleSource)} after a later turn`);
 
+    await assertNoViolations('chats');
     console.log('chats: OK — model title live on the port, user rename sticks through a later turn, last chat restored on reopen, New chat not persisted, archive hides and unarchives on send');
   } finally {
     await b.close();
@@ -777,6 +826,7 @@ async function isolationFlow() {
     throw new Error(`isolation: ${m}`);
   };
   try {
+    await clearViolations();
     const panel = await openPanel(b.ctx, b.extId);
 
     // --- Tab 1: the slow chat, A.
@@ -896,7 +946,136 @@ async function isolationFlow() {
       fail(`Stop pressed in chat B aborted chat A's run (chat A holds: ${JSON.stringify(aAfterStop.slice(0, 600))})`);
     }
 
+    await assertNoViolations('isolation');
     console.log('isolation: OK — two chats ran at once with no bleed on screen, in storage, or on the wire; Stop in B left A alone');
+  } finally {
+    await b.close();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Compaction test: a long conversation that crosses the context budget, forcing both tiers.
+//
+// The budget is shrunk through storage rather than by sending more turns, because six get_page
+// reads of a real Wikipedia article at max_chars is already hundreds of thousands of characters —
+// enough to cross a small budget the way a genuinely long session crosses the default one. What is
+// asserted:
+//   1. the 'compacted' note appears in the transcript, for both tiers;
+//   2. the summary the mock returned really reached the model history;
+//   3. requests got SMALLER after compaction, which is the whole point;
+//   4. the backend saw zero structurally invalid requests — compaction rewrites old messages, so
+//      this is where a broken tool_call/tool_result pairing would show up;
+//   5. the conversation still completes, with its proposal card.
+// ---------------------------------------------------------------------------
+
+/**
+ * Four user TURNS, not one long one. Tier 2 cuts only at user-turn boundaries, so a single turn —
+ * however many tools it calls — can only ever be elided; forcing the summariser to run takes a
+ * conversation with a real history of turns behind it.
+ */
+const COMPACT_PROMPTS = [
+  'trace every heading on this page',
+  'now check the infobox too',
+  'and the references section',
+  'now write the mod',
+];
+
+/**
+ * The last thing the mock says in each turn. Waiting for this exact line is how the flow knows a
+ * turn finished: the Stop button stays mounted while the post-turn title call is in flight, and the
+ * turn's earlier rows would match anything looser.
+ */
+const COMPACT_TURN_ENDS = [
+  'the headings are h2 inside .mw-heading.',
+  'turn 2: got it.',
+  'references live under #References.',
+  'done — here is the mod.',
+];
+
+/** A budget small enough that a handful of full-page reads cross it, in lib/agent/compact.ts's units. */
+const SMALL_BUDGET = 12_000;
+
+async function compactionFlow() {
+  const b = await launch('light');
+  const fail = (m) => {
+    throw new Error(`compaction: ${m}`);
+  };
+  try {
+    await clearViolations();
+    await fetch(`${CONTROL_BASE}/__requests`, { method: 'DELETE' }).catch(() => {});
+
+    // The budget is a normal setting, so shrinking it is exactly what a user could do.
+    const panel = await openPanel(b.ctx, b.extId, { settings: { contextBudget: SMALL_BUDGET } });
+    await openSite(b.ctx, 'https://en.wikipedia.org/wiki/Common_kingfisher');
+    await panel.waitForTimeout(1200);
+
+    // Each turn ends with a distinct text-only reply, so waiting for that line is how we know the
+    // turn is over — more reliable than watching the Stop button, which the panel keeps mounted
+    // while the post-turn title call is still in flight.
+    for (let i = 0; i < COMPACT_PROMPTS.length; i++) {
+      await panel.locator('textarea').fill(COMPACT_PROMPTS[i]);
+      await panel.locator('.composer button.btn.primary').click();
+      await panel.locator('.messages .msg.assistant', { hasText: COMPACT_TURN_ENDS[i] }).last().waitFor({ timeout: 180_000 });
+      await panel.waitForTimeout(1000);
+    }
+    await panel.locator('.messages .card h4').first().waitFor({ timeout: 30_000 });
+    await panel.waitForTimeout(1500);
+
+    // --- 1. The note is in the transcript, and says what it did.
+    // Matched on the note's TEXT, not its class: the transcript's styling is restyled from time to
+    // time, and a flow that silently stops finding the note is worse than one that breaks loudly.
+    const rows = (await panel.locator('.messages > *').allTextContents()).map((t) => t.trim());
+    const compacted = rows.filter((t) => /earlier (tool output trimmed|conversation summarised)/.test(t));
+    if (!compacted.length) fail(`no compaction note in the transcript (rows: ${JSON.stringify(rows.slice(0, 20))})`);
+    if (!compacted.some((t) => t.includes('earlier tool output trimmed'))) {
+      fail(`tier 1 never ran, or its note is missing: ${JSON.stringify(compacted)}`);
+    }
+    if (!compacted.some((t) => t.includes('earlier conversation summarised'))) {
+      fail(`tier 2 never ran, or its note is missing: ${JSON.stringify(compacted)}`);
+    }
+    for (const note of compacted) {
+      if (!/\d+k? → \d+k? tokens/.test(note)) fail(`a compaction note carries no sizes: ${JSON.stringify(note)}`);
+    }
+
+    // --- 2. The summary the mock wrote reached the stored model history.
+    const stored = Object.values(await storedMessages(panel));
+    if (stored.length !== 1) fail(`expected one chat's history, got ${stored.length}`);
+    if (!stored[0].includes(SUMMARY_MARKER)) fail("the compaction summary never reached the chat's model history");
+    if (!stored[0].includes('elided ·')) fail('no elided stub survived into the stored history');
+
+    // --- 3. The requests really got smaller.
+    // The history grows within a turn and shrinks when compaction fires, so the thing to look for
+    // is a DROP between consecutive requests — not a smaller last request, which would only happen
+    // if the final turn happened to compact on its last round.
+    const recorded = (await fetchRequests()).filter((r) => r.script.startsWith('compaction'));
+    if (recorded.length < 6) fail(`expected several rounds across four turns, got ${recorded.length}`);
+    const sizes = recorded.map((r) => JSON.stringify(r.messages).length);
+    let biggestDrop = 0;
+    let dropAt = -1;
+    for (let i = 1; i < sizes.length; i++) {
+      const drop = sizes[i - 1] - sizes[i];
+      if (drop > biggestDrop) {
+        biggestDrop = drop;
+        dropAt = i;
+      }
+    }
+    if (biggestDrop <= 0) fail(`the request history never got smaller: ${sizes.join(' → ')}`);
+    // A meaningful drop, not a turn that merely sent a shorter user message.
+    if (biggestDrop < sizes[dropAt - 1] * 0.2) {
+      fail(`the biggest drop was only ${biggestDrop} chars, which is noise rather than compaction: ${sizes.join(' → ')}`);
+    }
+    log(`compaction: request sizes ${sizes.join(' → ')} (biggest drop ${biggestDrop} chars)`);
+
+    // --- 4. Nothing invalid went over the wire.
+    await assertNoViolations('compaction');
+
+    // --- 5. The conversation still finished.
+    const title = (await panel.locator('.messages .card h4').first().textContent())?.trim();
+    if (title !== 'Wikipedia: numbered headings') fail(`proposal title was ${JSON.stringify(title)}`);
+    const text = await transcriptText(panel);
+    if (!text.includes(`${COMPACT_MARKER} done`)) fail('the conversation did not reach its final step');
+
+    console.log(`compaction: OK — both tiers ran, summary landed in history, biggest drop ${biggestDrop} chars, zero invalid requests`);
   } finally {
     await b.close();
   }
@@ -908,6 +1087,10 @@ async function main() {
   fs.mkdirSync(OUT_DIR, { recursive: true });
   const mock = await startMock();
   try {
+    if (COMPACTION) {
+      await compactionFlow();
+      return;
+    }
     if (ISOLATION) {
       await isolationFlow();
       return;
@@ -921,6 +1104,7 @@ async function main() {
       await activityFlow();
       await chatsFlow();
       await isolationFlow();
+      await compactionFlow();
       return;
     }
     await chatProposal('light', '01-chat-proposal.png');

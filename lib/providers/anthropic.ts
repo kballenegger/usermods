@@ -5,7 +5,8 @@ import type { Provider, ProviderResponse } from './types';
 /** Models that accept adaptive thinking. Older ones (Haiku 4.5, 3.x) reject it. */
 const ADAPTIVE_THINKING = /(opus-5|sonnet-5|fable-5|mythos-5|opus-4-[678]|sonnet-4-6)/;
 
-function toAnthropicMessages(messages: Msg[]): Anthropic.MessageParam[] {
+/** Exported for test/compact.test.ts, which asserts that a compacted history still converts cleanly. */
+export function toAnthropicMessages(messages: Msg[]): Anthropic.MessageParam[] {
   return messages.map((m) => ({
     role: m.role,
     content: m.content.filter((p) => p.type !== 'opaque').map((p): Anthropic.ContentBlockParam => {
