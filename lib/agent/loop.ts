@@ -1,5 +1,5 @@
 import { createProvider } from '../providers';
-import type { AgentEvent, ElementRef, ModProposal, Msg, Part, Settings } from '../types';
+import type { AgentEvent, ElementRef, ModProposal, Msg, Part, Settings, UserTurn } from '../types';
 import { SYSTEM_PROMPT } from './prompt';
 import { TOOLS } from './tools';
 
@@ -16,11 +16,30 @@ export interface AgentEnv {
 export interface AgentInput {
   settings: Settings;
   history: Msg[];
-  text: string;
-  refs?: ElementRef[];
+  turn: UserTurn;
+  /** Messages the user sent while this run was in progress. Drained between model calls. */
+  pullQueued: () => UserTurn[];
   env: AgentEnv;
   emit: (e: AgentEvent) => void;
   signal: AbortSignal;
+}
+
+function renderTurn(turn: UserTurn, page: { url: string; title: string } | null, injected: boolean): string {
+  const lines: string[] = [];
+  if (page) lines.push(`[Current page: ${page.title} — ${page.url}]`);
+  for (const ref of turn.refs ?? []) {
+    const html = ref.html.length > 2500 ? ref.html.slice(0, 2500) + '…' : ref.html;
+    lines.push(`[@${ref.token} = ${ref.label} — selector: ${ref.selector}]`, html);
+  }
+  if (injected) lines.push('[The user sent this while you were working. Take it into account from here on.]');
+  return `${lines.join('\n')}\n\n${turn.text}`.trim();
+}
+
+/** Drop a trailing assistant turn whose tool calls were never answered, so the history stays valid. */
+function trimUnanswered(messages: Msg[]): Msg[] {
+  const last = messages[messages.length - 1];
+  if (last?.role === 'assistant' && last.content.some((p) => p.type === 'tool_call')) return messages.slice(0, -1);
+  return messages;
 }
 
 export async function runAgent(input: AgentInput): Promise<Msg[]> {
@@ -28,16 +47,18 @@ export async function runAgent(input: AgentInput): Promise<Msg[]> {
   const provider = createProvider(settings);
   const messages: Msg[] = [...input.history];
 
-  const page = await env.pageInfo();
-  const userParts: Part[] = [];
-  const contextLines = [`[Current page: ${page.title} — ${page.url}]`];
-  for (const ref of input.refs ?? []) {
-    const html = ref.html.length > 2500 ? ref.html.slice(0, 2500) + '…' : ref.html;
-    contextLines.push(`[@${ref.token} = ${ref.label} — selector: ${ref.selector}]`, html);
-  }
-  userParts.push({ type: 'text', text: `${contextLines.join('\n')}\n\n${input.text}` });
-  messages.push({ role: 'user', content: userParts });
+  const page = await env.pageInfo().catch(() => null);
+  messages.push({ role: 'user', content: [{ type: 'text', text: renderTurn(input.turn, page, false) }] });
+  emit({ type: 'accepted', id: input.turn.id });
 
+  try {
+    await loop();
+  } catch (e) {
+    if (!signal.aborted) throw e;
+  }
+  return signal.aborted ? trimUnanswered(messages) : messages;
+
+  async function loop() {
   for (let i = 0; i < MAX_ITERATIONS; i++) {
     if (signal.aborted) break;
     const res = await provider.chat({
@@ -51,6 +72,7 @@ export async function runAgent(input: AgentInput): Promise<Msg[]> {
 
     const calls = res.content.filter((p): p is Extract<Part, { type: 'tool_call' }> => p.type === 'tool_call');
     if (res.stopReason === 'max_tokens' && calls.length) {
+      messages.pop();
       emit({ type: 'error', message: 'The model hit its output limit mid tool call. Try again with a smaller request.' });
       break;
     }
@@ -69,11 +91,18 @@ export async function runAgent(input: AgentInput): Promise<Msg[]> {
       results.push({ type: 'tool_result', toolCallId: call.id, content: r.content, isError: r.isError });
       if (call.name === 'propose_mod' && !r.isError) proposed = true;
     }
+    // Anything the user typed meanwhile joins this message, after the tool results.
+    const queued = signal.aborted ? [] : input.pullQueued();
+    for (const q of queued) {
+      results.push({ type: 'text', text: renderTurn(q, null, true) });
+      emit({ type: 'accepted', id: q.id });
+    }
     messages.push({ role: 'user', content: results });
+    if (signal.aborted) break;
     // A proposal ends the turn: the user decides what happens next.
-    if (proposed) break;
+    if (proposed && !queued.length) break;
   }
-  return messages;
+  }
 }
 
 function summarize(parts: Part[]): string {

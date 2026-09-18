@@ -4,7 +4,7 @@ import { rpc, type AgentPortRequest } from '@/lib/rpc';
 import type { AgentEvent, ContentEvent, ElementRef, ModProposal } from '@/lib/types';
 
 type Item =
-  | { kind: 'user'; text: string; refs?: ElementRef[] }
+  | { kind: 'user'; id: string; text: string; refs?: ElementRef[]; queued?: boolean }
   | { kind: 'assistant'; text: string }
   | { kind: 'tool'; id: string; name: string; input: Record<string, unknown>; summary?: string; isError?: boolean }
   | { kind: 'proposal'; proposal: ModProposal; saved?: boolean }
@@ -68,6 +68,16 @@ export function Chat({ tabId, pageUrl }: { tabId: number | null; pageUrl: string
           case 'proposal':
             next.push({ kind: 'proposal', proposal: e.proposal });
             return next;
+          case 'accepted':
+            return next.map((it) => (it.kind === 'user' && it.id === e.id ? { ...it, queued: false } : it));
+          case 'unqueued': {
+            const dropped = next.find((it) => it.kind === 'user' && it.id === e.id) as Extract<Item, { kind: 'user' }> | undefined;
+            if (dropped) {
+              setText((t) => (t.trim() ? `${t.trim()}\n${dropped.text}` : dropped.text));
+              if (dropped.refs) setRefs((r) => [...r, ...dropped.refs!]);
+            }
+            return next.filter((it) => !(it.kind === 'user' && it.id === e.id));
+          }
           case 'error':
             next.push({ kind: 'error', text: e.message });
             return next;
@@ -75,7 +85,7 @@ export function Chat({ tabId, pageUrl }: { tabId: number | null; pageUrl: string
             return next;
         }
       });
-      if (e.type === 'done' || e.type === 'error') {
+      if (e.type === 'done') {
         setBusy(false);
         setHasHistory(true);
       }
@@ -112,16 +122,18 @@ export function Chat({ tabId, pageUrl }: { tabId: number | null; pageUrl: string
     setText((prev) => prev.replace(new RegExp(`@${escapeRe(token)}(?![\\w.#-])\\s?`, 'g'), ''));
   }
 
+  /** Send now, or queue if a turn is running. Queued messages reach the model between its tool calls. */
   function send() {
     const t = text.trim();
-    if (!t || busy || tabId == null) return;
+    if (!t || tabId == null) return;
     // Only send references whose token still appears in the message.
     const used = refs.filter((r) => new RegExp(`@${escapeRe(r.token)}(?![\\w.#-])`).test(t));
-    setItems((prev) => [...prev, { kind: 'user', text: t, refs: used.length ? used : undefined }]);
+    const id = crypto.randomUUID();
+    setItems((prev) => [...prev, { kind: 'user', id, text: t, refs: used.length ? used : undefined, queued: busy }]);
     setText('');
-    setBusy(true);
-    const req: AgentPortRequest = { type: 'send', tabId, text: t, refs: used.length ? used : undefined };
     setRefs([]);
+    setBusy(true);
+    const req: AgentPortRequest = { type: 'send', tabId, id, text: t, refs: used.length ? used : undefined };
     connect().postMessage(req);
   }
 
@@ -188,7 +200,8 @@ export function Chat({ tabId, pageUrl }: { tabId: number | null; pageUrl: string
           switch (it.kind) {
             case 'user':
               return (
-                <div key={i} className="msg user">
+                <div key={i} className={`msg user${it.queued ? ' queued' : ''}`}>
+                  {it.queued && <div className="muted" style={{ fontSize: 11 }}>queued · will be sent between steps</div>}
                   {it.text}
                   {it.refs && (
                     <div className="row" style={{ marginTop: 4 }}>
@@ -265,11 +278,8 @@ export function Chat({ tabId, pageUrl }: { tabId: number | null; pageUrl: string
           </button>
           <button className="btn" onClick={() => void reset()} disabled={items.length === 0 && !hasHistory}>New chat</button>
           <span className="grow" />
-          {busy ? (
-            <button className="btn danger" onClick={abort}>Stop</button>
-          ) : (
-            <button className="btn primary" onClick={send} disabled={!text.trim() || unsupported}>Send</button>
-          )}
+          {busy && <button className="btn danger" onClick={abort}>Stop</button>}
+          <button className="btn primary" onClick={send} disabled={!text.trim() || unsupported}>{busy ? 'Queue' : 'Send'}</button>
         </div>
       </div>
     </div>

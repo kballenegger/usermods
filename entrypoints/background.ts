@@ -14,7 +14,7 @@ import {
 } from '@/lib/oauth';
 import type { AgentPortRequest, OAuthLoginState, RpcRequest } from '@/lib/rpc';
 import { loadSettings } from '@/lib/settings';
-import type { ContentRequest, Msg } from '@/lib/types';
+import type { ContentRequest, Msg, UserTurn } from '@/lib/types';
 
 export default defineBackground(() => {
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
@@ -32,45 +32,57 @@ export default defineBackground(() => {
 
   chrome.runtime.onConnect.addListener((port) => {
     if (port.name !== 'agent') return;
+    // One session per side panel: a running turn, plus messages queued while it runs.
     let controller: AbortController | null = null;
+    let running = false;
+    const queue: UserTurn[] = [];
+    const post = (e: unknown) => {
+      try {
+        port.postMessage(e);
+      } catch {
+        /* panel closed */
+      }
+    };
+
+    async function run(tabId: number, turn: UserTurn) {
+      running = true;
+      controller = new AbortController();
+      const signal = controller.signal;
+      try {
+        const settings = await loadSettings();
+        const usesKey = settings.provider === 'anthropic' || settings.provider === 'openai-compatible';
+        if (usesKey && !settings.apiKey && !settings.baseUrl) throw new Error('Add an API key in Settings first (or a base URL for a local server or proxy).');
+        if (!settings.model) throw new Error('Choose a model in Settings first.');
+        const history = await loadHistory(tabId);
+        const messages = await runAgent({
+          settings,
+          history,
+          turn,
+          pullQueued: () => queue.splice(0),
+          env: envForTab(tabId),
+          emit: post,
+          signal,
+        });
+        await saveHistory(tabId, messages);
+      } catch (e) {
+        post({ type: 'error', message: e instanceof Error ? e.message : String(e) });
+      }
+      running = false;
+      // Stop clears the queue; otherwise anything still waiting starts the next turn.
+      const next = queue.shift();
+      if (next && !signal.aborted) void run(tabId, next);
+      else post({ type: 'done' });
+    }
+
     port.onMessage.addListener((req: AgentPortRequest) => {
       if (req.type === 'abort') {
+        for (const q of queue.splice(0)) post({ type: 'unqueued', id: q.id });
         controller?.abort();
         return;
       }
-      controller?.abort();
-      controller = new AbortController();
-      const signal = controller.signal;
-      void (async () => {
-        const post = (e: unknown) => {
-          try {
-            port.postMessage(e);
-          } catch {
-            /* panel closed */
-          }
-        };
-        try {
-          const settings = await loadSettings();
-          const usesKey = settings.provider === 'anthropic' || settings.provider === 'openai-compatible';
-          if (usesKey && !settings.apiKey && !settings.baseUrl) throw new Error('Add an API key in Settings first (or a base URL for a local server or proxy).');
-          if (!settings.model) throw new Error('Choose a model in Settings first.');
-          const history = await loadHistory(req.tabId);
-          const messages = await runAgent({
-            settings,
-            history,
-            text: req.text,
-            refs: req.refs,
-            env: envForTab(req.tabId),
-            emit: post,
-            signal,
-          });
-          await saveHistory(req.tabId, messages);
-          post({ type: 'done' });
-        } catch (e) {
-          if (signal.aborted) post({ type: 'done' });
-          else post({ type: 'error', message: e instanceof Error ? e.message : String(e) });
-        }
-      })();
+      const turn: UserTurn = { id: req.id, text: req.text, refs: req.refs };
+      if (running) queue.push(turn);
+      else void run(req.tabId, turn);
     });
     port.onDisconnect.addListener(() => controller?.abort());
   });

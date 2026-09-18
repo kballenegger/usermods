@@ -66,8 +66,19 @@ export type AgentEvent =
   | { type: 'tool_call'; id: string; name: string; input: Record<string, unknown> }
   | { type: 'tool_result'; id: string; summary: string; isError: boolean }
   | { type: 'proposal'; proposal: ModProposal }
+  /** A sent message has entered the conversation (started a turn, or was injected mid-run). */
+  | { type: 'accepted'; id: string }
+  /** A queued message was dropped because the run was stopped; the panel gets its text back. */
+  | { type: 'unqueued'; id: string }
   | { type: 'done' }
   | { type: 'error'; message: string };
+
+/** A user message travelling from the side panel to the agent. */
+export interface UserTurn {
+  id: string;
+  text: string;
+  refs?: ElementRef[];
+}
 
 /** An element the user picked on the page. */
 export interface PickedElement {
