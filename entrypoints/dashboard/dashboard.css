@@ -54,13 +54,15 @@
   align-items: center;
   gap: 10px;
   font-family: var(--font-display);
-  font-size: 22px;
+  font-size: var(--fs-title);
   margin: 0;
   font-weight: 400;
   letter-spacing: 0.02em;
   text-transform: lowercase;
   color: var(--live-text);
-  text-shadow: 2px 2px 0 var(--accent-edge);
+  /* 1px, not 2px. The offset was tuned to Pixelify's heavier strokes; against Jersey's finer ones
+     a 2px shadow covers a large share of each letterform and the wordmark turns muddy. */
+  text-shadow: 1px 1px 0 var(--accent-edge);
 }
 .dash-head .sub {
   color: var(--text-2);
