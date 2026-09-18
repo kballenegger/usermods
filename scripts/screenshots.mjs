@@ -719,7 +719,50 @@ async function themeFlow() {
     if (!(await install.locator('.theme-toggle').count())) fail('no theme toggle on the install page');
     log('theme: the install page wears the same saved choice and carries the toggle');
 
-    console.log('theme: OK — OS default, cycling toggle, persistence with no first-paint flash, color-scheme both ways');
+    // --- 4. The dashboard is the third entry point, and the one a flash costs most -----------
+    //
+    // It is a full tab rather than a 420px strip, so a frame of the wrong palette is a whole
+    // screen of it. It gets the same three checks the panel does: the saved choice on the first
+    // paint, the toggle, and color-scheme for its native selects and scrollbars.
+    const dash = await b.ctx.newPage();
+    await dash.addInitScript(() => {
+      const sample = () => {
+        try {
+          const v = getComputedStyle(document.documentElement).getPropertyValue('--bg-app').trim();
+          if (v) window.__firstPaintBg ??= v;
+        } catch {
+          /* nothing to read yet */
+        }
+      };
+      requestAnimationFrame(() => {
+        sample();
+        requestAnimationFrame(sample);
+      });
+      document.addEventListener('DOMContentLoaded', sample, { once: true });
+    });
+    await dash.goto(`chrome-extension://${b.extId}/dashboard.html`);
+    await dash.locator('[data-testid="overview"]').waitFor({ timeout: 15_000 });
+    const dashFirst = await dash.evaluate(() => window.__firstPaintBg ?? null);
+    if (!dashFirst) fail('could not sample the dashboard first paint background');
+    if (paletteOf(dashFirst) !== 'dark') {
+      fail(`the dashboard painted the ${paletteOf(dashFirst)} palette on its first frame with dark saved (--bg-app ${dashFirst}) — that is the flash, a full tab of it`);
+    }
+    const ds = await themeState(dash);
+    if (ds.attr !== 'dark') fail(`the dashboard ignored the saved choice: data-theme ${JSON.stringify(ds.attr)}`);
+    if (ds.colorScheme !== 'dark') fail(`color-scheme on the dark dashboard was ${JSON.stringify(ds.colorScheme)}`);
+    const dashToggle = dash.locator('.theme-toggle');
+    if (!(await dashToggle.count())) fail('no theme toggle in the dashboard header');
+
+    // And it cycles there too, restyling the page under the cursor rather than after a reload.
+    await dashToggle.click(); // dark -> light
+    await dash.waitForTimeout(300);
+    const dsLight = await themeState(dash);
+    if (dsLight.attr !== 'light') fail(`the dashboard toggle gave data-theme ${JSON.stringify(dsLight.attr)}`);
+    if (paletteOf(dsLight.bgApp) !== 'light') fail(`the dashboard did not repaint light (--bg-app ${dsLight.bgApp})`);
+    if (dsLight.colorScheme !== 'light') fail(`color-scheme on the light dashboard was ${JSON.stringify(dsLight.colorScheme)}`);
+    log('theme: the dashboard wears the saved choice with no flash, and its toggle repaints the page');
+
+    console.log('theme: OK — OS default, cycling toggle, persistence with no first-paint flash, color-scheme both ways, all three entry points');
   } finally {
     await b.close();
   }
@@ -1559,7 +1602,7 @@ function seedChats() {
 }
 
 /** Open dashboard.html with chats and mods already in storage. */
-async function openDashboard(ctx, extId, { storage = {} } = {}) {
+async function openDashboard(ctx, extId, { storage = {}, settings = {} } = {}) {
   const page = await ctx.newPage();
   await page.setViewportSize({ width: 1280, height: 950 });
   await page.goto(`chrome-extension://${extId}/dashboard.html`);
@@ -1567,7 +1610,7 @@ async function openDashboard(ctx, extId, { storage = {} } = {}) {
     async ([s, extra]) => {
       await chrome.storage.local.set({ settings: s, consent: { version: 1, acceptedAt: Date.now() }, ...extra });
     },
-    [{ provider: 'openai-compatible', baseUrl: BASE_URL, apiKey: '', model: 'demo' }, storage],
+    [{ provider: 'openai-compatible', baseUrl: BASE_URL, apiKey: '', model: 'demo', ...settings }, storage],
   );
   await page.reload();
   await page.locator('[data-testid="overview"]').waitFor({ timeout: 15_000 });
@@ -1626,7 +1669,12 @@ async function dashboardFlow({ capture = false } = {}) {
     throw new Error(`dashboard: ${m}`);
   };
   try {
-    const page = await openDashboard(b.ctx, b.extId, { storage: { ...seedChats(), mods: seedMods() } });
+    // Theme pinned rather than left to resolveTheme's old-profile rule: the capture below shoots
+    // dark and then light from this page, so which one it starts on has to be stated, not inferred.
+    const page = await openDashboard(b.ctx, b.extId, {
+      storage: { ...seedChats(), mods: seedMods() },
+      settings: { theme: 'dark' },
+    });
 
     // --- 1. Chats are grouped by host, newest site first, with per-group counts.
     const groups = page.locator('[data-testid="hostgroup"]');
@@ -2152,6 +2200,24 @@ async function dashboardFlow({ capture = false } = {}) {
       await page.setViewportSize({ width: 1280, height: Math.max(560, Math.min(height, 1100)) });
       await page.waitForTimeout(300);
       await shot(page, '07-dashboard.png');
+
+      // The same page in light, from the same state, so the README's pair differs only by theme.
+      // The theme is driven through the toggle rather than through storage plus a reload: a reload
+      // would drop the open preview and re-collapse the list, and the two shots would then be of
+      // two different pages.
+      await page.locator('.theme-toggle').click();
+      await page.waitForTimeout(500);
+      const nowLight = await page.evaluate(() =>
+        getComputedStyle(document.documentElement).getPropertyValue('--bg-app').trim(),
+      );
+      if (paletteOf(nowLight) !== 'light') fail(`the light capture was still on the ${paletteOf(nowLight)} palette (--bg-app ${nowLight})`);
+      await page.mouse.move(1260, 8);
+      await page.waitForTimeout(200);
+      await shot(page, '07-dashboard-light.png');
+      // Back to dark, so nothing after this step inherits a light page.
+      await page.locator('.theme-toggle').click(); // light -> system
+      await page.locator('.theme-toggle').click(); // system -> dark
+      await page.waitForTimeout(300);
     }
 
     // Nothing structurally invalid went over the wire. The dashboard does not run a conversation

@@ -3,9 +3,14 @@
 // icon's context menu as well as from the side panel's Dashboard button.
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { applyStoredTheme } from '@/lib/theme';
 import { Dashboard } from './Dashboard';
 import '../sidepanel/styles.css';
 import './dashboard.css';
+
+// The authoritative read, correcting the synchronous mirror theme-boot.js already applied. Not
+// awaited: see the note in sidepanel/main.tsx.
+void applyStoredTheme();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

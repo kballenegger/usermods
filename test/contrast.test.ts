@@ -244,6 +244,58 @@ const PAIRS: Pair[] = [
     on: card,
     min: 3,
   },
+
+  // --- The dashboard (entrypoints/dashboard/dashboard.css) -----------------
+  //
+  // The full-tab page reuses the panel's tokens but puts several of them in places the panel does
+  // not, so these are the pairings that page specifically has to clear.
+  {
+    // .rowcard sits on the app background rather than inside a card, and :hover/.selected raise its
+    // edge to the accent — which is then the sole marker of which row is chosen. (The RESTING edge
+    // is deliberately not listed: --border-card is 1.10:1 on the light page, which is why the row,
+    // the stat and the bulk bar all take --shadow-raise. The shadow test below is what holds that.)
+    what: 'dashboard: selected/hovered row edge and the active section rule',
+    fg: '--accent-text',
+    on: both,
+    min: 3,
+  },
+  {
+    // The transcript preview insets a bubble and the source editor inside a white card. Both are
+    // --surface-well there, and both carry real prose.
+    what: 'dashboard: preview bubble and editor text on the well',
+    fg: '--text-1',
+    on: (t) => [{ label: 'surface-well', rgb: parseColor(resolve(t, '--surface-well')) }],
+    min: 4.5,
+  },
+  {
+    // .preview .prev-tool is --text-3 on the well, and it is the tool trace someone reads.
+    what: 'dashboard: tool trace on the well',
+    fg: '--text-3',
+    on: (t) => [{ label: 'surface-well', rgb: parseColor(resolve(t, '--surface-well')) }],
+    min: 4.5,
+  },
+  {
+    // A disabled pill and a dimmed row both recede to the well in light rather than fading, so the
+    // label they keep still has to be readable — that is the whole point of not using opacity.
+    what: 'dashboard: disabled pill label on the well it recedes to',
+    fg: '--text-3',
+    on: (t) => [{ label: 'surface-well', rgb: parseColor(resolve(t, '--surface-well')) }],
+    min: 4.5,
+  },
+  {
+    // .preview .prev-tool.is-error and .error's border are the only markers those two carry.
+    what: 'dashboard: error rail and error notice edge',
+    fg: '--error-text',
+    on: (t) => [...both(t), { label: 'surface-well', rgb: parseColor(resolve(t, '--surface-well')) }],
+    min: 3,
+  },
+  {
+    // The .badge.warn outline doubles as its only fill-free marker.
+    what: 'dashboard: warn badge outline',
+    fg: '--warn-text',
+    on: both,
+    min: 3,
+  },
 ];
 
 // ---------------------------------------------------------------------------

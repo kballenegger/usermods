@@ -96,9 +96,13 @@ place of the border they cannot rely on at that contrast. Both themes meet WCAG 
     </td>
   </tr>
   <tr>
-    <td width="100%" colspan="2" valign="top">
-      <img src="docs/screenshots/07-dashboard.png" alt="The dashboard: an overview strip, then chats grouped by host with a transcript preview open beside them.">
-      <sub><b>Dashboard.</b> Every chat and every mod in a full tab — see <a href="#dashboard">Dashboard</a> below.</sub>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/07-dashboard-light.png" alt="The dashboard in light mode: the overview strip, chats grouped by host, and a transcript preview open beside them.">
+      <sub><b>Dashboard, light.</b> Every chat and every mod in a full tab — see <a href="#dashboard">Dashboard</a> below.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/07-dashboard.png" alt="The same dashboard in dark mode.">
+      <sub><b>Dashboard, dark.</b></sub>
     </td>
   </tr>
 </table>

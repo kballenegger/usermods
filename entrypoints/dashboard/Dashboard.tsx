@@ -5,6 +5,7 @@ import { rpc } from '@/lib/rpc';
 import { loadSettings } from '@/lib/settings';
 import type { Mod, Settings } from '@/lib/types';
 import { SettingsView } from '../sidepanel/SettingsView';
+import { ThemeToggle } from '../sidepanel/components/ThemeToggle';
 import { ChatsSection } from './ChatsSection';
 import { ModsSection } from './ModsSection';
 
@@ -78,6 +79,7 @@ export function Dashboard() {
         <header className="dash-head">
           <h1>usermods</h1>
           <span className="sub">every chat and every mod, in one place</span>
+          <ThemeToggle />
         </header>
 
         <div className="overview" data-testid="overview">

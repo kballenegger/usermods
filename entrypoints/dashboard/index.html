@@ -1,9 +1,17 @@
 <!doctype html>
+<!--
+  No data-theme here: see the note in sidepanel/index.html. The attribute is left off so the first
+  paint is whatever the OS asks for, and main.tsx writes one only for an explicit choice.
+-->
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>usermods — dashboard</title>
+    <!-- Ahead of the stylesheets, and a classic script so it is not deferred past the first paint.
+         This page is a full tab, so a flash of the wrong palette is a whole screen of it.
+         See public/theme-boot.js. -->
+    <script src="/theme-boot.js"></script>
     <link rel="stylesheet" href="../sidepanel/styles.css" />
     <link rel="stylesheet" href="./dashboard.css" />
   </head>
