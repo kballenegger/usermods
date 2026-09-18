@@ -17,6 +17,22 @@ export const READ_TOOLS = new Set(['get_page', 'find_elements', 'get_styles', 's
 /** Tools that count as acting, and so reset the read counter. */
 export const ACT_TOOLS = new Set(['run_script', 'propose_mod']);
 
+/**
+ * wait_for is in NEITHER set, deliberately, and this constant exists to say so out loud.
+ *
+ * It is not a read: it returns no page content, and counting it as one would charge the model for
+ * the very fix that replaced the polling this budget was invented to punish — wait, get nudged
+ * for reading too much, go back to run_script loops.
+ *
+ * It is not an act either: a wait proves nothing about the page and must not clear a read streak,
+ * or "get_page, get_page, get_page, wait_for, get_page" would slip the budget forever.
+ *
+ * It still costs a step, because it is a model round trip like any other. Its own overuse is
+ * caught by the separate guard in lib/agent/wait.ts, which measures the thing that actually goes
+ * wrong: waiting over and over for something that is not coming.
+ */
+export const NEUTRAL_TOOLS = new Set(['wait_for']);
+
 /** More than this many reads with nothing acted on earns a nudge. */
 export const READ_BUDGET = 3;
 

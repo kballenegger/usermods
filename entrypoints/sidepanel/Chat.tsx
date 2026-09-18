@@ -6,7 +6,7 @@ import { HANDOFF_KEY, resolveHandoff, type ChatHandoff } from '@/lib/dashboard';
 import { findByName } from '@/lib/modmatch';
 import { modFromProposal } from '@/lib/mods';
 import { rpc, type AgentPortRequest } from '@/lib/rpc';
-import { RECONNECT_NOTE, looksUnfinished, reduceItems, unqueuedItem } from '@/lib/transcript';
+import { RECONNECT_NOTE, looksUnfinished, reduceItems, toolDotClass, toolDotState, toolRowTitle, unqueuedItem } from '@/lib/transcript';
 import type { AgentEvent, ChatItem, ContentEvent, ElementRef, Mod, ModProposal } from '@/lib/types';
 
 const SAVE_DEBOUNCE_MS = 400;
@@ -742,11 +742,10 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
               return (
                 <details key={i} className={`tool${it.isError ? ' error' : ''}`}>
                   <summary>
-                    <span className={`dot${it.summary === undefined ? ' running' : it.isError ? ' error' : ''}`} aria-hidden="true" />
-                    <span>
-                      {it.name}
-                      {typeof it.input.description === 'string' ? `: ${it.input.description}` : typeof it.input.selector === 'string' ? ` ${it.input.selector}` : ''}
-                    </span>
+                    {/* A wait_for that timed out takes the amber dot, not the coral one: the page
+                        did not do the thing, which is a result, not a failure. */}
+                    <span className={`dot${toolDotClass(toolDotState(it))}`} aria-hidden="true" />
+                    <span>{toolRowTitle(it.name, it.input)}</span>
                   </summary>
                   {typeof it.input.code === 'string' && <pre>{it.input.code}</pre>}
                   {it.summary && <pre>{it.summary}</pre>}

@@ -6,6 +6,17 @@ import { compact, needsCompaction } from './compact';
 import { SYSTEM_PROMPT } from './prompt';
 import { checkProposal, type ProposalContext } from './propose';
 import { TOOLS } from './tools';
+import {
+  EMPTY_TALLY,
+  foldWait,
+  markNudged,
+  parseWaitInput,
+  renderWaitResult,
+  waitAbuseNudge,
+  waitActivityDetail,
+  type WaitOutcome,
+  type WaitSpec,
+} from './wait';
 
 /** Everything a tool needs from the browser. Implemented in the background worker. */
 export interface AgentEnv {
@@ -13,6 +24,14 @@ export interface AgentEnv {
   runScript(code: string): Promise<RunResult>;
   screenshot(): Promise<{ mediaType: 'image/jpeg' | 'image/png'; data: string }>;
   pageInfo(): Promise<{ url: string; title: string }>;
+  /**
+   * Wait until a condition holds (lib/agent/wait.ts). DOM conditions go to the content script,
+   * url/load to chrome.tabs.onUpdated, `ms` to a timer — which one is the background's business,
+   * not the loop's. Never rejects: a wait that could not run reports `failure` in its outcome.
+   *
+   * The signal is the run's own: Stop must end a 15s wait immediately rather than at its timeout.
+   */
+  wait(spec: WaitSpec, signal: AbortSignal): Promise<WaitOutcome>;
 }
 
 export interface AgentInput {
@@ -101,6 +120,11 @@ export async function runAgent(input: AgentInput): Promise<Msg[]> {
     // "test it first" check reads. Held here rather than derived from the message history, because
     // by the time the history is stored a tool result is provider-neutral text.
     const ctx: ProposalContext = { testedSinceProposal: false, userText: input.turn.text };
+    // How much this turn has waited (lib/agent/wait.ts). Waiting is neither a read nor an act, so
+    // it has its own counter: it must not trip the read budget (polling was the problem wait_for
+    // exists to remove, and charging for the fix would push the model straight back to polling),
+    // and it must not reset it either (a wait proves nothing about the page).
+    let tally = EMPTY_TALLY;
     // Every other exit from the for loop is deliberate and says something; falling off the end is
     // the one that used to say nothing at all.
     let ranOut = true;
@@ -150,21 +174,34 @@ export async function runAgent(input: AgentInput): Promise<Msg[]> {
 
       const results: Part[] = [];
       let proposed = false;
+      // Real time spent inside wait_for and run_script's then_wait this iteration, so the abuse
+      // guard charges what waiting actually cost rather than what it was allowed to cost.
+      let waitedMs = 0;
       for (const call of calls) {
         emit({ type: 'tool_call', id: call.id, name: call.name, input: call.input });
         emit({ type: 'status', phase: 'tool', tool: call.name, detail: describeCall(call.name, call.input), iteration: i + 1 });
-        const r = await executeTool(call.name, call.input, env, emit, ctx);
+        const r = await executeTool(call.name, call.input, env, emit, ctx, signal);
         emit({ type: 'tool_result', id: call.id, summary: summarize(r.content), isError: !!r.isError });
         results.push({ type: 'tool_result', toolCallId: call.id, content: r.content, isError: r.isError });
         if (call.name === 'propose_mod' && !r.isError) proposed = true;
+        waitedMs += r.waitedMs ?? 0;
       }
 
       // Both nudges ride along with the tool results rather than as a separate user message, so the
       // history keeps its assistant/tool-result pairing and no orphan turn appears in the panel.
       const before = reads;
-      reads = countReads(reads, calls.map((c) => c.name));
+      const names = calls.map((c) => c.name);
+      reads = countReads(reads, names);
       const budget = readBudgetNudge(reads, before);
       if (budget) results.push({ type: 'text', text: budget });
+      // The waiting guard. A turn that waits, acts, waits, acts is using the tool as intended and
+      // is never nudged; a turn that has stopped doing anything but wait is told so once.
+      tally = foldWait(tally, names, waitedMs);
+      const waited = waitAbuseNudge(tally);
+      if (waited) {
+        results.push({ type: 'text', text: waited });
+        tally = markNudged(tally);
+      }
       const wrapUp = wrapUpNudge(i);
       if (wrapUp) results.push({ type: 'text', text: wrapUp });
 
@@ -198,6 +235,13 @@ export async function runAgent(input: AgentInput): Promise<Msg[]> {
  * carries its own description; the page-inspection tools are best described by what they look at.
  */
 function describeCall(name: string, input: Record<string, unknown>): string | undefined {
+  // A wait says what it is waiting for, which is what makes a 15s pause legible rather than a
+  // hang: "waiting for .result · 3s". The identifier is truncated in lib/agent/wait.ts so a long
+  // selector cannot push the elapsed timer off a 420px panel.
+  if (name === 'wait_for') {
+    const parsed = parseWaitInput(input);
+    return parsed.ok ? waitActivityDetail(parsed.spec.condition) : 'waiting';
+  }
   if (name === 'run_script' && typeof input.description === 'string' && input.description.trim()) return input.description.trim();
   if ((name === 'find_elements' || name === 'get_styles' || name === 'get_page') && typeof input.selector === 'string' && input.selector.trim()) {
     return input.selector.trim();
@@ -213,10 +257,17 @@ function summarize(parts: Part[]): string {
   return '';
 }
 
-function text(s: string): { content: Part[]; isError?: boolean } {
+/** What one tool call produced. `waitedMs` is real time spent waiting, for the abuse guard. */
+interface ToolOutcome {
+  content: Part[];
+  isError?: boolean;
+  waitedMs?: number;
+}
+
+function text(s: string): ToolOutcome {
   return { content: [{ type: 'text', text: s }] };
 }
-function err(s: string): { content: Part[]; isError: true } {
+function err(s: string): ToolOutcome & { isError: true } {
   return { content: [{ type: 'text', text: s }], isError: true };
 }
 
@@ -226,7 +277,8 @@ async function executeTool(
   env: AgentEnv,
   emit: (e: AgentEventBody) => void,
   ctx: ProposalContext,
-): Promise<{ content: Part[]; isError?: boolean }> {
+  signal: AbortSignal,
+): Promise<ToolOutcome> {
   try {
     switch (name) {
       case 'get_page': {
@@ -254,12 +306,51 @@ async function executeTool(
       }
       case 'run_script': {
         if (typeof input.code !== 'string') return err('code is required');
+        // then_wait is parsed BEFORE the code runs: a malformed condition should cost nothing and
+        // change nothing, rather than mutate the page and then report an input error.
+        let thenWait: WaitSpec | null = null;
+        if (input.then_wait !== undefined && input.then_wait !== null) {
+          const parsed = parseWaitInput(input.then_wait);
+          if (!parsed.ok) return err(`then_wait: ${parsed.error}`);
+          thenWait = parsed.spec;
+        }
         const r = await env.runScript(input.code);
         const rendered = renderRunResult(r);
         // Only a run that actually completed counts as having tested the script. A navigation, a
         // timeout or a throw proves nothing, so propose_mod will still ask for a real test.
         if (r.outcome.kind === 'ok') ctx.testedSinceProposal = true;
-        return rendered.isError ? err(rendered.text) : text(rendered.text);
+        if (!thenWait) return rendered.isError ? err(rendered.text) : text(rendered.text);
+
+        // The composition case. A script that navigates loses its result (renderRunResult says so,
+        // and rightly — normally that IS a lost result). But when the model said it was waiting for
+        // a url or load condition, the navigation is the thing it asked for, so the same outcome
+        // stops being a loss and becomes the expected first half of a successful step. The wait
+        // below then confirms it, and the two halves are reported together either way.
+        const navigatedAsExpected = r.outcome.kind === 'navigated' && (thenWait.condition.kind === 'url' || thenWait.condition.kind === 'load');
+        const startedAt = Date.now();
+        const outcome = await env.wait(thenWait, signal);
+        const waitedMs = Date.now() - startedAt;
+        const waitText = renderWaitResult(thenWait, outcome).text;
+
+        const scriptLine = navigatedAsExpected
+          ? `The script ran and the page navigated to ${(r.outcome as Extract<RunResult['outcome'], { kind: 'navigated' }>).url}, which is what then_wait was waiting for.`
+          : rendered.text;
+        const combined = `${scriptLine}\n\nthen_wait: ${waitText}`;
+        // A failed wait (a closed tab, a torn-down page) is an error; a timeout is not, and neither
+        // is a navigation the model asked for.
+        const isError = outcome.failure ? true : navigatedAsExpected ? false : rendered.isError;
+        return { content: [{ type: 'text', text: combined }], isError: isError || undefined, waitedMs };
+      }
+      case 'wait_for': {
+        const parsed = parseWaitInput(input);
+        // Invalid input is the one thing here that IS an error: the model wrote a condition that
+        // cannot be answered, and telling it so is more useful than waiting 5s to say nothing.
+        if (!parsed.ok) return err(parsed.error);
+        const startedAt = Date.now();
+        const outcome = await env.wait(parsed.spec, signal);
+        const waitedMs = Date.now() - startedAt;
+        const rendered = renderWaitResult(parsed.spec, outcome);
+        return { content: [{ type: 'text', text: rendered.text }], isError: rendered.isError || undefined, waitedMs };
       }
       case 'screenshot': {
         const img = await env.screenshot();
