@@ -69,10 +69,17 @@ export type AgentEvent =
   | { type: 'done' }
   | { type: 'error'; message: string };
 
-/** Context the side panel attaches to a user message. */
+/** An element the user picked on the page. */
 export interface PickedElement {
   selector: string;
   html: string;
+  /** Short human label, e.g. `button "Subscribe"`. */
+  label: string;
+}
+
+/** A picked element bound to an @token the user typed in their message. */
+export interface ElementRef extends PickedElement {
+  token: string;
 }
 
 // Messages between the side panel / background and the content script.

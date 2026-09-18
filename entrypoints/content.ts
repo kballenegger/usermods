@@ -47,6 +47,13 @@ export default defineContentScript({
       }
     });
 
+    function labelFor(el: Element): string {
+      const tag = el.tagName.toLowerCase();
+      const text = (el.getAttribute('aria-label') ?? (el as HTMLElement).innerText ?? el.textContent ?? '').replace(/\s+/g, ' ').trim();
+      const short = text.length > 30 ? text.slice(0, 30) + '…' : text;
+      return short ? `${tag} "${short}"` : tag;
+    }
+
     function startPicker(): () => void {
       const overlay = document.createElement('div');
       Object.assign(overlay.style, {
@@ -100,7 +107,7 @@ export default defineContentScript({
         e.stopPropagation();
         if (!current) return finish({ type: 'pick-cancelled' });
         const html = current.outerHTML.length > 4000 ? snapshot({ root: current, maxChars: 4000 }) : current.outerHTML;
-        finish({ type: 'picked', element: { selector: selectorFor(current), html } });
+        finish({ type: 'picked', element: { selector: selectorFor(current), html, label: labelFor(current) } });
       };
       const onKey = (e: KeyboardEvent) => {
         if (e.key === 'Escape') {

@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { modFromProposal } from '@/lib/mods';
 import { rpc, type AgentPortRequest } from '@/lib/rpc';
-import type { AgentEvent, ContentEvent, ModProposal, PickedElement } from '@/lib/types';
+import type { AgentEvent, ContentEvent, ElementRef, ModProposal } from '@/lib/types';
 
 type Item =
-  | { kind: 'user'; text: string; picked?: PickedElement }
+  | { kind: 'user'; text: string; refs?: ElementRef[] }
   | { kind: 'assistant'; text: string }
   | { kind: 'tool'; id: string; name: string; input: Record<string, unknown>; summary?: string; isError?: boolean }
   | { kind: 'proposal'; proposal: ModProposal; saved?: boolean }
@@ -14,8 +14,9 @@ export function Chat({ tabId, pageUrl }: { tabId: number | null; pageUrl: string
   const [items, setItems] = useState<Item[]>([]);
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
-  const [picked, setPicked] = useState<PickedElement | null>(null);
+  const [refs, setRefs] = useState<ElementRef[]>([]);
   const [picking, setPicking] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const portRef = useRef<chrome.runtime.Port | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [hasHistory, setHasHistory] = useState(false);
@@ -28,8 +29,12 @@ export function Chat({ tabId, pageUrl }: { tabId: number | null; pageUrl: string
   useEffect(() => {
     const onMsg = (msg: ContentEvent) => {
       if (msg?.type === 'picked') {
-        setPicked(msg.element);
         setPicking(false);
+        setRefs((prev) => {
+          const token = uniqueToken(tokenFor(msg.element.selector), prev.map((r) => r.token));
+          insertAtCursor(`@${token} `);
+          return [...prev, { ...msg.element, token }];
+        });
       } else if (msg?.type === 'pick-cancelled') setPicking(false);
     };
     chrome.runtime.onMessage.addListener(onMsg);
@@ -83,14 +88,40 @@ export function Chat({ tabId, pageUrl }: { tabId: number | null; pageUrl: string
     return port;
   }
 
+  /** Insert text at the caret in the composer and keep focus there. */
+  function insertAtCursor(snippet: string) {
+    const ta = textareaRef.current;
+    setText((prev) => {
+      if (!ta) return prev + snippet;
+      const start = ta.selectionStart ?? prev.length;
+      const end = ta.selectionEnd ?? start;
+      const before = prev.slice(0, start);
+      const pad = before && !/\s$/.test(before) ? ' ' : '';
+      const next = before + pad + snippet + prev.slice(end);
+      const caret = (before + pad + snippet).length;
+      requestAnimationFrame(() => {
+        ta.focus();
+        ta.setSelectionRange(caret, caret);
+      });
+      return next;
+    });
+  }
+
+  function removeRef(token: string) {
+    setRefs((prev) => prev.filter((r) => r.token !== token));
+    setText((prev) => prev.replace(new RegExp(`@${escapeRe(token)}(?![\\w.#-])\\s?`, 'g'), ''));
+  }
+
   function send() {
     const t = text.trim();
     if (!t || busy || tabId == null) return;
-    setItems((prev) => [...prev, { kind: 'user', text: t, picked: picked ?? undefined }]);
+    // Only send references whose token still appears in the message.
+    const used = refs.filter((r) => new RegExp(`@${escapeRe(r.token)}(?![\\w.#-])`).test(t));
+    setItems((prev) => [...prev, { kind: 'user', text: t, refs: used.length ? used : undefined }]);
     setText('');
     setBusy(true);
-    const req: AgentPortRequest = { type: 'send', tabId, text: t, picked: picked ?? undefined };
-    setPicked(null);
+    const req: AgentPortRequest = { type: 'send', tabId, text: t, refs: used.length ? used : undefined };
+    setRefs([]);
     connect().postMessage(req);
   }
 
@@ -158,8 +189,12 @@ export function Chat({ tabId, pageUrl }: { tabId: number | null; pageUrl: string
             case 'user':
               return (
                 <div key={i} className="msg user">
-                  {it.picked && <div className="chip" title={it.picked.selector}>⌖ {it.picked.selector}</div>}
                   {it.text}
+                  {it.refs && (
+                    <div className="row" style={{ marginTop: 4 }}>
+                      {it.refs.map((r) => <span key={r.token} className="chip" title={r.selector}>@{r.token} → {r.label}</span>)}
+                    </div>
+                  )}
                 </div>
               );
             case 'assistant':
@@ -201,13 +236,18 @@ export function Chat({ tabId, pageUrl }: { tabId: number | null; pageUrl: string
         <div ref={bottomRef} />
       </div>
       <div className="composer">
-        {picked && (
+        {refs.length > 0 && (
           <div className="row">
-            <span className="chip grow" title={picked.selector}>⌖ {picked.selector}</span>
-            <button className="btn" onClick={() => setPicked(null)}>×</button>
+            {refs.map((r) => (
+              <span key={r.token} className="chip" title={r.selector}>
+                @{r.token} → {r.label}{' '}
+                <button className="chip-x" onClick={() => removeRef(r.token)} title="Remove reference">×</button>
+              </span>
+            ))}
           </div>
         )}
         <textarea
+          ref={textareaRef}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
@@ -216,12 +256,12 @@ export function Chat({ tabId, pageUrl }: { tabId: number | null; pageUrl: string
               send();
             }
           }}
-          placeholder={unsupported ? 'Open a web page first' : 'What should this page do differently?'}
+          placeholder={unsupported ? 'Open a web page first' : 'What should this page do differently? Use ⌖ to point at elements.'}
           disabled={unsupported}
         />
         <div className="row">
-          <button className="btn" onClick={() => void pick()} disabled={picking || unsupported || tabId == null}>
-            {picking ? 'Click an element…' : '⌖ Pick element'}
+          <button className="btn" onClick={() => void pick()} disabled={picking || unsupported || tabId == null} title="Click an element on the page to reference it in your message">
+            {picking ? 'Click an element…' : '⌖ Point at element'}
           </button>
           <button className="btn" onClick={() => void reset()} disabled={items.length === 0 && !hasHistory}>New chat</button>
           <span className="grow" />
@@ -234,4 +274,20 @@ export function Chat({ tabId, pageUrl }: { tabId: number | null; pageUrl: string
       </div>
     </div>
   );
+}
+
+/** A short, readable token from a selector's last segment, e.g. `#main-nav > a.logo` → `a.logo`. */
+function tokenFor(selector: string): string {
+  const last = selector.split('>').pop()?.trim() ?? selector;
+  const cleaned = last.replace(/:nth-of-type\(\d+\)/g, '').replace(/[^\w.#-]/g, '');
+  return cleaned.replace(/^\./, '').slice(0, 24) || 'el';
+}
+
+function uniqueToken(base: string, taken: string[]): string {
+  if (!taken.includes(base)) return base;
+  for (let i = 2; ; i++) if (!taken.includes(`${base}${i}`)) return `${base}${i}`;
+}
+
+function escapeRe(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

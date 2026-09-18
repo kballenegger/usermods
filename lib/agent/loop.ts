@@ -1,5 +1,5 @@
 import { createProvider } from '../providers';
-import type { AgentEvent, ModProposal, Msg, Part, PickedElement, Settings } from '../types';
+import type { AgentEvent, ElementRef, ModProposal, Msg, Part, Settings } from '../types';
 import { SYSTEM_PROMPT } from './prompt';
 import { TOOLS } from './tools';
 
@@ -17,7 +17,7 @@ export interface AgentInput {
   settings: Settings;
   history: Msg[];
   text: string;
-  picked?: PickedElement;
+  refs?: ElementRef[];
   env: AgentEnv;
   emit: (e: AgentEvent) => void;
   signal: AbortSignal;
@@ -31,8 +31,9 @@ export async function runAgent(input: AgentInput): Promise<Msg[]> {
   const page = await env.pageInfo();
   const userParts: Part[] = [];
   const contextLines = [`[Current page: ${page.title} — ${page.url}]`];
-  if (input.picked) {
-    contextLines.push(`[User selected element: ${input.picked.selector}]`, input.picked.html);
+  for (const ref of input.refs ?? []) {
+    const html = ref.html.length > 2500 ? ref.html.slice(0, 2500) + '…' : ref.html;
+    contextLines.push(`[@${ref.token} = ${ref.label} — selector: ${ref.selector}]`, html);
   }
   userParts.push({ type: 'text', text: `${contextLines.join('\n')}\n\n${input.text}` });
   messages.push({ role: 'user', content: userParts });

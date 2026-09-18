@@ -59,7 +59,7 @@ export default defineBackground(() => {
             settings,
             history,
             text: req.text,
-            picked: req.picked,
+            refs: req.refs,
             env: envForTab(req.tabId),
             emit: post,
             signal,

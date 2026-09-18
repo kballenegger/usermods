@@ -17,8 +17,8 @@ const PRESETS: Array<{ label: string; apply: Partial<Settings> }> = [
 ];
 
 export function SettingsView() {
-  const [s, setS] = useState<Settings>(DEFAULT_SETTINGS);
-  const [saved, setSaved] = useState(false);
+  const [s, setS] = useState<Settings | null>(null);
+  const [saved, setSaved] = useState(true);
   const [models, setModels] = useState<string[]>([]);
   const [modelsError, setModelsError] = useState('');
 
@@ -26,17 +26,24 @@ export function SettingsView() {
     loadSettings().then(setS);
   }, []);
 
+  // Autosave: every change is persisted after a short pause, so nothing depends on a Save button.
+  useEffect(() => {
+    if (!s || saved) return;
+    const t = window.setTimeout(() => {
+      void saveSettings(s).then(() => setSaved(true));
+    }, 300);
+    return () => window.clearTimeout(t);
+  }, [s, saved]);
+
   function update(patch: Partial<Settings>) {
-    setS((prev) => ({ ...prev, ...patch }));
+    setS((prev) => ({ ...(prev ?? DEFAULT_SETTINGS), ...patch }));
     setSaved(false);
   }
-  async function save() {
-    await saveSettings(s);
-    setSaved(true);
-  }
   async function fetchModels() {
+    if (!s) return;
     setModelsError('');
     await saveSettings(s); // the background reads settings to know which backend to ask
+    setSaved(true);
     try {
       const list = await rpc({ type: 'models.list' });
       setModels(list);
@@ -46,6 +53,7 @@ export function SettingsView() {
     }
   }
 
+  if (!s) return <div className="view muted">Loading…</div>;
   const subscription = s.provider === 'chatgpt' || s.provider === 'xai';
 
   return (
@@ -94,10 +102,7 @@ export function SettingsView() {
         {models.length > 0 && <span>{models.length} models available. Start typing to filter.</span>}
       </label>
 
-      <div className="row">
-        <button className="btn primary" onClick={() => void save()}>Save</button>
-        {saved && <span className="muted">Saved.</span>}
-      </div>
+      <div className="muted" style={{ fontSize: 12 }}>{saved ? 'All changes saved.' : 'Saving…'}</div>
       <p className="muted" style={{ marginTop: 20 }}>
         {subscription
           ? "Sign-in tokens are stored in this extension's local storage on this device and sent only to the vendor. Usage counts against your plan limits."

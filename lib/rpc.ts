@@ -1,4 +1,4 @@
-import type { AgentEvent, Mod, PickedElement } from './types';
+import type { AgentEvent, ElementRef, Mod } from './types';
 
 export type OAuthKind = 'chatgpt' | 'xai';
 export type OAuthLoginState =
@@ -52,5 +52,5 @@ export async function rpc<T extends RpcRequest['type']>(req: Extract<RpcRequest,
 }
 
 /** Messages over the long-lived "agent" port. */
-export type AgentPortRequest = { type: 'send'; tabId: number; text: string; picked?: PickedElement } | { type: 'abort' };
+export type AgentPortRequest = { type: 'send'; tabId: number; text: string; refs?: ElementRef[] } | { type: 'abort' };
 export type AgentPortEvent = AgentEvent;
