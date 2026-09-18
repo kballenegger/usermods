@@ -107,6 +107,18 @@ export type AgentEvent =
   | { type: 'done' }
   | { type: 'error'; message: string };
 
+/**
+ * One row of the side-panel transcript. Stored as-is in chrome.storage.local, so every member
+ * must stay JSON-serializable.
+ */
+export type ChatItem =
+  | { kind: 'user'; id: string; text: string; refs?: ElementRef[]; queued?: boolean }
+  | { kind: 'assistant'; text: string }
+  | { kind: 'tool'; id: string; name: string; input: Record<string, unknown>; summary?: string; isError?: boolean }
+  | { kind: 'proposal'; proposal: ModProposal; saved?: boolean }
+  | { kind: 'note'; text: string }
+  | { kind: 'error'; text: string };
+
 /** A user message travelling from the side panel to the agent. */
 export interface UserTurn {
   id: string;

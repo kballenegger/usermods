@@ -1,3 +1,4 @@
+import type { Chat } from './chats';
 import type { AgentEvent, Mod, ScriptPreview, UserTurn } from './types';
 
 export type OAuthKind = 'chatgpt' | 'xai';
@@ -29,8 +30,10 @@ export type RpcRequest =
   | { type: 'userScripts.status' }
   | { type: 'page.pick'; tabId: number }
   | { type: 'page.info'; tabId: number }
-  | { type: 'chat.reset'; tabId: number }
-  | { type: 'chat.hasHistory'; tabId: number }
+  | { type: 'chats.list'; host: string }
+  | { type: 'chats.create'; host: string }
+  | { type: 'chats.delete'; id: string }
+  | { type: 'chats.rename'; id: string; title: string }
   | { type: 'oauth.status'; kind: OAuthKind }
   | { type: 'oauth.start'; kind: OAuthKind }
   | { type: 'oauth.poll'; kind: OAuthKind }
@@ -51,11 +54,12 @@ interface RpcResults {
   'mods.try': { ok: boolean; result?: string; logs: string[]; error?: string };
   'userScripts.status': { available: boolean; message: string };
   'page.info': { url: string; title: string };
-  'chat.hasHistory': boolean;
   'oauth.status': { signedIn: boolean; label?: string };
   'oauth.start': OAuthLoginState;
   'oauth.poll': OAuthLoginState;
   'models.list': string[];
+  'chats.list': Chat[];
+  'chats.create': Chat;
 }
 
 export type RpcResponse<T extends RpcRequest['type']> = T extends keyof RpcResults ? RpcResults[T] : { ok: true };
@@ -68,5 +72,5 @@ export async function rpc<T extends RpcRequest['type']>(req: Extract<RpcRequest,
 }
 
 /** Messages over the long-lived "agent" port. */
-export type AgentPortRequest = ({ type: 'send'; tabId: number } & UserTurn) | { type: 'abort' };
+export type AgentPortRequest = ({ type: 'send'; tabId: number; chatId: string } & UserTurn) | { type: 'abort' };
 export type AgentPortEvent = AgentEvent;

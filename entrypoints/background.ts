@@ -2,6 +2,7 @@ import { runAgent, type AgentEnv } from '@/lib/agent/loop';
 import { buildRegisteredCode, gmValuesKey, loadGmValues, type GmMessage } from '@/lib/gm';
 import { fetchText, previewFromUrl, resolveDependencies } from '@/lib/install';
 import { loadMods, modFromSource, parseHeader, previewFromSource, upsertMod, deleteMod, saveMods } from '@/lib/mods';
+import { createChat, deleteChat, listChats, loadMessages, renameChat, saveMessages, touchChat } from '@/lib/chats';
 import {
   CHATGPT_CODEX_BASE,
   XAI_PROXY_BASE,
@@ -58,7 +59,7 @@ export default defineBackground(() => {
       }
     };
 
-    async function run(tabId: number, turn: UserTurn) {
+    async function run(tabId: number, chatId: string, turn: UserTurn) {
       running = true;
       controller = new AbortController();
       const signal = controller.signal;
@@ -67,7 +68,9 @@ export default defineBackground(() => {
         const usesKey = settings.provider === 'anthropic' || settings.provider === 'openai-compatible';
         if (usesKey && !settings.apiKey && !settings.baseUrl) throw new Error('Add an API key in Settings first (or a base URL for a local server or proxy).');
         if (!settings.model) throw new Error('Choose a model in Settings first.');
-        const history = await loadHistory(tabId);
+        const history = await loadMessages(chatId);
+        // The first message of a chat names it.
+        await touchChat(chatId, history.length ? {} : { title: turn.text });
         const messages = await runAgent({
           settings,
           history,
@@ -77,14 +80,15 @@ export default defineBackground(() => {
           emit: post,
           signal,
         });
-        await saveHistory(tabId, messages);
+        await saveMessages(chatId, messages);
+        await touchChat(chatId);
       } catch (e) {
         post({ type: 'error', message: e instanceof Error ? e.message : String(e) });
       }
       running = false;
       // Stop clears the queue; otherwise anything still waiting starts the next turn.
       const next = queue.shift();
-      if (next && !signal.aborted) void run(tabId, next);
+      if (next && !signal.aborted) void run(tabId, chatId, next);
       else post({ type: 'done' });
     }
 
@@ -96,7 +100,7 @@ export default defineBackground(() => {
       }
       const turn: UserTurn = { id: req.id, text: req.text, refs: req.refs };
       if (running) queue.push(turn);
-      else void run(req.tabId, turn);
+      else void run(req.tabId, req.chatId, turn);
     });
     port.onDisconnect.addListener(() => controller?.abort());
   });
@@ -200,11 +204,16 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
       const tab = await chrome.tabs.get(req.tabId);
       return { url: tab.url ?? '', title: tab.title ?? '' };
     }
-    case 'chat.reset':
-      await chrome.storage.session.remove(historyKey(req.tabId));
+    case 'chats.list':
+      return listChats(req.host);
+    case 'chats.create':
+      return createChat(req.host);
+    case 'chats.delete':
+      await deleteChat(req.id);
       return { ok: true };
-    case 'chat.hasHistory':
-      return (await loadHistory(req.tabId)).length > 0;
+    case 'chats.rename':
+      await renameChat(req.id, req.title);
+      return { ok: true };
     case 'oauth.status': {
       const t = await loadTokens(req.kind);
       return { signedIn: !!t, label: t?.label };
@@ -560,26 +569,4 @@ function envForTab(tabId: number): AgentEnv {
       return { url: tab.url ?? '', title: tab.title ?? '' };
     },
   };
-}
-
-// ---------- chat history (per tab, session-scoped) ----------
-
-const historyKey = (tabId: number) => `chat:${tabId}`;
-
-async function loadHistory(tabId: number): Promise<Msg[]> {
-  const r = await chrome.storage.session.get(historyKey(tabId));
-  return (r[historyKey(tabId)] as Msg[] | undefined) ?? [];
-}
-
-async function saveHistory(tabId: number, messages: Msg[]): Promise<void> {
-  // Screenshots are large; drop image data from stored history to stay under the session quota.
-  const slim = messages.map((m) => ({
-    ...m,
-    content: m.content.map((p) =>
-      p.type === 'tool_result'
-        ? { ...p, content: p.content.map((c) => (c.type === 'image' ? { type: 'text' as const, text: '[screenshot omitted from history]' } : c)) }
-        : p,
-    ),
-  }));
-  await chrome.storage.session.set({ [historyKey(tabId)]: slim });
 }

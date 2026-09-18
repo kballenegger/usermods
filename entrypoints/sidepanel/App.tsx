@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { hostFromUrl } from '@/lib/chats';
 import { rpc } from '@/lib/rpc';
 import { Chat } from './Chat';
 import { ModsView } from './ModsView';
@@ -42,12 +43,7 @@ export function App() {
     return () => window.removeEventListener('focus', onFocus);
   }, []);
 
-  let host = '';
-  try {
-    host = pageUrl ? new URL(pageUrl).hostname : '';
-  } catch {
-    /* chrome:// etc */
-  }
+  const host = hostFromUrl(pageUrl);
 
   return (
     <div className="app">
@@ -59,7 +55,7 @@ export function App() {
         <span className="status" title={pageUrl}>{host}</span>
       </nav>
       {usStatus && !usStatus.available && <div className="notice">{usStatus.message}</div>}
-      {tab === 'chat' && <Chat tabId={tabId} pageUrl={pageUrl} />}
+      {tab === 'chat' && <Chat tabId={tabId} pageUrl={pageUrl} host={host} />}
       {tab === 'mods' && <ModsView tabId={tabId} pageUrl={pageUrl} />}
       {tab === 'settings' && <SettingsView />}
     </div>
