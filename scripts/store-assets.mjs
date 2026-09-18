@@ -188,7 +188,18 @@ async function openSite(ctx, url) {
   return site;
 }
 
+/**
+ * Wait until the panel has found its target tab and the composer is live. The composer is disabled
+ * until the panel's tab query returns a real web page, and a flat sleep is a bet on how fast the
+ * host is: when it loses, the send lands on a disabled control and the proposal card never comes.
+ * See the same helper in scripts/screenshots.mjs.
+ */
+async function waitForComposer(panel, timeout = 30_000) {
+  await panel.locator('textarea:not([disabled])').waitFor({ state: 'visible', timeout });
+}
+
 async function runConversation(panel, text) {
+  await waitForComposer(panel);
   await panel.locator('textarea').fill(text);
   await panel.locator('.composer button.btn.primary').click();
   await panel.locator('.messages .card h4').first().waitFor({ timeout: 60_000 });
@@ -321,7 +332,7 @@ const tmp = (name) => path.join(os.tmpdir(), `usermods-store-${name}-${process.p
 async function shotChat(b, composer) {
   const panel = await openPanel(b.ctx, b.extId);
   const site = await openSite(b.ctx, WIKI);
-  await panel.waitForTimeout(1200);
+  await waitForComposer(panel);
   await runConversation(panel, 'hide the sidebar and make the article full width');
 
   const l = tmp('chat-site');
@@ -342,7 +353,7 @@ async function shotChat(b, composer) {
 async function shotRefs(b, composer) {
   const panel = await openPanel(b.ctx, b.extId);
   const site = await openSite(b.ctx, WIKI);
-  await panel.waitForTimeout(1200);
+  await waitForComposer(panel);
   await runConversation(panel, 'hide the sidebar and make the article full width');
 
   // The genuine element picker: the panel starts it, the content script broadcasts the pick.

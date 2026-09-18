@@ -195,6 +195,23 @@ async function shot(page, name) {
 }
 
 /**
+ * Reload the panel and wait until it is usable again, without trusting the reload's own promise.
+ *
+ * A reload issued while a run is still streaming into the panel can navigate — the call log shows
+ * "navigated to sidepanel.html" — and yet never resolve its wait, so both the default 'load' and
+ * 'domcontentloaded' time out at 30s on a page that is plainly up and serving. Every caller
+ * establishes real readiness immediately afterwards (a transcript row, the switcher, the composer,
+ * or a chrome.storage read), so the navigation promise buys nothing beyond starting the reload.
+ *
+ * Instead: kick the reload off, then prove the document is live and the extension APIs are bound.
+ */
+async function reloadPanel(panel) {
+  await panel.reload({ waitUntil: 'domcontentloaded', timeout: 10_000 }).catch(() => {});
+  await panel.waitForFunction(() => typeof chrome !== 'undefined' && !!chrome.storage?.local, null, { timeout: 30_000 });
+  await panel.addStyleTag({ content: MASK }).catch(() => {});
+}
+
+/**
  * Wait until the panel has found its target tab and the composer is live.
  *
  * The composer is `disabled={unsupported}` until the panel's tab query comes back with a real web
@@ -222,8 +239,7 @@ async function runConversation(panel, text, { refreshTitle = false } = {}) {
   // reads "New chat" until the next refresh. Nudging the list here shows the real title, which is
   // what the switcher looks like any time after the first turn.
   if (refreshTitle) {
-    await panel.reload({ waitUntil: 'domcontentloaded' });
-    await panel.addStyleTag({ content: MASK }).catch(() => {});
+    await reloadPanel(panel);
     // The restored transcript, and the switcher now showing the real title rather than "New chat".
     await panel.locator('.messages .card h4').first().waitFor({ timeout: 20_000 });
     await panel
@@ -797,26 +813,9 @@ async function waitForSwitcherLabel(panel, text, timeout = 25_000) {
   return label;
 }
 
-/**
- * Reload the panel tab the way a user reopening the side panel would, and settle.
- *
- * The reload's own promise is deliberately not trusted. The isolation flow reopens the panel while
- * a run is STILL STREAMING into it, and a reload issued then can navigate — the call log shows
- * "navigated to sidepanel.html" — without its wait ever resolving, so both the default 'load' and
- * 'domcontentloaded' time out at 30s on a page that is plainly up and serving. The panel's
- * readiness is established below and re-asserted by every caller anyway (the transcript, the
- * switcher row, the composer, or a chrome.storage read), so the navigation promise is worth
- * nothing here beyond kicking the reload off.
- *
- * So: ask for the reload, give it a short window, and then prove the page is usable by round-
- * tripping through the extension API the callers actually depend on.
- */
+/** Reload the panel tab the way a user reopening the side panel would (reloadPanel), and settle. */
 async function reopenPanel(panel) {
-  await panel.reload({ waitUntil: 'domcontentloaded', timeout: 10_000 }).catch(() => {});
-  // The real readiness check: an evaluate that reaches chrome.storage means the document is live
-  // and the extension APIs are bound, which is all any caller needs.
-  await panel.waitForFunction(() => typeof chrome !== 'undefined' && !!chrome.storage?.local, null, { timeout: 30_000 });
-  await panel.addStyleTag({ content: MASK }).catch(() => {});
+  await reloadPanel(panel);
   // Long enough for the host lookup, the chat lookup and the transcript read to all resolve.
   await panel.waitForTimeout(2500);
 }
