@@ -17,6 +17,8 @@ export interface Mod {
   world: 'USER_SCRIPT' | 'MAIN';
   allFrames: boolean;
   grants: string[];
+  /** Raw @connect values (e.g. "api.example.com", "*", "self", "localhost"), enforced for GM_xmlhttpRequest. */
+  connect: string[];
   /** @require scripts, fetched at install time and prepended to the code. */
   requires: Array<{ url: string; code: string }>;
   /** @resource entries, fetched at install time. */
@@ -39,6 +41,8 @@ export interface ScriptPreview {
   matches: string[];
   includeGlobs: string[];
   grants: string[];
+  /** Raw @connect values the script asks for. */
+  connect: string[];
   requires: string[];
   resources: string[];
   world: Mod['world'];

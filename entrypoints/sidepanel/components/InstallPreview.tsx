@@ -60,6 +60,16 @@ export function InstallPreview({
         </Section>
       )}
 
+      {preview.connect.length > 0 && (
+        <Section label="Can request">
+          {preview.connect.map((c) => (
+            <span key={c} className="chip" title={c === '*' ? 'This script may request any host.' : `GM_xmlhttpRequest may reach ${c}`}>
+              {c}
+            </span>
+          ))}
+        </Section>
+      )}
+
       {preview.requires.length > 0 && (
         <Section label={`Loads ${preview.requires.length} librar${preview.requires.length === 1 ? 'y' : 'ies'}`}>
           {preview.requires.map((u) => (

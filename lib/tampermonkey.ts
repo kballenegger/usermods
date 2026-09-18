@@ -140,7 +140,8 @@ export function parseTampermonkeyJson(text: string): TmParseResult {
   return { scripts, skipped };
 }
 
-const baseName = (p: string) => p.replace(/\\/g, '/').split('/').pop() ?? p;
+const normalizePath = (p: string) => p.replace(/\\/g, '/').replace(/^\.?\//, '');
+const baseName = (p: string) => normalizePath(p).split('/').pop() ?? p;
 
 /**
  * Parse the ZIP export, given its already-unzipped entries as text.
@@ -157,24 +158,28 @@ export function parseTampermonkeyZipEntries(files: Record<string, string>): TmPa
   for (const [path, text] of Object.entries(files)) {
     const file = baseName(path);
     if (!file || file.startsWith('.') || path.endsWith('/')) continue;
+    // Key by the full path with the suffix stripped, not the basename: an export may hold both
+    // scripts/tool.user.js and archive/tool.user.js, and keying by "tool" would collapse them and
+    // cross-attach each other's sidecars. The basename is only used for the display name.
+    const dir = normalizePath(path).replace(/[^/]*$/, '');
     const optionsStem = file.match(/^(.*?)\.options\.json$/i)?.[1];
     const storageStem = file.match(/^(.*?)\.storage\.json$/i)?.[1];
     const sourceStem = file.match(/^(.*?)\.user\.js$/i)?.[1];
     try {
       if (optionsStem != null) {
         const j = JSON.parse(text) as unknown;
-        if (isObject(j)) options.set(optionsStem, j);
+        if (isObject(j)) options.set(dir + optionsStem, j);
       } else if (storageStem != null) {
-        storages.set(storageStem, JSON.parse(text) as unknown);
+        storages.set(dir + storageStem, JSON.parse(text) as unknown);
       } else if (sourceStem != null) {
-        sources.set(sourceStem, text);
+        sources.set(dir + sourceStem, text);
       } else if (/\.(txt|json)$/i.test(file)) {
         // Older exports: one JSON script object per .txt entry.
         const s = scriptFromEntry(JSON.parse(text) as unknown, file.replace(/\.(txt|json)$/i, ''));
         if (s) scripts.push(s);
         else skipped.push(`${file} (no userscript source)`);
       } else if (text.includes('==UserScript==')) {
-        sources.set(file, text);
+        sources.set(normalizePath(path), text);
       }
     } catch (e) {
       skipped.push(`${file} (${e instanceof Error ? e.message : String(e)})`);
@@ -183,10 +188,11 @@ export function parseTampermonkeyZipEntries(files: Record<string, string>): TmPa
 
   for (const [stem, source] of sources) {
     const opts = options.get(stem);
-    const entry: Json = { source, name: stem };
+    const display = baseName(stem);
+    const entry: Json = { source, name: display };
     if (opts) entry['options'] = opts;
     if (storages.has(stem)) entry['storage'] = storages.get(stem);
-    const s = scriptFromEntry(entry, stem);
+    const s = scriptFromEntry(entry, display);
     if (s) scripts.push(s);
     else skipped.push(`${stem}.user.js (no userscript header)`);
   }
