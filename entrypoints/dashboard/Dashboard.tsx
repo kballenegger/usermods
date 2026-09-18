@@ -137,8 +137,28 @@ export function Dashboard() {
             <SettingsView />
           </div>
         )}
+
+        <StyleGuideLink />
       </div>
     </div>
+  );
+}
+
+/**
+ * The way into the living specimen (entrypoints/styleguide), which documents the design system.
+ *
+ * It is unlisted on purpose: it is a contributor's tool, not a product surface, so it appears only
+ * in a dev build or when someone asks for it with ?styleguide=1. The page itself always ships —
+ * a specimen kept out of the bundle is a specimen that silently goes stale.
+ */
+function StyleGuideLink() {
+  const asked =
+    typeof location !== 'undefined' && new URLSearchParams(location.search).has('styleguide');
+  if (!import.meta.env.DEV && !asked) return null;
+  return (
+    <footer className="dash-footer">
+      <a href="/styleguide.html">Design system — the living style guide</a>
+    </footer>
   );
 }
 

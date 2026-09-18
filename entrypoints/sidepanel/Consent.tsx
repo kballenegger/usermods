@@ -11,7 +11,7 @@ export function Consent({ onAccept, onDismiss }: { onAccept: () => void; onDismi
   }
 
   return (
-    <div className="view stack">
+    <div className="view view-form stack">
       <div>
         <div className="label">Before your first message</div>
         <p style={{ margin: 0, color: 'var(--text-2)', fontSize: 'var(--fs-meta)' }}>

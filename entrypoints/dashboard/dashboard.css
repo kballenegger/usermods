@@ -3,17 +3,20 @@
  * shared pieces (.card, .btn, .chip, .row, install preview, Tampermonkey migration), so a mod card
  * looks the same here as it does in the panel.
  *
- * Colors come from the Volt OS tokens in sidepanel/tokens.css, which styles.css imports, so this
- * page is dressed by the same palette as the panel and follows it through a restyle with no edit
- * here. These were written with fallbacks to an older palette while those tokens were still
- * landing; the tokens are here now and the fallbacks are gone. Do not hard-code a hex in this file
- * — the one exception is the ink on a volt-filled button, which styles.css spells the same way,
- * because it is the colour of the text ON the accent rather than a colour of its own.
+ * Colours come from the role tokens in sidepanel/tokens.css, which styles.css imports, so this page
+ * is dressed by the same palette as the panel and follows it through a restyle with no edit here.
+ * Do not hard-code a hex in this file: if a colour is missing, it is a missing token.
+ *
+ * At page width the brand gets more room than the 420px panel allows, so this is where the banner's
+ * devices are used most freely — a blue header block under the wordmark, pixel section labels, and
+ * stat tiles that are solid colour blocks rather than outlined cards. The rule that survives from
+ * the panel is the same one: anything you READ sits on a solid panel in a text face.
  */
 
 .dash {
   min-height: 100vh;
-  background: var(--bg-app);
+  background: var(--bg-ambient);
+  background-attachment: fixed;
   color: var(--text-1);
   display: flex;
   flex-direction: column;
@@ -28,65 +31,84 @@
 
 /* ---------- header, tabs ---------- */
 
+/*
+ * The header block. At page width the wordmark gets the banner's own treatment: pixel type, lime,
+ * with the accent's hard offset behind it, on a solid panel that runs the width of the content.
+ *
+ * The mark sits with the wordmark inside h1, centred on each other, so the 32px image does not hang
+ * below the text baseline the way a baseline-aligned row would leave it.
+ */
 .dash-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 12px;
   flex-wrap: wrap;
   margin-bottom: 14px;
+  background: var(--surface-1);
+  border: var(--border-width) solid var(--border-strong);
+  box-shadow: var(--shadow-card);
+  padding: 14px 16px;
 }
-/* The mark sits with the wordmark, so h1 is its own flex line: the header's baseline alignment
-   keeps the 32px image's bottom edge on the text baseline, which hangs it too low. Centring the
-   two inside h1 and letting the h1 itself take part in the baseline row keeps "usermods" aligned
-   with the subtitle exactly as before. */
 .dash-head h1 {
   display: flex;
   align-items: center;
-  gap: 9px;
-  font-size: 19px;
+  gap: 10px;
+  font-family: var(--font-display);
+  font-size: 22px;
   margin: 0;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  color: var(--live-text);
+  text-shadow: 2px 2px 0 var(--accent-edge);
 }
 .dash-head .sub {
-  color: var(--text-3);
+  color: var(--text-2);
   font-size: 12px;
 }
 
+/*
+ * Section tabs. The active one is a solid lime block with an ink label — the same treatment the
+ * panel's tab bar uses, so "which section am I on" is answered the same way on both surfaces.
+ */
 .dash-tabs {
   display: flex;
   gap: 4px;
-  border-bottom: 1px solid var(--border-hair);
-  margin-bottom: 16px;
+  border-bottom: var(--border-width) solid var(--border-hair);
+  margin: 16px 0;
+  padding-bottom: 0;
 }
 .dash-tabs button {
   background: none;
   border: 0;
-  border-bottom: 2px solid transparent;
-  color: var(--text-3);
-  padding: 8px 12px 7px;
-  font: inherit;
+  color: var(--text-2);
+  padding: 8px 12px;
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   cursor: pointer;
 }
-/*
- * The label says which section you are on, and the 2px rule under it is the only other marker, so
- * both need to clear the 3:1 UI rule. --accent-text is --volt in dark and the deep chartreuse in
- * light, where plain --volt is 2.89:1 on the page.
- */
-.dash-tabs button.active {
+.dash-tabs button:hover {
   color: var(--text-1);
-  border-bottom-color: var(--accent-text);
+}
+.dash-tabs button.active {
+  color: var(--live-on-fill);
+  background: var(--live-fill);
+  box-shadow: var(--shadow-press);
 }
 
-/* ---------- section labels: uppercase, tracked, small ---------- */
+/* ---------- section labels: pixel type, uppercase, tracked ---------- */
 
 .dash-label {
+  font-family: var(--font-display);
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--text-3);
+  color: var(--text-2);
   margin: 0 0 6px;
-  font-weight: 500;
+  font-weight: 700;
 }
 
 /* ---------- overview strip ---------- */
@@ -98,23 +120,31 @@
   margin-bottom: 16px;
 }
 .stat {
-  background: var(--surface-card);
-  border: 1px solid var(--border-card);
+  background: var(--surface-1);
+  border: var(--border-width) solid var(--border-strong);
   border-radius: var(--r-card);
   padding: 12px 14px;
   box-shadow: var(--shadow-card);
 }
+/*
+ * The number is the point of a stat tile, so it is set big in the pixel display face — this is
+ * exactly the short-label job that face is for. The key under it stays small and tracked.
+ */
 .stat .n {
-  font-size: 22px;
+  font-size: 26px;
   font-variant-numeric: tabular-nums;
-  font-family: var(--font-mono);
+  font-family: var(--font-display);
+  font-weight: 700;
   line-height: 1.1;
+  color: var(--live-text);
 }
 .stat .k {
+  font-family: var(--font-display);
   font-size: 11px;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--text-3);
+  color: var(--text-2);
   margin-top: 4px;
 }
 
@@ -124,8 +154,8 @@
   flex-wrap: wrap;
   gap: 8px 20px;
   align-items: center;
-  background: var(--surface-card);
-  border: 1px solid var(--border-card);
+  background: var(--surface-1);
+  border: var(--border-width) solid var(--border-strong);
   border-radius: var(--r-card);
   padding: 10px 14px;
   margin-bottom: 18px;
@@ -147,9 +177,8 @@
   background: var(--text-3);
 }
 /*
- * The dot tokens, not --volt and the text tones. A 7px dot is a UI element, so it needs 3:1 against
- * the surface behind it: --volt is 2.89:1 on the light app background, and the dark theme's amber
- * and coral fills are 1.84:1 and 2.95:1 on white. --dot-* is the pair each theme can actually show.
+ * The --dot-* tokens, not the text tones. A 7px dot is a UI element, so it needs 3:1 against the
+ * surface behind it, and each theme's dot tone is the one that actually clears it there.
  */
 .dot.ok { background: var(--dot-ok); }
 .dot.warn { background: var(--dot-warn); }
@@ -169,9 +198,9 @@
 .dash-toolbar select {
   font: inherit;
   padding: 6px 10px;
-  border: 1px solid var(--border-card);
+  border: var(--border-width) solid var(--border-strong);
   border-radius: var(--r-field);
-  background: var(--surface-card);
+  background: var(--surface-1);
   color: var(--text-1);
 }
 .dash-toolbar input[type='search'] {
@@ -185,8 +214,8 @@
   gap: 8px;
   align-items: center;
   flex-wrap: wrap;
-  background: var(--surface-card);
-  border: 1px solid var(--border-card);
+  background: var(--surface-1);
+  border: var(--border-width) solid var(--border-strong);
   border-radius: var(--r-field);
   padding: 7px 10px;
   margin-bottom: 10px;
@@ -243,8 +272,8 @@
   display: flex;
   gap: 10px;
   align-items: flex-start;
-  background: var(--surface-card);
-  border: 1px solid var(--border-card);
+  background: var(--surface-1);
+  border: var(--border-width) solid var(--border-strong);
   border-radius: var(--r-field);
   padding: 9px 11px;
   cursor: pointer;
@@ -255,32 +284,28 @@
   box-shadow: var(--shadow-raise);
 }
 /* Selection is carried by this edge alone, so it takes the tone that clears 3:1 in both themes. */
-.rowcard:hover { border-color: var(--accent-text); }
-.rowcard.selected { border-color: var(--accent-text); }
+.rowcard:hover { border-color: var(--primary); }
+.rowcard.selected { border-color: var(--primary); }
 /*
- * An archived row. Dark dims the whole thing: on charcoal a 0.62 row still reads, and the fade is
- * what says "put away". On white that same fade takes the title to about 2.6:1 and reads as broken
- * rather than as archived, so light recedes it the way the panel's .card.disabled does — flatten
- * the surface, drop the lift, and step the title back one tone — while leaving every label legible.
+ * An archived row, in BOTH themes now.
+ *
+ * This used to be `opacity: 0.62` in dark and a flattened surface in light, because on charcoal a
+ * faded row still read. On the electric blue page it does not: a 0.62 row lets the saturated page
+ * through the panel and the title lands at about 2.6:1 over a strong colour, which reads as broken
+ * rather than as put away. So both themes now recede a row the same way the panel's .card.disabled
+ * does — flatten the surface, drop the lift and the bright edge, step the title back one tone —
+ * and every label stays legible.
+ *
+ * The general rule, worth keeping: on a saturated palette, never state "inactive" with opacity.
+ * State it with surface and edge.
  */
-.rowcard.dimmed { opacity: 0.62; }
-:root[data-theme='light'] .rowcard.dimmed {
-  opacity: 1;
+.rowcard.dimmed {
   background: var(--surface-well);
+  border-color: var(--border-hair);
   box-shadow: none;
 }
-:root[data-theme='light'] .rowcard.dimmed .title {
+.rowcard.dimmed .title {
   color: var(--text-2);
-}
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme]) .rowcard.dimmed {
-    opacity: 1;
-    background: var(--surface-well);
-    box-shadow: none;
-  }
-  :root:not([data-theme]) .rowcard.dimmed .title {
-    color: var(--text-2);
-  }
 }
 .rowcard .body { flex: 1; min-width: 0; }
 .rowcard .title {
@@ -320,7 +345,7 @@
   width: 15px;
   height: 15px;
   border-radius: 4px;
-  border: 1px solid var(--border-card);
+  border: var(--border-width) solid var(--border-strong);
   background: var(--surface-well);
   box-shadow: none;
   position: relative;
@@ -331,7 +356,7 @@
 }
 .rowcard input[data-testid='chat-select']:hover,
 .rowcard input[data-testid='mod-select']:hover {
-  border-color: var(--accent-text);
+  border-color: var(--primary);
 }
 .rowcard input[data-testid='chat-select']:checked,
 .rowcard input[data-testid='mod-select']:checked {
@@ -377,18 +402,22 @@
 }
 
 /* Pill buttons, small enough to sit inside a row. */
+/* Row actions are secondary by definition — several per row — so they take the quiet outline. */
 button.pill {
-  font: inherit;
+  font-family: var(--font-display);
   font-size: 11px;
-  border: 1px solid var(--border-card);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: var(--border-width) solid var(--border-hair);
   background: transparent;
   color: var(--text-2);
-  border-radius: var(--r-pill);
+  border-radius: var(--r-field);
   padding: 3px 10px;
   cursor: pointer;
   white-space: nowrap;
 }
-button.pill:hover { border-color: var(--accent-text); color: var(--text-1); }
+button.pill:hover { border-color: var(--primary); color: var(--text-1); }
 /*
  * Same tokens as .btn.primary, not a hard-coded volt-on-near-black pair: in light the accent fill
  * is --volt-bright, because white on --volt is 3.14:1 and volt's own near-black label is only
@@ -402,35 +431,25 @@ button.pill.primary {
 }
 button.pill.danger { color: var(--error-text); }
 /*
- * Disabled recedes by surface in light, not by opacity. 0.45 on charcoal reads as "unavailable";
- * on white it takes an 11px label to roughly 2:1 and reads as broken. Same reasoning as
- * button.btn:disabled in styles.css.
+ * Disabled recedes by surface in both themes, never by opacity — the same rule as .rowcard.dimmed
+ * above and button.btn:disabled in styles.css. An 11px label at 0.45 opacity is unreadable on
+ * white and only marginally better over the blue page; a flat well with a stepped-back label says
+ * "unavailable" without ever saying "broken".
  */
-button.pill:disabled { opacity: 0.45; cursor: default; }
-:root[data-theme='light'] button.pill:disabled,
-:root[data-theme='light'] button.pill.primary:disabled {
-  opacity: 1;
-  color: var(--text-3);
+button.pill:disabled,
+button.pill.primary:disabled {
+  cursor: default;
+  color: var(--btn-disabled-fg);
   background: var(--surface-well);
-  border-color: var(--border-card);
+  border-color: var(--border-hair);
   box-shadow: none;
-}
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme]) button.pill:disabled,
-  :root:not([data-theme]) button.pill.primary:disabled {
-    opacity: 1;
-    color: var(--text-3);
-    background: var(--surface-well);
-    border-color: var(--border-card);
-    box-shadow: none;
-  }
 }
 
 .badge {
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  border: 1px solid var(--border-card);
+  border: var(--border-width) solid var(--border-strong);
   border-radius: var(--r-pill);
   padding: 1px 7px;
   color: var(--text-3);
@@ -443,7 +462,7 @@ button.pill:disabled { opacity: 0.45; cursor: default; }
   font-size: 13px;
   width: 100%;
   padding: 2px 6px;
-  border: 1px solid var(--accent-text);
+  border: 1px solid var(--primary);
   border-radius: var(--r-field);
   background: var(--surface-well);
   color: var(--text-1);
@@ -452,8 +471,8 @@ button.pill:disabled { opacity: 0.45; cursor: default; }
 /* ---------- detail pane ---------- */
 
 .detail {
-  background: var(--surface-card);
-  border: 1px solid var(--border-card);
+  background: var(--surface-1);
+  border: var(--border-width) solid var(--border-strong);
   border-radius: var(--r-card);
   padding: 14px;
 }
@@ -483,7 +502,7 @@ button.pill:disabled { opacity: 0.45; cursor: default; }
   /* A speech bubble is an enclosed shape, so it takes the card edge: --border-hair is a divider
      tone and draws no visible outline on the light theme's white. */
   background: var(--surface-well);
-  border: 1px solid var(--border-card);
+  border: var(--border-width) solid var(--border-strong);
   border-radius: 12px 12px 2px 12px;
   padding: 7px 10px;
   max-width: 92%;
@@ -516,7 +535,7 @@ button.pill:disabled { opacity: 0.45; cursor: default; }
   overflow: auto;
 }
 .preview .prev-proposal {
-  border: 1px solid var(--border-card);
+  border: var(--border-width) solid var(--border-strong);
   border-radius: var(--r-field);
   padding: 9px 11px;
   display: flex;
@@ -525,7 +544,7 @@ button.pill:disabled { opacity: 0.45; cursor: default; }
 }
 .preview .prev-proposal h4 { margin: 0; font-size: 13px; }
 .preview pre {
-  background: var(--surface-lo);
+  background: var(--surface-well);
   border-radius: 6px;
   padding: 8px;
   font-size: 11.5px;
@@ -544,7 +563,7 @@ button.pill:disabled { opacity: 0.45; cursor: default; }
   line-height: 1.5;
   tab-size: 2;
   padding: 10px;
-  border: 1px solid var(--border-card);
+  border: var(--border-width) solid var(--border-strong);
   border-radius: var(--r-field);
   /* The editor is a recessed field inside a white card in light; --bg-ambient is a page tone. */
   background: var(--surface-well);
@@ -585,7 +604,7 @@ button.pill:disabled { opacity: 0.45; cursor: default; }
   color: var(--text-3);
   text-align: center;
   padding: 36px 12px;
-  border: 1px dashed var(--border-card);
+  border: var(--border-width) dashed var(--border-strong);
   border-radius: var(--r-card);
 }
 
@@ -594,27 +613,72 @@ button.pill:disabled { opacity: 0.45; cursor: default; }
  * They were written against the side panel's stylesheet, which this page does not load, so they
  * rendered as bare text — the conflict notice especially, which asks the user to choose between two
  * versions and needs to read as something that wants an answer.
+ *
+ * These are scoped to a direct child of the page's own containers rather than written as a bare
+ * `.error`. A bare `.error` matches EVERY element carrying that class, and this page has two others
+ * that are not banners at all: the 7px `.dot.error` and the `.tool.error` rail, both of which were
+ * being given a banner's padding, border and 12px font — which turned the status dot into a 28x24
+ * red block sitting on top of the text beside it. The living style guide is where that showed up.
  */
-.error,
-.ok,
-.notice {
-  border: 1px solid var(--border-card);
+.dash > .error,
+.dash-inner > .error,
+.detail > .error,
+.install-col > .error,
+.dash > .ok,
+.dash-inner > .ok,
+.detail > .ok,
+.install-col > .ok,
+.dash > .notice,
+.dash-inner > .notice,
+.detail > .notice,
+.install-col > .notice {
+  border: var(--border-width) solid var(--border-strong);
   border-radius: var(--r-card);
   padding: 10px 12px;
   font-size: 12px;
   line-height: 1.5;
 }
-.error {
+.dash > .error,
+.dash-inner > .error,
+.detail > .error,
+.install-col > .error {
   color: var(--error-text);
-  border-color: var(--error-text);
+  border-color: var(--error);
 }
-.ok { color: var(--text-2); }
+.dash > .ok,
+.dash-inner > .ok,
+.detail > .ok,
+.install-col > .ok {
+  color: var(--text-2);
+}
 /* The notice is the one that interrupts, so it is the one that gets the accent edge. */
-.notice {
+.dash > .notice,
+.dash-inner > .notice,
+.detail > .notice,
+.install-col > .notice {
   color: var(--text-1);
-  border-color: var(--accent-text);
+  border-color: var(--accent-edge);
 }
 
 /* The install / import / migrate block reuses the panel's .card, but at page width it should not
    stretch the whole 1100px: it reads better as a column. */
 .install-col { max-width: 560px; display: flex; flex-direction: column; gap: 10px; }
+
+/*
+ * The way into the living style guide. Dev builds and ?styleguide=1 only (Dashboard.tsx), so this
+ * is a contributor's footer rather than a product surface — quiet by design.
+ */
+.dash-footer {
+  margin-top: 28px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-hair);
+  font-size: 12px;
+}
+.dash-footer a {
+  color: var(--primary-text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.dash-footer a:hover {
+  color: var(--accent-text);
+}

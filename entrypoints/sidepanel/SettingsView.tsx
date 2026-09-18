@@ -93,7 +93,7 @@ export function SettingsView({ onReviewNotice }: { onReviewNotice?: () => void }
   const subscription = !STORE_BUILD && (s.provider === 'chatgpt' || s.provider === 'xai');
 
   return (
-    <div className="view">
+    <div className="view view-form">
       {migrated && (
         <p className="error" style={{ marginTop: 0 }}>
           ▲ This build of usermods does not include subscription sign-in, so your ChatGPT / SuperGrok

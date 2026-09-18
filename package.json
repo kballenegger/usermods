@@ -25,11 +25,13 @@
     "smoke:theme": "wxt build && node scripts/screenshots.mjs --theme",
     "smoke:tabbar": "wxt build && node scripts/screenshots.mjs --tabbar",
     "smoke:wait": "wxt build && node scripts/screenshots.mjs --wait",
+    "styleguide": "wxt build && node scripts/screenshots.mjs --styleguide",
     "store-assets": "wxt build && node scripts/store-assets.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.126.0",
     "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@fontsource/pixelify-sans": "^5.3.0",
     "acorn": "^8.18.0",
     "fflate": "^0.8.3",
     "react": "^19.3.0",

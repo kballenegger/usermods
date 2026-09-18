@@ -1,0 +1,32 @@
+<!doctype html>
+<!--
+  The living specimen for docs/design.md.
+
+  It loads the REAL stylesheets — sidepanel/styles.css and dashboard.css, the same files the
+  extension ships — so nothing here can drift from what users see. If a component looks right on
+  this page it looks right in the product, and if it looks wrong here it is wrong everywhere.
+
+  It is an unlisted page: nothing links to it in a production build, and it ships because keeping a
+  specimen out of the bundle means keeping it out of date. See entrypoints/styleguide/main.tsx.
+
+  No data-theme here: see the note in sidepanel/index.html. The attribute is left off so the first
+  paint is whatever the OS asks for, and main.tsx writes one only for an explicit choice.
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>usermods — style guide</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="/icon/32.png" />
+    <link rel="icon" type="image/png" sizes="128x128" href="/icon/128.png" />
+    <script src="/theme-boot.js"></script>
+    <link rel="stylesheet" href="../sidepanel/styles.css" />
+    <link rel="stylesheet" href="../sidepanel/activity.css" />
+    <link rel="stylesheet" href="../dashboard/dashboard.css" />
+    <link rel="stylesheet" href="./styleguide.css" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>
