@@ -1,10 +1,33 @@
 <!doctype html>
-<!-- data-theme starts on the default so the first paint is dark; main.tsx corrects it to the saved choice. -->
-<html lang="en" data-theme="dark" style="color-scheme: dark">
+<!--
+  No data-theme here, deliberately.
+
+  chrome.storage is async, so the saved choice cannot be known before the first paint. Hardcoding a
+  theme would mean every user of the other one watches the panel start in the wrong palette and
+  flip. Leaving the attribute off starts the document in exactly the state "System" means — the
+  prefers-color-scheme rules in tokens.css decide — so the first paint already matches the OS, and
+  main.tsx only has to write an attribute for someone whose explicit choice differs from it.
+
+  color-scheme is left to CSS for the same reason; :root carries `color-scheme: light dark` so the
+  native controls and scrollbars follow the OS until a choice is applied.
+-->
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>usermods</title>
+    <!--
+      A classic, non-module, non-deferred script, deliberately placed BEFORE the stylesheet.
+
+      A `type="module"` script is deferred by definition: the browser is free to paint the
+      stylesheet's default palette before it runs, which is a visible flash of the wrong theme for
+      anyone whose saved choice differs from their OS. A classic script blocks parsing at this
+      point, so the saved theme is on <html> before any CSS has been applied, let alone painted.
+
+      MV3's content security policy forbids an INLINE script, hence the separate file. It is a few
+      lines and imports nothing — see public/theme-boot.js.
+    -->
+    <script src="/theme-boot.js"></script>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>

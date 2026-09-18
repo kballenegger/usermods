@@ -3,6 +3,7 @@ import { hostFromUrl } from '@/lib/chats';
 import { hasConsented } from '@/lib/consent';
 import { rpc } from '@/lib/rpc';
 import { Chat } from './Chat';
+import { ThemeToggle } from './components/ThemeToggle';
 import { Consent } from './Consent';
 import { ModsView } from './ModsView';
 import { SettingsView } from './SettingsView';
@@ -92,6 +93,7 @@ export function App() {
         <button className="tab-action" onClick={() => void openDashboard()} title="Open the dashboard: every chat and every mod, in a full tab">
           Dashboard
         </button>
+        <ThemeToggle />
       </nav>
       {usStatus && !usStatus.available && <div className="notice">{usStatus.message}</div>}
       {tab === 'chat' &&

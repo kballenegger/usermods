@@ -198,7 +198,7 @@ export function SettingsView({ onReviewNotice }: { onReviewNotice?: () => void }
             <option key={t.value} value={t.value}>{t.label}</option>
           ))}
         </select>
-        <span>System follows this device. Dark is the default.</span>
+        <span>System follows this device, and is the default. The ◐ in the tab bar cycles the same setting.</span>
       </label>
 
       <div className="row" style={{ marginTop: 'var(--sp-4)' }}>

@@ -61,6 +61,18 @@ export default defineContentScript({
      * stylesheet: injecting one would leak usermods' rules into the site, and the site's own CSS
      * could reach an injected class. They are the volt tokens spelled out — the extension's CSS
      * custom properties do not reach a content script's elements.
+     *
+     * This stays volt in both themes, deliberately. It is not part of the panel: it is usermods'
+     * mark on a page it does not own, and it has to read the same whatever the site's own palette
+     * is — the site may be light, dark, or a photograph, and it does not follow the user's theme.
+     *
+     * What that costs is that neither a light nor a dark page can be assumed, so a single flat
+     * colour cannot do the work. Both elements carry their contrast with them:
+     *   - the highlight is a volt line with a dark outer ring, so the edge is visible on white
+     *     (where volt alone is ~1.6:1) and on black (where the dark ring simply disappears behind
+     *     the volt line);
+     *   - the label is a near-black pill with volt text, which is legible against anything, and it
+     *     takes a light outer ring so its own edge does not vanish on a dark page.
      */
     function startPicker(): () => void {
       const overlay = document.createElement('div');
@@ -71,7 +83,8 @@ export default defineContentScript({
         border: '1px solid #c8ff2e', // --volt
         background: 'rgba(200,255,46,0.12)', // --volt-a12
         borderRadius: '12px', // --r-field
-        boxShadow: '0 0 16px rgba(200,255,46,0.35)', // the volt glow: this element is live
+        // The glow says "live"; the dark ring outside it is what makes the line findable on white.
+        boxShadow: '0 0 0 1px rgba(10,13,11,0.55), 0 0 16px rgba(200,255,46,0.35)',
         transition: 'all 40ms linear',
       } satisfies Partial<CSSStyleDeclaration>);
       const label = document.createElement('div');
@@ -83,6 +96,8 @@ export default defineContentScript({
         background: '#0e120f', // --surface-lo
         color: '#c8ff2e', // --volt
         border: '1px solid #222b24', // --border-card
+        // A hairline of light outside the pill, so its edge survives on a dark page too.
+        boxShadow: '0 0 0 1px rgba(232,237,232,0.28)',
         padding: '3px 10px',
         borderRadius: '999px', // --r-pill
         maxWidth: '60vw',

@@ -11,6 +11,7 @@ import { rpc } from '@/lib/rpc';
 import { applyStoredTheme } from '@/lib/theme';
 import type { ScriptPreview } from '@/lib/types';
 import { InstallPreview } from '../sidepanel/components/InstallPreview';
+import { ThemeToggle } from '../sidepanel/components/ThemeToggle';
 import '../sidepanel/styles.css';
 
 function InstallPage() {
@@ -56,9 +57,12 @@ function InstallPage() {
 
   return (
     <div className="page">
-      <div>
-        <div className="wordmark">usermods</div>
-        <h2>Install userscript</h2>
+      <div className="page-head">
+        <div>
+          <div className="wordmark">usermods</div>
+          <h2>Install userscript</h2>
+        </div>
+        <ThemeToggle />
       </div>
       {url && (
         <div className="card">
@@ -89,8 +93,9 @@ function InstallPage() {
   );
 }
 
-// Same theme the side panel is wearing, settled before the first paint.
-await applyStoredTheme();
+// The authoritative read, correcting the mirror the import above already applied. Not awaited: see
+// the note in sidepanel/main.tsx.
+void applyStoredTheme();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

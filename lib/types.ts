@@ -89,10 +89,67 @@ export const DEFAULT_SETTINGS: Settings = {
   apiKey: '',
   model: 'claude-opus-5',
   autoNameChats: true,
-  // Dark is the design system's default, so it is this extension's default too.
-  theme: 'dark',
+  /**
+   * Follow the OS by default.
+   *
+   * This differs deliberately from the Volt OS design system, whose own default is dark. The design
+   * system describes a full-screen dashboard someone chooses to look at; this is a side panel that
+   * sits against whatever website the user is already on, all day. A panel that is charcoal beside
+   * a white page is not "on brand", it is a lamp in the corner of the screen. Following the OS is
+   * what people expect from a browser panel, and someone running a dark desktop still gets Volt OS
+   * exactly as designed.
+   *
+   * Dark remains the fallback: `system` resolves to dark whenever the OS expresses no preference
+   * (see tokens.css — only `prefers-color-scheme: light` overrides, so no-preference stays dark).
+   *
+   * This is the default for NEW installs only. An existing user's saved choice is never rewritten;
+   * lib/settings.ts pins the old default for profiles that predate this change.
+   */
+  theme: 'system',
   contextBudget: DEFAULT_CONTEXT_BUDGET,
 };
+
+/** The three choices, in the order the compact ◐ toggle cycles them. */
+export const THEME_CYCLE: readonly ThemeChoice[] = ['dark', 'light', 'system'];
+
+/** What the toggle calls each choice, in its tooltip and its accessible name. */
+export const THEME_LABEL: Record<ThemeChoice, string> = {
+  dark: 'Dark',
+  light: 'Light',
+  system: 'System',
+};
+
+/**
+ * The next choice in the cycle: Dark → Light → System → Dark. A value outside the cycle (which the
+ * types forbid, but stored data can still hold) starts it from the beginning.
+ */
+export function nextTheme(current: ThemeChoice): ThemeChoice {
+  const i = THEME_CYCLE.indexOf(current);
+  return THEME_CYCLE[(i + 1) % THEME_CYCLE.length] ?? 'dark';
+}
+
+/**
+ * Which theme a stored profile should wear.
+ *
+ * The default changed from 'dark' to 'system' (see DEFAULT_SETTINGS.theme). Merging the new default
+ * into an old profile would silently restyle someone who never asked for it, so a profile that
+ * predates the change keeps the old default instead.
+ *
+ * The test is whether a settings object was ever stored at all. Settings are written whole
+ * (saveSettings persists the full merged object), so any stored profile has been through the
+ * Settings screen and carries an explicit `theme` — unless it was written before `theme` existed,
+ * which is exactly the case this pins to 'dark'. A fresh install has nothing stored and follows
+ * the OS.
+ *
+ * It lives here rather than in settings.ts so it sits beside the default it is defending, and so a
+ * test can reach it without pulling in chrome.storage.
+ */
+export function resolveTheme(stored: Partial<Settings> | undefined): ThemeChoice {
+  if (!stored) return DEFAULT_SETTINGS.theme; // fresh install: follow the OS
+  const t = stored.theme;
+  if (t === 'system' || t === 'dark' || t === 'light') return t; // an explicit choice, kept
+  return 'dark'; // an existing profile from before the theme setting: unchanged, as it looked
+}
 
 // Provider-neutral conversation format. Adapters translate to each API's wire shape.
 export type Part =

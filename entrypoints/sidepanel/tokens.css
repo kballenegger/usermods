@@ -5,11 +5,33 @@
  * alive (a running turn, an enabled mod, the active tab) glows volt; everything else stays quiet:
  * white text, grey metadata, hairline separators. Warning and error never glow.
  *
- * Dark is the default theme. Light is an override, applied either by the OS preference or by the
- * explicit `data-theme` attribute the Settings theme control writes on <html>.
+ * Two themes, one vocabulary. Every rule in styles.css reads tokens only, so the light theme is a
+ * different set of values rather than a second stylesheet. Light is applied either by the OS
+ * preference (Theme: System) or by the explicit `data-theme` attribute lib/theme.ts writes on
+ * <html>.
+ *
+ * Contrast is a gate here, not a preference: test/contrast.test.ts parses this file and asserts
+ * WCAG AA for every foreground/background pairing the UI actually uses. Three light values are
+ * deliberately darker than the published Volt OS light palette because that palette's own values
+ * fail AA; each deviation is marked `AA:` below with the ratio it buys.
  */
 
 :root {
+  /*
+   * Native controls — the select popup, checkboxes, date inputs, scrollbars — are painted by the
+   * engine, not by these tokens, and `color-scheme` is the only thing that tells it which way.
+   *
+   * It is declared here as well as on the element (lib/theme.ts sets style.colorScheme once the
+   * saved choice is read) so it is already right on the very first paint, before any script has
+   * run.
+   *
+   * `dark` rather than `light dark`, because this block is the dark theme: it is what a no-
+   * preference OS gets, and it is what a `data-theme="dark"` document gets. The light block below
+   * sets `light`, and it is reached by exactly the two cases that should be light — an explicit
+   * light choice, or System on a light OS.
+   */
+  color-scheme: dark;
+
   /* App background */
   --bg-app: #0a0d0b;
   --bg-ambient:
@@ -23,10 +45,26 @@
   --border-card: #222b24;
   --border-hair: #1a201b;
 
+  /*
+   * A card's lift. Dark has none — the border does the work (the design system is explicit: no
+   * drop shadows in dark). Light gets a faint 1px shadow, because a white card on a near-white
+   * background has almost no border contrast to sit on.
+   */
+  --shadow-card: none;
+  --shadow-raise: none;
+
   /* Text */
   --text-1: #e8ede8;
   --text-2: #8a948b;
-  --text-3: #5a645b;
+
+  /*
+   * AA: the design system's --text-3 is #5A645B, which is 2.84:1 on a card — the same failure the
+   * light palette's faint step has, and found by the same test. This token is not decoration here:
+   * it is placeholder text in the composer and the URL field, the inactive tab labels, and list
+   * markers. Lifted along the same hue to 4.62:1 on a card and 5.16:1 on the app background. It is
+   * still clearly the faintest of the three steps.
+   */
+  --text-3: #7b867c;
 
   /* Volt accent */
   --volt: #c8ff2e;
@@ -38,6 +76,20 @@
   --volt-a28: rgba(200, 255, 46, 0.28);
   --accent-text: var(--volt);
 
+  /*
+   * The primary button: a volt fill with a label dark enough to read on it. In dark the fill is
+   * full volt and the label is the app background; light swaps in the brighter chartreuse, whose
+   * near-black label clears AA comfortably (see --btn-primary-* in the light block).
+   */
+  --btn-primary-bg: var(--volt);
+  --btn-primary-fg: #0a0d0b;
+
+  /* The colour a focus ring is drawn in. Light needs a deeper one to clear 3:1 on white. */
+  --focus-ring: var(--volt);
+
+  /* The label on a disabled primary button, which sits on the muted volt tint rather than a fill. */
+  --btn-disabled-fg: var(--volt);
+
   /* Semantic. Never glows. */
   --warn: #e8b84b;
   --warn-bg: rgba(232, 184, 75, 0.12);
@@ -46,9 +98,25 @@
   --error-bg: rgba(242, 109, 94, 0.12);
   --error-text: #f26d5e;
 
+  /*
+   * Status dots are 7px UI components, so they answer to the 3:1 rule rather than the text rule.
+   * In dark the semantic fills clear it easily; in light they do not, so the dot tones separate
+   * from the fill tones there.
+   */
+  --dot-ok: var(--volt);
+  --dot-warn: var(--warn);
+  --dot-error: var(--error);
+
   /* Data */
   --fill-grad: linear-gradient(90deg, #aee822, #e6ff8f);
   --track: rgba(128, 140, 130, 0.18);
+
+  /* Code and other inset wells: quieter than the card they sit in. */
+  --surface-well: var(--surface-lo);
+
+  /* Text selection. The browser default blue belongs to no theme here. */
+  --selection-bg: rgba(200, 255, 46, 0.3);
+  --selection-fg: #ffffff;
 
   /* Type */
   --font-ui: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, sans-serif;
@@ -86,11 +154,25 @@
 }
 
 /*
- * Theme: Light, chosen explicitly. Glows go to none — light has no neon. The same override set is
- * repeated under the OS-preference media query below for Theme: System; CSS has no way to share a
- * declaration block between a plain selector and a media query without a build step.
+ * ---------------------------------------------------------------------------
+ * Theme: Light
+ * ---------------------------------------------------------------------------
+ *
+ * White cards on #F4F6F2 with a single ambient volt radial in the top-right. Volt darkens to
+ * chartreuse so it can carry text and fills on white, and every glow goes to none: light has no
+ * neon. What replaces the glow as the "this is alive" signal is the same volt hue used as a fill,
+ * a tint or a border — the vocabulary is unchanged, only the luminance moves.
+ *
+ * Light is reached two ways: an explicit `data-theme="light"`, or no explicit choice at all while
+ * the OS asks for light (Theme: System). CSS cannot share one declaration block between a plain
+ * selector and a media query, so the values live here once under a private attribute and the two
+ * entry points below both switch that attribute on. `:not([data-theme])` is what keeps a
+ * deliberate "Dark" from being overridden on a light desktop.
+ *
+ * test/contrast.test.ts parses exactly this block. Keep one `--token: value;` per line.
  */
 :root[data-theme='light'] {
+  color-scheme: light;
   --bg-app: #f4f6f2;
   --bg-ambient: radial-gradient(480px 360px at 110% -5%, rgba(200, 255, 46, 0.2), transparent 70%), #f4f6f2;
   --surface-hi: #ffffff;
@@ -98,20 +180,94 @@
   --surface-card: linear-gradient(180deg, #ffffff, #ffffff);
   --border-card: #e8ece5;
   --border-hair: #f0f2ee;
+
+  /*
+   * The faint lift the design system asks for in light. It does the job --border-card cannot: at
+   * 1.2:1 against white that border is decoration, so the shadow is what actually separates a card
+   * from the page.
+   */
+  --shadow-card: 0 1px 2px rgba(22, 24, 26, 0.05), 0 1px 1px rgba(22, 24, 26, 0.04);
+  --shadow-raise: 0 1px 2px rgba(22, 24, 26, 0.06);
+
   --text-1: #16181a;
-  --text-2: #79806f;
-  --text-3: #9aa096;
+
+  /*
+   * AA: the published light palette's --text-2 #79806F is 3.76:1 on #F4F6F2 — below the 4.5:1 body
+   * rule, and this token carries real prose (card descriptions, field help, notice bodies), not
+   * decoration. Darkened along the same warm grey-green hue to 4.74:1 on the app background and
+   * 5.16:1 on a card.
+   */
+  --text-2: #68705f;
+
+  /*
+   * AA: the published --text-3 #9AA096 is 2.68:1 on white — far below AA, and this token is used
+   * for placeholder text and list markers, which are content, not ornament. Rather than restrict
+   * the token to decoration and audit every call site forever, it is darkened within the palette's
+   * hue to 4.97:1 on a card / 4.57:1 on the app background. It stays visibly the faintest of the
+   * three steps; it is now merely a legible faint rather than a decorative one.
+   */
+  --text-3: #6b7267;
+
   --volt: #7c9d0e;
   --volt-bright: #8fbf00;
   --volt-deep: #5c7a00;
   --accent-text: #5c7a00;
+
+  /*
+   * AA: white on --volt #7C9D0E is 3.14:1, which fails a button label. The in-system fix is the
+   * one the palette already offers — the brighter chartreuse fill with a near-black label, which
+   * is how --volt-bright is used on the light swatch card in the design system itself. 8.15:1.
+   */
+  --btn-primary-bg: var(--volt-bright);
+  --btn-primary-fg: #16181a;
+
+  /* --volt at 3.14:1 on white is under the 3:1 UI rule's margin; the deep chartreuse is 4.95:1. */
+  --focus-ring: var(--volt-deep);
+
+  /* On the pale --volt-a25 tint the accent is 4.1:1; the deep chartreuse clears AA at 4.71:1. */
+  --btn-disabled-fg: #547000;
+
   --warn-text: #8a6516;
   --warn-bg: #fbf3df;
   --error-text: #a2372c;
   --error-bg: #fbe9e6;
+
+  /*
+   * The dark theme's amber #E8B84B and coral #F26D5E are 1.84:1 and 2.95:1 on white: invisible as
+   * 7px dots. In light a dot borrows its own text tone, which is the same hue read at a luminance
+   * that works on white (5.31:1 / 6.73:1).
+   *
+   * The healthy dot has the same problem: --volt is 2.89:1 on the app background, under the 3:1 UI
+   * rule, and the tab bar's "this page can be acted on" dot sits on exactly that background. It
+   * takes the deep chartreuse (4.56:1) — the same colour the accent text already uses.
+   */
+  --dot-ok: var(--volt-deep);
+  --dot-warn: #8a6516;
+  --dot-error: #a2372c;
+
+  /*
+   * The solid semantic fills. Dark uses amber and coral directly on charcoal; on white the same two
+   * are 1.84:1 and 2.95:1, so light takes the tones that survive there. Restated rather than
+   * inherited so nothing keeps a charcoal-only value by accident — the contrast test checks that
+   * every colour token is answered here.
+   */
+  --warn: #8a6516;
+  --error: #a2372c;
+
+  --volt-a10: #f7fae9;
   --volt-a12: #f2f8d9;
+  --volt-a25: #e3f0b4;
+  --volt-a28: #cfe08f;
   --fill-grad: linear-gradient(90deg, #8fbf00, #aee822);
   --track: rgba(0, 0, 0, 0.08);
+
+  /* On white cards an inset well reads as slightly recessed, not as a second white. */
+  --surface-well: #f7f8f5;
+
+  --selection-bg: #e3f0b4;
+  --selection-fg: #16181a;
+
+  /* No neon in light. The hero card keeps a faint volt-tinted lift instead of a glow. */
   --glow-dot: none;
   --glow-fill: none;
   --glow-hero: 0 2px 16px rgba(124, 157, 14, 0.12);
@@ -120,11 +276,17 @@
 }
 
 /*
- * Theme: System. The OS preference decides, unless an explicit choice is already on the root —
- * :not([data-theme]) keeps a deliberate "Dark" from being overridden on a light desktop.
+ * Theme: System — the same light values, reached through the OS preference instead of an explicit
+ * choice. CSS has no way to share a declaration block between a plain selector and a media query
+ * without a build step, so this is a verbatim copy of the block above.
+ *
+ * It is not maintained by hand: test/contrast.test.ts asserts the two blocks declare exactly the
+ * same tokens with exactly the same values, so any edit made to one and not the other fails the
+ * test rather than shipping a theme that differs depending on how it was reached.
  */
 @media (prefers-color-scheme: light) {
   :root:not([data-theme]) {
+    color-scheme: light;
     --bg-app: #f4f6f2;
     --bg-ambient: radial-gradient(480px 360px at 110% -5%, rgba(200, 255, 46, 0.2), transparent 70%), #f4f6f2;
     --surface-hi: #ffffff;
@@ -132,20 +294,94 @@
     --surface-card: linear-gradient(180deg, #ffffff, #ffffff);
     --border-card: #e8ece5;
     --border-hair: #f0f2ee;
+
+    /*
+     * The faint lift the design system asks for in light. It does the job --border-card cannot: at
+     * 1.2:1 against white that border is decoration, so the shadow is what actually separates a card
+     * from the page.
+     */
+    --shadow-card: 0 1px 2px rgba(22, 24, 26, 0.05), 0 1px 1px rgba(22, 24, 26, 0.04);
+    --shadow-raise: 0 1px 2px rgba(22, 24, 26, 0.06);
+
     --text-1: #16181a;
-    --text-2: #79806f;
-    --text-3: #9aa096;
+
+    /*
+     * AA: the published light palette's --text-2 #79806F is 3.76:1 on #F4F6F2 — below the 4.5:1 body
+     * rule, and this token carries real prose (card descriptions, field help, notice bodies), not
+     * decoration. Darkened along the same warm grey-green hue to 4.74:1 on the app background and
+     * 5.16:1 on a card.
+     */
+    --text-2: #68705f;
+
+    /*
+     * AA: the published --text-3 #9AA096 is 2.68:1 on white — far below AA, and this token is used
+     * for placeholder text and list markers, which are content, not ornament. Rather than restrict
+     * the token to decoration and audit every call site forever, it is darkened within the palette's
+     * hue to 4.97:1 on a card / 4.57:1 on the app background. It stays visibly the faintest of the
+     * three steps; it is now merely a legible faint rather than a decorative one.
+     */
+    --text-3: #6b7267;
+
     --volt: #7c9d0e;
     --volt-bright: #8fbf00;
     --volt-deep: #5c7a00;
     --accent-text: #5c7a00;
+
+    /*
+     * AA: white on --volt #7C9D0E is 3.14:1, which fails a button label. The in-system fix is the
+     * one the palette already offers — the brighter chartreuse fill with a near-black label, which
+     * is how --volt-bright is used on the light swatch card in the design system itself. 8.15:1.
+     */
+    --btn-primary-bg: var(--volt-bright);
+    --btn-primary-fg: #16181a;
+
+    /* --volt at 3.14:1 on white is under the 3:1 UI rule's margin; the deep chartreuse is 4.95:1. */
+    --focus-ring: var(--volt-deep);
+
+    /* On the pale --volt-a25 tint the accent is 4.1:1; the deep chartreuse clears AA at 4.71:1. */
+    --btn-disabled-fg: #547000;
+
     --warn-text: #8a6516;
     --warn-bg: #fbf3df;
     --error-text: #a2372c;
     --error-bg: #fbe9e6;
+
+    /*
+     * The dark theme's amber #E8B84B and coral #F26D5E are 1.84:1 and 2.95:1 on white: invisible as
+     * 7px dots. In light a dot borrows its own text tone, which is the same hue read at a luminance
+     * that works on white (5.31:1 / 6.73:1).
+     *
+     * The healthy dot has the same problem: --volt is 2.89:1 on the app background, under the 3:1 UI
+     * rule, and the tab bar's "this page can be acted on" dot sits on exactly that background. It
+     * takes the deep chartreuse (4.56:1) — the same colour the accent text already uses.
+     */
+    --dot-ok: var(--volt-deep);
+    --dot-warn: #8a6516;
+    --dot-error: #a2372c;
+
+    /*
+     * The solid semantic fills. Dark uses amber and coral directly on charcoal; on white the same two
+     * are 1.84:1 and 2.95:1, so light takes the tones that survive there. Restated rather than
+     * inherited so nothing keeps a charcoal-only value by accident — the contrast test checks that
+     * every colour token is answered here.
+     */
+    --warn: #8a6516;
+    --error: #a2372c;
+
+    --volt-a10: #f7fae9;
     --volt-a12: #f2f8d9;
+    --volt-a25: #e3f0b4;
+    --volt-a28: #cfe08f;
     --fill-grad: linear-gradient(90deg, #8fbf00, #aee822);
     --track: rgba(0, 0, 0, 0.08);
+
+    /* On white cards an inset well reads as slightly recessed, not as a second white. */
+    --surface-well: #f7f8f5;
+
+    --selection-bg: #e3f0b4;
+    --selection-fg: #16181a;
+
+    /* No neon in light. The hero card keeps a faint volt-tinted lift instead of a glow. */
     --glow-dot: none;
     --glow-fill: none;
     --glow-hero: 0 2px 16px rgba(124, 157, 14, 0.12);
