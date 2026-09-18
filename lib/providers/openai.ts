@@ -32,7 +32,7 @@ function toOpenAIMessages(system: string, messages: Msg[]): OAIMessage[] {
         .join('\n');
       out.push({ role: 'tool', tool_call_id: r.toolCallId, content: r.isError ? `ERROR: ${text}` : text });
     }
-    const rest = m.content.filter((p) => p.type !== 'tool_result');
+    const rest = m.content.filter((p) => p.type !== 'tool_result' && p.type !== 'opaque');
     if (rest.length) {
       const hasImage = rest.some((p) => p.type === 'image');
       out.push({

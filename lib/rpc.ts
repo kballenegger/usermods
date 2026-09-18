@@ -1,5 +1,12 @@
 import type { AgentEvent, Mod, PickedElement } from './types';
 
+export type OAuthKind = 'chatgpt' | 'xai';
+export type OAuthLoginState =
+  | { status: 'idle' }
+  | { status: 'pending'; userCode: string; verificationUri: string; expiresAt: number }
+  | { status: 'done' }
+  | { status: 'error'; message: string };
+
 /** Request/response messages from the side panel to the background worker. */
 export type RpcRequest =
   | { type: 'mods.list' }
@@ -11,7 +18,13 @@ export type RpcRequest =
   | { type: 'page.pick'; tabId: number }
   | { type: 'page.info'; tabId: number }
   | { type: 'chat.reset'; tabId: number }
-  | { type: 'chat.hasHistory'; tabId: number };
+  | { type: 'chat.hasHistory'; tabId: number }
+  | { type: 'oauth.status'; kind: OAuthKind }
+  | { type: 'oauth.start'; kind: OAuthKind }
+  | { type: 'oauth.poll'; kind: OAuthKind }
+  | { type: 'oauth.cancel'; kind: OAuthKind }
+  | { type: 'oauth.signout'; kind: OAuthKind }
+  | { type: 'models.list' };
 
 export type RpcResponse<T extends RpcRequest['type']> = T extends 'mods.list' | 'mods.save' | 'mods.delete' | 'mods.toggle'
   ? Mod[]
@@ -23,7 +36,13 @@ export type RpcResponse<T extends RpcRequest['type']> = T extends 'mods.list' | 
         ? { url: string; title: string }
         : T extends 'chat.hasHistory'
           ? boolean
-          : { ok: true };
+          : T extends 'oauth.status'
+            ? { signedIn: boolean; label?: string }
+            : T extends 'oauth.start' | 'oauth.poll'
+              ? OAuthLoginState
+              : T extends 'models.list'
+                ? string[]
+                : { ok: true };
 
 export async function rpc<T extends RpcRequest['type']>(req: Extract<RpcRequest, { type: T }>): Promise<RpcResponse<T>> {
   const res = (await chrome.runtime.sendMessage(req)) as { ok: true; data: RpcResponse<T> } | { ok: false; error: string };

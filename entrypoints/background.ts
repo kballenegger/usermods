@@ -1,6 +1,18 @@
 import { runAgent, type AgentEnv } from '@/lib/agent/loop';
 import { loadMods, upsertMod, deleteMod, saveMods } from '@/lib/mods';
-import type { AgentPortRequest, RpcRequest } from '@/lib/rpc';
+import {
+  CHATGPT_CODEX_BASE,
+  XAI_PROXY_BASE,
+  chatgptHeaders,
+  getValidTokens,
+  loadTokens,
+  saveTokens,
+  startChatgptLogin,
+  startXaiLogin,
+  xaiProxyHeaders,
+  type OAuthKind,
+} from '@/lib/oauth';
+import type { AgentPortRequest, OAuthLoginState, RpcRequest } from '@/lib/rpc';
 import { loadSettings } from '@/lib/settings';
 import type { ContentRequest, Msg } from '@/lib/types';
 
@@ -39,7 +51,8 @@ export default defineBackground(() => {
         };
         try {
           const settings = await loadSettings();
-          if (!settings.apiKey && !settings.baseUrl) throw new Error('Add an API key in Settings first (or a base URL for a local server or proxy).');
+          const usesKey = settings.provider === 'anthropic' || settings.provider === 'openai-compatible';
+          if (usesKey && !settings.apiKey && !settings.baseUrl) throw new Error('Add an API key in Settings first (or a base URL for a local server or proxy).');
           if (!settings.model) throw new Error('Choose a model in Settings first.');
           const history = await loadHistory(req.tabId);
           const messages = await runAgent({
@@ -117,7 +130,88 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
       return { ok: true };
     case 'chat.hasHistory':
       return (await loadHistory(req.tabId)).length > 0;
+    case 'oauth.status': {
+      const t = await loadTokens(req.kind);
+      return { signedIn: !!t, label: t?.label };
+    }
+    case 'oauth.start':
+      return startLogin(req.kind);
+    case 'oauth.poll':
+      return logins.get(req.kind)?.state ?? { status: 'idle' };
+    case 'oauth.cancel':
+      logins.get(req.kind)?.controller.abort();
+      logins.delete(req.kind);
+      return { ok: true };
+    case 'oauth.signout':
+      logins.get(req.kind)?.controller.abort();
+      logins.delete(req.kind);
+      await saveTokens(req.kind, null);
+      return { ok: true };
+    case 'models.list':
+      return listModels();
   }
+}
+
+// ---------- subscription sign-in (device code) ----------
+
+const logins = new Map<OAuthKind, { state: OAuthLoginState; controller: AbortController }>();
+
+async function startLogin(kind: OAuthKind): Promise<OAuthLoginState> {
+  logins.get(kind)?.controller.abort();
+  const controller = new AbortController();
+  const entry = { state: { status: 'idle' } as OAuthLoginState, controller };
+  logins.set(kind, entry);
+  try {
+    const login = kind === 'chatgpt' ? await startChatgptLogin() : await startXaiLogin();
+    entry.state = { status: 'pending', userCode: login.userCode, verificationUri: login.verificationUri, expiresAt: login.expiresAt };
+    void login
+      .poll(controller.signal)
+      .then(async (tokens) => {
+        await saveTokens(kind, tokens);
+        entry.state = { status: 'done' };
+      })
+      .catch((e: unknown) => {
+        if (controller.signal.aborted) return;
+        entry.state = { status: 'error', message: e instanceof Error ? e.message : String(e) };
+      });
+  } catch (e) {
+    entry.state = { status: 'error', message: e instanceof Error ? e.message : String(e) };
+  }
+  return entry.state;
+}
+
+/** Model ids for the configured provider, where the backend can list them. */
+async function listModels(): Promise<string[]> {
+  const s = await loadSettings();
+  let url: string;
+  let headers: Record<string, string>;
+  switch (s.provider) {
+    case 'chatgpt':
+      url = `${(s.baseUrl || CHATGPT_CODEX_BASE).replace(/\/+$/, '')}/models`;
+      headers = chatgptHeaders(await getValidTokens('chatgpt'));
+      break;
+    case 'xai': {
+      const t = await getValidTokens('xai');
+      url = `${(s.baseUrl || XAI_PROXY_BASE).replace(/\/+$/, '')}/models`;
+      const h = xaiProxyHeaders('', t.access);
+      delete h['x-grok-model-override'];
+      headers = h;
+      break;
+    }
+    case 'openai-compatible':
+      url = `${(s.baseUrl || 'https://api.openai.com/v1').replace(/\/+$/, '')}/models`;
+      headers = s.apiKey ? { authorization: `Bearer ${s.apiKey}` } : {};
+      break;
+    case 'anthropic':
+      url = `${(s.baseUrl || 'https://api.anthropic.com').replace(/\/+$/, '')}/v1/models?limit=100`;
+      headers = { 'x-api-key': s.apiKey, 'anthropic-version': '2023-06-01' };
+      break;
+  }
+  const r = await fetch(url, { headers });
+  if (!r.ok) throw new Error(`Could not list models: ${r.status}`);
+  const body = (await r.json()) as { data?: Array<{ id?: string; slug?: string }>; models?: Array<{ id?: string; slug?: string }> };
+  const entries = body.data ?? body.models ?? [];
+  return entries.map((m) => m.id ?? m.slug ?? '').filter(Boolean).sort();
 }
 
 // ---------- userScripts ----------

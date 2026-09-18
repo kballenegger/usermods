@@ -52,7 +52,23 @@ The base URL is always editable. Anything that speaks one of the two protocols w
 
 ### Using a subscription instead of an API key
 
-usermods talks only to the two APIs above and never handles vendor logins. If you want to run it against a Claude, ChatGPT or other subscription, run a local proxy that exposes that login as an Anthropic- or OpenAI-compatible endpoint, and point a Custom preset at it. Several open-source projects do this. Whether that is allowed depends on the vendor's terms, which have changed more than once in 2026, so check before you rely on it. Anthropic's sanctioned route for subscriptions is the Agent SDK credit, which requires the Claude Code CLI on your machine; a proxy built on that is the clean option.
+Two subscriptions can sign in directly from Settings, with no API key and no local process:
+
+| Preset | Plans | How |
+|---|---|---|
+| ChatGPT subscription | Plus, Pro, Team | "Sign in with ChatGPT" device code. Opens a page, you type a short code, done. |
+| SuperGrok subscription | SuperGrok, or X Premium+ on the X account you sign in with | xAI's coding-agent OAuth, same device-code flow. |
+
+Both talk to the vendor's Responses API backend that their own coding agents use. Tokens are stored in extension local storage and refreshed automatically. Use **Fetch models** after signing in to see which model ids your plan allows.
+
+Caveats worth knowing:
+
+- Neither vendor publishes developer docs for this. The endpoints and headers are the ones their CLIs use, as reused by several open-source agents. OpenAI and xAI have both said third-party tools may use these logins, but that is a statement, not a contract.
+- Usage counts against your plan's limits.
+- xAI has been seen to reject some standard-tier SuperGrok accounts with a 403 even when the subscription is active.
+- Anthropic forbids using a Claude subscription outside its own clients, so there is no Claude sign-in. Anthropic's sanctioned route is the Agent SDK credit, which requires the Claude Code CLI on your machine. If you run a local proxy built on that, point a Custom Anthropic preset at it.
+
+For any other subscription, the same rule applies: run a local proxy that exposes it as an Anthropic- or OpenAI-compatible endpoint and point a Custom preset at it.
 
 ## How it works
 

@@ -14,7 +14,7 @@ export interface Mod {
   updatedAt: number;
 }
 
-export type ProviderKind = 'anthropic' | 'openai-compatible';
+export type ProviderKind = 'anthropic' | 'openai-compatible' | 'chatgpt' | 'xai';
 
 export interface Settings {
   provider: ProviderKind;
@@ -36,7 +36,9 @@ export type Part =
   | { type: 'text'; text: string }
   | { type: 'image'; mediaType: 'image/png' | 'image/jpeg'; data: string }
   | { type: 'tool_call'; id: string; name: string; input: Record<string, unknown> }
-  | { type: 'tool_result'; toolCallId: string; content: Part[]; isError?: boolean };
+  | { type: 'tool_result'; toolCallId: string; content: Part[]; isError?: boolean }
+  /** A provider-specific item replayed verbatim by the provider that produced it (e.g. reasoning items). */
+  | { type: 'opaque'; provider: string; item: unknown };
 
 export interface Msg {
   role: 'user' | 'assistant';

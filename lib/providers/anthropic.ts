@@ -8,7 +8,7 @@ const ADAPTIVE_THINKING = /(opus-5|sonnet-5|fable-5|mythos-5|opus-4-[678]|sonnet
 function toAnthropicMessages(messages: Msg[]): Anthropic.MessageParam[] {
   return messages.map((m) => ({
     role: m.role,
-    content: m.content.map((p): Anthropic.ContentBlockParam => {
+    content: m.content.filter((p) => p.type !== 'opaque').map((p): Anthropic.ContentBlockParam => {
       switch (p.type) {
         case 'text':
           return { type: 'text', text: p.text };
