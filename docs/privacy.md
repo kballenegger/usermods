@@ -14,6 +14,12 @@ service that *you* chose and configured.
 The source code for every claim on this page is public at
 <https://github.com/kballenegger/usermods>.
 
+**Two builds.** The build published on the Chrome Web Store omits ChatGPT and SuperGrok subscription
+sign-in; it contacts no vendor authentication endpoint at all. The sections below marked
+*(GitHub build only)* therefore do not apply to the Web Store version — in that build no
+subscription token is ever created, stored or sent. They are documented here because the same
+policy covers the GitHub build, which keeps the feature.
+
 ---
 
 ## 1. Data stored on your device
@@ -26,7 +32,7 @@ never uploads it anywhere.
 |---|---|---|
 | **Provider settings** — the provider you picked, the base URL, the model name | `chrome.storage.local` | So usermods knows which endpoint to talk to. |
 | **Your API key**, if you use one | `chrome.storage.local` | Sent only to the endpoint you configured, as the authentication header for your own requests. |
-| **Subscription tokens** — OAuth access and refresh tokens for ChatGPT or xAI sign-in, and the account identifier and label (typically your email address and plan name) read out of those tokens | `chrome.storage.local` | Sent only to that vendor, to authenticate your own requests, and refreshed automatically. Removed when you sign out. |
+| **Subscription tokens** *(GitHub build only)* — OAuth access and refresh tokens for ChatGPT or xAI sign-in, and the account identifier and label (typically your email address and plan name) read out of those tokens | `chrome.storage.local` | Sent only to that vendor, to authenticate your own requests, and refreshed automatically. Removed when you sign out. |
 | **Saved mods** — the full userscript text, its header metadata, its enabled state, and any `@require` libraries and `@resource` files downloaded at install time | `chrome.storage.local` | So your mods can run on matching pages. |
 | **Mod values** — data your scripts save with `GM_setValue`, including values imported from a Tampermonkey backup | `chrome.storage.local` | The storage that userscripts expect. It belongs to the script, not to usermods. |
 | **Chat history** — your messages, the model's replies, the tool calls made and their results, and the page address and title of the tab a chat belongs to | `chrome.storage.local` | So a conversation survives closing the panel. Capped at 200 chats, oldest dropped. Screenshots are stripped from stored history. |
@@ -82,7 +88,7 @@ by an explicit action of yours:
   *Fetch models*, usermods requests that URL. `@require` libraries and `@resource` files named in a
   script's header are downloaded at install time from the addresses the script names, and stored
   with the mod.
-- **Signing in to a subscription.** The ChatGPT and xAI device-code sign-in flows contact those
+- **Signing in to a subscription** *(GitHub build only)*. The ChatGPT and xAI device-code sign-in flows contact those
   vendors' own authentication servers.
 - **`GM_xmlhttpRequest` from a userscript.** Scripts you installed can make cross-origin requests,
   restricted to the hosts their `@connect` header declares. These are requests made by *that script*

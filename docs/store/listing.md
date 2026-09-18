@@ -63,8 +63,6 @@ BRING YOUR OWN MODEL
 usermods has no account and no server of its own. You choose where it sends your requests:
 
 • Anthropic, OpenAI, xAI or OpenRouter with your own API key.
-• A ChatGPT (Plus, Pro, Team) or SuperGrok subscription you already pay for, signed in from
-  Settings — no API key needed.
 • A model running on your own machine through Ollama, LM Studio, vLLM or mlx_lm, so nothing leaves
   your computer.
 • Anything else that speaks the Anthropic Messages or OpenAI chat-completions protocol.
@@ -106,16 +104,20 @@ Greasemonkey.
 
 ## Graphic assets checklist
 
+All graphic assets are built and checked in. Regenerate them with `npm run store-assets`
+(`scripts/store-assets.mjs`); the icon itself is `assets/icon.svg`, rasterized to `public/icon/*.png`
+by `scripts/render-icons.mjs`.
+
 | Asset | Requirement | Status |
 |---|---|---|
-| Store icon | 128×128 PNG | `public/icon/128.png` ships in the build; a larger, more finished 128px store icon is worth drawing before submission. |
-| Screenshots | 1280×800 **or** 640×400 PNG/JPEG, at least one, up to five | **To do.** The existing `docs/screenshots/*.png` are side-panel-shaped (420×820 at 2×) and must be re-composited onto a 1280×800 canvas showing the panel beside the page it is modifying — which also reads better in the store. |
-| Small promo tile | 440×280 PNG/JPEG | **To do.** Required for the listing. |
-| Marquee promo tile | 1400×560 PNG/JPEG | Optional; only used if the item is featured. |
+| Store icon | 128×128 PNG | **Done.** `public/icon/128.png`, rendered from `assets/icon.svg`. |
+| Screenshots | 1280×800 **or** 640×400 PNG/JPEG, at least one, up to five | **Done.** Five at 1280×800 in `docs/store/assets/`: `01-chat.png`, `02-point.png`, `03-mods.png`, `04-install.png`, `05-migrate.png`. The panes are real extension output composited into a window frame, not mockups. |
+| Small promo tile | 440×280 PNG/JPEG | **Done.** `docs/store/assets/promo-tile.png`. |
+| Marquee promo tile | 1400×560 PNG/JPEG | **Done** (optional; only used if featured). `docs/store/assets/marquee.png`. |
 
-Suggested screenshot captions: (1) the proposal with Try and Save, (2) the element picker dropping a
-reference into the composer, (3) the Mods list split by matching site, (4) Settings with the
-provider presets, (5) the install preview for a Greasy Fork script.
+Screenshot captions, as composited: (1) the chat proposing a mod on Wikipedia, (2) the element
+picker dropping an @reference into the composer, (3) the Mods list split by what matches this site,
+(4) the install page for a live Greasy Fork script, (5) Migrate from Tampermonkey, expanded.
 
 ---
 
@@ -153,10 +155,10 @@ the user's device. Answer:
 
 | Category | Check? | Why |
 |---|---|---|
-| **Personally identifiable information** (name, address, email address, age, identification number) | **No** | usermods asks for none of it. The email address shown after a subscription sign-in is read out of the vendor's own token, stays on the device, and is transmitted to no one. |
+| **Personally identifiable information** (name, address, email address, age, identification number) | **No** | usermods asks for none of it. The store build has no sign-in of any kind and collects no identifier. |
 | **Health information** | No | Not collected. |
 | **Financial and payment information** | No | Not collected. |
-| **Authentication information** (passwords, credentials, security questions, PINs) | **Yes** | The user's own API key and OAuth tokens are stored locally and transmitted to the model endpoint they configured, to authenticate their own requests. They are disclosed here because they are transmitted off the device, even though the destination is the user's own provider. |
+| **Authentication information** (passwords, credentials, security questions, PINs) | **Yes** | The user's own API key is stored locally and transmitted to the model endpoint they configured, to authenticate their own requests. They are disclosed here because they are transmitted off the device, even though the destination is the user's own provider. |
 | **Personal communications** (emails, texts, chat messages) | **Yes** | The user's chat messages to the model are transmitted to the endpoint they configured. If the user opens the panel on a page that itself contains messages, that page content is part of what is sent — disclosed here for that reason. |
 | **Location** (region, IP address, GPS coordinates) | No | Never requested or derived. |
 | **Web history** (the list of web pages a user has visited) | No | usermods keeps no history of visited pages, and transmits none. The address of the page a user is actively working on is sent as part of the conversation they started, which is covered by "Website content" below. |
