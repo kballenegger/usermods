@@ -128,7 +128,8 @@ bordered bright and shadowed hard.
 | Warn | `--warn` | `#FFF345` | `94.5% 0.182 105` | attention, not failure | with a glow |
 | Error | `--error` | `#F35F55` | `67.5% 0.184 27` | failure | **on the blue page** (3.48:1) |
 | Outline | `--border-strong` | `#A7C2FE` | `81.6% 0.090 266` | every panel edge | as a hairline divider |
-| Divider | `--border-hair` | `#1C3350` | — | lines *inside* a panel | as a panel's edge |
+| Control edge | `--border-control` | `#55749C` | `52.0% 0.062 260` | buttons, inputs, the toggle track | as a panel's edge |
+| Divider | `--border-hair` | `#1C3350` | — | lines *inside* a panel | as a panel's or a control's edge |
 
 **Why the panel edge is bright.** The blue page and the ink panel are only **1.68:1** apart in
 luminance. A dark hairline would be invisible and a luminance step cannot carry the edge, so every
@@ -157,6 +158,7 @@ fills with ink labels. Day is the banner seen in daylight — the same construct
 | Warn | `--warn` | `#6C6601` | `50.0% 0.106 106` | — |
 | Error | `--error` | `#7D030E` | `38.9% 0.161 27` | deliberately very dark; see below |
 | Outline | `--border-strong` | `#071B31` | `21.9% 0.051 253` | **ink**, 17.35:1 on white |
+| Control edge | `--border-control` | `#7089AC` | `59.0% 0.049 257` | 3.58:1 on white — a control's edge is a UI boundary |
 
 Day is where `#1008C8` gets to be the text colour it is best at. Every identity colour that must
 carry *text* drops to its deep step, while every *fill* keeps the full identity colour with an ink
@@ -223,6 +225,7 @@ Generated from the shipped tokens. AA is 4.5:1 for text, 3:1 for large text and 
 | Focus ring vs a panel | `--focus-ring` on `--surface-1` | 11.99:1 | 11.11:1 | 3:1 | AA (UI) / AA (UI) |
 | Panel border vs the page | `--border-strong` on `--bg-app` | 6.24:1 | 15.20:1 | 3:1 | AA (UI) / AA (UI) |
 | Panel border vs the panel | `--border-strong` on `--surface-1` | 10.48:1 | 17.35:1 | 3:1 | AA (UI) / AA (UI) |
+| Control border (buttons, inputs, toggle) | `--border-control` on `--surface-1` | 3.88:1 | 3.58:1 | 3:1 | AA (UI) / AA (UI) |
 | Status dot: ok | `--dot-ok` on `--surface-1` | 15.23:1 | 5.75:1 | 3:1 | AA (UI) / AA (UI) |
 | Status dot: warn | `--dot-warn` on `--surface-1` | 16.14:1 | 5.93:1 | 3:1 | AA (UI) / AA (UI) |
 | Status dot: error | `--dot-error` on `--surface-1` | 5.85:1 | 11.10:1 | 3:1 | AA (UI) / AA (UI) |

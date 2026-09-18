@@ -165,7 +165,20 @@
    */
   --border-strong: var(--blue-300); /* 6.24:1 on the page, 10.48:1 on a panel */
   --border-card: var(--blue-300);
-  --border-hair: #1c3350; /* the one quiet line: separators INSIDE a panel, never a panel's edge */
+
+  /*
+   * The resting edge of an interactive control — a secondary button, an input, the toggle track,
+   * the top bar's icon buttons.
+   *
+   * It is NOT --border-hair. A control's outline is the thing that says "this is a control", so it
+   * answers to the 3:1 UI rule; the hairline below is 1.46:1 and at that value the top bar's two
+   * icon buttons read as two naked icons rather than as buttons. 3.88:1 on a panel, 4.22:1 on the
+   * well, and it stays quieter than --border-strong so the hierarchy still reads.
+   */
+  --border-control: #55749c;
+
+  /* The one quiet line: separators INSIDE a panel. Never a panel's edge, never a control's. */
+  --border-hair: #1c3350;
   --border-width: 2px;
 
   /*
@@ -345,6 +358,7 @@
   /* Day outlines in INK. 17.35:1 on white — the boldest edge in the system, and the banner's own. */
   --border-strong: #071b31;
   --border-card: #071b31;
+  --border-control: #7089ac;
   --border-hair: #c9d8f0;
   --border-width: 2px;
 
@@ -450,6 +464,7 @@
 
     --border-strong: #071b31;
     --border-card: #071b31;
+    --border-control: #7089ac;
     --border-hair: #c9d8f0;
     --border-width: 2px;
 

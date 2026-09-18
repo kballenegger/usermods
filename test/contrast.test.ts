@@ -312,6 +312,16 @@ const PAIRS: Pair[] = [
     on: (t) => [...page(t), { label: 'surface-1', rgb: surface(t, '--surface-1') }],
     min: 3,
   },
+  {
+    // The resting edge of a secondary button, an input, the toggle track and the top bar's icon
+    // buttons. It is what says "this is a control", so it is a UI boundary and not decoration —
+    // which is exactly why it is a token of its own and not --border-hair, whose 1.46:1 left the
+    // top bar's two icon buttons reading as two bare icons.
+    what: 'control border (buttons, inputs, the toggle track, top-bar icon buttons)',
+    fg: '--border-control',
+    on: panels,
+    min: 3,
+  },
   { what: 'status dot: ok', fg: '--dot-ok', on: everywhere, min: 3 },
   { what: 'status dot: warn', fg: '--dot-warn', on: everywhere, min: 3 },
   { what: 'status dot: error', fg: '--dot-error', on: panels, min: 3 },

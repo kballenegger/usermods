@@ -197,7 +197,7 @@ button.pill,
   width: 26px;
   height: 26px;
   padding: 0;
-  border: var(--border-width) solid var(--border-hair);
+  border: var(--border-width) solid var(--border-control);
   border-radius: var(--r-field);
   background: none;
   color: var(--text-2);
@@ -309,7 +309,7 @@ button.pill,
   font: 400 var(--fs-meta) / 1.4 var(--font-ui);
   color: var(--text-1);
   background: var(--surface-well);
-  border: var(--border-width) solid var(--border-hair);
+  border: var(--border-width) solid var(--border-control);
   border-radius: var(--r-field);
   padding: 6px 9px;
   cursor: pointer;
@@ -508,7 +508,7 @@ button.pill,
   font: 400 var(--fs-body) / 1.5 var(--font-ui);
   background: var(--surface-well);
   color: var(--text-1);
-  border: var(--border-width) solid var(--border-hair);
+  border: var(--border-width) solid var(--border-control);
   border-radius: var(--r-field);
   padding: 10px 12px;
   min-height: 64px;
@@ -558,7 +558,7 @@ button.btn {
   line-height: 1;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  border: var(--border-width) solid var(--border-hair);
+  border: var(--border-width) solid var(--border-control);
   background: var(--surface-2);
   color: var(--text-1);
   border-radius: var(--r-field);
@@ -886,7 +886,7 @@ label.field select,
   text-transform: none;
   letter-spacing: 0;
   padding: 9px 11px;
-  border: var(--border-width) solid var(--border-hair);
+  border: var(--border-width) solid var(--border-control);
   border-radius: var(--r-field);
   background: var(--surface-well);
   color: var(--text-1);
@@ -1109,9 +1109,10 @@ input[type='checkbox']:checked::after {
   min-width: 28px;
   min-height: 28px;
   padding: var(--sp-1) var(--sp-2);
-  /* --border-hair is the divider tone and vanishes at this size; these are buttons, so they take
-     a real 2px outline like every other block in the system. */
-  border: var(--border-width) solid var(--border-hair);
+  /* --border-control, not --border-hair: the hairline is a divider tone at 1.46:1 and at this size
+     it leaves two naked icons where there should be two buttons. A control's outline is what says
+     "this is a control", so it answers to the 3:1 UI rule. */
+  border: var(--border-width) solid var(--border-control);
   border-radius: var(--r-field);
   background: none;
   font-family: var(--font-display);
