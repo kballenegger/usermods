@@ -61,8 +61,22 @@ const WIKI = 'https://en.wikipedia.org/wiki/Common_kingfisher';
 const GREASY_FORK_URL =
   'https://update.greasyfork.org/scripts/478687/GitHub%20Custom%20Global%20Navigation.user.js';
 
-/** See note 4 in scripts/screenshots.mjs: a first-run notice, not the steady state. */
-const HIDE_SETUP_NOTICE = '.app > .notice { display: none !important; }';
+/**
+ * What the store captures mask. See note 4 in scripts/screenshots.mjs, and HIDE_SETUP_NOTICE /
+ * HIDE_UNTESTED_LINE there:
+ *
+ *  - the first-run "Allow User Scripts" setup notice, a first-run instruction rather than the
+ *    steady state;
+ *  - the proposal card's "not tested on this page · …" line, which appears only because
+ *    chrome.userScripts is unavailable in an automated profile, so the scripted conversations must
+ *    pass untested_reason to get past propose_mod's (correct, and deliberately strict) refusal of
+ *    untested scripts. A real session with the toggle on tests the script and shows no such line.
+ *
+ * Both are artefacts of automation rather than of the product, so showing them in the store assets
+ * would misrepresent it. This file only ever captures — it asserts nothing — so unlike
+ * screenshots.mjs it needs no capture-only gate around the second selector.
+ */
+const MASK = '.app > .notice, .card .label.untested { display: none !important; }';
 
 const log = (...a) => console.log('[store-assets]', ...a);
 
@@ -158,8 +172,10 @@ async function openPanel(ctx, extId, { settings = {}, storage = {} } = {}) {
     },
     [{ provider: 'openai-compatible', baseUrl: BASE_URL, apiKey: '', model: 'demo', ...settings }, storage],
   );
-  await page.reload();
-  await page.addStyleTag({ content: HIDE_SETUP_NOTICE });
+  // 'domcontentloaded', not the default 'load': the caller drives the panel through its own waits
+  // from here, and 'load' also waits on this page's webfonts, which can hang on a loaded host.
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.addStyleTag({ content: MASK });
   return page;
 }
 

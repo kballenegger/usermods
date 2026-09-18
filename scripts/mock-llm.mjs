@@ -27,11 +27,15 @@
 // programmatically), so those tools would fail and put an error row in the transcript. get_page,
 // find_elements and get_styles all go through the content script and work fine.
 //
-// A consequence, since propose_mod started refusing untested scripts: every script here proposes
-// with `untested_reason`, because in this profile a mod genuinely cannot be run first. That is the
-// honest state and the proposal card says so. It is also the only reason the captured screenshots
-// carry a "not tested on this page" line; a real session with the user-scripts toggle on runs the
-// script and shows no such line.
+// A consequence, since propose_mod started refusing untested scripts: every propose_mod here
+// passes `untested_reason`, because in this profile a mod genuinely cannot be run first. That is
+// the honest state and the proposal card says so. The one exception is the first propose in the
+// `guardrails` scenario, which omits it on purpose so the smoke run can watch the loop refuse it.
+//
+// It is also the only reason a captured screenshot would carry a "not tested on this page" line;
+// a real session with the user-scripts toggle on runs the script and shows no such line, so the
+// capture scripts mask that line (HIDE_UNTESTED_LINE in scripts/screenshots.mjs). The asserting
+// flows do not mask it — they assert it is visible.
 
 import http from 'node:http';
 
@@ -309,6 +313,7 @@ setTimeout(() => observer.disconnect(), 10000);`,
               name: 'Wikipedia: numbered headings',
               description: 'Numbers the section headings of an article.',
               matches: ['*://*.wikipedia.org/wiki/*'],
+              untested_reason: 'chrome.userScripts is unavailable in this automated profile',
               code: "document.querySelectorAll('.mw-heading h2').forEach((h, i) => { h.prepend(`${i + 1}. `); });",
             },
           },

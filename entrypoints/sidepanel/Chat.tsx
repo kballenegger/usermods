@@ -757,7 +757,7 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
                   <div className="desc">{it.proposal.description}</div>
                   {/* The model said it could not run this one. Worth knowing before you save it. */}
                   {it.proposal.untestedReason && (
-                    <div className="label">not tested on this page · {it.proposal.untestedReason}</div>
+                    <div className="label untested">not tested on this page · {it.proposal.untestedReason}</div>
                   )}
                   <div className="row">{it.proposal.matches.map((m) => <span key={m} className="chip">{m}</span>)}</div>
                   <details>

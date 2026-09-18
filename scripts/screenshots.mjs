@@ -34,10 +34,12 @@
 //    extension toggle in chrome://extensions that cannot be set programmatically or by a flag.
 //    The panel correctly shows a setup notice about it. That notice is real, but it is a
 //    first-run instruction rather than the normal state, so it is hidden with injected CSS for
-//    the screenshots only (HIDE_SETUP_NOTICE below). The consequence for the scripted
+//    the screenshots only (HIDE_SETUP_NOTICE / MASK below). The consequence for the scripted
 //    conversations is that run_script and screenshot would fail, so the mock never calls them;
 //    get_page, find_elements and get_styles go through the content script and work for real
-//    against the live pages.
+//    against the live pages. It also means every scripted propose_mod must pass untested_reason
+//    to get past the propose-time check, which puts a "not tested on this page" line on the card
+//    — masked in the captures only, see HIDE_UNTESTED_LINE.
 //
 // 5. Settings are seeded by evaluating chrome.storage.local.set from an extension page, which
 //    has the same storage as the side panel.
@@ -65,8 +67,31 @@ const CHATS = process.argv.includes('--chats');
 const ISOLATION = process.argv.includes('--isolation');
 const COMPACTION = process.argv.includes('--compaction');
 
+/** True when this run is capturing screenshots rather than asserting behaviour (see MASK below). */
+const CAPTURING = !SMOKE && !CHATS && !ISOLATION && !COMPACTION;
+
 /** See note 4: a first-run setup instruction, not the steady state the README should show. */
 const HIDE_SETUP_NOTICE = '.app > .notice { display: none !important; }';
+
+/**
+ * The "not tested on this page · …" line on the proposal card, hidden for the captures ONLY.
+ *
+ * chrome.userScripts is unavailable in an automated profile (note 4), so the scripted
+ * conversations must pass untested_reason to get past propose_mod's refusal of untested scripts.
+ * That refusal is correct product behaviour and stays strict; the line it produces is an artefact
+ * of automation, not of the product — a real session with the toggle on tests the script and shows
+ * no such line — so leaving it in the README and store captures would misrepresent the normal
+ * product.
+ *
+ * This is deliberately NOT part of HIDE_SETUP_NOTICE, because that constant is injected by the
+ * shared openPanel/shot/reopenPanel helpers, which every asserting flow also goes through. Hiding
+ * the line there would quietly disarm the smoke and guardrails flows, which assert that the line
+ * IS shown to the user.
+ */
+const HIDE_UNTESTED_LINE = '.card .label.untested { display: none !important; }';
+
+/** Everything the capture path masks: the setup notice always, the untested line only when capturing. */
+const MASK = CAPTURING ? `${HIDE_SETUP_NOTICE}\n${HIDE_UNTESTED_LINE}` : HIDE_SETUP_NOTICE;
 
 /**
  * A real, popular Greasy Fork script, fetched live for the install screenshot: it has a @require
@@ -143,7 +168,7 @@ async function openPanel(ctx, extId, { settings = {}, storage = {} } = {}) {
     [{ provider: 'openai-compatible', baseUrl: BASE_URL, apiKey: '', model: 'demo', ...settings }, storage],
   );
   await page.reload();
-  await page.addStyleTag({ content: HIDE_SETUP_NOTICE });
+  await page.addStyleTag({ content: MASK });
   return page;
 }
 
@@ -159,7 +184,7 @@ async function openSite(ctx, url) {
 }
 
 async function shot(page, name) {
-  await page.addStyleTag({ content: HIDE_SETUP_NOTICE }).catch(() => {});
+  await page.addStyleTag({ content: MASK }).catch(() => {});
   const file = path.join(OUT_DIR, name);
   await page.screenshot({ path: file });
   const kb = Math.round(fs.statSync(file).size / 1024);
@@ -181,7 +206,7 @@ async function runConversation(panel, text, { refreshTitle = false } = {}) {
   // what the switcher looks like any time after the first turn.
   if (refreshTitle) {
     await panel.reload();
-    await panel.addStyleTag({ content: HIDE_SETUP_NOTICE }).catch(() => {});
+    await panel.addStyleTag({ content: MASK }).catch(() => {});
     // The restored transcript, and the switcher now showing the real title rather than "New chat".
     await panel.locator('.messages .card h4').first().waitFor({ timeout: 20_000 });
     await panel
@@ -527,8 +552,15 @@ async function guardrails() {
     // carrying untested_reason, was accepted and the card names the reason for the user.
     const cards = await panel.locator('.messages .card h4').count();
     if (cards !== 1) fail(`expected exactly one proposal card, got ${cards}`);
-    const cardText = (await panel.locator('.messages .card').first().textContent()) ?? '';
-    if (!cardText.includes('scripts cannot be run in this browser profile')) {
+    // Asserted on the line itself, not just the card's text, because the capture path masks this
+    // line with CSS (HIDE_UNTESTED_LINE). This flow must see it RENDERED: if the mask ever leaked
+    // out of the capture path into the asserting flows, isVisible() is what would catch it.
+    const untested = panel.locator('.messages .card .label.untested');
+    if ((await untested.count()) !== 1) fail(`expected 1 untested line on the card, got ${await untested.count()}`);
+    if (!(await untested.first().isVisible())) fail('the untested line is in the DOM but not visible to the user');
+    const untestedText = (await untested.first().textContent()) ?? '';
+    if (!untestedText.includes('not tested on this page')) fail(`untested line read ${JSON.stringify(untestedText)}`);
+    if (!untestedText.includes('scripts cannot be run in this browser profile')) {
       fail('the proposal card does not show the untested reason');
     }
 
@@ -698,7 +730,7 @@ async function waitForSwitcherLabel(panel, text, timeout = 25_000) {
 /** Reload the panel tab the way a user reopening the side panel would, and settle. */
 async function reopenPanel(panel) {
   await panel.reload();
-  await panel.addStyleTag({ content: HIDE_SETUP_NOTICE }).catch(() => {});
+  await panel.addStyleTag({ content: MASK }).catch(() => {});
   // Long enough for the host lookup, the chat lookup and the transcript read to all resolve.
   await panel.waitForTimeout(2500);
 }
