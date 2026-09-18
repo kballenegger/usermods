@@ -322,7 +322,8 @@ available again from Settings → *Review data notice*. The full policy is in
 
 Issues and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) covers the setup, the npm
 scripts, where everything lives, how to add a provider, and the one hard rule: every fix lands with a
-regression test. Participation is governed by the [Code of Conduct](CODE_OF_CONDUCT.md).
+regression test. The [Code of Conduct](CODE_OF_CONDUCT.md) sets out how this project is run and the
+one line it draws.
 
 ## Author
 

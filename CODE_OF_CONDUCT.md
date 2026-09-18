@@ -1,135 +1,46 @@
-# Contributor Covenant Code of Conduct
+# Code of Conduct
 
-## Our Pledge
+This project is a voluntary association. Nobody is required to contribute, and nobody is required
+to accept a contribution. The maintainer decides what goes into this repository and owes no one a
+merge, a reply, or a seat. That is not hostility; it is what it means for a project to have a
+direction. Because usermods is MIT licensed, anyone who disagrees is free to fork it and run their
+project their way, with no permission needed and nothing owed back. Exit is always available, and
+it is the ultimate check on the maintainer.
 
-We as members, contributors, and leaders pledge to make participation in our
-community a harassment-free experience for everyone, regardless of age, body
-size, visible or invisible disability, ethnicity, sex characteristics, gender
-identity and expression, level of experience, education, socio-economic status,
-nationality, personal appearance, race, caste, color, religion, or sexual
-identity and orientation.
+## The work is what is judged
 
-We pledge to act and interact in ways that contribute to an open, welcoming,
-diverse, inclusive, and healthy community.
+Contributions are evaluated on the work itself: whether the code is correct, whether it is clear,
+whether it is tested, and whether it fits where the project is going. Not on who submitted it,
+what they believe, where they are from, or anything they have said or done elsewhere. This project
+takes no position on any subject other than the software, and asks contributors for none.
 
-## Our Standards
+## Speech
 
-Examples of behavior that contributes to a positive environment for our
-community include:
+Argue hard about code and design. Blunt technical criticism is welcome here and is not an offence;
+being told your patch is wrong, in plain words, is the service a review exists to provide. Keep
+project spaces on topic: issues, pull requests and discussions are for the software, and that is
+the only restriction on subject matter.
 
-* Demonstrating empathy and kindness toward other people
-* Being respectful of differing opinions, viewpoints, and experiences
-* Giving and gracefully accepting constructive feedback
-* Accepting responsibility and apologizing to those affected by our mistakes,
-  and learning from the experience
-* Focusing on what is best not just for us as individuals, but for the overall
-  community
+## The one firm line
 
-Examples of unacceptable behavior include:
+The line that is not a matter of taste is the initiation of force or fraud. Specifically: threats,
+doxxing or publishing private information, organised harassment, malware or deliberately harmful
+code, deception about what a contribution actually does, and spam. These are not disagreements
+about tone. They are attacks on other people, and they get removed.
 
-* The use of sexualized language or imagery, and sexual attention or advances of
-  any kind
-* Trolling, insulting or derogatory comments, and personal or political attacks
-* Public or private harassment
-* Publishing others' private information, such as a physical or email address,
-  without their explicit permission
-* Other conduct which could reasonably be considered inappropriate in a
-  professional setting
+## Responsibility
 
-## Enforcement Responsibilities
+You are responsible for what you post and for what you submit, including having the right to
+contribute it under the MIT license. No one here is responsible for how you feel about a code
+review, and you are not responsible for how anyone feels about yours.
 
-Community leaders are responsible for clarifying and enforcing our standards of
-acceptable behavior and will take appropriate and fair corrective action in
-response to any behavior that they deem inappropriate, threatening, offensive,
-or harmful.
+## Enforcement, such as it is
 
-Community leaders have the right and responsibility to remove, edit, or reject
-comments, commits, code, wiki edits, issues, and other contributions that are
-not aligned to this Code of Conduct, and will communicate reasons for moderation
-decisions when appropriate.
+There is no committee, no ladder of sanctions, and no anonymous reporting process. The maintainer
+moderates this project's own spaces at his sole discretion, as the owner of them, and will remove
+the aggression described above along with off-topic noise. That is the exercise of a property
+right, not a tribunal, and nothing here claims authority over anyone outside these spaces.
 
-## Scope
-
-This Code of Conduct applies within all community spaces, and also applies when
-an individual is officially representing the community in public spaces.
-Examples of representing our community include using an official email address,
-posting via an official social media account, or acting as an appointed
-representative at an online or offline event.
-
-## Enforcement
-
-Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported to the community leaders responsible for enforcement at
-[@kballenegger on GitHub](https://github.com/kballenegger), by opening a
-[private security advisory](https://github.com/kballenegger/usermods/security/advisories)
-when the matter is sensitive and should not be public, or by opening an
-[issue](https://github.com/kballenegger/usermods/issues) when it need not be.
-All complaints will be reviewed and investigated promptly and fairly.
-
-All community leaders are obligated to respect the privacy and security of the
-reporter of any incident.
-
-## Enforcement Guidelines
-
-Community leaders will follow these Community Impact Guidelines in determining
-the consequences for any action they deem in violation of this Code of Conduct:
-
-### 1. Correction
-
-**Community Impact**: Use of inappropriate language or other behavior deemed
-unprofessional or unwelcome in the community.
-
-**Consequence**: A private, written warning from community leaders, providing
-clarity around the nature of the violation and an explanation of why the
-behavior was inappropriate. A public apology may be requested.
-
-### 2. Warning
-
-**Community Impact**: A violation through a single incident or series of
-actions.
-
-**Consequence**: A warning with consequences for continued behavior. No
-interaction with the people involved, including unsolicited interaction with
-those enforcing the Code of Conduct, for a specified period of time. This
-includes avoiding interactions in community spaces as well as external channels
-like social media. Violating these terms may lead to a temporary or permanent
-ban.
-
-### 3. Temporary Ban
-
-**Community Impact**: A serious violation of community standards, including
-sustained inappropriate behavior.
-
-**Consequence**: A temporary ban from any sort of interaction or public
-communication with the community for a specified period of time. No public or
-private interaction with the people involved, including unsolicited interaction
-with those enforcing the Code of Conduct, is allowed during this period.
-Violating these terms may lead to a permanent ban.
-
-### 4. Permanent Ban
-
-**Community Impact**: Demonstrating a pattern of violation of community
-standards, including sustained inappropriate behavior, harassment of an
-individual, or aggression toward or disparagement of classes of individuals.
-
-**Consequence**: A permanent ban from any sort of public interaction within the
-community.
-
-## Attribution
-
-This Code of Conduct is adapted from the [Contributor Covenant][homepage],
-version 2.1, available at
-[https://www.contributor-covenant.org/version/2/1/code_of_conduct.html][v2.1].
-
-Community Impact Guidelines were inspired by
-[Mozilla's code of conduct enforcement ladder][Mozilla CoC].
-
-For answers to common questions about this code of conduct, see the FAQ at
-[https://www.contributor-covenant.org/faq][FAQ]. Translations are available at
-[https://www.contributor-covenant.org/translations][translations].
-
-[homepage]: https://www.contributor-covenant.org
-[v2.1]: https://www.contributor-covenant.org/version/2/1/code_of_conduct.html
-[Mozilla CoC]: https://github.com/mozilla/diversity
-[FAQ]: https://www.contributor-covenant.org/faq
-[translations]: https://www.contributor-covenant.org/translations
+Two practical notes. The project is hosted on GitHub, so GitHub's Terms of Service and Acceptable
+Use Policies govern activity here regardless of anything written above. Security problems go
+through [SECURITY.md](SECURITY.md), privately, not the issue tracker.
