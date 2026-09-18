@@ -3,7 +3,8 @@
 // scripted mock backend in scripts/mock-llm.mjs. No API key and no network model call.
 //
 //   npm run screenshots     capture everything into docs/screenshots/
-//   npm run smoke           the same chat flow, headless, asserting the proposal card appears
+//   npm run smoke           headless: the chat flow (proposal card) then the chats flow, both asserted
+//   npm run smoke:chats     headless: the chats flow alone (restore, New chat, archive/unarchive)
 //
 // ---------------------------------------------------------------------------
 // How this works, and why it is shaped this way
