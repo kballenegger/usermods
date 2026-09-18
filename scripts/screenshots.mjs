@@ -167,7 +167,9 @@ async function openPanel(ctx, extId, { settings = {}, storage = {} } = {}) {
     },
     [{ provider: 'openai-compatible', baseUrl: BASE_URL, apiKey: '', model: 'demo', ...settings }, storage],
   );
-  await page.reload();
+  // 'domcontentloaded', not the default 'load': see reopenPanel. The caller drives the panel
+  // through its own waits from here, and 'load' also waits on this page's webfonts.
+  await page.reload({ waitUntil: 'domcontentloaded' });
   await page.addStyleTag({ content: MASK });
   return page;
 }
@@ -192,8 +194,23 @@ async function shot(page, name) {
   return file;
 }
 
+/**
+ * Wait until the panel has found its target tab and the composer is live.
+ *
+ * The composer is `disabled={unsupported}` until the panel's tab query comes back with a real web
+ * page (note 3). Every flow used to cover that with a flat waitForTimeout(1200), which is a bet on
+ * how fast the host is: when it lost, `fill()` resolved the textarea and then sat on a disabled
+ * element for the full 30s timeout — the failure read "locator resolved to <textarea …>" with the
+ * ENABLED placeholder, because it had enabled a moment after the fill gave up. Waiting for the
+ * element to be editable tests the thing that actually matters and is immune to host speed.
+ */
+async function waitForComposer(panel, timeout = 30_000) {
+  await panel.locator('textarea:not([disabled])').waitFor({ state: 'visible', timeout });
+}
+
 /** Send a message in the panel and wait for the proposal card. */
 async function runConversation(panel, text, { refreshTitle = false } = {}) {
+  await waitForComposer(panel);
   await panel.locator('textarea').fill(text);
   await panel.locator('.composer button.btn.primary').click();
   await panel.locator('.messages .card h4').first().waitFor({ timeout: 60_000 });
@@ -205,7 +222,7 @@ async function runConversation(panel, text, { refreshTitle = false } = {}) {
   // reads "New chat" until the next refresh. Nudging the list here shows the real title, which is
   // what the switcher looks like any time after the first turn.
   if (refreshTitle) {
-    await panel.reload();
+    await panel.reload({ waitUntil: 'domcontentloaded' });
     await panel.addStyleTag({ content: MASK }).catch(() => {});
     // The restored transcript, and the switcher now showing the real title rather than "New chat".
     await panel.locator('.messages .card h4').first().waitFor({ timeout: 20_000 });
@@ -267,7 +284,7 @@ async function chatProposal(colorScheme, name) {
   try {
     const panel = await openPanel(b.ctx, b.extId);
     await openSite(b.ctx, 'https://en.wikipedia.org/wiki/Common_kingfisher');
-    await panel.waitForTimeout(1200);
+    await waitForComposer(panel);
     await runConversation(panel, 'hide the sidebar and make the article full width', { refreshTitle: true });
     const proposal = await panel.locator('.messages .card h4').first().textContent();
     await shot(panel, name);
@@ -294,7 +311,7 @@ async function chatRefs() {
   try {
     const panel = await openPanel(b.ctx, b.extId);
     const site = await openSite(b.ctx, 'https://en.wikipedia.org/wiki/Common_kingfisher');
-    await panel.waitForTimeout(1200);
+    await waitForComposer(panel);
 
     // A first exchange, so the shot shows a conversation in progress rather than an empty panel.
     await runConversation(panel, 'hide the sidebar and make the article full width', { refreshTitle: true });
@@ -454,7 +471,7 @@ async function smoke() {
     await clearViolations();
     const panel = await openPanel(b.ctx, b.extId);
     await openSite(b.ctx, 'https://en.wikipedia.org/wiki/Common_kingfisher');
-    await panel.waitForTimeout(1200);
+    await waitForComposer(panel);
     await runConversation(panel, 'hide the sidebar and make the article full width');
 
     const fail = (m) => {
@@ -466,6 +483,17 @@ async function smoke() {
 
     const match = (await panel.locator('.messages .card .chip').first().textContent())?.trim();
     if (match !== '*://*.wikipedia.org/wiki/*') fail(`match pattern was ${JSON.stringify(match)}`);
+
+    // Under automation nothing can be run, so the scripted propose_mod passes untested_reason and
+    // the card must tell the user so — visibly. The capture path masks this line with injected CSS
+    // (MASK above); asserting visibility here is what keeps that mask out of the asserting flows.
+    const untested = panel.locator('.messages .card .label.untested');
+    if ((await untested.count()) !== 1) fail(`expected 1 untested line on the card, got ${await untested.count()}`);
+    if (!(await untested.first().isVisible())) fail('the untested line is in the DOM but not visible to the user');
+    const untestedText = (await untested.first().textContent()) ?? '';
+    if (!untestedText.includes('not tested on this page · chrome.userScripts is unavailable')) {
+      fail(`untested line read ${JSON.stringify(untestedText)}`);
+    }
 
     // The tools really ran against the page through the content script.
     const tools = await panel.locator('.messages .tool summary').allTextContents();
@@ -522,11 +550,12 @@ async function sentToModel() {
 async function guardrails() {
   // Start from an empty log so nothing asserted here can be satisfied by a previous flow's traffic.
   await fetch(`http://127.0.0.1:${PORT}/__requests`, { method: 'DELETE' });
+  await clearViolations();
   const b = await launch('light');
   try {
     const panel = await openPanel(b.ctx, b.extId);
     await openSite(b.ctx, 'https://en.wikipedia.org/wiki/Common_kingfisher');
-    await panel.waitForTimeout(1200);
+    await waitForComposer(panel);
     await runConversation(panel, 'tidy up the references section');
 
     const fail = (m) => {
@@ -569,7 +598,12 @@ async function guardrails() {
     const refused = await panel.locator('.messages details.tool.error summary', { hasText: 'propose_mod' }).count();
     if (refused !== 1) fail(`expected 1 refused propose_mod row, got ${refused}`);
 
-    console.log('guardrails: OK — read-budget nudge and propose-time refusal both reached the model, override accepted');
+    // This flow is the one that most needs the check: a refused propose_mod is a tool ERROR, and
+    // the nudges are extra text parts appended to the same tool-results message. Both are exactly
+    // the shapes that can separate a tool call from its result if anything mishandles them.
+    await assertNoViolations('guardrails');
+
+    console.log('guardrails: OK — read-budget nudge and propose-time refusal both reached the model, override accepted, zero invalid requests');
   } finally {
     await b.close();
   }
@@ -595,7 +629,7 @@ async function activityFlow() {
     await clearViolations();
     const panel = await openPanel(b.ctx, b.extId);
     await openSite(b.ctx, 'https://en.wikipedia.org/wiki/Common_kingfisher');
-    await panel.waitForTimeout(1200);
+    await waitForComposer(panel);
 
     const indicator = panel.locator('.activity');
     if (await indicator.count()) fail('the activity line was showing before anything had been sent');
@@ -604,25 +638,57 @@ async function activityFlow() {
     // coin flip. Record every distinct value the line takes instead, from inside the page.
     await installActivityRecorder(panel);
 
-    // --- 1. It appears within 500ms of sending. The mock does not answer for ~3s, so if the line
-    // waited for the backend rather than for the send, it would not be up yet.
+    // --- 1. It appears on SEND, not on the first byte from the backend. The mock deliberately
+    // stays silent for 3s (firstByteDelay in scripts/mock-llm.mjs), so the whole content of this
+    // check is that the line is up well before the backend has said anything.
+    //
+    // The bound is 1.5s rather than a few hundred ms on purpose. What is being timed from here is
+    // not the render: it is a Playwright click round-trip, plus the port connect, plus waking the
+    // extension's service worker, which on a cold profile is most of the budget and scales with
+    // how loaded the host is. A tighter bound measures the machine rather than the product — it
+    // failed here at 534ms, 850ms and 957ms on an unchanged build, including at 2b2796c before any
+    // of this branch's work. 1.5s is still only half the mock's silence, so a line that genuinely
+    // waited for the backend fails this as loudly as it ever did.
+    const APPEAR_BUDGET_MS = 1_500;
     await panel.locator('textarea').fill(THINKING_PROMPT);
     const sentAt = Date.now();
     await panel.locator('.composer button.btn.primary').click();
-    await indicator.waitFor({ timeout: 2_000 });
+    await indicator.waitFor({ timeout: 5_000 });
     const appearedIn = Date.now() - sentAt;
-    if (appearedIn > 500) fail(`the activity line took ${appearedIn}ms to appear, which is longer than the 500ms it promises`);
+    if (appearedIn > APPEAR_BUDGET_MS) {
+      fail(`the activity line took ${appearedIn}ms to appear, longer than the ${APPEAR_BUDGET_MS}ms it promises`);
+    }
 
     // --- 2. During the delay it says it is waiting for the model, and its timer ticks.
+    //
+    // Both facts are read from ONE snapshot of the line. Reading the label and then re-reading the
+    // DOM for the timer is a race: the run can leave the model phase between the two reads, and
+    // the tool label carries no "Ns", so readTimer came back null while the message printed the
+    // stale label — "the line showed no elapsed timer (it said "waiting for model·0s")", which
+    // accuses the timer of being absent and then quotes it.
     const waitingText = (await indicator.textContent())?.trim() ?? '';
     if (!/waiting for model/i.test(waitingText)) fail(`the line did not say it was waiting for the model (it said ${JSON.stringify(waitingText)})`);
 
-    const firstTimer = await readTimer(panel);
+    const firstTimer = parseTimer(waitingText);
     if (firstTimer === null) fail(`the line showed no elapsed timer (it said ${JSON.stringify(waitingText)})`);
-    await panel.waitForTimeout(1600);
-    const secondTimer = await readTimer(panel);
-    if (secondTimer === null || secondTimer <= firstTimer) {
-      fail(`the elapsed timer did not tick: it read ${firstTimer}s then ${secondTimer}s`);
+
+    // Wait for the timer to actually advance rather than sampling twice across a fixed sleep. The
+    // line renders WHOLE seconds, so a fixed window only reliably shows a change if it is safely
+    // longer than a second of real time — and under load the two reads landed inside the same
+    // second and both said "0s", failing a timer that was ticking perfectly well. Polling for the
+    // change tests the same property (it advances) without betting on the host's timing.
+    let secondTimer = firstTimer;
+    const tickDeadline = Date.now() + 8_000;
+    while (Date.now() < tickDeadline) {
+      await panel.waitForTimeout(250);
+      const t = await readTimer(panel);
+      if (t !== null && t > firstTimer) {
+        secondTimer = t;
+        break;
+      }
+    }
+    if (secondTimer <= firstTimer) {
+      fail(`the elapsed timer did not tick: it read ${firstTimer}s and was still ${secondTimer}s 8s later`);
     }
 
     // --- 3. It follows the run into the tool call. A tool phase can be short, so rather than poll
@@ -646,18 +712,22 @@ async function activityFlow() {
 
     if (process.env.ACTIVITY_VERBOSE) console.log('[activity] the line showed:', await recorded(panel));
     await assertNoViolations('activity');
-    console.log('activity: OK — appears <500ms, waiting label with a ticking timer, tool label, gone after done');
+    console.log('activity: OK — appears on send, waiting label with a ticking timer, tool label, gone after done');
 
   } finally {
     await b.close();
   }
 }
 
-/** The elapsed seconds the line is showing, or null if it is not showing one. */
-async function readTimer(panel) {
-  const text = await panel.locator('.activity').textContent().catch(() => null);
+/** The elapsed seconds in one already-read line of activity text, or null if it shows none. */
+function parseTimer(text) {
   const m = text?.match(/(\d+)s(?!\w)/);
   return m ? Number(m[1]) : null;
+}
+
+/** The elapsed seconds the line is showing right now, or null if it is not showing one. */
+async function readTimer(panel) {
+  return parseTimer(await panel.locator('.activity').textContent().catch(() => null));
 }
 
 /**
@@ -727,9 +797,25 @@ async function waitForSwitcherLabel(panel, text, timeout = 25_000) {
   return label;
 }
 
-/** Reload the panel tab the way a user reopening the side panel would, and settle. */
+/**
+ * Reload the panel tab the way a user reopening the side panel would, and settle.
+ *
+ * The reload's own promise is deliberately not trusted. The isolation flow reopens the panel while
+ * a run is STILL STREAMING into it, and a reload issued then can navigate — the call log shows
+ * "navigated to sidepanel.html" — without its wait ever resolving, so both the default 'load' and
+ * 'domcontentloaded' time out at 30s on a page that is plainly up and serving. The panel's
+ * readiness is established below and re-asserted by every caller anyway (the transcript, the
+ * switcher row, the composer, or a chrome.storage read), so the navigation promise is worth
+ * nothing here beyond kicking the reload off.
+ *
+ * So: ask for the reload, give it a short window, and then prove the page is usable by round-
+ * tripping through the extension API the callers actually depend on.
+ */
 async function reopenPanel(panel) {
-  await panel.reload();
+  await panel.reload({ waitUntil: 'domcontentloaded', timeout: 10_000 }).catch(() => {});
+  // The real readiness check: an evaluate that reaches chrome.storage means the document is live
+  // and the extension APIs are bound, which is all any caller needs.
+  await panel.waitForFunction(() => typeof chrome !== 'undefined' && !!chrome.storage?.local, null, { timeout: 30_000 });
   await panel.addStyleTag({ content: MASK }).catch(() => {});
   // Long enough for the host lookup, the chat lookup and the transcript read to all resolve.
   await panel.waitForTimeout(2500);
@@ -751,7 +837,7 @@ async function chatsFlow() {
     await clearViolations();
     const panel = await openPanel(b.ctx, b.extId);
     await openSite(b.ctx, 'https://en.wikipedia.org/wiki/Common_kingfisher');
-    await panel.waitForTimeout(1200);
+    await waitForComposer(panel);
 
     // --- 1. A real conversation, so there is something to come back to.
     await runConversation(panel, PROMPT);
@@ -947,7 +1033,7 @@ async function isolationFlow() {
 
     // --- Tab 1: the slow chat, A.
     const tab1 = await openSite(b.ctx, 'https://en.wikipedia.org/wiki/Common_kingfisher');
-    await panel.waitForTimeout(1200);
+    await waitForComposer(panel);
     await panel.locator('textarea').fill(SLOW_PROMPT);
     await panel.locator('.composer button.btn.primary').click();
 
@@ -968,7 +1054,9 @@ async function isolationFlow() {
     // the old bug where the button aborted whatever the port last started.
     await panel.locator('textarea').fill(FAST_PROMPT);
     await panel.locator('.composer button.btn.primary').click();
-    await panel.locator('.messages .msg.assistant', { hasText: FAST_MARKER }).waitFor({ timeout: 30_000 });
+    // .first(): B's reply can render as more than one assistant bubble while it streams, and this
+    // is only a wait for the answer to have arrived — the bleed assertions below do the real work.
+    await panel.locator('.messages .msg.assistant', { hasText: FAST_MARKER }).first().waitFor({ timeout: 30_000 });
     // B has answered; pressing Stop here is the user tidying up their own chat.
     const stopInB = panel.locator('.composer button.btn.danger', { hasText: 'Stop' });
     if (await stopInB.count()) await stopInB.click();
@@ -979,7 +1067,24 @@ async function isolationFlow() {
     if (bText.includes(SLOW_PROMPT)) fail(`chat A's user message appeared in chat B: ${JSON.stringify(bText.slice(0, 400))}`);
 
     // --- Let A finish while B is on screen, then go back to it.
-    await panel.waitForTimeout(12_000);
+    //
+    // Wait for A's run to actually be over rather than sleeping a fixed 12s and hoping. A is
+    // offscreen here, so the only honest signal is what the background has PERSISTED for it: poll
+    // until some stored transcript carries A's "step two". A flat sleep made this assertion fail
+    // spuriously under load — the transcript came back ending at `get_page`, i.e. A was simply
+    // still running, which reads exactly like the real bug this check exists to catch.
+    const tailDeadline = Date.now() + 60_000;
+    let aFinished = false;
+    while (Date.now() < tailDeadline) {
+      const snapshot = await storedTranscripts(panel).catch(() => ({}));
+      if (Object.values(snapshot).some((v) => v.includes(`${SLOW_MARKER} step two`))) {
+        aFinished = true;
+        break;
+      }
+      await panel.waitForTimeout(500);
+    }
+    if (!aFinished) fail(`chat A never finished: no stored transcript reached "${SLOW_MARKER} step two" within 60s`);
+
     await tab1.bringToFront();
     await panel.waitForTimeout(3000);
 
@@ -1049,7 +1154,9 @@ async function isolationFlow() {
     await panel.waitForTimeout(1500);
     await panel.locator('textarea').fill(FAST_PROMPT);
     await panel.locator('.composer button.btn.primary').click();
-    await panel.locator('.messages .msg.assistant', { hasText: FAST_MARKER }).waitFor({ timeout: 30_000 });
+    // .first(): B's reply can render as more than one assistant bubble while it streams, and this
+    // is only a wait for the answer to have arrived — the bleed assertions below do the real work.
+    await panel.locator('.messages .msg.assistant', { hasText: FAST_MARKER }).first().waitFor({ timeout: 30_000 });
     const stopB = panel.locator('.composer button.btn.danger', { hasText: 'Stop' });
     if (await stopB.count()) await stopB.click();
     await panel.waitForTimeout(1000);
@@ -1123,7 +1230,7 @@ async function compactionFlow() {
     // The budget is a normal setting, so shrinking it is exactly what a user could do.
     const panel = await openPanel(b.ctx, b.extId, { settings: { contextBudget: SMALL_BUDGET } });
     await openSite(b.ctx, 'https://en.wikipedia.org/wiki/Common_kingfisher');
-    await panel.waitForTimeout(1200);
+    await waitForComposer(panel);
 
     // Each turn ends with a distinct text-only reply, so waiting for that line is how we know the
     // turn is over — more reliable than watching the Stop button, which the panel keeps mounted
