@@ -1,0 +1,155 @@
+/*
+ * Volt OS design tokens.
+ *
+ * A single neon yellow-green accent glowing against near-black, green-cast surfaces. Everything
+ * alive (a running turn, an enabled mod, the active tab) glows volt; everything else stays quiet:
+ * white text, grey metadata, hairline separators. Warning and error never glow.
+ *
+ * Dark is the default theme. Light is an override, applied either by the OS preference or by the
+ * explicit `data-theme` attribute the Settings theme control writes on <html>.
+ */
+
+:root {
+  /* App background */
+  --bg-app: #0a0d0b;
+  --bg-ambient:
+    radial-gradient(480px 360px at 110% -5%, rgba(200, 255, 46, 0.14), transparent 70%),
+    radial-gradient(420px 320px at -15% 108%, rgba(200, 255, 46, 0.08), transparent 70%), #0a0d0b;
+
+  /* Surfaces */
+  --surface-hi: #151b16;
+  --surface-lo: #0e120f;
+  --surface-card: linear-gradient(180deg, var(--surface-hi), var(--surface-lo));
+  --border-card: #222b24;
+  --border-hair: #1a201b;
+
+  /* Text */
+  --text-1: #e8ede8;
+  --text-2: #8a948b;
+  --text-3: #5a645b;
+
+  /* Volt accent */
+  --volt: #c8ff2e;
+  --volt-bright: #e6ff8f;
+  --volt-deep: #aee822;
+  --volt-a10: rgba(200, 255, 46, 0.1);
+  --volt-a12: rgba(200, 255, 46, 0.12);
+  --volt-a25: rgba(200, 255, 46, 0.25);
+  --volt-a28: rgba(200, 255, 46, 0.28);
+  --accent-text: var(--volt);
+
+  /* Semantic. Never glows. */
+  --warn: #e8b84b;
+  --warn-bg: rgba(232, 184, 75, 0.12);
+  --warn-text: #e8b84b;
+  --error: #f26d5e;
+  --error-bg: rgba(242, 109, 94, 0.12);
+  --error-text: #f26d5e;
+
+  /* Data */
+  --fill-grad: linear-gradient(90deg, #aee822, #e6ff8f);
+  --track: rgba(128, 140, 130, 0.18);
+
+  /* Type */
+  --font-ui: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --fs-micro: 10px;
+  --fs-label: 11px;
+  --fs-meta: 12px;
+  --fs-body: 13px;
+  --fs-ui: 14px;
+  --fs-stat: 20px;
+  --fs-title: 26px;
+  --lbl-tracking: 0.06em;
+
+  /* Radii — nothing is sharp */
+  --r-card: 20px;
+  --r-field: 12px;
+  --r-pill: 999px;
+  --r-bar: 3px;
+
+  /* Glows: the dark theme's signature, volt only */
+  --glow-dot: 0 0 6px rgba(200, 255, 46, 0.6);
+  --glow-fill: 0 0 10px rgba(200, 255, 46, 0.5);
+  --glow-hero: 0 0 32px rgba(200, 255, 46, 0.12), inset 0 1px 0 rgba(200, 255, 46, 0.18);
+  --glow-text: 0 0 24px rgba(200, 255, 46, 0.35);
+  --glow-tab: 0 0 16px rgba(200, 255, 46, 0.55), inset 0 0 8px rgba(200, 255, 46, 0.35);
+
+  /* Spacing rhythm */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --card-pad: 16px 18px;
+  --stack-gap: 12px;
+}
+
+/*
+ * Theme: Light, chosen explicitly. Glows go to none — light has no neon. The same override set is
+ * repeated under the OS-preference media query below for Theme: System; CSS has no way to share a
+ * declaration block between a plain selector and a media query without a build step.
+ */
+:root[data-theme='light'] {
+  --bg-app: #f4f6f2;
+  --bg-ambient: radial-gradient(480px 360px at 110% -5%, rgba(200, 255, 46, 0.2), transparent 70%), #f4f6f2;
+  --surface-hi: #ffffff;
+  --surface-lo: #ffffff;
+  --surface-card: linear-gradient(180deg, #ffffff, #ffffff);
+  --border-card: #e8ece5;
+  --border-hair: #f0f2ee;
+  --text-1: #16181a;
+  --text-2: #79806f;
+  --text-3: #9aa096;
+  --volt: #7c9d0e;
+  --volt-bright: #8fbf00;
+  --volt-deep: #5c7a00;
+  --accent-text: #5c7a00;
+  --warn-text: #8a6516;
+  --warn-bg: #fbf3df;
+  --error-text: #a2372c;
+  --error-bg: #fbe9e6;
+  --volt-a12: #f2f8d9;
+  --fill-grad: linear-gradient(90deg, #8fbf00, #aee822);
+  --track: rgba(0, 0, 0, 0.08);
+  --glow-dot: none;
+  --glow-fill: none;
+  --glow-hero: 0 2px 16px rgba(124, 157, 14, 0.12);
+  --glow-text: none;
+  --glow-tab: none;
+}
+
+/*
+ * Theme: System. The OS preference decides, unless an explicit choice is already on the root —
+ * :not([data-theme]) keeps a deliberate "Dark" from being overridden on a light desktop.
+ */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --bg-app: #f4f6f2;
+    --bg-ambient: radial-gradient(480px 360px at 110% -5%, rgba(200, 255, 46, 0.2), transparent 70%), #f4f6f2;
+    --surface-hi: #ffffff;
+    --surface-lo: #ffffff;
+    --surface-card: linear-gradient(180deg, #ffffff, #ffffff);
+    --border-card: #e8ece5;
+    --border-hair: #f0f2ee;
+    --text-1: #16181a;
+    --text-2: #79806f;
+    --text-3: #9aa096;
+    --volt: #7c9d0e;
+    --volt-bright: #8fbf00;
+    --volt-deep: #5c7a00;
+    --accent-text: #5c7a00;
+    --warn-text: #8a6516;
+    --warn-bg: #fbf3df;
+    --error-text: #a2372c;
+    --error-bg: #fbe9e6;
+    --volt-a12: #f2f8d9;
+    --fill-grad: linear-gradient(90deg, #8fbf00, #aee822);
+    --track: rgba(0, 0, 0, 0.08);
+    --glow-dot: none;
+    --glow-fill: none;
+    --glow-hero: 0 2px 16px rgba(124, 157, 14, 0.12);
+    --glow-text: none;
+    --glow-tab: none;
+  }
+}

@@ -8,6 +8,7 @@ import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import { isInstallableUrl, scriptUrlFromLocation } from '@/lib/installurl';
 import { rpc } from '@/lib/rpc';
+import { applyStoredTheme } from '@/lib/theme';
 import type { ScriptPreview } from '@/lib/types';
 import { InstallPreview } from '../sidepanel/components/InstallPreview';
 import '../sidepanel/styles.css';
@@ -55,17 +56,23 @@ function InstallPage() {
 
   return (
     <div className="page">
-      <h2>Install userscript</h2>
+      <div>
+        <div className="wordmark">usermods</div>
+        <h2>Install userscript</h2>
+      </div>
       {url && (
         <div className="card">
-          <div className="muted label">Fetching from</div>
-          <div className="break"><code>{url}</code></div>
+          <div className="label">Fetching from</div>
+          <div className="break mono">{url}</div>
         </div>
       )}
-      {error && <div className="card"><div className="error">{error}</div></div>}
+      {error && <div className="card"><div className="error">▲ {error}</div></div>}
       {done && preview && (
-        <div className="card">
-          <h4>Installed</h4>
+        <div className="card hero">
+          <div className="row">
+            <span className="dot" aria-hidden="true" />
+            <h4 className="grow">Installed</h4>
+          </div>
           <div className="desc">
             “{preview.name}” is installed and enabled. It will run the next time you load a page it matches. Manage it from the usermods side panel.
           </div>
@@ -74,13 +81,16 @@ function InstallPage() {
           </div>
         </div>
       )}
-      {!done && !error && !preview && <div className="empty">Fetching {url}…</div>}
+      {!done && !error && !preview && <div className="empty">fetching {url}…</div>}
       {!done && preview && (
         <InstallPreview preview={preview} busy={busy} error={installError} onInstall={() => void install()} onCancel={() => void closeTab()} />
       )}
     </div>
   );
 }
+
+// Same theme the side panel is wearing, settled before the first paint.
+await applyStoredTheme();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

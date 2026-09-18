@@ -54,15 +54,24 @@ export default defineContentScript({
       return short ? `${tag} "${short}"` : tag;
     }
 
+    /**
+     * The picker's highlight and its label, in Volt OS colours.
+     *
+     * These live on someone else's page, so the values are written inline rather than through a
+     * stylesheet: injecting one would leak usermods' rules into the site, and the site's own CSS
+     * could reach an injected class. They are the volt tokens spelled out — the extension's CSS
+     * custom properties do not reach a content script's elements.
+     */
     function startPicker(): () => void {
       const overlay = document.createElement('div');
       Object.assign(overlay.style, {
         position: 'fixed',
         pointerEvents: 'none',
         zIndex: '2147483647',
-        border: '2px solid #f59e0b',
-        background: 'rgba(245,158,11,0.15)',
-        borderRadius: '3px',
+        border: '1px solid #c8ff2e', // --volt
+        background: 'rgba(200,255,46,0.12)', // --volt-a12
+        borderRadius: '12px', // --r-field
+        boxShadow: '0 0 16px rgba(200,255,46,0.35)', // the volt glow: this element is live
         transition: 'all 40ms linear',
       } satisfies Partial<CSSStyleDeclaration>);
       const label = document.createElement('div');
@@ -70,11 +79,12 @@ export default defineContentScript({
         position: 'fixed',
         zIndex: '2147483647',
         pointerEvents: 'none',
-        font: '12px/1.4 ui-monospace, monospace',
-        background: '#1c1917',
-        color: '#fde68a',
-        padding: '2px 6px',
-        borderRadius: '3px',
+        font: "500 12px/1.5 'IBM Plex Mono', ui-monospace, monospace", // identifiers are mono
+        background: '#0e120f', // --surface-lo
+        color: '#c8ff2e', // --volt
+        border: '1px solid #222b24', // --border-card
+        padding: '3px 10px',
+        borderRadius: '999px', // --r-pill
         maxWidth: '60vw',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
@@ -91,7 +101,8 @@ export default defineContentScript({
         Object.assign(overlay.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
         label.textContent = selectorFor(el);
         label.style.left = `${Math.max(0, r.left)}px`;
-        label.style.top = `${r.top > 24 ? r.top - 22 : r.bottom + 4}px`;
+        // Above the highlight when there is room for the pill, otherwise just below it.
+        label.style.top = `${r.top > 28 ? r.top - 26 : r.bottom + 6}px`;
       };
       const finish = (ev?: ContentEvent) => {
         document.removeEventListener('mousemove', onMove, true);

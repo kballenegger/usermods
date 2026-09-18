@@ -27,7 +27,7 @@ export function InstallPreview({
         {preview.version && <span className="chip">v{preview.version}</span>}
         {preview.world === 'MAIN' && (
           <span className="chip warn" title="@grant none or unsafeWindow: this script runs in the page's own JavaScript context.">
-            page world
+            ▲ page world
           </span>
         )}
       </div>
@@ -35,8 +35,9 @@ export function InstallPreview({
       {preview.description && <div className="desc">{preview.description}</div>}
 
       {preview.downloadUrl && (
-        <div className="muted break">
-          From <code>{preview.downloadUrl}</code>
+        <div>
+          <div className="label">source</div>
+          <div className="muted break mono">{preview.downloadUrl}</div>
         </div>
       )}
 
@@ -44,11 +45,11 @@ export function InstallPreview({
 
       {preview.warnings.map((w) => (
         <div key={w} className="error">
-          {w}
+          ▲ {w}
         </div>
       ))}
 
-      <Section label={`Runs on (${targets.length})`}>
+      <Section label={`Runs on · ${targets.length}`}>
         {targets.length ? targets.map((m) => <span key={m} className="chip">{m}</span>) : <span className="muted">nothing — this script would never run</span>}
       </Section>
 
@@ -71,7 +72,7 @@ export function InstallPreview({
       )}
 
       {preview.requires.length > 0 && (
-        <Section label={`Loads ${preview.requires.length} librar${preview.requires.length === 1 ? 'y' : 'ies'}`}>
+        <Section label={`Loads · ${preview.requires.length} librar${preview.requires.length === 1 ? 'y' : 'ies'}`}>
           {preview.requires.map((u) => (
             <span key={u} className="chip">{u}</span>
           ))}
@@ -86,12 +87,12 @@ export function InstallPreview({
         </Section>
       )}
 
-      <div className="muted">
-        Runs at <code>{preview.runAt.replace('_', '-')}</code>
+      <div className="muted" style={{ fontSize: 'var(--fs-meta)' }}>
+        Runs at <span className="mono">{preview.runAt.replace('_', '-')}</span>
       </div>
 
       <details>
-        <summary className="muted">Show full source ({Math.ceil(preview.source.length / 1024)} KB)</summary>
+        <summary>▼ full source · {Math.ceil(preview.source.length / 1024)} KB</summary>
         <pre>{preview.source}</pre>
       </details>
 
@@ -112,7 +113,7 @@ export function InstallPreview({
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="muted label">{label}</div>
+      <div className="label">{label}</div>
       <div className="row">{children}</div>
     </div>
   );

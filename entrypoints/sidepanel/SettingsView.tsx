@@ -2,7 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { STORE_BUILD, migrateSettingsForBuild } from '@/lib/buildflags';
 import { rpc, type OAuthKind, type OAuthLoginState } from '@/lib/rpc';
 import { loadSettings, saveSettings } from '@/lib/settings';
-import { DEFAULT_SETTINGS, type Settings } from '@/lib/types';
+import { applyTheme } from '@/lib/theme';
+import { DEFAULT_SETTINGS, type Settings, type ThemeChoice } from '@/lib/types';
+
+const THEMES: Array<{ value: ThemeChoice; label: string }> = [
+  { value: 'system', label: 'System' },
+  { value: 'dark', label: 'Dark' },
+  { value: 'light', label: 'Light' },
+];
 
 type Preset = { label: string; apply: Partial<Settings> };
 
@@ -81,7 +88,7 @@ export function SettingsView({ onReviewNotice }: { onReviewNotice?: () => void }
     }
   }
 
-  if (!s) return <div className="view muted">Loading…</div>;
+  if (!s) return <div className="view muted">loading…</div>;
   // Constant-folded in a store build, where migrateSettingsForBuild has already ruled these out.
   const subscription = !STORE_BUILD && (s.provider === 'chatgpt' || s.provider === 'xai');
 
@@ -89,12 +96,13 @@ export function SettingsView({ onReviewNotice }: { onReviewNotice?: () => void }
     <div className="view">
       {migrated && (
         <p className="error" style={{ marginTop: 0 }}>
-          This build of usermods does not include subscription sign-in, so your ChatGPT / SuperGrok
+          ▲ This build of usermods does not include subscription sign-in, so your ChatGPT / SuperGrok
           provider was switched back to the default. Add an API key below, or install the GitHub
           build to sign in with a subscription again.
         </p>
       )}
-      <div className="row" style={{ marginBottom: 12 }}>
+      <div className="label">Presets</div>
+      <div className="row" style={{ marginBottom: 'var(--sp-4)' }}>
         {PRESETS.map((p) => (
           <button key={p.label} className="btn" onClick={() => update(p.apply)}>{p.label}</button>
         ))}
@@ -121,8 +129,9 @@ export function SettingsView({ onReviewNotice }: { onReviewNotice?: () => void }
             </span>
           </label>
           <label className="field">
-            API key (leave empty for local servers and proxies that do not need one)
+            API key
             <input type="password" value={s.apiKey} onChange={(e) => update({ apiKey: e.target.value })} autoComplete="off" />
+            <span>Leave empty for local servers and proxies that do not need one.</span>
           </label>
         </>
       )}
@@ -138,13 +147,13 @@ export function SettingsView({ onReviewNotice }: { onReviewNotice?: () => void }
         {models.length > 0 && <span>{models.length} models available. Start typing to filter.</span>}
       </label>
 
+      {/* Their toggle, wearing the volt switch rather than a native checkbox. */}
       <label className="field">
-        <span className="row" style={{ gap: 6 }}>
+        <span className="toggle" style={{ marginBottom: 'var(--sp-1)' }}>
           <input
             type="checkbox"
             checked={s.autoNameChats !== false}
             onChange={(e) => update({ autoNameChats: e.target.checked })}
-            style={{ width: 'auto', flex: 'none' }}
           />
           Name chats automatically
         </span>
@@ -155,8 +164,32 @@ export function SettingsView({ onReviewNotice }: { onReviewNotice?: () => void }
         </span>
       </label>
 
-      <div className="muted" style={{ fontSize: 12 }}>{saved ? 'All changes saved.' : 'Saving…'}</div>
-      <p className="muted" style={{ marginTop: 20 }}>
+      {/*
+        The theme is applied the moment it is picked, so the choice is visible while you make it;
+        the autosave effect above persists it like every other setting.
+      */}
+      <label className="field">
+        Theme
+        <select
+          value={s.theme}
+          onChange={(e) => {
+            const theme = e.target.value as ThemeChoice;
+            applyTheme(theme);
+            update({ theme });
+          }}
+        >
+          {THEMES.map((t) => (
+            <option key={t.value} value={t.value}>{t.label}</option>
+          ))}
+        </select>
+        <span>System follows this device. Dark is the default.</span>
+      </label>
+
+      <div className="row" style={{ marginTop: 'var(--sp-4)' }}>
+        <span className="dot" aria-hidden="true" style={saved ? undefined : { background: 'var(--warn)', boxShadow: 'none' }} />
+        <span className="label" style={{ marginBottom: 0 }}>{saved ? 'all changes saved' : 'saving…'}</span>
+      </div>
+      <p className="muted" style={{ marginTop: 'var(--sp-5)', fontSize: 'var(--fs-meta)' }}>
         {subscription
           ? "Sign-in tokens are stored in this extension's local storage on this device and sent only to the vendor. Usage counts against your plan limits."
           : "Keys are stored in this extension's local storage on this device and sent only to the endpoint above."}
@@ -223,33 +256,38 @@ function SubscriptionLogin({ kind }: { kind: OAuthKind }) {
   }
 
   return (
-    <div className="card" style={{ marginBottom: 10 }}>
+    <div className="card" style={{ marginBottom: 'var(--sp-3)' }}>
       {status?.signedIn ? (
         <div className="row">
+          <span className="dot" aria-hidden="true" />
           <span className="grow">Signed in to {vendor}{status.label ? ` as ${status.label}` : ''}</span>
           <button className="btn" onClick={() => void signOut()}>Sign out</button>
         </div>
       ) : login.status === 'pending' ? (
         <>
-          <div>Enter this code on the {vendor} page that just opened:</div>
-          <div style={{ fontSize: 22, fontFamily: 'ui-monospace, monospace', letterSpacing: 2, textAlign: 'center', padding: '6px 0' }}>{login.userCode}</div>
+          <div className="label">Enter this code on the {vendor} page</div>
+          <div className="mono" style={{ fontSize: 'var(--fs-stat)', letterSpacing: 2, textAlign: 'center', padding: 'var(--sp-2) 0', color: 'var(--accent-text)' }}>{login.userCode}</div>
           <div className="row">
             <button className="btn" onClick={() => chrome.tabs.create({ url: login.verificationUri })}>Open sign-in page</button>
             <button className="btn" onClick={() => navigator.clipboard.writeText(login.userCode).catch(() => {})}>Copy code</button>
             <span className="grow" />
             <button className="btn" onClick={() => void cancel()}>Cancel</button>
           </div>
-          <div className="muted">Waiting for approval…</div>
+          <div className="row">
+            <span className="dot running" aria-hidden="true" />
+            <span className="label" style={{ marginBottom: 0 }}>waiting for approval</span>
+          </div>
         </>
       ) : (
         <>
           <div className="row">
-            <span className="grow">Not signed in to {vendor}.</span>
+            <span className="dot off" aria-hidden="true" />
+            <span className="grow">Not signed in to {vendor}</span>
             <button className="btn primary" onClick={() => void start()}>Sign in with {vendor}</button>
           </div>
-          {login.status === 'error' && <div className="error">{login.message}</div>}
-          {login.status === 'done' && <div className="muted">Signed in.</div>}
-          <div className="muted">
+          {login.status === 'error' && <div className="error">▲ {login.message}</div>}
+          {login.status === 'done' && <div className="ok">● Signed in</div>}
+          <div className="muted" style={{ fontSize: 'var(--fs-meta)' }}>
             {kind === 'chatgpt'
               ? 'Works with ChatGPT Plus, Pro and Team plans.'
               : 'Requires SuperGrok, or X Premium+ on the X account you sign in with. Some standard-tier accounts are rejected by xAI with a 403.'}

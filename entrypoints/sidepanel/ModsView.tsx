@@ -111,9 +111,9 @@ export function ModsView({ tabId, pageUrl }: { tabId: number | null; pageUrl: st
   const cardProps = { onToggle: toggle, onRemove: remove, onTry: tryNow, onExport: exportMod, onUpdate: update };
 
   return (
-    <div className="view">
-      {error && <div className="error">{error}</div>}
-      {status && <div className="ok">{status}</div>}
+    <div className="view stack">
+      {error && <div className="error">▲ {error}</div>}
+      {status && <div className="ok">● {status}</div>}
 
       <TampermonkeyCard
         onImported={(r) => {
@@ -123,8 +123,8 @@ export function ModsView({ tabId, pageUrl }: { tabId: number | null; pageUrl: st
         onError={fail}
       />
 
-      <div className="card" style={{ marginBottom: 10 }}>
-        <div className="muted label">Install from URL</div>
+      <div className="card">
+        <div className="label">Install from URL</div>
         <div className="field-row">
           <input
             value={url}
@@ -139,31 +139,30 @@ export function ModsView({ tabId, pageUrl }: { tabId: number | null; pageUrl: st
           </button>
         </div>
         <div className="row">
-          <span className="muted grow">Or import a .user.js file from disk.</span>
+          <span className="muted grow" style={{ fontSize: 'var(--fs-meta)' }}>or import a .user.js file from disk</span>
           <button className="btn" onClick={importFile}>Import file</button>
         </div>
       </div>
 
       {pending && (
-        <div style={{ marginBottom: 10 }}>
-          <InstallPreview
-            preview={pending.preview}
-            busy={busy}
-            error={installError}
-            onInstall={() => void confirmInstall()}
-            onCancel={() => setPending(null)}
-          />
-        </div>
+        <InstallPreview
+          preview={pending.preview}
+          busy={busy}
+          error={installError}
+          onInstall={() => void confirmInstall()}
+          onCancel={() => setPending(null)}
+        />
       )}
 
-      <div className="row" style={{ marginBottom: 10 }}>
-        <span className="muted grow">{mods.length} mod{mods.length === 1 ? '' : 's'}</span>
-      </div>
-      {mods.length === 0 && <div className="empty">No mods yet. Build one in Chat, or install one above.</div>}
-      {here.length > 0 && <h4 className="muted" style={{ margin: '4px 0' }}>On this site</h4>}
-      <div className="list">{here.map((m) => <ModCard key={m.id} m={m} {...cardProps} />)}</div>
-      {elsewhere.length > 0 && <h4 className="muted" style={{ margin: '12px 0 4px' }}>Other sites</h4>}
-      <div className="list">{elsewhere.map((m) => <ModCard key={m.id} m={m} {...cardProps} />)}</div>
+      {mods.length === 0 && <div className="empty">no mods yet · build one in Chat, or install one above</div>}
+      {here.length > 0 && (
+        <div className="label" style={{ marginBottom: 0 }}>On this site · {here.length}</div>
+      )}
+      {here.length > 0 && <div className="list">{here.map((m) => <ModCard key={m.id} m={m} {...cardProps} />)}</div>}
+      {elsewhere.length > 0 && (
+        <div className="label" style={{ marginBottom: 0 }}>Other sites · {elsewhere.length}</div>
+      )}
+      {elsewhere.length > 0 && <div className="list">{elsewhere.map((m) => <ModCard key={m.id} m={m} {...cardProps} />)}</div>}
     </div>
   );
 }
@@ -200,16 +199,16 @@ function TampermonkeyCard({
   }
 
   return (
-    <div className="card" style={{ marginBottom: 10 }}>
+    <div className="card">
       <div className="row">
         <h4 className="grow">Migrate from Tampermonkey</h4>
-        <button className="btn" onClick={() => setOpen((v) => !v)}>{open ? 'Hide' : 'Show'}</button>
+        <button className="btn" onClick={() => setOpen((v) => !v)}>{open ? '▲ Hide' : '▼ Show'}</button>
       </div>
       {open && (
         <>
           <div className="desc">Extensions cannot read each other's storage, so bring your scripts over with Tampermonkey's own export file.</div>
           <ol className="steps">
-            <li>Open the Tampermonkey dashboard (its toolbar icon → Dashboard).</li>
+            <li>Open the Tampermonkey dashboard (its toolbar icon · Dashboard).</li>
             <li>Go to the <b>Utilities</b> tab.</li>
             <li>Under <b>File</b>, click <b>Export</b> to save the backup (.zip or .json).</li>
             <li>Pick that file here. Scripts, their on/off state and their stored values come across.</li>
@@ -257,35 +256,37 @@ function ModCard({
   onExport: (m: Mod) => void;
   onUpdate: (m: Mod) => void;
 }) {
+  // An enabled mod is alive: the toggle at the foot of the card carries the volt. A disabled one
+  // recedes rather than being decorated with an "off" marker.
   return (
-    <div className="card" style={{ opacity: m.enabled ? 1 : 0.6 }}>
+    <div className="card" style={{ opacity: m.enabled ? 1 : 0.55 }}>
       <div className="row">
         <h4 className="grow">{m.name}</h4>
         {m.version && <span className="chip">v{m.version}</span>}
         {m.world === 'MAIN' && (
-          <span className="chip warn" title="Runs in the page's own JavaScript context (@grant none or unsafeWindow).">page world</span>
+          <span className="chip warn" title="Runs in the page's own JavaScript context (@grant none or unsafeWindow).">▲ page world</span>
         )}
-        <label className="muted" style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-          <input type="checkbox" checked={m.enabled} onChange={() => onToggle(m)} /> on
-        </label>
       </div>
       {m.description && <div className="desc">{m.description}</div>}
       <div className="row">{[...m.matches, ...m.includeGlobs].map((x) => <span key={x} className="chip">{x}</span>)}</div>
       {m.grants.length > 0 && (
         <div className="row">
           {m.grants.slice(0, 6).map((g) => <span key={g} className="chip">{g}</span>)}
-          {m.grants.length > 6 && <span className="muted">+{m.grants.length - 6} more</span>}
+          {m.grants.length > 6 && <span className="muted" style={{ fontSize: 'var(--fs-label)' }}>+{m.grants.length - 6} more</span>}
         </div>
       )}
       <details>
-        <summary className="muted">Show code</summary>
+        <summary>▼ code</summary>
         <pre>{m.source}</pre>
       </details>
       <div className="row">
-        <button className="btn" onClick={() => onTry(m)}>Run now</button>
+        <label className="toggle">
+          <input type="checkbox" checked={m.enabled} onChange={() => onToggle(m)} /> {m.enabled ? 'on' : 'off'}
+        </label>
+        <span className="grow" />
+        <button className="btn" onClick={() => onTry(m)}>Run once</button>
         <button className="btn" onClick={() => onExport(m)}>Export</button>
         {m.downloadUrl && <button className="btn" onClick={() => onUpdate(m)}>Update</button>}
-        <span className="grow" />
         <button className="btn danger" onClick={() => onRemove(m)}>Delete</button>
       </div>
     </div>

@@ -58,7 +58,7 @@ test('the unavailable message names the vendor and both ways out', () => {
 
 // ---------- upgrading into a store build ----------
 
-const chatgptProfile: Settings = { provider: 'chatgpt', baseUrl: '', apiKey: '', model: 'gpt-5-codex' };
+const chatgptProfile: Settings = { provider: 'chatgpt', baseUrl: '', apiKey: '', model: 'gpt-5-codex', theme: 'light' };
 
 test('a stored subscription profile is migrated to a usable provider in a store build', () => {
   const migrated = migrateSettingsForBuild(chatgptProfile, true);
@@ -69,10 +69,12 @@ test('a stored subscription profile is migrated to a usable provider in a store 
   assert.equal(migrated.model, DEFAULT_SETTINGS.model);
   assert.equal(migrated.baseUrl, '');
   assert.equal(migrated.apiKey, '');
+  // The theme is a presentation choice, unrelated to the provider that was dropped.
+  assert.equal(migrated.theme, chatgptProfile.theme);
 });
 
 test('migration is a no-op for a profile the build can already use', () => {
-  const keyed: Settings = { provider: 'openai-compatible', baseUrl: 'http://localhost:1234/v1', apiKey: 'sk-local', model: 'qwen' };
+  const keyed: Settings = { provider: 'openai-compatible', baseUrl: 'http://localhost:1234/v1', apiKey: 'sk-local', model: 'qwen', theme: 'dark' };
   assert.equal(migrateSettingsForBuild(keyed, true), null);
   assert.equal(migrateSettingsForBuild(keyed, false), null);
 });

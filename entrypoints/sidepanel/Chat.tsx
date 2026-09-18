@@ -483,7 +483,8 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
               <button className="btn danger" onClick={() => void removeChat()} title="Delete this chat for good">Delete</button>
             </>
           ) : (
-            <button className="btn danger" onClick={() => void setArchived(chatId!, true)} disabled={!chatId} title="Archive this chat: it moves to the Archived group and stops opening by default">
+            // Archive is reversible, so it stays a secondary button; coral is kept for Delete.
+            <button className="btn" onClick={() => void setArchived(chatId!, true)} disabled={!chatId} title="Archive this chat: it moves to the Archived group and stops opening by default">
               Archive
             </button>
           )}
@@ -497,12 +498,12 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
         {loaded && items.length === 0 && (
           <div className="empty">
             {unsupported ? (
-              <>Open a regular web page to start.</>
+              <>open a regular web page to start</>
             ) : (
               <>
-                Describe how you want this page to change.
+                describe how this page should change
                 <br />
-                <span className="muted">e.g. "hide the sidebar", "make the font bigger", "add a button that copies the title"</span>
+                <span className="muted">hide the sidebar · make the font bigger · add a button that copies the title</span>
               </>
             )}
           </div>
@@ -512,11 +513,11 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
             case 'user':
               return (
                 <div key={i} className={`msg user${it.queued ? ' queued' : ''}`}>
-                  {it.queued && <div className="muted" style={{ fontSize: 11 }}>queued · will be sent between steps</div>}
+                  {it.queued && <div className="label" style={{ marginBottom: 6 }}>queued · sends between steps</div>}
                   {it.text}
                   {it.refs && (
-                    <div className="row" style={{ marginTop: 4 }}>
-                      {it.refs.map((r) => <span key={r.token} className="chip" title={r.selector}>@{r.token} → {r.label}</span>)}
+                    <div className="row" style={{ marginTop: 8 }}>
+                      {it.refs.map((r) => <span key={r.token} className="chip ref" title={r.selector}>@{r.token} · {r.label}</span>)}
                     </div>
                   )}
                 </div>
@@ -524,33 +525,41 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
             case 'assistant':
               return <div key={i} className="msg assistant">{it.text}</div>;
             case 'note':
-              return <div key={i} className="muted" style={{ fontSize: 11, textAlign: 'center' }}>{it.text}</div>;
+              return <div key={i} className="label" style={{ textAlign: 'center' }}>{it.text}</div>;
             case 'tool':
+              // The dot carries the state the glyphs used to: volt when it came back clean, amber
+              // while it is still running, coral when it failed. Only volt glows.
               return (
                 <details key={i} className={`tool${it.isError ? ' error' : ''}`}>
                   <summary>
-                    {it.summary === undefined ? '⏳ ' : it.isError ? '✗ ' : '✓ '}
-                    {it.name}
-                    {typeof it.input.description === 'string' ? `: ${it.input.description}` : typeof it.input.selector === 'string' ? ` ${it.input.selector}` : ''}
+                    <span className={`dot${it.summary === undefined ? ' running' : it.isError ? ' error' : ''}`} aria-hidden="true" />
+                    <span>
+                      {it.name}
+                      {typeof it.input.description === 'string' ? `: ${it.input.description}` : typeof it.input.selector === 'string' ? ` ${it.input.selector}` : ''}
+                    </span>
                   </summary>
                   {typeof it.input.code === 'string' && <pre>{it.input.code}</pre>}
                   {it.summary && <pre>{it.summary}</pre>}
                 </details>
               );
             case 'proposal':
+              // The hero of this screen: the one card that takes the glow.
               return (
-                <div key={i} className="card">
-                  <h4>{it.proposal.name}</h4>
+                <div key={i} className="card hero">
+                  <div>
+                    <div className="label">proposed mod</div>
+                    <h4>{it.proposal.name}</h4>
+                  </div>
                   <div className="desc">{it.proposal.description}</div>
                   <div className="row">{it.proposal.matches.map((m) => <span key={m} className="chip">{m}</span>)}</div>
                   <details>
-                    <summary className="muted">Show code</summary>
+                    <summary>▼ code</summary>
                     <pre>{it.proposal.code}</pre>
                   </details>
                   <div className="row">
-                    <button className="btn" onClick={() => void tryProposal(it.proposal)} disabled={tabId == null}>Try now</button>
+                    <button className="btn" onClick={() => void tryProposal(it.proposal)} disabled={tabId == null}>Run once</button>
                     <button className="btn primary" onClick={() => void saveProposal(it.proposal, i)} disabled={it.saved}>
-                      {it.saved ? 'Saved & enabled' : 'Save & enable'}
+                      {it.saved ? 'Saved · enabled' : 'Save & enable'}
                     </button>
                   </div>
                 </div>
@@ -565,8 +574,8 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
         {refs.length > 0 && (
           <div className="row">
             {refs.map((r) => (
-              <span key={r.token} className="chip" title={r.selector}>
-                @{r.token} → {r.label}{' '}
+              <span key={r.token} className="chip ref" title={r.selector}>
+                @{r.token} · {r.label}{' '}
                 <button className="chip-x" onClick={() => removeRef(r.token)} title="Remove reference">×</button>
               </span>
             ))}
@@ -582,12 +591,12 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
               void send();
             }
           }}
-          placeholder={unsupported ? 'Open a web page first' : 'What should this page do differently? Use ⌖ to point at elements.'}
+          placeholder={unsupported ? 'open a web page first' : 'what should this page do differently? point at elements to reference them'}
           disabled={unsupported}
         />
         <div className="row">
           <button className="btn" onClick={() => void pick()} disabled={picking || unsupported || tabId == null} title="Click an element on the page to reference it in your message">
-            {picking ? 'Click an element…' : '⌖ Point at element'}
+            {picking ? 'click an element…' : 'Point at element'}
           </button>
           <button className="btn" onClick={newChat} disabled={unsupported || !host || (!chatId && items.length === 0)}>New chat</button>
           <span className="grow" />
