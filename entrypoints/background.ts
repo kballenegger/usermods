@@ -132,6 +132,14 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn): Promise<v
       env: envForTab(session.tabId),
       emit: post,
       signal,
+      // The compaction summary is the same one tool-free call the chat titler uses, with its own
+      // deadline: a summariser that hangs must not hold up the user's turn, and compact() falls
+      // back to dropping the oldest turns when this rejects.
+      complete: (system, user, sig) => completeWithTimeout(settings!, system, user, COMPACT_TIMEOUT_MS, sig),
+      // A compacted history is written back immediately. The next turn then starts from the small
+      // version even if this one later dies mid-run, which is the whole point: the chat that was
+      // too big to send must not stay too big to send.
+      onCompacted: (msgs) => saveMessages(chatId, msgs),
     });
     await saveMessages(chatId, messages);
     await touchChat(chatId);
@@ -240,6 +248,36 @@ async function complete(settings: Settings, system: string, user: string, signal
 
 /** A title call that hangs must not keep the worker alive, so it gets its own deadline. */
 const TITLE_TIMEOUT_MS = 20_000;
+
+/**
+ * The compaction summary reads a long conversation and writes a long answer, so it gets more room
+ * than a title call. Past this the loop stops waiting and drops the oldest turns instead.
+ */
+const COMPACT_TIMEOUT_MS = 60_000;
+
+/**
+ * `complete` with a deadline of its own, and with the caller's signal still able to cancel it:
+ * pressing Stop mid-summary aborts the summary too.
+ */
+async function completeWithTimeout(
+  settings: Settings,
+  system: string,
+  user: string,
+  timeoutMs: number,
+  signal?: AbortSignal,
+): Promise<string> {
+  const ac = new AbortController();
+  const onAbort = () => ac.abort();
+  signal?.addEventListener('abort', onAbort, { once: true });
+  if (signal?.aborted) ac.abort();
+  const timer = setTimeout(() => ac.abort(), timeoutMs);
+  try {
+    return await complete(settings, system, user, ac.signal);
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener('abort', onAbort);
+  }
+}
 
 /**
  * Give the chat a model-written name, if it is due one.

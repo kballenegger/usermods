@@ -20,6 +20,7 @@
     "smoke": "wxt build && node scripts/screenshots.mjs --smoke",
     "smoke:chats": "wxt build && node scripts/screenshots.mjs --chats",
     "smoke:isolation": "wxt build && node scripts/screenshots.mjs --isolation",
+    "smoke:compaction": "wxt build && node scripts/screenshots.mjs --compaction",
     "store-assets": "wxt build && node scripts/store-assets.mjs"
   },
   "dependencies": {

@@ -62,11 +62,28 @@ export function reduceItems(items: ChatItem[], event: AgentEventBody): ChatItem[
       // so it reads as a muted status line rather than a red error row. Saying nothing here is what
       // made a capped turn look like the agent had silently given up.
       return [...items, { kind: 'note', text: `stopped after ${event.steps} steps · send a message to continue` }];
+    case 'compacted':
+      return [...items, { kind: 'note', text: compactedNote(event) }];
     case 'error':
       return [...items, { kind: 'error', text: event.message }];
     case 'done':
       return items;
   }
+}
+
+/**
+ * The muted line shown when the model history was compacted. The transcript the user reads is
+ * never rewritten — only the history sent to the model shrinks — so this is a note about what the
+ * model can still see, not an edit to what the user said.
+ */
+export function compactedNote(event: Extract<AgentEventBody, { type: 'compacted' }>): string {
+  const what = event.tier === 'elided' ? 'earlier tool output trimmed' : 'earlier conversation summarised';
+  return `${what} · ${approxTokens(event.before)} → ${approxTokens(event.after)} tokens`;
+}
+
+/** 148_231 -> "148k". Small numbers keep their digits, because "0k" reads as a bug. */
+function approxTokens(n: number): string {
+  return n >= 1000 ? `${Math.round(n / 1000)}k` : String(Math.max(0, Math.round(n)));
 }
 
 /** The queued user bubble an `unqueued` event refers to, so the caller can recover its text. */
