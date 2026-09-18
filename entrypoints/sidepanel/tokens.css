@@ -1,282 +1,430 @@
 /*
- * Volt OS design tokens.
+ * The usermods design tokens.
  *
- * A single neon yellow-green accent glowing against near-black, green-cast surfaces. Everything
- * alive (a running turn, an enabled mod, the active tab) glows volt; everything else stays quiet:
- * white text, grey metadata, hairline separators. Warning and error never glow.
+ * FIRST PRINCIPLE: BE BOLD, AND BE LEGIBLE.
  *
- * Two themes, one vocabulary. Every rule in styles.css reads tokens only, so the light theme is a
- * different set of values rather than a second stylesheet. Light is applied either by the OS
- * preference (Theme: System) or by the explicit `data-theme` attribute lib/theme.ts writes on
- * <html>.
+ * These are not in tension. Legibility comes from contrast, type size, spacing and solid surfaces —
+ * not from desaturation. White on the banner's electric blue is 11.1:1; ink on lime is 16.1:1. So
+ * when a choice arises, take the bolder colour and then MAKE it legible (raise contrast, enlarge
+ * the type, thicken the stroke, put the text on a solid panel) rather than toning the colour down.
  *
- * Contrast is a gate here, not a preference: test/contrast.test.ts parses this file and asserts
- * WCAG AA for every foreground/background pairing the UI actually uses. Three light values are
- * deliberately darker than the published Volt OS light palette because that palette's own values
- * fail AA; each deviation is marked `AA:` below with the ratio it buys.
+ * The visual source of truth is docs/banner.png. Its identity palette is used here literally:
+ *
+ *   electric blue  #1008C8   the page itself, and the primary fill
+ *   lime           #AEFF24   live / ok — the one thing allowed to glow or pulse
+ *   cyan           #00E5F2   info, and the focus ring
+ *   ink            #030B16   outlines and hard offset shadows
+ *   magenta        #F343D3   accent: the hero edge, element chips, the wordmark's shadow
+ *   yellow         #FFF345   warning
+ *
+ * Two structural facts drive nearly every decision below, and both were measured, not guessed:
+ *
+ *  1. #1008C8 is a very dark, saturated blue (OKLCH L=38%). It is superb as a FILL under white
+ *     (11.11:1) or lime (9.06:1) text, and as TEXT on the light theme's pale page (9.73:1). It is
+ *     unusable as text or as a thin border on a dark navy panel. So the primary role carries a
+ *     tonal scale: the fill tone is the banner blue itself, and a bright tint (--primary-300
+ *     #A7C2FE) does the work of text, icons and borders wherever the surface is dark.
+ *
+ *  2. The blue page and the ink panels that sit on it differ by only 1.68:1 in luminance. A panel
+ *     edge therefore CANNOT be carried by a luminance step or by a dark hairline. Every panel in
+ *     the night theme takes a bright 2px border (--primary-300 is 6.24:1 on the page) plus a hard
+ *     ink offset shadow. This is exactly how the banner is built, so the constraint and the
+ *     aesthetic give the same answer.
+ *
+ * READING SURFACES. Long-form text — assistant prose, code, the mod source editor, settings help,
+ * the consent notice, install preview source — is never set on the blue page and never on a
+ * texture. It sits on a solid ink panel (night) or a white ink-outlined panel (day), in a
+ * proportional or mono TEXT face, at >=13px body / >=12px code. The pixel display face is for
+ * short labels only. See the typography block.
+ *
+ * ROLES, NOT HUES. Components read --primary-*, --live-*, --accent-*, --info-*, --warn-*,
+ * --error-*, --surface-*, --text-*. A component never names a hue, so re-tinting the brand is a
+ * change to this file alone. The old Volt OS names survive as deprecated aliases in one marked
+ * block at the very end, because other branches in flight still use them.
+ *
+ * Contrast is a gate, not a preference: test/contrast.test.ts parses this file and asserts WCAG AA
+ * for every pairing the UI actually renders, in both themes. Deviations are marked `AA:` with the
+ * ratio they buy and the reason.
  */
 
 :root {
   /*
    * Native controls — the select popup, checkboxes, date inputs, scrollbars — are painted by the
-   * engine, not by these tokens, and `color-scheme` is the only thing that tells it which way.
-   *
-   * It is declared here as well as on the element (lib/theme.ts sets style.colorScheme once the
-   * saved choice is read) so it is already right on the very first paint, before any script has
-   * run.
-   *
-   * `dark` rather than `light dark`, because this block is the dark theme: it is what a no-
-   * preference OS gets, and it is what a `data-theme="dark"` document gets. The light block below
-   * sets `light`, and it is reached by exactly the two cases that should be light — an explicit
-   * light choice, or System on a light OS.
+   * engine, not by these tokens, and `color-scheme` is the only thing that tells it which way. It
+   * is declared here as well as on the element (lib/theme.ts) so it is already right on the very
+   * first paint, before any script has run.
    */
   color-scheme: dark;
 
-  /* App background */
-  --bg-app: #0a0d0b;
+  /* =========================================================================
+   * IDENTITY — the banner's own six colours, unaltered.
+   *
+   * These are the brand. They are the same in both themes and must never be edited to fix a
+   * contrast problem: fix it with a tonal step below, or by changing the surface.
+   * ====================================================================== */
+  --brand-blue: #1008c8;
+  --brand-lime: #aeff24;
+  --brand-cyan: #00e5f2;
+  --brand-ink: #030b16;
+  --brand-pink: #f343d3;
+  --brand-yellow: #fff345;
+
+  /* =========================================================================
+   * TONAL SCALES — derived in OKLCH holding each identity hue steady.
+   *
+   * Steps are named the usual way: 300 is the bright tint that carries text on dark surfaces, 500
+   * is the identity colour itself, 700 is the deep tone that carries text on white. Only the steps
+   * the UI actually uses are defined.
+   * ====================================================================== */
+
+  /* Blue — hue 266. 500 is the banner blue. */
+  --blue-200: #c1d4ff; /* oklch(87.0% 0.073 266) — hover tint of primary text on dark */
+  --blue-300: #a7c2fe; /* oklch(81.6% 0.090 266) — primary as TEXT/BORDER on dark surfaces */
+  --blue-400: #6792fe; /* oklch(68.0% 0.150 266) */
+  --blue-500: #1008c8; /* oklch(38.3% 0.256 266) — THE banner blue: page, and primary fill */
+  --blue-700: #060077; /* oklch(26.0% 0.243 266) — pressed state of a blue fill */
+
+  /* Lime — hue 130. 500 is the banner lime. */
+  --lime-300: #c0ff73; /* oklch(93.0% 0.180 130) — hover of live text on dark */
+  --lime-500: #aeff24; /* oklch(91.3% 0.237 130) — live/ok on dark; fills with an ink label */
+  --lime-700: #4a7104; /* oklch(50.0% 0.132 130) — live/ok as TEXT on white (lime is unreadable there) */
+
+  /*
+   * Pink — hue 336. 500 is the banner magenta.
+   *
+   * 300 is deliberately a pale pink rather than the mid tint one would reach for first. The reason
+   * is the error role: at oklch(80%) the accent and the error sit only 1.59:1 apart in luminance,
+   * and luminance is the ONLY channel that survives a colour-vision deficiency simulation for this
+   * pair. Lifting the accent to 86% opens the gap to 2.00:1 without touching either hue, which is
+   * what test/contrast.test.ts holds. Do not darken this step back down.
+   */
+  --pink-300: #ffb6ec; /* oklch(86.0% 0.120 336) — accent TEXT on dark surfaces */
+  --pink-500: #f343d3; /* oklch(68.6% 0.254 336) — accent fills, edges, the wordmark shadow */
+  --pink-600: #c4139f; /* oklch(55.8% 0.219 336) — accent as TEXT on white; see --red-800 */
+
+  /* Cyan — hue 202. 500 is the banner cyan. */
+  --cyan-500: #00e5f2; /* oklch(83.9% 0.143 202) — info + focus ring on dark */
+  --cyan-700: #02777f; /* oklch(51.9% 0.088 203) — info as TEXT on white */
+
+  /* Yellow — hue 105. 500 is the banner yellow. */
+  --yellow-500: #fff345; /* oklch(94.5% 0.182 105) — warning on dark; fills with an ink label */
+  --yellow-700: #6c6601; /* oklch(50.0% 0.106 106) — warning as TEXT on white */
+
+  /*
+   * Red — hue 27. NOT a banner colour: the banner has no red, and error needs one that cannot be
+   * mistaken for the pink accent.
+   *
+   * Hue alone does not achieve that. Simulating protanopia, deuteranopia and tritanopia (Brettel
+   * LMS) collapses pink #F343D3 and any red toward the same olive/grey: at best 2.4:1 between them,
+   * at worst 1.01:1 under tritanopia. So the separation is carried three ways at once, and colour
+   * is the weakest of them:
+   *   - LIGHTNESS: the two roles are held at least 1.8:1 apart in relative luminance in BOTH
+   *     themes, which is the one channel a simulation cannot collapse. Night pairs a pale accent
+   *     (#FFB6EC) with a mid red (#F35F55) for a 2.00:1 gap; day pairs a mid accent (#C4139F) with
+   *     a very dark red (#7D030E) for 2.08:1. Both gaps are asserted by test/contrast.test.ts;
+   *   - FORM: an error is the only thing that takes a filled rail / a solid outlined block, and the
+   *     accent is the only thing that takes the hero's doubled edge. Shape, not hue, is what the
+   *     component is recognised by;
+   *   - WORDS: every error state carries a word ("failed", "error"), never colour alone.
+   * This is recorded as a hard rule in docs/design.md; do not "fix" it by re-hueing.
+   */
+  --red-500: #f35f55; /* oklch(67.5% 0.184 27) — error on dark */
+  --red-800: #7d030e; /* oklch(38.9% 0.161 27) — error as TEXT and as a fill on white */
+
+  /* =========================================================================
+   * THEME: NIGHT (the default, and the hero look)
+   *
+   * The banner's electric blue IS the page. Reading panels are blue-cast ink laid on top of it,
+   * bordered bright and shadowed hard.
+   * ====================================================================== */
+
+  /* The page. Not a near-black: the brand colour, at full strength. */
+  --bg-app: #1008c8;
+
+  /*
+   * The page's decoration. The banner has stars and dither on its blue field; this is the same
+   * idea at a whisper — two soft corner glows and nothing behind text. It is a background-image, so
+   * anything that must carry prose paints its own solid --surface-* over it.
+   */
   --bg-ambient:
-    radial-gradient(480px 360px at 110% -5%, rgba(200, 255, 46, 0.14), transparent 70%),
-    radial-gradient(420px 320px at -15% 108%, rgba(200, 255, 46, 0.08), transparent 70%), #0a0d0b;
+    radial-gradient(520px 380px at 108% -8%, rgba(174, 255, 36, 0.1), transparent 70%),
+    radial-gradient(440px 340px at -12% 106%, rgba(243, 67, 211, 0.12), transparent 70%), #1008c8;
 
-  /* Surfaces */
-  --surface-hi: #151b16;
-  --surface-lo: #0e120f;
-  --surface-card: linear-gradient(180deg, var(--surface-hi), var(--surface-lo));
-  --border-card: #222b24;
-  --border-hair: #1a201b;
-
-  /*
-   * A card's lift. Dark has none — the border does the work (the design system is explicit: no
-   * drop shadows in dark). Light gets a faint 1px shadow, because a white card on a near-white
-   * background has almost no border contrast to sit on.
-   */
-  --shadow-card: none;
-  --shadow-raise: none;
-
-  /* Text */
-  --text-1: #e8ede8;
-  --text-2: #8a948b;
+  /* Surfaces: solid, never gradient — text has to sit on one flat colour. */
+  --surface-1: #041325; /* the reading panel: cards, the transcript, the composer */
+  --surface-2: #0b1f34; /* raised: a hovered row, a header strip inside a card */
+  --surface-well: #000613; /* inset: code blocks, the source editor, tool output */
+  --surface-card: var(--surface-1);
+  --surface-hi: var(--surface-1);
+  --surface-lo: var(--surface-well);
 
   /*
-   * AA: the design system's --text-3 is #5A645B, which is 2.84:1 on a card — the same failure the
-   * light palette's faint step has, and found by the same test. This token is not decoration here:
-   * it is placeholder text in the composer and the URL field, the inactive tab labels, and list
-   * markers. Lifted along the same hue to 4.62:1 on a card and 5.16:1 on the app background. It is
-   * still clearly the faintest of the three steps.
+   * Borders. On the night theme a border is a BRIGHT line, because the ink panel and the blue page
+   * are only 1.68:1 apart and a dark hairline would simply vanish. 2px, not 1px: the banner's
+   * outlines are chunky, and a 2px bright edge is also what makes the panel legible.
    */
-  --text-3: #7b867c;
-
-  /* Volt accent */
-  --volt: #c8ff2e;
-  --volt-bright: #e6ff8f;
-  --volt-deep: #aee822;
-  --volt-a10: rgba(200, 255, 46, 0.1);
-  --volt-a12: rgba(200, 255, 46, 0.12);
-  --volt-a25: rgba(200, 255, 46, 0.25);
-  --volt-a28: rgba(200, 255, 46, 0.28);
-  --accent-text: var(--volt);
+  --border-strong: var(--blue-300); /* 6.24:1 on the page, 10.48:1 on a panel */
+  --border-card: var(--blue-300);
+  --border-hair: #1c3350; /* the one quiet line: separators INSIDE a panel, never a panel's edge */
+  --border-width: 2px;
 
   /*
-   * The primary button: a volt fill with a label dark enough to read on it. In dark the fill is
-   * full volt and the label is the app background; light swaps in the brighter chartreuse, whose
-   * near-black label clears AA comfortably (see --btn-primary-* in the light block).
+   * The hard offset pixel shadow — the banner's device, and the night theme's depth. No blur: a
+   * solid ink block, offset down-right. Ink on the blue page is 1.78:1, which is not contrast but
+   * is not meant to be: the bright border carries the edge, and the shadow gives it weight.
    */
-  --btn-primary-bg: var(--volt);
-  --btn-primary-fg: #0a0d0b;
+  --shadow-card: 4px 4px 0 var(--brand-ink);
+  --shadow-raise: 3px 3px 0 var(--brand-ink);
+  --shadow-press: 1px 1px 0 var(--brand-ink);
 
-  /* The colour a focus ring is drawn in. Light needs a deeper one to clear 3:1 on white. */
-  --focus-ring: var(--volt);
+  /* Text. The blue-cast neutral family, derived from the banner's ink hue (251). */
+  --text-1: #f2f6ff; /* 17.25:1 on a panel, 10.26:1 on the blue page */
+  --text-2: #aebed1; /* 9.85:1 on a panel, 5.86:1 on the page — descriptions, help, notice bodies */
+  --text-3: #8d9fb2; /* 6.88:1 on a panel — placeholders, markers, meta. NOT for use on the page. */
+  --text-on-fill: var(--brand-ink); /* the label on a lime / cyan / yellow / pink fill */
+  --text-on-primary: #ffffff; /* the label on a blue fill: 11.11:1 */
 
-  /* The label on a disabled primary button, which sits on the muted volt tint rather than a fill. */
-  --btn-disabled-fg: var(--volt);
+  /* --- Roles -------------------------------------------------------------- */
 
-  /* Semantic. Never glows. */
-  --warn: #e8b84b;
-  --warn-bg: rgba(232, 184, 75, 0.12);
-  --warn-text: #e8b84b;
-  --error: #f26d5e;
-  --error-bg: rgba(242, 109, 94, 0.12);
-  --error-text: #f26d5e;
+  /* PRIMARY — brand, and the main interactive colour. */
+  --primary: var(--blue-300); /* as text, icon, border, active-tab mark on dark */
+  --primary-fill: var(--blue-500); /* as a surface: primary buttons, header blocks */
+  --primary-fill-hover: #2e5bfc;
+  --primary-fill-press: var(--blue-700);
+  --primary-text: var(--blue-300);
+  --primary-on-fill: var(--text-on-primary);
 
-  /*
-   * Status dots are 7px UI components, so they answer to the 3:1 rule rather than the text rule.
-   * In dark the semantic fills clear it easily; in light they do not, so the dot tones separate
-   * from the fill tones there.
-   */
-  --dot-ok: var(--volt);
+  /* LIVE / OK — the running turn, an enabled mod, a healthy status. The only role that may glow. */
+  --live: var(--brand-lime);
+  --live-text: var(--brand-lime);
+  --live-fill: var(--brand-lime);
+  --live-on-fill: var(--brand-ink);
+  --live-tint: rgba(174, 255, 36, 0.14);
+  --live-edge: rgba(174, 255, 36, 0.55);
+
+  /* ACCENT — the hero card's edge, element chips, selection, the wordmark's shadow. */
+  --accent: var(--pink-300);
+  --accent-text: var(--pink-300);
+  --accent-fill: var(--pink-500);
+  --accent-on-fill: var(--brand-ink);
+  --accent-tint: rgba(243, 67, 211, 0.16);
+  --accent-edge: var(--pink-500);
+
+  /* INFO — and the focus ring, which is always cyan so it is never confused with a state. */
+  --info: var(--brand-cyan);
+  --info-text: var(--brand-cyan);
+  --info-fill: var(--brand-cyan);
+  --info-on-fill: var(--brand-ink);
+  --info-tint: rgba(0, 229, 242, 0.14);
+  --focus-ring: var(--brand-cyan); /* 7.13:1 on the page, 11.99:1 on a panel */
+
+  /* WARN — attention, not failure. Never glows. */
+  --warn: var(--yellow-500);
+  --warn-text: var(--yellow-500);
+  --warn-fill: var(--yellow-500);
+  --warn-on-fill: var(--brand-ink);
+  --warn-bg: rgba(255, 243, 69, 0.14);
+
+  /* ERROR — failure. Never glows, always accompanied by a word. */
+  --error: var(--red-500);
+  --error-text: var(--red-500);
+  --error-fill: var(--red-500);
+  --error-on-fill: var(--brand-ink); /* 6.19:1 — ink, not white, which is only 3.99:1 */
+  --error-bg: rgba(243, 95, 85, 0.16);
+
+  /* Status dots are 7px UI components, so they answer to the 3:1 rule rather than the text rule. */
+  --dot-ok: var(--live);
   --dot-warn: var(--warn);
   --dot-error: var(--error);
 
-  /* Data */
-  --fill-grad: linear-gradient(90deg, #aee822, #e6ff8f);
-  --track: rgba(128, 140, 130, 0.18);
+  /* Buttons. */
+  --btn-primary-bg: var(--primary-fill);
+  --btn-primary-fg: var(--primary-on-fill);
+  --btn-disabled-fg: var(--text-3);
 
-  /* Code and other inset wells: quieter than the card they sit in. */
-  --surface-well: var(--surface-lo);
+  /* Data. */
+  --fill-grad: linear-gradient(90deg, var(--brand-lime), var(--brand-cyan));
+  --track: rgba(167, 194, 254, 0.22);
 
-  /* Text selection. The browser default blue belongs to no theme here. */
-  --selection-bg: rgba(200, 255, 46, 0.3);
+  /* Selection: the accent, because selecting is a small moment of delight, not a state. */
+  --selection-bg: rgba(243, 67, 211, 0.45);
   --selection-fg: #ffffff;
 
-  /* Type */
+  /* =========================================================================
+   * TYPE
+   *
+   * Three families, and which one is used is a rule, not a preference:
+   *
+   *   --font-display  Pixelify Sans. SHORT LABELS ONLY: the wordmark, tab labels, section labels,
+   *                   button labels, stat numbers, headings. Never a sentence, never below 11px.
+   *                   Chosen over Silkscreen and Press Start 2P: Silkscreen is uppercase-only (it
+   *                   cannot set the lowercase "usermods" the brand requires) and tracks so wide
+   *                   that SETTINGS wraps in a 420px panel; Press Start 2P is wider still and only
+   *                   legible above ~20px. Pixelify has true lowercase and stays crisp from 11px.
+   *                   Its C and O are near-identical below 11px, hence the floor.
+   *   --font-ui       the system UI face. ALL prose and every long-form reading surface.
+   *   --font-mono     IBM Plex Mono. Identifiers, code, and anything the user might copy.
+   * ====================================================================== */
+  --font-display: 'Pixelify Sans', ui-monospace, monospace;
   --font-ui: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
-  --fs-micro: 10px;
+
+  --fs-micro: 11px; /* the display face's floor; was 10px, raised because pixel type needs it */
   --fs-label: 11px;
   --fs-meta: 12px;
   --fs-body: 13px;
   --fs-ui: 14px;
   --fs-stat: 20px;
   --fs-title: 26px;
-  --lbl-tracking: 0.06em;
+  --lbl-tracking: 0.08em; /* pixel type needs more air between glyphs than a sans does */
 
-  /* Radii — nothing is sharp */
-  --r-card: 20px;
-  --r-field: 12px;
-  --r-pill: 999px;
-  --r-bar: 3px;
+  /*
+   * Radii. The banner is built from squares and stepped silhouettes, so the system is square with
+   * one small step for the things you touch. Nothing is round any more except a status dot.
+   */
+  --r-card: 0px;
+  --r-field: 2px;
+  --r-pill: 2px;
+  --r-bar: 0px;
 
-  /* Glows: the dark theme's signature, volt only */
-  --glow-dot: 0 0 6px rgba(200, 255, 46, 0.6);
-  --glow-fill: 0 0 10px rgba(200, 255, 46, 0.5);
-  --glow-hero: 0 0 32px rgba(200, 255, 46, 0.12), inset 0 1px 0 rgba(200, 255, 46, 0.18);
-  --glow-text: 0 0 24px rgba(200, 255, 46, 0.35);
-  --glow-tab: 0 0 16px rgba(200, 255, 46, 0.55), inset 0 0 8px rgba(200, 255, 46, 0.35);
+  /*
+   * Glow. ONLY alive things glow or pulse, and alive is always lime. Everything else takes its
+   * weight from colour blocks, bright borders and hard offset shadows.
+   */
+  --glow-dot: 0 0 7px rgba(174, 255, 36, 0.75);
+  --glow-fill: 0 0 12px rgba(174, 255, 36, 0.45);
+  --glow-hero: none; /* the hero is marked by its pink edge and shadow, not by a blur */
+  --glow-text: 0 0 20px rgba(174, 255, 36, 0.4);
+  --glow-tab: none; /* the active tab is a solid lime block; it needs no halo */
 
-  /* Spacing rhythm */
+  /* Spacing rhythm. */
   --sp-1: 4px;
   --sp-2: 8px;
   --sp-3: 12px;
   --sp-4: 16px;
   --sp-5: 20px;
-  --card-pad: 16px 18px;
+  --card-pad: 14px 16px;
   --stack-gap: 12px;
 }
 
 /*
  * ---------------------------------------------------------------------------
- * Theme: Light
+ * THEME: DAY
  * ---------------------------------------------------------------------------
  *
- * White cards on #F4F6F2 with a single ambient volt radial in the top-right. Volt darkens to
- * chartreuse so it can carry text and fills on white, and every glow goes to none: light has no
- * neon. What replaces the glow as the "this is alive" signal is the same volt hue used as a fill,
- * a tint or a border — the vocabulary is unchanged, only the luminance moves.
+ * Not "a white app with blue links". A pale cool page, white panels OUTLINED IN INK with the same
+ * hard offset shadow, big blue header blocks carrying white or lime, and lime / pink / yellow used
+ * as real fills with ink labels. The day theme is the banner seen in daylight — the same
+ * construction, inverted.
  *
- * Light is reached two ways: an explicit `data-theme="light"`, or no explicit choice at all while
- * the OS asks for light (Theme: System). CSS cannot share one declaration block between a plain
- * selector and a media query, so the values live here once under a private attribute and the two
- * entry points below both switch that attribute on. `:not([data-theme])` is what keeps a
- * deliberate "Dark" from being overridden on a light desktop.
+ * What changes from night, and why:
+ *   - every identity colour that has to carry TEXT drops to its 700 step: lime, cyan, yellow and
+ *     pink are all unreadable as text on white (lime #AEFF24 on white is 1.4:1);
+ *   - the primary becomes the banner blue ITSELF, which is 11.11:1 on white — day is where
+ *     #1008C8 gets to be the text colour it is best at;
+ *   - borders become ink rather than a bright tint, because on white the bright tints vanish;
+ *   - glows go to none. There is no neon in daylight; "alive" is carried by a solid lime fill.
  *
  * test/contrast.test.ts parses exactly this block. Keep one `--token: value;` per line.
  */
 :root[data-theme='light'] {
   color-scheme: light;
-  --bg-app: #f4f6f2;
-  --bg-ambient: radial-gradient(480px 360px at 110% -5%, rgba(200, 255, 46, 0.2), transparent 70%), #f4f6f2;
-  --surface-hi: #ffffff;
-  --surface-lo: #ffffff;
-  --surface-card: linear-gradient(180deg, #ffffff, #ffffff);
-  --border-card: #e8ece5;
-  --border-hair: #f0f2ee;
 
-  /*
-   * The faint lift the design system asks for in light. It does the job --border-card cannot: at
-   * 1.2:1 against white that border is decoration, so the shadow is what actually separates a card
-   * from the page.
-   */
-  --shadow-card: 0 1px 2px rgba(22, 24, 26, 0.05), 0 1px 1px rgba(22, 24, 26, 0.04);
-  --shadow-raise: 0 1px 2px rgba(22, 24, 26, 0.06);
+  --bg-app: #eaf0fe;
+  --bg-ambient:
+    radial-gradient(520px 380px at 108% -8%, rgba(16, 8, 200, 0.07), transparent 70%),
+    radial-gradient(440px 340px at -12% 106%, rgba(243, 67, 211, 0.07), transparent 70%), #eaf0fe;
 
-  --text-1: #16181a;
+  --surface-1: #ffffff;
+  --surface-2: #ffffff;
+  --surface-well: #f3f7ff;
+  --surface-card: var(--surface-1);
+  --surface-hi: var(--surface-1);
+  --surface-lo: var(--surface-well);
 
-  /*
-   * AA: the published light palette's --text-2 #79806F is 3.76:1 on #F4F6F2 — below the 4.5:1 body
-   * rule, and this token carries real prose (card descriptions, field help, notice bodies), not
-   * decoration. Darkened along the same warm grey-green hue to 4.74:1 on the app background and
-   * 5.16:1 on a card.
-   */
-  --text-2: #68705f;
+  /* Day outlines in INK. 17.35:1 on white — the boldest edge in the system, and the banner's own. */
+  --border-strong: #071b31;
+  --border-card: #071b31;
+  --border-hair: #c9d8f0;
+  --border-width: 2px;
 
-  /*
-   * AA: the published --text-3 #9AA096 is 2.68:1 on white — far below AA, and this token is used
-   * for placeholder text and list markers, which are content, not ornament. Rather than restrict
-   * the token to decoration and audit every call site forever, it is darkened within the palette's
-   * hue to 4.97:1 on a card / 4.57:1 on the app background. It stays visibly the faintest of the
-   * three steps; it is now merely a legible faint rather than a decorative one.
-   */
-  --text-3: #6b7267;
+  /* The same hard offset shadow, in the same ink. 17.30:1 on the page. */
+  --shadow-card: 4px 4px 0 #071b31;
+  --shadow-raise: 3px 3px 0 #071b31;
+  --shadow-press: 1px 1px 0 #071b31;
 
-  --volt: #7c9d0e;
-  --volt-bright: #8fbf00;
-  --volt-deep: #5c7a00;
-  --accent-text: #5c7a00;
+  --text-1: #081a2d;
+  --text-2: #44596f;
+  --text-3: #5a6c81;
+  --text-on-fill: #081a2d;
+  --text-on-primary: #ffffff;
 
-  /*
-   * AA: white on --volt #7C9D0E is 3.14:1, which fails a button label. The in-system fix is the
-   * one the palette already offers — the brighter chartreuse fill with a near-black label, which
-   * is how --volt-bright is used on the light swatch card in the design system itself. 8.15:1.
-   */
-  --btn-primary-bg: var(--volt-bright);
-  --btn-primary-fg: #16181a;
+  /* PRIMARY: in day the banner blue is the text colour, and the fill colour, and the header block. */
+  --primary: #1008c8;
+  --primary-fill: #1008c8;
+  --primary-fill-hover: #060077;
+  --primary-fill-press: #060077;
+  --primary-text: #1008c8;
+  --primary-on-fill: #ffffff;
 
-  /* --volt at 3.14:1 on white is under the 3:1 UI rule's margin; the deep chartreuse is 4.95:1. */
-  --focus-ring: var(--volt-deep);
+  /* LIVE: lime cannot carry text on white, so text drops to lime-700 while FILLS stay full lime. */
+  --live: #4a7104;
+  --live-text: #4a7104;
+  --live-fill: #aeff24;
+  --live-on-fill: #081a2d;
+  --live-tint: #e6ffc2;
+  --live-edge: #4a7104;
 
-  /* On the pale --volt-a25 tint the accent is 4.1:1; the deep chartreuse clears AA at 4.71:1. */
-  --btn-disabled-fg: #547000;
+  --accent: #c4139f;
+  --accent-text: #c4139f;
+  --accent-fill: #f343d3;
+  --accent-on-fill: #081a2d;
+  --accent-tint: #ffe8fa;
+  --accent-edge: #c4139f;
 
-  --warn-text: #8a6516;
-  --warn-bg: #fbf3df;
-  --error-text: #a2372c;
-  --error-bg: #fbe9e6;
+  --info: #02777f;
+  --info-text: #02777f;
+  --info-fill: #00e5f2;
+  --info-on-fill: #081a2d;
+  --info-tint: #dbfbfd;
+  --focus-ring: #1008c8;
 
-  /*
-   * The dark theme's amber #E8B84B and coral #F26D5E are 1.84:1 and 2.95:1 on white: invisible as
-   * 7px dots. In light a dot borrows its own text tone, which is the same hue read at a luminance
-   * that works on white (5.31:1 / 6.73:1).
-   *
-   * The healthy dot has the same problem: --volt is 2.89:1 on the app background, under the 3:1 UI
-   * rule, and the tab bar's "this page can be acted on" dot sits on exactly that background. It
-   * takes the deep chartreuse (4.56:1) — the same colour the accent text already uses.
-   */
-  --dot-ok: var(--volt-deep);
-  --dot-warn: #8a6516;
-  --dot-error: #a2372c;
+  --warn: #6c6601;
+  --warn-text: #6c6601;
+  --warn-fill: #fff345;
+  --warn-on-fill: #081a2d;
+  --warn-bg: #fffbcf;
 
-  /*
-   * The solid semantic fills. Dark uses amber and coral directly on charcoal; on white the same two
-   * are 1.84:1 and 2.95:1, so light takes the tones that survive there. Restated rather than
-   * inherited so nothing keeps a charcoal-only value by accident — the contrast test checks that
-   * every colour token is answered here.
-   */
-  --warn: #8a6516;
-  --error: #a2372c;
+  --error: #7d030e;
+  --error-text: #7d030e;
+  --error-fill: #7d030e;
+  --error-on-fill: #ffffff;
+  --error-bg: #ffe4e4;
 
-  --volt-a10: #f7fae9;
-  --volt-a12: #f2f8d9;
-  --volt-a25: #e3f0b4;
-  --volt-a28: #cfe08f;
-  --fill-grad: linear-gradient(90deg, #8fbf00, #aee822);
-  --track: rgba(0, 0, 0, 0.08);
+  --dot-ok: #4a7104;
+  --dot-warn: #6c6601;
+  --dot-error: #7d030e;
 
-  /* On white cards an inset well reads as slightly recessed, not as a second white. */
-  --surface-well: #f7f8f5;
+  --btn-primary-bg: #1008c8;
+  --btn-primary-fg: #ffffff;
+  --btn-disabled-fg: #5a6c81;
 
-  --selection-bg: #e3f0b4;
-  --selection-fg: #16181a;
+  --fill-grad: linear-gradient(90deg, #4a7104, #02777f);
+  --track: rgba(8, 26, 45, 0.12);
 
-  /* No neon in light. The hero card keeps a faint volt-tinted lift instead of a glow. */
+  --selection-bg: #ffc2f0;
+  --selection-fg: #081a2d;
+
+  /* No neon in daylight. Alive is a solid lime fill, not a halo. */
   --glow-dot: none;
   --glow-fill: none;
-  --glow-hero: 0 2px 16px rgba(124, 157, 14, 0.12);
+  --glow-hero: none;
   --glow-text: none;
   --glow-tab: none;
 }
 
 /*
- * Theme: System — the same light values, reached through the OS preference instead of an explicit
+ * Theme: System — the same day values, reached through the OS preference instead of an explicit
  * choice. CSS has no way to share a declaration block between a plain selector and a media query
  * without a build step, so this is a verbatim copy of the block above.
  *
@@ -287,105 +435,124 @@
 @media (prefers-color-scheme: light) {
   :root:not([data-theme]) {
     color-scheme: light;
-    --bg-app: #f4f6f2;
-    --bg-ambient: radial-gradient(480px 360px at 110% -5%, rgba(200, 255, 46, 0.2), transparent 70%), #f4f6f2;
-    --surface-hi: #ffffff;
-    --surface-lo: #ffffff;
-    --surface-card: linear-gradient(180deg, #ffffff, #ffffff);
-    --border-card: #e8ece5;
-    --border-hair: #f0f2ee;
 
-    /*
-     * The faint lift the design system asks for in light. It does the job --border-card cannot: at
-     * 1.2:1 against white that border is decoration, so the shadow is what actually separates a card
-     * from the page.
-     */
-    --shadow-card: 0 1px 2px rgba(22, 24, 26, 0.05), 0 1px 1px rgba(22, 24, 26, 0.04);
-    --shadow-raise: 0 1px 2px rgba(22, 24, 26, 0.06);
+    --bg-app: #eaf0fe;
+    --bg-ambient:
+      radial-gradient(520px 380px at 108% -8%, rgba(16, 8, 200, 0.07), transparent 70%),
+      radial-gradient(440px 340px at -12% 106%, rgba(243, 67, 211, 0.07), transparent 70%), #eaf0fe;
 
-    --text-1: #16181a;
+    --surface-1: #ffffff;
+    --surface-2: #ffffff;
+    --surface-well: #f3f7ff;
+    --surface-card: var(--surface-1);
+    --surface-hi: var(--surface-1);
+    --surface-lo: var(--surface-well);
 
-    /*
-     * AA: the published light palette's --text-2 #79806F is 3.76:1 on #F4F6F2 — below the 4.5:1 body
-     * rule, and this token carries real prose (card descriptions, field help, notice bodies), not
-     * decoration. Darkened along the same warm grey-green hue to 4.74:1 on the app background and
-     * 5.16:1 on a card.
-     */
-    --text-2: #68705f;
+    --border-strong: #071b31;
+    --border-card: #071b31;
+    --border-hair: #c9d8f0;
+    --border-width: 2px;
 
-    /*
-     * AA: the published --text-3 #9AA096 is 2.68:1 on white — far below AA, and this token is used
-     * for placeholder text and list markers, which are content, not ornament. Rather than restrict
-     * the token to decoration and audit every call site forever, it is darkened within the palette's
-     * hue to 4.97:1 on a card / 4.57:1 on the app background. It stays visibly the faintest of the
-     * three steps; it is now merely a legible faint rather than a decorative one.
-     */
-    --text-3: #6b7267;
+    --shadow-card: 4px 4px 0 #071b31;
+    --shadow-raise: 3px 3px 0 #071b31;
+    --shadow-press: 1px 1px 0 #071b31;
 
-    --volt: #7c9d0e;
-    --volt-bright: #8fbf00;
-    --volt-deep: #5c7a00;
-    --accent-text: #5c7a00;
+    --text-1: #081a2d;
+    --text-2: #44596f;
+    --text-3: #5a6c81;
+    --text-on-fill: #081a2d;
+    --text-on-primary: #ffffff;
 
-    /*
-     * AA: white on --volt #7C9D0E is 3.14:1, which fails a button label. The in-system fix is the
-     * one the palette already offers — the brighter chartreuse fill with a near-black label, which
-     * is how --volt-bright is used on the light swatch card in the design system itself. 8.15:1.
-     */
-    --btn-primary-bg: var(--volt-bright);
-    --btn-primary-fg: #16181a;
+    --primary: #1008c8;
+    --primary-fill: #1008c8;
+    --primary-fill-hover: #060077;
+    --primary-fill-press: #060077;
+    --primary-text: #1008c8;
+    --primary-on-fill: #ffffff;
 
-    /* --volt at 3.14:1 on white is under the 3:1 UI rule's margin; the deep chartreuse is 4.95:1. */
-    --focus-ring: var(--volt-deep);
+    --live: #4a7104;
+    --live-text: #4a7104;
+    --live-fill: #aeff24;
+    --live-on-fill: #081a2d;
+    --live-tint: #e6ffc2;
+    --live-edge: #4a7104;
 
-    /* On the pale --volt-a25 tint the accent is 4.1:1; the deep chartreuse clears AA at 4.71:1. */
-    --btn-disabled-fg: #547000;
+    --accent: #c4139f;
+    --accent-text: #c4139f;
+    --accent-fill: #f343d3;
+    --accent-on-fill: #081a2d;
+    --accent-tint: #ffe8fa;
+    --accent-edge: #c4139f;
 
-    --warn-text: #8a6516;
-    --warn-bg: #fbf3df;
-    --error-text: #a2372c;
-    --error-bg: #fbe9e6;
+    --info: #02777f;
+    --info-text: #02777f;
+    --info-fill: #00e5f2;
+    --info-on-fill: #081a2d;
+    --info-tint: #dbfbfd;
+    --focus-ring: #1008c8;
 
-    /*
-     * The dark theme's amber #E8B84B and coral #F26D5E are 1.84:1 and 2.95:1 on white: invisible as
-     * 7px dots. In light a dot borrows its own text tone, which is the same hue read at a luminance
-     * that works on white (5.31:1 / 6.73:1).
-     *
-     * The healthy dot has the same problem: --volt is 2.89:1 on the app background, under the 3:1 UI
-     * rule, and the tab bar's "this page can be acted on" dot sits on exactly that background. It
-     * takes the deep chartreuse (4.56:1) — the same colour the accent text already uses.
-     */
-    --dot-ok: var(--volt-deep);
-    --dot-warn: #8a6516;
-    --dot-error: #a2372c;
+    --warn: #6c6601;
+    --warn-text: #6c6601;
+    --warn-fill: #fff345;
+    --warn-on-fill: #081a2d;
+    --warn-bg: #fffbcf;
 
-    /*
-     * The solid semantic fills. Dark uses amber and coral directly on charcoal; on white the same two
-     * are 1.84:1 and 2.95:1, so light takes the tones that survive there. Restated rather than
-     * inherited so nothing keeps a charcoal-only value by accident — the contrast test checks that
-     * every colour token is answered here.
-     */
-    --warn: #8a6516;
-    --error: #a2372c;
+    --error: #7d030e;
+    --error-text: #7d030e;
+    --error-fill: #7d030e;
+    --error-on-fill: #ffffff;
+    --error-bg: #ffe4e4;
 
-    --volt-a10: #f7fae9;
-    --volt-a12: #f2f8d9;
-    --volt-a25: #e3f0b4;
-    --volt-a28: #cfe08f;
-    --fill-grad: linear-gradient(90deg, #8fbf00, #aee822);
-    --track: rgba(0, 0, 0, 0.08);
+    --dot-ok: #4a7104;
+    --dot-warn: #6c6601;
+    --dot-error: #7d030e;
 
-    /* On white cards an inset well reads as slightly recessed, not as a second white. */
-    --surface-well: #f7f8f5;
+    --btn-primary-bg: #1008c8;
+    --btn-primary-fg: #ffffff;
+    --btn-disabled-fg: #5a6c81;
 
-    --selection-bg: #e3f0b4;
-    --selection-fg: #16181a;
+    --fill-grad: linear-gradient(90deg, #4a7104, #02777f);
+    --track: rgba(8, 26, 45, 0.12);
 
-    /* No neon in light. The hero card keeps a faint volt-tinted lift instead of a glow. */
+    --selection-bg: #ffc2f0;
+    --selection-fg: #081a2d;
+
     --glow-dot: none;
     --glow-fill: none;
-    --glow-hero: 0 2px 16px rgba(124, 157, 14, 0.12);
+    --glow-hero: none;
     --glow-text: none;
     --glow-tab: none;
   }
+}
+
+/*
+ * ===========================================================================
+ * DEPRECATED ALIASES — do not use in new code.
+ * ===========================================================================
+ *
+ * The design system used to be called Volt OS and its accent was a single neon yellow-green named
+ * "volt". These names are kept, pointing at the roles that replaced them, because other branches
+ * are in flight against them and would otherwise render unstyled on merge.
+ *
+ * The mapping is by MEANING, not by hue. "volt" meant two different things in the old system and
+ * they have separated here: where it meant "this is alive" it is now --live; where it meant "this
+ * is the brand / the main interactive colour" it is now --primary. The aliases below resolve to
+ * --live, because that was volt's dominant sense (the glow, the enabled toggle, the running turn).
+ * A rule that used --volt for brand emphasis will come out lime rather than blue and should be
+ * moved to --primary by hand.
+ *
+ * REMOVAL PLAN: delete this block once no file outside it mentions these names. Check with:
+ *     grep -rn -- 'var(--volt' entrypoints lib | grep -v tokens.css
+ * They are intentionally not used anywhere in this repository's own CSS any more, and
+ * test/contrast.test.ts asserts that, so the block can go as soon as the in-flight branches land.
+ */
+:root,
+:root[data-theme='light'] {
+  --volt: var(--live);
+  --volt-bright: var(--live);
+  --volt-deep: var(--live-text);
+  --volt-a10: var(--live-tint);
+  --volt-a12: var(--live-tint);
+  --volt-a25: var(--live-tint);
+  --volt-a28: var(--live-edge);
 }

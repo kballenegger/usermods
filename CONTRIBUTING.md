@@ -37,6 +37,7 @@ You do not need a real model at all for the tests or the smoke run — both use 
 | `npm run smoke` | Builds, then drives the real side panel headless in Playwright against `scripts/mock-llm.mjs`, asserting the whole chat loop end to end. |
 | `npm run screenshots` | Regenerates the README images through the same harness. |
 | `npm run store-assets` | Regenerates the Chrome Web Store screenshots and promo tiles into `docs/store/assets/`. |
+| `npm run styleguide` | Rebuilds and recaptures the living style guide into `docs/design/`, which `docs/design.md` embeds. |
 
 Two notes on the harness. `scripts/mock-llm.mjs` is a local server that replays scripted
 conversations over the OpenAI wire protocol, so neither `smoke` nor `screenshots` needs an API key or
@@ -112,6 +113,29 @@ and say in the PR why a unit test could not reach it.
 
 New features want tests too, but the standard is judgement rather than a rule. A fix has no such
 latitude: something was wrong, and a test is how we learn if it goes wrong again.
+
+## Design
+
+If you are touching anything visual, read **[docs/design.md](docs/design.md)** first. It is the
+reference the interface is designed from: the role palette for both themes with hexes and OKLCH
+values, the tonal scales, the contrast table, typography, every component with its states and
+do/don'ts, motion, theming and the accessibility commitments. It ends with a checklist for adding a
+new surface — work through it before you open the PR.
+
+Three things will save you a review round:
+
+- **Use role tokens, never a hex.** Components name `--primary-*`, `--live-*`, `--accent-*`,
+  `--info-*`, `--warn-*`, `--error-*`, `--surface-*`, `--text-*`. No hex belongs outside
+  `entrypoints/sidepanel/tokens.css`. (The one exception is the in-page element picker in
+  `entrypoints/content.ts`, which runs on other people's pages where CSS variables do not reach.)
+- **Add your real pairings to `test/contrast.test.ts`.** It is a gate, and it checks both themes. A
+  new colour token that is not restated for the day theme also fails there.
+- **Anything you read a sentence of goes on a solid panel, in a text face, at ≥13px.** The pixel
+  display face is for short labels only and never below 11px.
+
+The living style guide at `entrypoints/styleguide/` renders every component with the real
+stylesheets. In a dev build it is linked from the dashboard footer, or open `/styleguide.html?styleguide=1`
+directly. Re-capture it with `npm run styleguide` if you change a component's appearance.
 
 ## Before you open a PR
 

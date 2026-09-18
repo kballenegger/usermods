@@ -93,24 +93,26 @@ export default defineContentScript({
     }
 
     /**
-     * The picker's highlight and its label, in Volt OS colours.
+     * The picker's highlight and its label, in the usermods brand colours.
      *
      * These live on someone else's page, so the values are written inline rather than through a
      * stylesheet: injecting one would leak usermods' rules into the site, and the site's own CSS
-     * could reach an injected class. They are the volt tokens spelled out — the extension's CSS
+     * could reach an injected class. They are the brand tokens spelled out — the extension's CSS
      * custom properties do not reach a content script's elements.
      *
-     * This stays volt in both themes, deliberately. It is not part of the panel: it is usermods'
-     * mark on a page it does not own, and it has to read the same whatever the site's own palette
-     * is — the site may be light, dark, or a photograph, and it does not follow the user's theme.
+     * This does NOT follow the user's theme, deliberately. It is not part of the panel: it is
+     * usermods' mark on a page it does not own, and it has to read the same whatever the site's own
+     * palette is — the site may be light, dark, or a photograph.
      *
      * What that costs is that neither a light nor a dark page can be assumed, so a single flat
-     * colour cannot do the work. Both elements carry their contrast with them:
-     *   - the highlight is a volt line with a dark outer ring, so the edge is visible on white
-     *     (where volt alone is ~1.6:1) and on black (where the dark ring simply disappears behind
-     *     the volt line);
-     *   - the label is a near-black pill with volt text, which is legible against anything, and it
-     *     takes a light outer ring so its own edge does not vanish on a dark page.
+     * colour cannot do the work. Both elements carry their contrast with them, and the device that
+     * makes that possible is the brand's own: a bright line with a hard ink edge outside it.
+     *   - the highlight is a lime line (the "this is alive" colour, and the thing under the cursor
+     *     is the liveliest thing on the page) with an ink ring outside it, so the edge is visible on
+     *     white — where lime alone is ~1.4:1 — and on black, where the ink ring simply disappears
+     *     behind the lime;
+     *   - the label is an ink block with lime text at 16.1:1, which is legible against anything, and
+     *     it takes a hard lime offset shadow so its own edge does not vanish on a dark page.
      */
     function startPicker(): () => void {
       const overlay = document.createElement('div');
@@ -118,11 +120,11 @@ export default defineContentScript({
         position: 'fixed',
         pointerEvents: 'none',
         zIndex: '2147483647',
-        border: '1px solid #c8ff2e', // --volt
-        background: 'rgba(200,255,46,0.12)', // --volt-a12
-        borderRadius: '12px', // --r-field
-        // The glow says "live"; the dark ring outside it is what makes the line findable on white.
-        boxShadow: '0 0 0 1px rgba(10,13,11,0.55), 0 0 16px rgba(200,255,46,0.35)',
+        border: '2px solid #AEFF24', // --brand-lime
+        background: 'rgba(174,255,36,0.14)', // --live-tint
+        borderRadius: '2px', // --r-field
+        // The glow says "live"; the ink ring outside it is what makes the line findable on white.
+        boxShadow: '0 0 0 2px rgba(3,11,22,0.65), 0 0 14px rgba(174,255,36,0.4)',
         transition: 'all 40ms linear',
       } satisfies Partial<CSSStyleDeclaration>);
       const label = document.createElement('div');
@@ -131,13 +133,13 @@ export default defineContentScript({
         zIndex: '2147483647',
         pointerEvents: 'none',
         font: "500 12px/1.5 'IBM Plex Mono', ui-monospace, monospace", // identifiers are mono
-        background: '#0e120f', // --surface-lo
-        color: '#c8ff2e', // --volt
-        border: '1px solid #222b24', // --border-card
-        // A hairline of light outside the pill, so its edge survives on a dark page too.
-        boxShadow: '0 0 0 1px rgba(232,237,232,0.28)',
-        padding: '3px 10px',
-        borderRadius: '999px', // --r-pill
+        background: '#030B16', // --brand-ink
+        color: '#AEFF24', // --brand-lime, 16.1:1 on the ink
+        border: '2px solid #AEFF24', // --brand-lime
+        // The brand's hard offset, which doubles as the edge that survives on a dark page.
+        boxShadow: '3px 3px 0 rgba(243,67,211,0.9)',
+        padding: '3px 8px',
+        borderRadius: '2px', // --r-field
         maxWidth: '60vw',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
