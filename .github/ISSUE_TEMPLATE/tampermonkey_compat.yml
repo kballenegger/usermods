@@ -1,0 +1,127 @@
+name: A userscript that works in Tampermonkey fails in usermods
+description: A script runs correctly under Tampermonkey (or Violentmonkey) but misbehaves here.
+labels: [bug, compatibility]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Tampermonkey compatibility is a goal, so this is a real bug and worth reporting carefully.
+        The `@grant` lines and the exact error are what make it diagnosable.
+
+        Two known behaviours to rule out first, both documented in the
+        [README](https://github.com/kballenegger/usermods/blob/main/README.md#gm-api-compatibility):
+
+        - `GM_download`, `GM_cookie` and `GM_webRequest` are **not implemented**, and
+          `GM_registerMenuCommand`, `GM_notification` and `GM_getTab`/`GM_saveTab`/`GM_getTabs` are
+          **stubs**. If the script needs one of those, say so — it is a feature request, and useful
+          as one.
+        - A `@grant none` or `unsafeWindow` script runs in the page's MAIN world, where
+          `GM_setValue` writes update the in-page copy but **cannot be persisted**.
+        - Regex-style `@include` lines (`/^https?:\/\/…$/`) are not supported; Chrome matches on
+          patterns and globs only. The install preview warns when it drops one.
+
+  - type: input
+    id: script-url
+    attributes:
+      label: Script URL
+      description: >
+        Where the script comes from — its Greasy Fork / OpenUserJS page or its `.user.js` URL. If it
+        is private, paste the smallest version that still shows the problem in the field below
+        instead.
+      placeholder: https://greasyfork.org/en/scripts/12345-example
+    validations:
+      required: false
+
+  - type: textarea
+    id: grants
+    attributes:
+      label: The script's header
+      description: >
+        Paste the `==UserScript==` block — **the `@grant` lines especially**, plus `@match`,
+        `@include`, `@require`, `@resource`, `@connect` and `@run-at`. Almost every compatibility
+        difference is visible in the header.
+      render: javascript
+      placeholder: |
+        // ==UserScript==
+        // @name         Example Helper
+        // @match        https://example.com/*
+        // @grant        GM_setValue
+        // @grant        GM_xmlhttpRequest
+        // @connect      api.example.com
+        // @run-at       document-end
+        // ==/UserScript==
+    validations:
+      required: true
+
+  - type: textarea
+    id: difference
+    attributes:
+      label: What it does under Tampermonkey vs. under usermods
+      description: Both halves, concretely.
+      placeholder: |
+        Tampermonkey: the button appears in the toolbar and clicking it saves the current filter.
+        usermods: the button appears, but the filter is forgotten on reload.
+    validations:
+      required: true
+
+  - type: textarea
+    id: error
+    attributes:
+      label: The error
+      description: >
+        The exact message and stack from the page's console (where a registered script logs), plus
+        anything in the background worker's console at `chrome://extensions` → Details →
+        **Inspect views: service worker**. If the failure is silent, say that.
+      render: text
+    validations:
+      required: false
+
+  - type: input
+    id: page
+    attributes:
+      label: Page it happens on
+      description: A URL where the difference is visible, if the script is site-specific.
+      placeholder: https://example.com/some/page
+    validations:
+      required: false
+
+  - type: dropdown
+    id: install-route
+    attributes:
+      label: How the script got into usermods
+      options:
+        - Install from URL
+        - Clicked a .user.js link
+        - Imported a file
+        - Tampermonkey backup import
+        - Written by the chat
+    validations:
+      required: true
+
+  - type: input
+    id: chrome-version
+    attributes:
+      label: Chrome version
+      placeholder: "141.0.7390.55"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: allow-user-scripts
+    attributes:
+      label: Is "Allow User Scripts" turned on?
+      description: "`chrome://extensions` → Details on usermods. Nothing runs without it."
+      options:
+        - "Yes, it is on"
+        - "No, it is off"
+        - "I do not see that toggle"
+    validations:
+      required: true
+
+  - type: input
+    id: tm-version
+    attributes:
+      label: Tampermonkey version it works under
+      placeholder: "5.3.3"
+    validations:
+      required: false

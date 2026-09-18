@@ -180,13 +180,16 @@ side panel (React)  ──rpc──▶  background service worker  ──▶  LL
 - **Provider adapters** live in `lib/providers/`. Anthropic uses the official SDK; the OpenAI-compatible adapter speaks `chat/completions` with function calling over raw fetch. Adding a provider means implementing one `chat()` method.
 - **The agent loop** (`lib/agent/`) is provider-neutral. Tools: `get_page`, `find_elements`, `get_styles`, `run_script`, `screenshot`, `propose_mod`.
 - **Mods** are stored in `chrome.storage.local` as full userscript text. The header is parsed for name, description, `@match`/`@include`/`@exclude`, `@grant`, `@require`, `@resource`, `@run-at` and `@noframes`. Enabled mods are registered with `chrome.userScripts`, each wrapped in a closure that provides the `GM_*` and `GM.*` API, in the world and at the run-at its header asks for.
-- **Chats** are per site and live in `chrome.storage.local`, so they survive the panel closing, the service worker sleeping and a browser restart. Opening the panel on a site brings back its last chat, transcript and all, without a click; that keeps happening until you start a new one or **archive** it. Archiving is the switcher's main "done with this" action and needs no confirmation, because it is reversible: archived chats move to an *Archived* group at the bottom of the switcher, where you can reopen one (sending in it unarchives it), put it back, or delete it for good. Only deleting asks. Chats name themselves: once the first turn finishes, usermods makes one small extra call to the same model — no tools, a few hundred characters of the exchange — and asks for a three-to-six-word title, refreshing it once more when the chat reaches its fourth turn. That call happens after your turn is done and is never allowed to slow it down or fail it; if it errors, the truncated first message stays. **Rename** in the switcher gives a chat your own name, and nothing overwrites that afterwards. Turn the whole thing off with *Name chats automatically* in Settings. The index is capped at 200 chats per profile, and archived chats are evicted before live ones.
+- **Chats** are per site and live in `chrome.storage.local`, so they survive the panel closing, the service worker sleeping and a browser restart. Opening the panel on a site brings back its last chat, transcript and all, without a click; that keeps happening until you start a new one or **archive** it. Archiving is the switcher's main "done with this" action and needs no confirmation, because it is reversible: archived chats move to an *Archived* group at the bottom of the switcher, where you can reopen one (sending in it unarchives it), put it back, or delete it for good. Only deleting asks. Chats name themselves: once the first turn finishes, usermods makes one small extra call to the same model — no tools, a few hundred characters of the exchange — and asks for a three-to-six-word title, refreshing it once more when the chat reaches its fourth turn. That call happens after your turn is done and is never allowed to slow it down or fail it; if it errors, the truncated first message stays. **Rename** in the switcher gives a chat your own name, and nothing overwrites that afterwards. Turn the whole thing off with *Name chats automatically* in Settings. The index is capped at 200 chats per profile, oldest dropped, with archived chats evicted before live ones, and screenshots are stripped from stored history.
 
 ## Security notes
 
 - Page content that the model reads is untrusted. The system prompt tells the model to treat it as data, and every generated script is shown to you before it is saved. Read it.
 - Scripts run in an isolated world: they see the DOM but not the page's JavaScript globals. Default `@match` is the current site only.
 - Your API key is stored in extension local storage and sent only to the endpoint you configure.
+
+Found a vulnerability? Please report it privately through GitHub's **Report a vulnerability** button
+rather than opening an issue. [SECURITY.md](SECURITY.md) has the scope and what to expect.
 
 ## Privacy
 
@@ -205,7 +208,7 @@ authenticate.
 
 The panel says all of this in the side panel before your first message, and the notice is always
 available again from Settings → *Review data notice*. The full policy is in
-[docs/privacy.md](docs/privacy.md); the Chrome Web Store submission material is in
+[PRIVACY.md](PRIVACY.md); the Chrome Web Store submission material is in
 [docs/store/](docs/store/).
 
 ## Roadmap
@@ -215,6 +218,12 @@ available again from Settings → *Review data notice*. The full policy is in
 - Mod sharing: export is there; a gallery is not.
 - CSS-only mods via a `@usermods-style` header, so pure restyles need no JavaScript.
 - Firefox, once its side panel story is settled.
+
+## Contributing
+
+Issues and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) covers the setup, the npm
+scripts, where everything lives, how to add a provider, and the one hard rule: every fix lands with a
+regression test. Participation is governed by the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Author
 

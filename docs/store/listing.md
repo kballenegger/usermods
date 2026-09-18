@@ -2,7 +2,7 @@
 
 Everything that goes in the **Store listing** and **Privacy practices** tabs of the developer
 dashboard. Companion files: [permissions.md](permissions.md) for the reviewer justifications,
-[../privacy.md](../privacy.md) for the hosted policy.
+[../../PRIVACY.md](../../PRIVACY.md) for the published policy.
 
 ---
 
@@ -125,10 +125,14 @@ picker dropping an @reference into the composer, (3) the Mods list split by what
 
 ## Privacy policy URL
 
-Serve `docs/privacy.md` from GitHub Pages and use that URL, e.g.
-`https://kballenegger.github.io/usermods/privacy`. Until Pages is enabled, the rendered file on
-GitHub works: `https://github.com/kballenegger/usermods/blob/main/docs/privacy.md`. A hosted policy
-is mandatory for any item that handles user data.
+```
+https://github.com/kballenegger/usermods/blob/main/PRIVACY.md
+```
+
+The policy lives at `PRIVACY.md` in the repository root and is served by GitHub's own file view.
+That rendered page is the URL to paste into the dashboard; a published policy is mandatory for any
+item that handles user data. Keeping it in the repo rather than on a separate site means the policy
+and the code it describes are versioned together, and a reviewer can diff them.
 
 ## Single purpose
 
@@ -181,7 +185,7 @@ Check all three. They are all true:
 
 ## Limited Use affirmation
 
-Section 7 of [../privacy.md](../privacy.md) carries the required sentence:
+Section 7 of [../../PRIVACY.md](../../PRIVACY.md) carries the required sentence:
 
 > usermods' use of information received from Google APIs will adhere to the Chrome Web Store User
 > Data Policy, including the Limited Use requirements.

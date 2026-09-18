@@ -129,5 +129,5 @@ will reasonably ask about it:
 ## Data usage
 
 See [docs/store/listing.md](listing.md) for the completed data-disclosure answers, and
-[docs/privacy.md](../privacy.md) for the hosted privacy policy, which carries the Limited Use
+[PRIVACY.md](../../PRIVACY.md) for the published privacy policy, which carries the Limited Use
 affirmation.

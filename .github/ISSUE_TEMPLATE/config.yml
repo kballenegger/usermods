@@ -1,0 +1,12 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/kballenegger/usermods/security/advisories/new
+    about: >
+      Please do not file exploitable issues publicly. This opens a private security advisory,
+      visible only to you and the maintainer. See SECURITY.md for scope.
+  - name: Compatibility, setup and GM API reference
+    url: https://github.com/kballenegger/usermods#gm-api-compatibility
+    about: >
+      Which GM_* functions are supported, what "Allow User Scripts" is, and how to migrate from
+      Tampermonkey. Worth a look before filing -- several common reports are answered there.
