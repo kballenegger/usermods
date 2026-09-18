@@ -153,6 +153,10 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn): Promise<v
   if (next && !signal.aborted) {
     void runChat(chatId, session.tabId, next);
   } else {
+    // The panel's activity line watches for this: 'idle' is what makes this chat's indicator
+    // disappear. It goes through the same post() as everything else, so it is stamped with this
+    // chat's id and cannot switch off the indicator of a chat that is still running.
+    post({ type: 'status', phase: 'idle', detail: 'done' });
     post({ type: 'done' });
     sessions.release(chatId);
     // Naming the chat is a second, tool-free model call. It runs only after 'done' has been

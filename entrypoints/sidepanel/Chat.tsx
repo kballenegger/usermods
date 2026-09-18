@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { Activity } from './Activity';
+import type { Phase } from '@/lib/activity';
 import { archivedChats, isArchived, liveChats, loadItems, pickChatToShow, relativeTime, saveItems, titleFromText, type Chat as ChatRecord } from '@/lib/chats';
 import { findByName } from '@/lib/modmatch';
 import { modFromProposal } from '@/lib/mods';
@@ -21,6 +23,19 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
    * never about the panel. `busy` below is this set's answer for the visible chat.
    */
   const [runningChats, setRunningChats] = useState<ReadonlySet<string>>(() => new Set());
+  /**
+   * What the live activity line shows, PER CHAT. The indicator is about one conversation's run, and
+   * several can be in flight at once, so a single state object would have shown chat A's tool call
+   * to someone reading chat B — the same class of bug the chat-isolation fix removed everywhere
+   * else. Every event updates its own chat's entry, including chats that are off screen, so
+   * switching to a running chat shows that chat's real progress rather than starting from nothing.
+   */
+  const [activities, setActivities] = useState<ReadonlyMap<string, ActivityState>>(() => new Map());
+  /**
+   * The last message sent in each chat, so Retry on a dead port resends into the chat the failed
+   * message belonged to and not into whatever happens to be on screen.
+   */
+  const lastSentRef = useRef<Map<string, { text: string; refs?: ElementRef[] }>>(new Map());
   const [refs, setRefs] = useState<ElementRef[]>([]);
   const [picking, setPicking] = useState(false);
   /** The draft title while the switcher is in rename mode, or null when it is a select again. */
@@ -65,6 +80,11 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
   const itemsRef = useRef<ChatItem[]>(items);
   /** Is the chat currently on screen the one that is running? Never "is the panel busy". */
   const busy = chatId != null && runningChats.has(chatId);
+  /**
+   * The activity line for the chat on screen, and only that one. A chat with no entry has nothing
+   * to say, which is how switching from a running chat to an idle one clears the line instantly.
+   */
+  const activity = (chatId != null ? activities.get(chatId) : undefined) ?? IDLE_ACTIVITY;
 
   // Pick up this site's chats and show the most recently updated live one, transcript and all. A
   // chat is only created on first send, so opening the panel on a new site does not litter storage
@@ -221,6 +241,11 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
     if (portRef.current) return portRef.current;
     const port = chrome.runtime.connect({ name: 'agent' });
     port.onMessage.addListener((e: AgentEvent) => {
+      // The activity line, folded in by the event's OWN chat. This happens above the routing
+      // below, and for off-screen chats too: a run the user is not watching still has to have its
+      // progress recorded, so switching to it shows where it actually is rather than nothing.
+      setActivities((prev) => withActivity(prev, e.chatId, (a) => activityFromEvent(a, e)));
+
       // Route by the event's own chat, never by "the chat this port last started". One port serves
       // the whole panel, and the panel may well be showing a different chat than the one running.
       if (e.type === 'done') setRunningChats((prev) => withoutChat(prev, e.chatId));
@@ -270,6 +295,18 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
       // The worker went away (or was restarted): nothing is streaming to us any more. Runs
       // themselves survive in the background and their transcripts are written there.
       setRunningChats(new Set());
+      // The port is the panel's only link to every chat at once, so a dead port marks EVERY chat
+      // that was mid-run as disconnected — not just the visible one. Each such chat then offers
+      // its own Retry, which resends that chat's own last message.
+      setActivities((prev) => {
+        let next: Map<string, ActivityState> | null = null;
+        for (const [id, a] of prev) {
+          if (a.phase === 'idle' || a.disconnected) continue;
+          next ??= new Map(prev);
+          next.set(id, { ...a, disconnected: true });
+        }
+        return next ?? prev;
+      });
     });
     portRef.current = port;
     return port;
@@ -299,9 +336,15 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
     setText((prev) => prev.replace(new RegExp(`@${escapeRe(token)}(?![\\w.#-])\\s?`, 'g'), ''));
   }
 
-  /** Send now, or queue if a turn is running. Queued messages reach the model between its tool calls. */
-  async function send() {
-    const t = text.trim();
+  /**
+   * Send now, or queue if a turn is running. Queued messages reach the model between its tool calls.
+   *
+   * `resend` lets a caller supply the message explicitly rather than reading it out of the composer,
+   * which Retry needs: it runs from an event handler that closed over the previous render's state,
+   * so putting the text back with setText and calling send() would send the stale (empty) value.
+   */
+  async function send(resend?: { text: string; refs?: ElementRef[] }) {
+    const t = (resend?.text ?? text).trim();
     if (!t || tabId == null) return;
     // The chat is created lazily, on the first message that actually goes out.
     let id = chatId;
@@ -326,7 +369,7 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
       }
     }
     // Only send references whose token still appears in the message.
-    const used = refs.filter((r) => new RegExp(`@${escapeRe(r.token)}(?![\\w.#-])`).test(t));
+    const used = (resend?.refs ?? refs).filter((r) => new RegExp(`@${escapeRe(r.token)}(?![\\w.#-])`).test(t));
     const msgId = crypto.randomUUID();
     // Queued only if THIS chat is already running. A run on another tab does not queue anything.
     const queued = runningChats.has(id);
@@ -334,6 +377,21 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
     setText('');
     setRefs([]);
     setRunningChats((prev) => (prev.has(id!) ? prev : new Set(prev).add(id!)));
+    lastSentRef.current.set(id, { text: t, refs: used.length ? used : undefined });
+    // Start THIS chat's line immediately, before any event comes back, so "is it stuck?" is
+    // answered from the very first frame rather than once the background gets round to us. It is
+    // filed under the chat the message went to, so sending and then switching away leaves the
+    // indicator with the run rather than with the view.
+    const at = Date.now();
+    setActivities((prev) =>
+      withActivity(prev, id!, (a) => ({
+        phase: 'model',
+        detail: 'waiting for model',
+        startedAt: a.phase === 'idle' ? at : (a.startedAt ?? at),
+        lastEventAt: at,
+        queued: a.phase === 'idle' ? 0 : a.queued + 1,
+      })),
+    );
     const req: AgentPortRequest = { type: 'send', tabId, chatId: id, id: msgId, text: t, refs: used.length ? used : undefined };
     titleFixRef.current = false;
     connect().postMessage(req);
@@ -365,6 +423,23 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
   function abort() {
     if (!chatId) return;
     portRef.current?.postMessage({ type: 'abort', chatId } satisfies AgentPortRequest);
+    // Only this chat's line goes quiet. The background still posts this chat's 'idle'/'done', but
+    // clearing here means the button the user just pressed has a visible effect immediately.
+    setActivities((prev) => withoutActivity(prev, chatId));
+  }
+
+  /**
+   * Retry after the worker died: resend the message the dead port never delivered — into the chat
+   * it belonged to, which is the chat whose line is offering the button, not merely "the current
+   * chat". connect() will open a fresh port, which wakes the service worker back up.
+   */
+  function retry() {
+    const id = chatId;
+    if (!id) return;
+    const last = lastSentRef.current.get(id);
+    setActivities((prev) => withoutActivity(prev, id));
+    setRunningChats((prev) => withoutChat(prev, id));
+    if (last) void send(last);
   }
 
   /**
@@ -376,6 +451,8 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
   function detach() {
     flushSave();
     handOff(chatIdRef.current, itemsRef.current);
+    // The activity entry is deliberately left alone: the run is not being stopped, so its progress
+    // must go on being recorded while the user is elsewhere and be there again on the way back.
     titleFixRef.current = false;
     // A half-typed name belongs to the chat being left, so it is dropped rather than carried over.
     setRenaming(null);
@@ -700,6 +777,19 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
         })}
         <div ref={bottomRef} />
       </div>
+      <Activity
+        phase={activity.phase}
+        tool={activity.tool}
+        detail={activity.detail}
+        iteration={activity.iteration}
+        startedAt={activity.startedAt}
+        lastEventAt={activity.lastEventAt}
+        writing={activity.writing}
+        queued={activity.queued}
+        disconnected={activity.disconnected}
+        onStop={abort}
+        onRetry={retry}
+      />
       <div className="composer">
         {refs.length > 0 && (
           <div className="row">
@@ -738,6 +828,60 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
   );
 }
 
+/** Everything one chat's activity line needs, kept in one object so one setState updates it all. */
+interface ActivityState {
+  phase: Phase;
+  tool?: string;
+  detail?: string;
+  iteration?: number;
+  startedAt: number | null;
+  lastEventAt: number | null;
+  writing?: boolean;
+  queued: number;
+  disconnected?: boolean;
+}
+
+const IDLE_ACTIVITY: ActivityState = { phase: 'idle', startedAt: null, lastEventAt: null, queued: 0 };
+
+/**
+ * Fold one port event into ONE chat's activity. Two things matter here: every event refreshes
+ * lastEventAt (silence is the stall signal), and the first text delta of a model phase flips
+ * "waiting for model" to "writing".
+ */
+function activityFromEvent(a: ActivityState, e: AgentEvent): ActivityState {
+  const at = Date.now();
+  switch (e.type) {
+    case 'status':
+      if (e.phase === 'idle') return IDLE_ACTIVITY;
+      return {
+        ...a,
+        phase: e.phase,
+        tool: e.tool,
+        detail: e.detail,
+        iteration: e.iteration,
+        startedAt: a.startedAt ?? at,
+        lastEventAt: at,
+        // A new phase has not written anything yet.
+        writing: false,
+        disconnected: false,
+      };
+    case 'text':
+      return { ...a, lastEventAt: at, writing: a.phase === 'model' ? true : a.writing };
+    case 'accepted':
+    case 'unqueued':
+      return { ...a, lastEventAt: at, queued: Math.max(0, a.queued - 1) };
+    case 'done':
+    case 'error':
+      return IDLE_ACTIVITY;
+    case 'chat_title':
+      // A rename arrives AFTER 'done', from the tool-free naming call. It is not the run, so it
+      // neither revives a finished line nor counts as proof of life for one still going.
+      return a;
+    default:
+      return { ...a, lastEventAt: at };
+  }
+}
+
 /** The saved mod a proposal of this name would revise, or undefined to save a new one. */
 async function findModByName(name: string): Promise<Mod | undefined> {
   try {
@@ -751,6 +895,34 @@ async function findModByName(name: string): Promise<Mod | undefined> {
 function withoutChat(set: ReadonlySet<string>, id: string): ReadonlySet<string> {
   if (!set.has(id)) return set;
   const next = new Set(set);
+  next.delete(id);
+  return next;
+}
+
+/**
+ * Apply an update to one chat's activity entry. An entry that comes out idle is dropped rather
+ * than kept as an idle row, so the map holds only chats that have something to say and a chat that
+ * finished leaves nothing behind. Returns the same map when nothing changed, so React can skip.
+ */
+function withActivity(
+  map: ReadonlyMap<string, ActivityState>,
+  id: string,
+  fn: (prev: ActivityState) => ActivityState,
+): ReadonlyMap<string, ActivityState> {
+  const prev = map.get(id) ?? IDLE_ACTIVITY;
+  const updated = fn(prev);
+  if (updated === prev) return map;
+  // A disconnected line is kept even though its phase reads idle: it is still saying something.
+  if (updated.phase === 'idle' && !updated.disconnected) return withoutActivity(map, id);
+  const next = new Map(map);
+  next.set(id, updated);
+  return next;
+}
+
+/** One chat's activity entry removed, or the same map when it had none. */
+function withoutActivity(map: ReadonlyMap<string, ActivityState>, id: string): ReadonlyMap<string, ActivityState> {
+  if (!map.has(id)) return map;
+  const next = new Map(map);
   next.delete(id);
   return next;
 }

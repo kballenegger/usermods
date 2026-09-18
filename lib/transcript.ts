@@ -47,6 +47,12 @@ export function reduceItems(items: ChatItem[], event: AgentEventBody): ChatItem[
       if (!items.some((it) => it.kind === 'user' && it.id === event.id)) return items;
       return items.filter((it) => !(it.kind === 'user' && it.id === event.id));
     }
+    case 'status':
+      // What the run is doing right now drives the activity line, which is not a transcript row:
+      // it says nothing that is worth reading back tomorrow. Returning the SAME array matters as
+      // much as producing no item — status events arrive several times a second during a run, and
+      // a new array would schedule a storage write for every one of them, for every offscreen chat.
+      return items;
     case 'chat_title':
       // A model-written name renames a row in the switcher, not a message: the transcript is
       // untouched, and returning the same array means an offscreen chat schedules no write for it.

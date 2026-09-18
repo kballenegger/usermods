@@ -117,6 +117,20 @@ export interface ModProposal {
 // background stamps `chatId` on at its single post() chokepoint, so no emitter can forget it.
 export type AgentEventBody =
   | { type: 'text'; delta: string }
+  /**
+   * What the run is doing right now, for the side panel's live activity line. Emitted before each
+   * model call and each tool execution, and once with 'idle' when the run is over.
+   */
+  | {
+      type: 'status';
+      phase: 'model' | 'tool' | 'idle';
+      /** Tool name, for phase 'tool'. */
+      tool?: string;
+      /** Human detail: the script's description, the selector, or 'waiting for model'. */
+      detail?: string;
+      /** Agent-loop iteration, 1-based. */
+      iteration?: number;
+    }
   | { type: 'tool_call'; id: string; name: string; input: Record<string, unknown> }
   | { type: 'tool_result'; id: string; summary: string; isError: boolean }
   | { type: 'proposal'; proposal: ModProposal }
