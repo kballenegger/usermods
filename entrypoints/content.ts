@@ -1,4 +1,5 @@
 import { computedStyles, describeElements, selectorFor, snapshot } from '@/lib/snapshot';
+import { waitForDom } from '@/lib/waitdom';
 import type { ContentEvent, ContentRequest } from '@/lib/types';
 
 export default defineContentScript({
@@ -7,9 +8,46 @@ export default defineContentScript({
   main() {
     let picking: null | (() => void) = null;
 
+    /**
+     * Waits currently running in this page, by id.
+     *
+     * A wait is the one content-script request that does not answer immediately, so it is also the
+     * only one that can need cancelling: Stop aborts the run in the background, but the message
+     * already in flight here has no notion of an AbortSignal. The background therefore sends a
+     * second message — 'wait-cancel' with the same id — and this map is what it reaches.
+     */
+    const waits = new Map<string, (reason?: string) => void>();
+
     chrome.runtime.onMessage.addListener((msg: ContentRequest, _sender, sendResponse) => {
       switch (msg.type) {
         case 'ping':
+          sendResponse({ ok: true });
+          return;
+        case 'wait': {
+          const { promise, cancel } = waitForDom(msg.condition, msg.timeoutMs);
+          waits.set(msg.id, cancel);
+          void promise.then(
+            (outcome) => {
+              waits.delete(msg.id);
+              sendResponse(outcome);
+            },
+            (e: unknown) => {
+              waits.delete(msg.id);
+              sendResponse({ matched: false, elapsedMs: 0, failure: e instanceof Error ? e.message : String(e) });
+            },
+          );
+          // Keeps the message channel open for the async sendResponse above.
+          return true;
+        }
+        case 'wait-cancel':
+          waits.get(msg.id)?.('The wait was stopped.');
+          waits.delete(msg.id);
+          sendResponse({ ok: true });
+          return;
+        case 'wait-debug':
+          // Test flag only: lib/waitdom.ts keeps a live observer count on window when this is set,
+          // so the browser flow can prove a finished or cancelled wait left nothing behind.
+          (globalThis as unknown as { __usermodsWaitDebug?: boolean }).__usermodsWaitDebug = true;
           sendResponse({ ok: true });
           return;
         case 'snapshot': {

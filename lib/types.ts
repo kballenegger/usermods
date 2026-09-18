@@ -1,4 +1,5 @@
 // Shared types used across the background worker, content script and side panel.
+import type { WaitCondition } from './agent/wait';
 
 /** A saved userscript. `source` is the canonical full userscript text, header included. */
 export interface Mod {
@@ -275,6 +276,15 @@ export type ContentRequest =
   | { type: 'query'; selector: string; limit?: number }
   | { type: 'styles'; selector: string; properties?: string[] }
   | { type: 'pick' }
+  /**
+   * Watch the DOM until a condition is true (lib/waitdom.ts). `id` is how the wait is cancelled:
+   * Stop sends a 'wait-cancel' carrying the same id, because a content-script message cannot be
+   * aborted from the background once it is in flight.
+   */
+  | { type: 'wait'; id: string; condition: WaitCondition; timeoutMs: number }
+  | { type: 'wait-cancel'; id: string }
+  /** Turn on the wait module's leftover-observer counter. Test flag only; see lib/waitdom.ts. */
+  | { type: 'wait-debug' }
   | { type: 'ping' };
 
 export type ContentEvent = { type: 'picked'; element: PickedElement } | { type: 'pick-cancelled' };

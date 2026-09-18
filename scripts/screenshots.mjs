@@ -4,12 +4,14 @@
 //
 //   npm run screenshots      capture everything into docs/screenshots/
 //   npm run smoke            headless: the chat, guardrails, activity, chats, isolation,
-//                            compaction, dashboard, theme and tab bar flows, all asserted
+//                            compaction, dashboard, theme, tab bar and wait flows, all asserted
 //   npm run smoke:chats      headless: the chats flow alone (restore, New chat, archive/unarchive)
 //   npm run smoke:isolation  headless: the isolation flow alone (two chats running at once, no bleed)
 //   npm run smoke:compaction headless: the compaction flow alone (both tiers, on a shrunken budget)
 //   npm run smoke:dashboard  headless: the dashboard flow alone (grouping, search, handoff, mods)
 //   npm run smoke:tabbar     headless: the top bar alone, at 320/360/420/640 in both themes
+//   npm run smoke:wait       headless: the wait flow alone (every wait_for condition, a deliberate
+//                            timeout, Stop mid-wait), against a fixture page the mock server serves
 //   node scripts/screenshots.mjs --dashboard-capture   that flow, also writing 07-dashboard.png
 //   node scripts/screenshots.mjs --tabbar-capture      the bar flow, also writing the bar at 360
 //                                                      and 640 into $TABBAR_SHOT_DIR
@@ -51,7 +53,7 @@
 
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
-import { COMPACT_MARKER, FAST_MARKER, SLOW_MARKER, SUMMARY_MARKER } from './mock-llm.mjs';
+import { COMPACT_MARKER, FAST_MARKER, SLOW_MARKER, SUMMARY_MARKER, WAIT_MARKER } from './mock-llm.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -76,6 +78,7 @@ const DASHBOARD = process.argv.includes('--dashboard');
 const DASHBOARD_SHOT = process.argv.includes('--dashboard-capture');
 const THEME = process.argv.includes('--theme');
 const TABBAR = process.argv.includes('--tabbar');
+const WAIT = process.argv.includes('--wait');
 
 /**
  * Where the tab bar's captures go when --tabbar is asked to write them (`--tabbar-capture`). These
@@ -87,7 +90,7 @@ const TABBAR_SHOT = process.argv.includes('--tabbar-capture');
 
 /** True when this run is capturing screenshots rather than asserting behaviour (see MASK below). */
 const CAPTURING =
-  !SMOKE && !CHATS && !ISOLATION && !COMPACTION && !DASHBOARD && !DASHBOARD_SHOT && !THEME && !TABBAR && !TABBAR_SHOT;
+  !SMOKE && !CHATS && !ISOLATION && !COMPACTION && !DASHBOARD && !DASHBOARD_SHOT && !THEME && !TABBAR && !TABBAR_SHOT && !WAIT;
 
 /** See note 4: a first-run setup instruction, not the steady state the README should show. */
 const HIDE_SETUP_NOTICE = '.app > .notice, .dash-inner > .notice { display: none !important; }';
@@ -577,6 +580,244 @@ async function smoke() {
 
     await assertNoViolations('smoke');
     console.log('smoke: OK — streamed reply, 3 page-inspection tools, proposal card, save to storage, zero invalid requests');
+  } finally {
+    await b.close();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Wait test: the agent can wait for the page instead of polling it.
+// ---------------------------------------------------------------------------
+//
+// The owner's report was "it's not handling waiting for things well". This drives every kind of
+// condition wait_for offers against a fixture page the mock server serves (/__fixture/async.html),
+// and reads back, from /__requests, the exact tool result the model received for each one — not
+// the transcript row, which is a truncated summary, but the text that actually went into the
+// model's context and decides what it does next.
+//
+// The four things it proves that a unit test cannot:
+//   1. an already-true condition costs ~nothing, so waiting stays cheap enough to keep choosing;
+//   2. a style-only reveal is seen at all (the MutationObserver misses it; the polling floor is
+//      what catches it), and late content and a pushState route change are seen too;
+//   3. a timeout comes back as a diagnostic statement and is NOT flagged as an error;
+//   4. Stop ends a 20s wait promptly and leaves no observer behind on the user's page.
+//
+// run_script and then_wait are absent on purpose: chrome.userScripts is unavailable in an
+// automated profile (note 4 at the top of this file), so the page is driven through Playwright
+// instead and then_wait's composition is covered in test/wait.test.ts.
+
+const WAIT_PROMPT = 'test the waiting behaviour on this page';
+const WAIT_STOP_PROMPT = 'wait a really long time for something';
+
+/** The fixture page, served by the mock backend itself. */
+const FIXTURE_URL = `${CONTROL_BASE}/__fixture/async.html`;
+
+/**
+ * Every wait_for result the model was handed, in order, read out of the recorded request bodies.
+ *
+ * The Nth request carries the results of every tool call made before it, so walking the requests
+ * and collecting each `tool` message in order reconstructs exactly what the model saw. This is the
+ * assertion surface that matters: a transcript row is a 160-character summary, and the whole point
+ * of a timeout's diagnostics is the part that gets truncated away.
+ */
+async function waitToolResults() {
+  const requests = await fetchRequests();
+  const seen = new Map();
+  for (const req of requests) {
+    const byId = new Map();
+    for (const m of req.messages ?? []) {
+      if (m.role === 'assistant') {
+        for (const call of m.tool_calls ?? []) byId.set(call.id, call.function?.name);
+      }
+      if (m.role === 'tool' && byId.get(m.tool_call_id) === 'wait_for' && !seen.has(m.tool_call_id)) {
+        seen.set(m.tool_call_id, typeof m.content === 'string' ? m.content : JSON.stringify(m.content));
+      }
+    }
+  }
+  return [...seen.values()];
+}
+
+async function waitFlow() {
+  const b = await launch('light');
+  const fail = (m) => {
+    throw new Error(`wait: ${m}`);
+  };
+  try {
+    await clearViolations();
+    await fetch(`${CONTROL_BASE}/__requests`, { method: 'DELETE' }).catch(() => {});
+
+    const panel = await openPanel(b.ctx, b.extId);
+    const site = await openSite(b.ctx, FIXTURE_URL);
+    await waitForComposer(panel);
+
+    // Turn on the content script's leftover-observer counter before anything waits, so the Stop
+    // assertion below has a baseline. It is a test-only flag: an ordinary page never gets it.
+    await site.evaluate(() => (globalThis.__usermodsWaitDebug = true));
+
+    // The fixture only does anything when it is driven, and each wait in the scripted conversation
+    // is waiting for one of these. They are fired on a timer rather than in lockstep with the
+    // conversation because the point is that the agent copes with things happening on the page's
+    // schedule, not on its own — and every one of them is slower than the step that waits for it.
+    // The reveal is deliberately fired on its own, with a quiet gap on either side. It is the one
+    // step whose whole point is that NOTHING mutates while it happens: if it were fired next to the
+    // #load click, the .result insertion would wake the MutationObserver, the observer would
+    // re-check every condition and find #fade visible, and the flow would pass with the polling
+    // floor removed — which is exactly what it did before the gaps were put in.
+    // How long the style-only reveal took to be noticed: the gap between the page flipping the CSS
+    // rule and the wait's transcript row completing. Measured rather than inferred, because the
+    // reported elapsed is relative to when the wait started, not to when the reveal happened.
+    let revealLatency = null;
+
+    const drive = (async () => {
+      await site.waitForTimeout(400);
+      await site.locator('#load').click(); // three .result items, 800ms later
+      await site.waitForTimeout(2000); // let that settle completely
+
+      // The reveal runs alone, with a quiet gap on either side. If it were fired next to the #load
+      // click, the .result insertion would wake the MutationObserver, the observer would re-check
+      // every condition and find #fade visible, and this step would pass with the polling floor
+      // removed — which is exactly what it did before the gaps and this measurement went in.
+      await site.locator('#reveal').click();
+      const revealPoll = (async () => {
+        // Wait for the page to actually flip the rule, then time how long until the row settles.
+        await site.waitForFunction(() => globalThis.__revealedAt !== null, null, { timeout: 10_000 });
+        const flippedAt = Date.now();
+        await panel.waitForFunction(
+          () => {
+            const rows = [...document.querySelectorAll('.messages .tool summary')].filter((r) => r.textContent?.includes('#fade'));
+            // A finished row has lost its amber "running" dot.
+            return rows.length > 0 && rows.every((r) => !r.querySelector('.dot.running'));
+          },
+          null,
+          { timeout: 15_000 },
+        );
+        revealLatency = Date.now() - flippedAt;
+      })().catch(() => {});
+      await revealPoll;
+      await site.waitForTimeout(1200); // …and nothing else may touch the DOM while it lands
+      await site.locator('#route').click(); // pushState to ?step=2, 300ms later
+      await site.waitForTimeout(800);
+      await site.locator('#churnstart').click(); // 1.5s of mutation, then quiet
+    })();
+
+    await panel.locator('textarea').fill(WAIT_PROMPT);
+    await panel.locator('.composer button.btn.primary').click();
+
+    // The conversation ends with a text-only step carrying the marker.
+    await panel
+      .locator('.messages .msg.assistant', { hasText: WAIT_MARKER })
+      .waitFor({ timeout: 90_000 })
+      .catch(async () => {
+        const rows = await panel.locator('.messages .tool summary').allTextContents();
+        fail(`the wait conversation never finished. Transcript rows: ${rows.join(' | ') || 'none'}`);
+      });
+    await drive.catch(() => {});
+
+    // --- What the model was actually told, condition by condition.
+    const results = await waitToolResults();
+    if (results.length !== 7) fail(`expected 7 wait_for results, got ${results.length}:\n${results.join('\n---\n')}`);
+    const [ready, late, faded, text, routed, settled, timedOut] = results;
+
+    /** The elapsed time a "matched after N,NNNms" result reports. */
+    const matchedMs = (s) => {
+      const m = /matched after ([\d,]+)ms/.exec(s ?? '');
+      return m ? Number(m[1].replace(/,/g, '')) : null;
+    };
+
+    // 1. Already true: the condition holds before anything is installed, so this is the result that
+    // decides whether waiting is cheap. An observer tick or a poll interval would show up here.
+    const readyMs = matchedMs(ready);
+    if (readyMs === null) fail(`the already-true condition did not report a match: ${JSON.stringify(ready)}`);
+    if (readyMs >= 100) fail(`an already-true condition took ${readyMs}ms; it must return immediately, or the model learns waiting is expensive`);
+    if (!/#ready/.test(ready)) fail(`the match did not name what matched: ${JSON.stringify(ready)}`);
+
+    // 2. Content that arrives 800ms after a click, which is the case the model used to poll for.
+    if (matchedMs(late) === null) fail(`the lazy-loaded results were never matched: ${JSON.stringify(late)}`);
+    if (!/3 elements match \.result/.test(late)) fail(`the match did not report the count: ${JSON.stringify(late)}`);
+    if (!/first: <li class="result"/.test(late)) fail(`the match did not describe the first element: ${JSON.stringify(late)}`);
+
+    // 3. A reveal that mutates nothing at all — the page edits the CSS rule, not the element — so a
+    // MutationObserver is structurally blind to it and only the polling floor can see it.
+    //
+    // The assertion is on LATENCY, not on the fact of a match. Any later mutation anywhere on the
+    // page wakes the observer, which re-checks every condition and finds #fade visible, so "it
+    // matched" passes even with the poll removed. What the floor actually guarantees is that the
+    // reveal is noticed within a poll interval of happening, while nothing else is going on — and
+    // the fixture records the moment it flipped the rule so that can be measured.
+    if (matchedMs(faded) === null) fail(`the style-only reveal was never seen: ${JSON.stringify(faded)}`);
+    const revealedAt = await site.evaluate(() => globalThis.__revealedAt ?? null);
+    if (revealedAt === null) fail('the fixture never performed the style-only reveal, so this step proved nothing');
+    if (revealLatency === null) fail('the flow did not record when the reveal was noticed');
+    if (revealLatency > 1_000) {
+      fail(`the style-only reveal took ${revealLatency}ms to be noticed — the polling floor under the MutationObserver is gone`);
+    }
+
+    // 4. Page text.
+    if (matchedMs(text) === null) fail(`the page text was never matched: ${JSON.stringify(text)}`);
+    if (!/Loaded three results/.test(text)) fail(`the text match did not name the text: ${JSON.stringify(text)}`);
+
+    // 5. A pushState route change: no navigation, so only a URL watched from the background sees it.
+    if (matchedMs(routed) === null) fail(`the SPA route change was never seen: ${JSON.stringify(routed)}`);
+    if (!/step=2/.test(routed)) fail(`the url match did not report the new URL: ${JSON.stringify(routed)}`);
+
+    // 6. "Wait until it stops changing."
+    if (matchedMs(settled) === null) fail(`the DOM never settled: ${JSON.stringify(settled)}`);
+    if (!/quiet/.test(settled)) fail(`the idle match did not say the DOM went quiet: ${JSON.stringify(settled)}`);
+
+    // 7. The deliberate timeout — the outcome this whole design turns on.
+    if (matchedMs(timedOut) !== null) fail(`the impossible condition somehow matched: ${JSON.stringify(timedOut)}`);
+    if (!/^Timed out after/.test(timedOut)) fail(`the timeout did not state itself plainly: ${JSON.stringify(timedOut)}`);
+    if (!/This is not an error/.test(timedOut)) fail(`the timeout did not tell the model it was not a failure: ${JSON.stringify(timedOut)}`);
+    // The diagnostics are what let the model tell "never going to happen" from "still loading".
+    if (!/0 elements match \.never-going-to-exist/.test(timedOut)) fail(`the timeout carried no element diagnostics: ${JSON.stringify(timedOut)}`);
+    if (!/readyState=/.test(timedOut)) fail(`the timeout did not report the document state: ${JSON.stringify(timedOut)}`);
+
+    // …and it is not painted as a failure. The transcript row takes the amber waiting dot, which is
+    // the same dot a running row uses — never the coral error dot.
+    const errorDots = await panel.locator('.messages .tool summary .dot.error').count();
+    if (errorDots) fail(`${errorDots} wait row(s) were painted as errors; a timeout is a result, not a failure`);
+    const rows = await panel.locator('.messages .tool summary').allTextContents();
+    const waitRows = rows.filter((r) => r.includes('wait_for'));
+    if (waitRows.length !== 7) fail(`expected 7 wait_for rows in the transcript, got ${waitRows.length}: ${rows.join(' | ')}`);
+    // The row says WHAT was waited for, not just the tool name.
+    if (!waitRows.some((r) => r.includes('.result'))) fail(`no transcript row named its condition: ${waitRows.join(' | ')}`);
+    if (!waitRows.some((r) => r.includes('url '))) fail(`the url condition was not named in its row: ${waitRows.join(' | ')}`);
+
+    // The page is left clean: every wait tore its observer down.
+    const leftover = await site.evaluate(() => globalThis.__usermodsWaitObservers ?? 0);
+    if (leftover !== 0) fail(`${leftover} observer(s) left behind on the page after the run finished`);
+
+    // --- Stop during a long wait ends the run promptly, and leaves nothing behind.
+    await panel.locator('textarea').fill(WAIT_STOP_PROMPT);
+    await panel.locator('.composer button.btn.primary').click();
+    // Wait until the run is genuinely inside the 20s wait before pressing Stop, so this measures
+    // the cancellation and not the round trip to get there.
+    await panel
+      .locator('.activity', { hasText: 'waiting for' })
+      .waitFor({ timeout: 30_000 })
+      .catch(async () => fail(`the activity line never showed the wait (it said ${JSON.stringify(await panel.locator('.activity').textContent().catch(() => null))})`));
+
+    // The line names the condition rather than going silent for 20s, and does NOT accuse the
+    // provider of being stuck while a wait is legitimately in progress.
+    const waitingLine = (await panel.locator('.activity').textContent())?.trim() ?? '';
+    if (!/waiting for/.test(waitingLine)) fail(`the activity line did not name the wait: ${JSON.stringify(waitingLine)}`);
+    if (/stuck/.test(waitingLine)) fail(`the panel called a legitimate wait a stall: ${JSON.stringify(waitingLine)}`);
+
+    const stoppedAt = Date.now();
+    await panel.locator('.composer button.btn.danger', { hasText: 'Stop' }).click();
+    await panel.locator('.activity').waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
+    const stopTook = Date.now() - stoppedAt;
+    // The whole complaint behind this work is an agent that sits there; a Stop that waits out a
+    // 20s timeout is the same failure wearing a different hat.
+    if (stopTook > 500) fail(`Stop took ${stopTook}ms to end a wait — it must not sit through the timeout`);
+
+    const leftoverAfterStop = await site.evaluate(() => globalThis.__usermodsWaitObservers ?? 0);
+    if (leftoverAfterStop !== 0) fail(`${leftoverAfterStop} observer(s) survived a cancelled wait`);
+
+    await assertNoViolations('wait');
+    console.log(
+      `wait: OK — already-true in <100ms, lazy-loaded content, style-only reveal seen in ${revealLatency}ms, page text, pushState route change, DOM settle, a timeout with diagnostics and no error flag, Stop inside ${stopTook}ms, no leftover observers, zero invalid requests`,
+    );
   } finally {
     await b.close();
   }
@@ -2510,6 +2751,10 @@ async function main() {
       await tabbarFlow({ capture: TABBAR_SHOT });
       return;
     }
+    if (WAIT) {
+      await waitFlow();
+      return;
+    }
     if (THEME) {
       await themeFlow();
       return;
@@ -2540,6 +2785,7 @@ async function main() {
       await dashboardFlow();
       await themeFlow();
       await tabbarFlow();
+      await waitFlow();
       return;
     }
     // The dark set: the design system's own palette, and what the README leads with.

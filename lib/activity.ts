@@ -20,6 +20,31 @@ export const STALL_MS = 90_000;
 /** How often the panel re-renders the line so the elapsed timer ticks. */
 export const TICK_MS = 1000;
 
+/**
+ * A wait_for that is running is silent BY DESIGN, so silence during one means nothing is wrong.
+ *
+ * Every other phase reports progress: the model streams text, a tool answers in milliseconds. A
+ * wait deliberately produces no events until its condition is true or its timeout is reached, and
+ * its timeout can be 20s — well past STILL_WAITING_MS and, with a couple of long waits in a row,
+ * within sight of STALL_MS. Applying the ordinary thresholds to it would put "the provider may be
+ * stuck" on screen for a tool doing exactly what it was asked to do, which is worse than saying
+ * nothing: it teaches the user to distrust the one line that is supposed to be trustworthy.
+ *
+ * So a wait gets its own, much later threshold. It is not infinite — a wait that outruns the
+ * longest timeout the tool permits, plus the round trips around it, really has hung — but it is
+ * far beyond any legitimate wait.
+ */
+export const WAIT_STALL_MS = 45_000;
+
+/** The tool whose silence is its normal behaviour. */
+const WAIT_TOOL = 'wait_for';
+
+/**
+ * How lib/agent/wait.ts phrases a wait's detail. The label splits on it so the condition lands in
+ * the mono identifier slot; the two must stay in step, which is what test/activity.test.ts pins.
+ */
+const WAIT_PREFIX = 'waiting for ';
+
 /** What the agent is doing right now, as reported by the background over the port. */
 export type Phase = 'model' | 'tool' | 'idle';
 
@@ -60,6 +85,12 @@ export interface Activity {
   monoJoin: ' ' | ' · ';
   /** Everything after the label: elapsed, step count, queued count. Already formatted. */
   segments: string[];
+  /**
+   * Render `label` BEFORE `mono` rather than after it. Only a wait uses this: its prose comes
+   * first and its identifier second ("waiting for .result"), which is the opposite of every other
+   * tool line, where the tool name leads ("find_elements #login").
+   */
+  labelFirst?: boolean;
   /** An inline action the line offers, if any. */
   action?: 'stop' | 'retry';
   /** True while the dot should pulse. A stalled or disconnected line holds still. */
@@ -85,10 +116,18 @@ function looksLikeSelector(detail: string): boolean {
  * human description (the script's `description`, or the selector it is about to query). A selector
  * joins the name inside the mono run; a description stands apart after an interpunct.
  */
-function toolLabel(state: ActivityState): { label: string; mono: string; monoJoin: Activity['monoJoin'] } {
+function toolLabel(state: ActivityState): { label: string; mono: string; monoJoin: Activity['monoJoin']; labelFirst?: boolean } {
   const name = state.tool ?? 'tool';
   const detail = state.detail?.trim();
   if (!detail) return { label: '', mono: name, monoJoin: ' ' };
+
+  // A wait is the one tool whose detail is a sentence WITH an identifier inside it: "waiting for
+  // .result". The prose belongs in the label and the thing being waited for belongs in the mono
+  // run, so the line reads "waiting for .result · 3s" with the selector in the identifier font —
+  // which is what makes a 15s pause legible at a glance rather than a wall of grey text.
+  const waitedFor = detail.startsWith(WAIT_PREFIX) ? detail.slice(WAIT_PREFIX.length).trim() : null;
+  if (waitedFor) return { label: WAIT_PREFIX.trim(), mono: waitedFor, monoJoin: ' ', labelFirst: true };
+
   if (looksLikeSelector(detail)) return { label: '', mono: `${name} ${detail}`, monoJoin: ' ' };
   return { label: detail, mono: name, monoJoin: ' · ' };
 }
@@ -114,13 +153,16 @@ export function activityFor(state: ActivityState): Activity | null {
 
   if (state.phase === 'idle') return null;
 
-  const stalled = state.sinceLastEvent >= STALL_MS;
+  // A wait that is legitimately in progress is held to its own, later threshold (WAIT_STALL_MS).
+  const waiting = state.phase === 'tool' && state.tool === WAIT_TOOL;
+  const stalled = state.sinceLastEvent >= (waiting ? WAIT_STALL_MS : STALL_MS);
   const slow = !stalled && state.phase === 'model' && !state.writing && state.sinceLastEvent >= STILL_WAITING_MS;
 
   let tone: Activity['tone'] = 'live';
   let label: string;
   let mono: string | undefined;
   let monoJoin: Activity['monoJoin'] = ' ';
+  let labelFirst = false;
   let action: Activity['action'];
 
   if (stalled) {
@@ -136,6 +178,7 @@ export function activityFor(state: ActivityState): Activity | null {
     label = t.label;
     mono = t.mono;
     monoJoin = t.monoJoin;
+    labelFirst = !!t.labelFirst;
   }
 
   // Elapsed always rides along, except on the stall line, which already names its own duration.
@@ -143,12 +186,12 @@ export function activityFor(state: ActivityState): Activity | null {
   if ((state.iteration ?? 1) > 1) segments.push(`step ${state.iteration}`);
   if (state.queued) segments.push(`${state.queued} queued`);
 
-  return { tone, label, mono, monoJoin, segments, action, pulse: !stalled };
+  return { tone, label, mono, monoJoin, segments, action, pulse: !stalled, ...(labelFirst ? { labelFirst } : {}) };
 }
 
 /** The whole line as one string, for tests and for the accessible label. */
 export function activityText(a: Activity): string {
-  const head = [a.mono, a.label].filter(Boolean).join(a.monoJoin);
+  const head = (a.labelFirst ? [a.label, a.mono] : [a.mono, a.label]).filter(Boolean).join(a.monoJoin);
   return [head, ...a.segments].filter(Boolean).join(' · ');
 }
 

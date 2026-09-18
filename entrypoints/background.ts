@@ -1,4 +1,5 @@
 import { runAgent, type AgentEnv } from '@/lib/agent/loop';
+import { isDomCondition, urlMatches, type WaitOutcome, type WaitSpec } from '@/lib/agent/wait';
 import { buildRegisteredCode, gmValuesKey, loadGmValues, type GmMessage } from '@/lib/gm';
 import { checkConnect, connectOf } from '@/lib/connect';
 import { dependenciesChanged, fetchText, previewFromUrl, reparseEditedSource, resolveDependencies, toBase64 } from '@/lib/install';
@@ -1024,10 +1025,142 @@ async function tabUrl(tabId: number): Promise<string> {
   }
 }
 
+/**
+ * Wait until a condition holds in `tabId`, or until the timeout, Stop, or the tab going away.
+ *
+ * The split is by where the truth lives. A selector, page text or DOM quiet is only observable
+ * from inside the page, so it goes to the content script (lib/waitdom.ts). A URL or a finished
+ * navigation is only observable from here, because the content script that would have watched it
+ * is destroyed by the very navigation being waited for — which is also why a url/load wait
+ * re-injects the content script before returning, so the NEXT tool call works instead of paying
+ * for a re-injection round trip of its own.
+ *
+ * Never rejects. Everything that can go wrong (a closed tab, a page that will not take a message)
+ * is reported as an outcome, because the model can act on "the tab closed" and cannot act on a
+ * rejected promise that the loop turns into a bare error string.
+ */
+async function waitInTab(tabId: number, spec: WaitSpec, signal: AbortSignal): Promise<WaitOutcome> {
+  const startedAt = Date.now();
+  const c = spec.condition;
+
+  if (signal.aborted) return { matched: false, elapsedMs: 0, failure: 'The wait was stopped.' };
+
+  // A plain delay needs nothing but a timer — and an abort, so Stop does not sit through it.
+  if (c.kind === 'ms') {
+    await new Promise<void>((resolve) => {
+      const t = setTimeout(done, c.ms);
+      const onAbort = () => done();
+      function done() {
+        clearTimeout(t);
+        signal.removeEventListener('abort', onAbort);
+        resolve();
+      }
+      signal.addEventListener('abort', onAbort, { once: true });
+    });
+    const elapsedMs = Date.now() - startedAt;
+    if (signal.aborted) return { matched: false, elapsedMs, failure: 'The wait was stopped.' };
+    return { matched: true, elapsedMs, detail: `waited ${elapsedMs}ms` };
+  }
+
+  if (isDomCondition(c)) {
+    const id = crypto.randomUUID();
+    // Stop cannot abort a message already in flight, so it is delivered as a second message the
+    // content script matches by id (see `waits` in entrypoints/content.ts).
+    const onAbort = () => void sendToContent(tabId, { type: 'wait-cancel', id }).catch(() => {});
+    signal.addEventListener('abort', onAbort, { once: true });
+    try {
+      const outcome = await sendToContent<WaitOutcome>(tabId, { type: 'wait', id, condition: c, timeoutMs: spec.timeoutMs });
+      // A cancel races the wait's own resolution; if Stop won, say so whatever came back.
+      if (signal.aborted) return { matched: false, elapsedMs: Date.now() - startedAt, failure: 'The wait was stopped.' };
+      return outcome;
+    } catch (e) {
+      const elapsedMs = Date.now() - startedAt;
+      if (signal.aborted) return { matched: false, elapsedMs, failure: 'The wait was stopped.' };
+      // The page went away or would not take the message: a clear outcome, not a hang.
+      const gone = await chrome.tabs.get(tabId).then(() => false).catch(() => true);
+      return {
+        matched: false,
+        elapsedMs,
+        failure: gone
+          ? 'The tab was closed while waiting.'
+          : `The page could not be reached while waiting (it may have navigated): ${e instanceof Error ? e.message : String(e)}`,
+      };
+    } finally {
+      signal.removeEventListener('abort', onAbort);
+    }
+  }
+
+  // url / load: watched from here, because the navigation destroys the content script.
+  return await new Promise<WaitOutcome>((resolve) => {
+    let settled = false;
+    const finish = (o: WaitOutcome) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      chrome.tabs.onUpdated.removeListener(onUpdated);
+      chrome.tabs.onRemoved.removeListener(onRemoved);
+      signal.removeEventListener('abort', onAbort);
+      // The content script is gone after a navigation. Re-injecting here, on the way out, means
+      // the model's next get_page or wait_for does not spend a failed round trip discovering that.
+      // sendToContent's own fallback would recover anyway; this just makes the next step cheap.
+      if (o.matched) void sendToContent(tabId, { type: 'ping' }).catch(() => {});
+      resolve(o);
+    };
+    const elapsed = () => Date.now() - startedAt;
+
+    const satisfied = (url: string | undefined, status: string | undefined): string | null => {
+      if (c.kind === 'url') return url && urlMatches(url, c) ? `the URL is now ${url}` : null;
+      // 'domcontentloaded' has no distinct tabs.onUpdated status: Chrome reports 'loading' then
+      // 'complete'. 'complete' satisfies both, and for domcontentloaded a URL change with the page
+      // already past loading is the closest honest signal.
+      if (status === 'complete') return `the page finished loading: ${url ?? ''}`.trim();
+      return null;
+    };
+
+    const onUpdated = (id: number, change: chrome.tabs.OnUpdatedInfo, tab: chrome.tabs.Tab) => {
+      if (id !== tabId) return;
+      const detail = satisfied(change.url ?? tab.url, change.status ?? tab.status);
+      if (detail) finish({ matched: true, elapsedMs: elapsed(), detail });
+    };
+    chrome.tabs.onUpdated.addListener(onUpdated);
+
+    const onRemoved = (id: number) => {
+      if (id === tabId) finish({ matched: false, elapsedMs: elapsed(), failure: 'The tab was closed while waiting.' });
+    };
+    chrome.tabs.onRemoved.addListener(onRemoved);
+
+    const onAbort = () => finish({ matched: false, elapsedMs: elapsed(), failure: 'The wait was stopped.' });
+    signal.addEventListener('abort', onAbort, { once: true });
+
+    const timer = setTimeout(async () => {
+      // The diagnostics a url/load timeout can offer: where the tab actually is now. That is what
+      // separates "the SPA route never changed" from "it changed to somewhere unexpected".
+      const tab = await chrome.tabs.get(tabId).catch(() => null);
+      if (!tab) return finish({ matched: false, elapsedMs: elapsed(), failure: 'The tab was closed while waiting.' });
+      finish({
+        matched: false,
+        elapsedMs: elapsed(),
+        diagnostics: [`the tab is at ${tab.url ?? 'an unknown URL'}; tab status=${tab.status ?? 'unknown'}.`],
+      });
+    }, spec.timeoutMs);
+
+    // Already true? A SPA that routed synchronously, or a page that is already loaded, must cost
+    // ~0ms rather than the full timeout.
+    void chrome.tabs
+      .get(tabId)
+      .then((tab) => {
+        const detail = satisfied(tab.url, tab.status);
+        if (detail) finish({ matched: true, elapsedMs: elapsed(), detail });
+      })
+      .catch(() => finish({ matched: false, elapsedMs: elapsed(), failure: 'The tab was closed while waiting.' }));
+  });
+}
+
 function envForTab(tabId: number): AgentEnv {
   return {
     sendToContent: (req) => sendToContent(tabId, req as ContentRequest),
     runScript: (code) => executeInTab(tabId, code),
+    wait: (spec, signal) => waitInTab(tabId, spec, signal),
     async screenshot() {
       const tab = await chrome.tabs.get(tabId);
       const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'jpeg', quality: 60 });

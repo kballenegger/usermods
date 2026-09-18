@@ -1,3 +1,4 @@
+import { toolRowTitle } from '@/lib/transcript';
 import type { ChatItem } from '@/lib/types';
 
 /**
@@ -56,12 +57,7 @@ export function TranscriptPreview({ items }: { items: ChatItem[] }) {
             return (
               <details key={i} className={`prev-tool${it.isError ? ' is-error' : ''}`}>
                 <summary>
-                  {it.name}
-                  {typeof it.input.description === 'string'
-                    ? `: ${it.input.description}`
-                    : typeof it.input.selector === 'string'
-                      ? ` ${it.input.selector}`
-                      : ''}
+                  {toolRowTitle(it.name, it.input)}
                   {it.isError ? ' · failed' : ''}
                 </summary>
                 {typeof it.input.code === 'string' && <pre>{it.input.code}</pre>}

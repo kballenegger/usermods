@@ -384,6 +384,185 @@ setTimeout(() => observer.disconnect(), 10000);`,
   },
 ];
 
+// ---------------------------------------------------------------------------
+// The wait_for flow
+// ---------------------------------------------------------------------------
+//
+// This one is scripted against a fixture page this server serves itself (/__fixture/async.html),
+// rather than a live site, because every condition it exercises needs the page to change on a
+// known schedule: content that arrives after 800ms, a pushState route change after 300ms, an
+// element that becomes visible through a class flip and no DOM mutation at all, and a region that
+// mutates for 1.5s and then stops. No real site offers all four on demand.
+//
+// It deliberately includes a wait that CANNOT succeed. A timeout is the outcome the design cares
+// most about — it must come back as a plain, diagnostic statement rather than an error — and the
+// only way to see that is to ask for something that is not there.
+
+export const WAIT_MARKER = 'WAITMARKER-3ab7';
+
+const WAIT_SCRIPT = {
+  name: 'wait-for',
+  match: /test the waiting/i,
+  steps: [
+    {
+      // 1. An already-true condition. The assertion on this one is a TIME: the fixture's #ready is
+      // present from first paint, so this must come back in ~0ms rather than after an observer
+      // tick, which is what makes waiting cheap enough that the model will keep reaching for it.
+      text: 'Checking what is already on the page.',
+      calls: [{ name: 'wait_for', args: { selector: '#ready', state: 'visible' } }],
+    },
+    {
+      // 2. Content that lazy-loads. The fixture inserts three .result items 800ms after #load is
+      // clicked; find_elements alone would see none of them.
+      text: 'Now waiting for the results that load late.',
+      calls: [{ name: 'wait_for', args: { selector: '.result', count: 3, timeout_ms: 8000 } }],
+    },
+    {
+      // 3. A style-only reveal: #fade is in the DOM the whole time and becomes visible because the
+      // page edits the CSS RULE that hid it. Nothing mutates, so a MutationObserver is blind to it
+      // — this is exactly what the polling floor in lib/waitdom.ts is there to catch.
+      text: 'Waiting for the element that becomes visible without any DOM change.',
+      calls: [{ name: 'wait_for', args: { selector: '#fade', state: 'visible', timeout_ms: 8000 } }],
+    },
+    {
+      // 4. Page text, which is how a model checks for a result it has no selector for.
+      text: 'Checking the page says it finished.',
+      calls: [{ name: 'wait_for', args: { text: 'Loaded three results', timeout_ms: 8000 } }],
+    },
+    {
+      // 5. A SPA route change. No navigation happens — pushState only — so nothing but a url
+      // condition watched from the background would see it.
+      text: 'Waiting for the route to change.',
+      calls: [{ name: 'wait_for', args: { url: '/__fixture/async.html?step=2', timeout_ms: 8000 } }],
+    },
+    {
+      // 6. The region that mutates for 1.5s then stops: "wait until it stops changing".
+      text: 'Waiting for the churn to settle.',
+      calls: [{ name: 'wait_for', args: { idle: true, quiet_ms: 400, timeout_ms: 8000 } }],
+    },
+    {
+      // 7. The deliberate timeout. Nothing on the fixture matches, and nothing ever will.
+      text: 'Now waiting for something that will never appear.',
+      calls: [{ name: 'wait_for', args: { selector: '.never-going-to-exist', timeout_ms: 1500 } }],
+    },
+    {
+      text: `${WAIT_MARKER} The waits behaved: the ready element matched at once, the late results and the faded element both arrived, the route changed, the page settled, and the impossible one timed out with diagnostics rather than an error.`,
+      calls: [],
+    },
+  ],
+};
+
+/**
+ * The long wait the Stop assertion interrupts. One call, twenty seconds, nothing that will match:
+ * pressing Stop must end the run promptly rather than at the timeout, and must leave no observer
+ * behind on the page.
+ */
+const WAIT_STOP_SCRIPT = {
+  name: 'wait-stop',
+  match: /wait a really long time/i,
+  steps: [
+    {
+      text: 'Waiting for something that will not happen for a while.',
+      calls: [{ name: 'wait_for', args: { selector: '.also-never-exists', timeout_ms: 20000 } }],
+    },
+    { text: 'Done waiting.', calls: [] },
+  ],
+};
+
+SCRIPTS.push(WAIT_SCRIPT, WAIT_STOP_SCRIPT);
+
+/** The fixture page the wait flow drives. Served by this server so the flow needs no live site. */
+const ASYNC_FIXTURE = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Async fixture</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 2rem; }
+  /* #fade is in the DOM from the start and is revealed by editing THIS RULE, not the element.
+     Nothing about #fade mutates — no node, no attribute, no text — so a MutationObserver sees
+     absolutely nothing, however wide its subtree. Only something that re-checks computed style on
+     a timer notices. A class flip would NOT test this: classList.add is an attribute mutation and
+     the observer catches it. This is the case the polling floor in lib/waitdom.ts exists for. */
+  #fade { opacity: 0; visibility: hidden; }
+  #churn { min-height: 2rem; }
+</style>
+</head>
+<body>
+  <h1 id="ready">Ready</h1>
+
+  <button id="load">Load results</button>
+  <ul id="results"></ul>
+  <p id="status"></p>
+
+  <div id="fade">Now you see me</div>
+  <button id="reveal">Reveal</button>
+
+  <a id="route" href="#">Go to step 2</a>
+
+  <button id="churnstart">Start churn</button>
+  <div id="churn"></div>
+
+<script>
+  // Results arrive 800ms after the click: long enough that proceeding immediately finds nothing.
+  document.getElementById('load').addEventListener('click', () => {
+    setTimeout(() => {
+      const ul = document.getElementById('results');
+      for (let i = 1; i <= 3; i++) {
+        const li = document.createElement('li');
+        li.className = 'result';
+        li.textContent = 'Result ' + i;
+        ul.appendChild(li);
+      }
+      document.getElementById('status').textContent = 'Loaded three results';
+    }, 800);
+  });
+
+  // A reveal that mutates NOTHING in the DOM: it rewrites the CSSOM rule that hides #fade. The
+  // element is untouched, so a MutationObserver is blind to it however it is configured.
+  //
+  // It also records WHEN it happened, on window. The flow reads that back and checks how long the
+  // wait took to notice, because "it matched eventually" is not the property under test — an
+  // unrelated mutation elsewhere on the page wakes the observer and makes any reveal look seen.
+  // What the polling floor guarantees is that it is noticed PROMPTLY, with nothing else going on.
+  window.__revealedAt = null;
+  document.getElementById('reveal').addEventListener('click', () => {
+    setTimeout(() => {
+      for (const sheet of document.styleSheets) {
+        for (const rule of sheet.cssRules) {
+          if (rule.selectorText === '#fade') {
+            rule.style.opacity = '1';
+            rule.style.visibility = 'visible';
+          }
+        }
+      }
+      window.__revealedAt = Date.now();
+    }, 600);
+  });
+
+  // A pushState route change, 300ms after the click. No navigation: the content script survives,
+  // and only something watching the tab's URL sees it.
+  document.getElementById('route').addEventListener('click', (e) => {
+    e.preventDefault();
+    setTimeout(() => history.pushState({}, '', '/__fixture/async.html?step=2'), 300);
+  });
+
+  // 1.5s of continuous mutation, then silence.
+  document.getElementById('churnstart').addEventListener('click', () => {
+    const box = document.getElementById('churn');
+    const stopAt = Date.now() + 1500;
+    const tick = () => {
+      box.textContent = 'churning ' + Date.now();
+      if (Date.now() < stopAt) setTimeout(tick, 60);
+      else box.textContent = 'settled';
+    };
+    tick();
+  });
+</script>
+</body>
+</html>
+`;
+
 /** A fallback so an unscripted message still produces something sane instead of hanging. */
 const FALLBACK = {
   steps: [{ text: 'This mock server has no script for that message. See scripts/mock-llm.mjs.', calls: [] }],
@@ -717,6 +896,16 @@ const server = http.createServer(async (req, res) => {
     const name = url.searchParams.get('name') ?? 'usermodsTestLib';
     res.writeHead(200, { 'content-type': 'application/javascript' });
     res.end(`window.${name} = () => ${JSON.stringify(name)};\n`);
+    return;
+  }
+
+  // The wait flow's fixture page: content that arrives late, a class-only reveal, a pushState
+  // route change and a region that mutates then settles. Served from here so the flow does not
+  // depend on a live site behaving asynchronously on cue. The query string is ignored — the SPA
+  // route change pushes ?step=2 onto this same path, and the page must still render there.
+  if (url.pathname === '/__fixture/async.html') {
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+    res.end(ASYNC_FIXTURE);
     return;
   }
 

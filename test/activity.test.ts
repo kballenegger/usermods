@@ -198,6 +198,57 @@ test('a negative clock (a machine that slept) reads zero rather than a minus sig
   assert.equal(formatElapsed(-5_000), '0s');
 });
 
+// ---------- a wait in progress ----------
+//
+// wait_for is the one tool whose silence is its normal behaviour, so the line has to treat it
+// differently in two ways: it names the thing being waited for, and it is not accused of stalling
+// while it does exactly what it was asked to do.
+
+test('a wait names its condition, with the condition in the identifier font', () => {
+  // The prose leads and the selector follows, which is the opposite of every other tool line.
+  const a = activityFor(state({ phase: 'tool', tool: 'wait_for', detail: 'waiting for .result', elapsed: 3_000 }));
+  assert.ok(a);
+  assert.equal(a.label, 'waiting for');
+  assert.equal(a.mono, '.result', 'the selector belongs in the mono slot, not buried in the prose');
+  assert.equal(a.labelFirst, true);
+  assert.equal(activityText(a), 'waiting for .result · 3s');
+});
+
+test('a wait on text or a URL reads the same way', () => {
+  assert.equal(line({ phase: 'tool', tool: 'wait_for', detail: 'waiting for "Loaded"', elapsed: 1_000 }), 'waiting for "Loaded" · 1s');
+  assert.equal(line({ phase: 'tool', tool: 'wait_for', detail: 'waiting for /checkout', elapsed: 2_000 }), 'waiting for /checkout · 2s');
+});
+
+test('a 15s wait is not a stall: silence is what a wait DOES', () => {
+  // The ordinary threshold would put "the provider may be stuck" on screen for a tool behaving
+  // exactly as designed, which teaches the user to distrust the one line meant to be trustworthy.
+  const waiting = state({ phase: 'tool', tool: 'wait_for', detail: 'waiting for .result', elapsed: 15_000, sinceLastEvent: 15_000 });
+  const a = activityFor(waiting);
+  assert.ok(a);
+  assert.equal(a.tone, 'live');
+  assert.equal(a.pulse, true);
+  assert.equal(a.action, undefined, 'a legitimate wait must not be offering Stop as if something were wrong');
+  assert.doesNotMatch(activityText(a), /stuck/);
+
+  // Even at the longest timeout the tool permits, plus a round trip.
+  const longest = activityFor(state({ phase: 'tool', tool: 'wait_for', detail: 'waiting for .x', elapsed: 21_000, sinceLastEvent: 21_000 }));
+  assert.equal(longest?.tone, 'live');
+});
+
+test('a wait that outruns every legitimate timeout is still called out', () => {
+  // Not infinite: past WAIT_STALL_MS something really has hung, and the line says so.
+  const a = activityFor(state({ phase: 'tool', tool: 'wait_for', detail: 'waiting for .x', elapsed: 50_000, sinceLastEvent: 50_000 }));
+  assert.equal(a?.tone, 'warn');
+  assert.equal(a?.action, 'stop');
+});
+
+test('the wait exemption is scoped to wait_for, so a real stall is still caught', () => {
+  // A run_script silent for 30s is not waiting by design; it has hung, and the old threshold holds.
+  const a = activityFor(state({ phase: 'tool', tool: 'run_script', detail: 'hide the modal', elapsed: 95_000, sinceLastEvent: 95_000 }));
+  assert.equal(a?.tone, 'warn');
+  assert.match(activityText(a!), /may be stuck/);
+});
+
 // ---------- per chat, not per panel ----------
 //
 // Runs are keyed by chat and several can be in flight at once, so the indicator is a property of a

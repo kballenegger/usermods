@@ -69,9 +69,12 @@ export function Activity(props: ActivityProps) {
     <div className={`activity${a.tone === 'live' ? '' : ` ${a.tone}`}`} role="status" aria-live="polite">
       {/* The design system's own dot, so a running line reads like a running tool row. */}
       <span className="dot" aria-hidden="true" />
+      {/* A wait reads "waiting for .result": prose first, identifier second. Everything else leads
+          with the identifier ("find_elements #login"), so the order is a property of the line. */}
+      {a.labelFirst && a.label && <span className="activity-label">{a.label}</span>}
       {a.mono && <span className="activity-mono activity-seg">{a.mono}</span>}
-      {a.mono && a.label && a.monoJoin === ' · ' && <span className="activity-sep">·</span>}
-      {a.label && <span className="activity-label">{a.label}</span>}
+      {!a.labelFirst && a.mono && a.label && a.monoJoin === ' · ' && <span className="activity-sep">·</span>}
+      {!a.labelFirst && a.label && <span className="activity-label">{a.label}</span>}
       {a.segments.map((s) => (
         <span key={s} style={{ display: 'contents' }}>
           <span className="activity-sep">·</span>

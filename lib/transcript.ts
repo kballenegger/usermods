@@ -5,6 +5,11 @@
 // is running in another tab. A run in chat A must keep filling in A's transcript while the user
 // reads chat B, and neither may leak into the other — so the rule for "what does this event do to
 // a transcript" has exactly one implementation, and it takes the items it edits as an argument.
+// The .ts extension is load-bearing: this is a VALUE import (every other lib-to-lib import here is
+// `import type`, which is erased), and `npm test` runs these files through node --experimental-
+// strip-types, whose ESM resolver does not guess extensions. tsconfig sets
+// allowImportingTsExtensions, so tsc and vite both take it as written.
+import { parseWaitInput, waitConditionLabel } from './agent/wait.ts';
 import type { AgentEventBody, ChatItem } from './types';
 
 /**
@@ -84,6 +89,59 @@ export function compactedNote(event: Extract<AgentEventBody, { type: 'compacted'
 /** 148_231 -> "148k". Small numbers keep their digits, because "0k" reads as a bug. */
 function approxTokens(n: number): string {
   return n >= 1000 ? `${Math.round(n / 1000)}k` : String(Math.max(0, Math.round(n)));
+}
+
+// ---------------------------------------------------------------------------
+// Tool rows
+// ---------------------------------------------------------------------------
+
+/**
+ * The title of one tool row: the tool's name plus the one thing worth seeing without opening it.
+ *
+ * wait_for is the reason this moved out of the two components that render it. What a wait is
+ * doing is entirely in its condition — `wait_for .result visible` — and neither `description` nor
+ * `selector`, the two fields the old inline expression knew about, holds it. Rather than teach
+ * two components the same new rule, both now ask here.
+ */
+export function toolRowTitle(name: string, input: Record<string, unknown>): string {
+  if (name === 'wait_for') {
+    const parsed = parseWaitInput(input);
+    return parsed.ok ? `${name} ${waitConditionLabel(parsed.spec.condition)}` : name;
+  }
+  if (typeof input.description === 'string') return `${name}: ${input.description}`;
+  if (typeof input.selector === 'string') return `${name} ${input.selector}`;
+  return name;
+}
+
+/**
+ * How a wait's outcome reads as a status: a timeout is `waiting`, not `error`.
+ *
+ * The distinction is the whole point of the tool. A timeout means the page did not do the thing,
+ * which is information, not a failure — and a transcript that paints it coral teaches the user
+ * (and, through the summary they read back, the model) that waiting went wrong when it went
+ * exactly as designed. Only a wait that could not run at all is an error, and the loop already
+ * flags those with `isError`.
+ */
+export type ToolDotState = 'running' | 'error' | 'waiting' | 'ok';
+
+export function toolDotState(item: Extract<ChatItem, { kind: 'tool' }>): ToolDotState {
+  if (item.summary === undefined) return 'running';
+  if (item.isError) return 'error';
+  if (item.name === 'wait_for' && /^timed out after/i.test(item.summary)) return 'waiting';
+  return 'ok';
+}
+
+/** The class the dot wears for each state. 'waiting' reuses the amber dot a running row uses. */
+export function toolDotClass(state: ToolDotState): string {
+  switch (state) {
+    case 'running':
+    case 'waiting':
+      return ' running';
+    case 'error':
+      return ' error';
+    case 'ok':
+      return '';
+  }
 }
 
 /** The queued user bubble an `unqueued` event refers to, so the caller can recover its text. */

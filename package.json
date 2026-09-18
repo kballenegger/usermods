@@ -24,6 +24,7 @@
     "smoke:dashboard": "wxt build && node scripts/screenshots.mjs --dashboard",
     "smoke:theme": "wxt build && node scripts/screenshots.mjs --theme",
     "smoke:tabbar": "wxt build && node scripts/screenshots.mjs --tabbar",
+    "smoke:wait": "wxt build && node scripts/screenshots.mjs --wait",
     "store-assets": "wxt build && node scripts/store-assets.mjs"
   },
   "dependencies": {
