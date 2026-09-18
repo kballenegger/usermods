@@ -77,7 +77,10 @@ export function Dashboard() {
     <div className="dash">
       <div className="dash-inner">
         <header className="dash-head">
-          <h1>usermods</h1>
+          <h1>
+            <img className="brand-mark" src="/icon/128.png" alt="" width={32} height={32} />
+            usermods
+          </h1>
           <span className="sub">every chat and every mod, in one place</span>
           <ThemeToggle />
         </header>

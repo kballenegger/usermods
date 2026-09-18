@@ -59,7 +59,10 @@ function InstallPage() {
     <div className="page">
       <div className="page-head">
         <div>
-          <div className="wordmark">usermods</div>
+          <div className="wordmark">
+            <img className="brand-mark" src="/icon/128.png" alt="" width={16} height={16} />
+            usermods
+          </div>
           <h2>Install userscript</h2>
         </div>
         <ThemeToggle />

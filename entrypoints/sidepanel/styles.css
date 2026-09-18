@@ -947,14 +947,33 @@ input[type='checkbox']:checked::after {
   margin: 0;
 }
 
-/* The wordmark where a logo would go: plain type, no mark. */
+/* The pixel mark, then the wordmark. */
 .wordmark {
+  display: flex;
+  align-items: center;
+  gap: 7px;
   font-family: var(--font-mono);
   font-size: var(--fs-label);
   font-weight: 600;
   letter-spacing: var(--lbl-tracking);
   text-transform: uppercase;
   color: var(--accent-text);
+}
+
+/*
+ * The brand mark is pixel art on a 16-unit grid (assets/icon-source.png), so it is only ever
+ * drawn at a whole multiple of 16 CSS px — 16 here, 32 in the dashboard header. Any other size
+ * puts block boundaries between device pixels and the hard edges turn to fringe.
+ *
+ * image-rendering: pixelated is what makes that hold on a HiDPI screen: the browser scales the
+ * 128px source up to the device pixel ratio, and the default smooth filter would blur exactly the
+ * edges the mark is made of. It carries its own blue tile, so it needs no treatment per theme and
+ * reads the same in light and dark.
+ */
+.brand-mark {
+  display: block;
+  flex: none;
+  image-rendering: pixelated;
 }
 
 .break {

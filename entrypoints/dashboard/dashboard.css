@@ -35,7 +35,14 @@
   flex-wrap: wrap;
   margin-bottom: 14px;
 }
+/* The mark sits with the wordmark, so h1 is its own flex line: the header's baseline alignment
+   keeps the 32px image's bottom edge on the text baseline, which hangs it too low. Centring the
+   two inside h1 and letting the h1 itself take part in the baseline row keeps "usermods" aligned
+   with the subtitle exactly as before. */
 .dash-head h1 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
   font-size: 19px;
   margin: 0;
   font-weight: 600;
