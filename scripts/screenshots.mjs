@@ -832,6 +832,32 @@ async function switcherOptions(panel) {
   );
 }
 
+/**
+ * Put the chat switcher into rename mode, and prove it got there.
+ *
+ * Rename and Save are the same slot in the chatbar: whichever one React renders depends on
+ * `renaming`, so entering and leaving rename mode replaces that button element rather than
+ * changing it. Playwright resolves the locator, then clicks — and when the swap lands in between,
+ * it clicks a node that is no longer in the document and retries until the 30s timeout, with a log
+ * that ends at "performing click action" and never says why. (That is a real failure this flow hit
+ * on the second rename, the one that follows an Escape.)
+ *
+ * So: click, and if the input did not appear, click again. The button is idempotent — it only ever
+ * sets rename mode on — so a retry costs nothing and the wait is on the state that matters.
+ */
+async function startRename(panel, attempts = 3) {
+  for (let i = 0; i < attempts; i++) {
+    await panel.locator('.chatbar button.btn', { hasText: 'Rename' }).click({ timeout: 10_000 }).catch(() => {});
+    try {
+      await panel.locator('.chatbar input.rename').waitFor({ timeout: 3000 });
+      return;
+    } catch {
+      /* the button was swapped out from under the click; try again */
+    }
+  }
+  throw new Error('chats: the switcher never entered rename mode');
+}
+
 async function chatsFlow() {
   const b = await launch('light');
   const fail = (m) => {
@@ -928,8 +954,7 @@ async function chatsFlow() {
 
     // --- 7. Renaming by hand: the select becomes an input, Escape abandons it, Enter commits.
     const MY_NAME = 'Kingfisher reading layout';
-    await panel.locator('.chatbar button.btn', { hasText: 'Rename' }).click();
-    await panel.locator('.chatbar input.rename').waitFor({ timeout: 5000 });
+    await startRename(panel);
     await panel.locator('.chatbar input.rename').fill('this one is abandoned');
     await panel.locator('.chatbar input.rename').press('Escape');
     await panel.waitForTimeout(400);
@@ -937,8 +962,7 @@ async function chatsFlow() {
     const afterEscape = await selectedLabel(panel);
     if (afterEscape?.includes('abandoned')) fail(`Escape saved the abandoned name anyway (switcher reads ${JSON.stringify(afterEscape)})`);
 
-    await panel.locator('.chatbar button.btn', { hasText: 'Rename' }).click();
-    await panel.locator('.chatbar input.rename').waitFor({ timeout: 5000 });
+    await startRename(panel);
     await panel.locator('.chatbar input.rename').fill(MY_NAME);
     await panel.locator('.chatbar input.rename').press('Enter');
     await panel.waitForTimeout(600);
