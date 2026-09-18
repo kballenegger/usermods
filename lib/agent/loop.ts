@@ -61,6 +61,9 @@ export async function runAgent(input: AgentInput): Promise<Msg[]> {
   async function loop() {
   for (let i = 0; i < MAX_ITERATIONS; i++) {
     if (signal.aborted) break;
+    // The panel's activity line is driven entirely by these: it has no other way to tell a model
+    // that is thinking from one that has hung.
+    emit({ type: 'status', phase: 'model', detail: i === 0 ? 'waiting for model' : 'continuing', iteration: i + 1 });
     const res = await provider.chat({
       system: SYSTEM_PROMPT,
       messages,
@@ -86,6 +89,7 @@ export async function runAgent(input: AgentInput): Promise<Msg[]> {
     let proposed = false;
     for (const call of calls) {
       emit({ type: 'tool_call', id: call.id, name: call.name, input: call.input });
+      emit({ type: 'status', phase: 'tool', tool: call.name, detail: describeCall(call.name, call.input), iteration: i + 1 });
       const r = await executeTool(call.name, call.input, env, emit);
       emit({ type: 'tool_result', id: call.id, summary: summarize(r.content), isError: !!r.isError });
       results.push({ type: 'tool_result', toolCallId: call.id, content: r.content, isError: r.isError });
@@ -103,6 +107,18 @@ export async function runAgent(input: AgentInput): Promise<Msg[]> {
     if (proposed && !queued.length) break;
   }
   }
+}
+
+/**
+ * The human half of a tool's status line: what a person would say the agent is doing. run_script
+ * carries its own description; the page-inspection tools are best described by what they look at.
+ */
+function describeCall(name: string, input: Record<string, unknown>): string | undefined {
+  if (name === 'run_script' && typeof input.description === 'string' && input.description.trim()) return input.description.trim();
+  if ((name === 'find_elements' || name === 'get_styles' || name === 'get_page') && typeof input.selector === 'string' && input.selector.trim()) {
+    return input.selector.trim();
+  }
+  return undefined;
 }
 
 function summarize(parts: Part[]): string {

@@ -419,6 +419,124 @@ async function smoke() {
 }
 
 // ---------------------------------------------------------------------------
+// Activity test: the panel says what it is doing while it is doing it.
+//
+// The owner's complaint was that a run gave no sign of life, so this asserts the sign of life is
+// there: it appears at once, it names the phase, its timer moves, it follows the run into a tool
+// call, and it is gone the moment the run ends. The 'take your time' script in mock-llm.mjs holds
+// its first byte for ~3s so there is a real waiting window to observe.
+// ---------------------------------------------------------------------------
+
+const SLOW_PROMPT = 'take your time and tell me what this page is';
+
+async function activityFlow() {
+  const b = await launch('light');
+  const fail = (m) => {
+    throw new Error(`activity: ${m}`);
+  };
+  try {
+    const panel = await openPanel(b.ctx, b.extId);
+    await openSite(b.ctx, 'https://en.wikipedia.org/wiki/Common_kingfisher');
+    await panel.waitForTimeout(1200);
+
+    const indicator = panel.locator('.activity');
+    if (await indicator.count()) fail('the activity line was showing before anything had been sent');
+
+    // A tool phase can be over in a few milliseconds, so sampling the DOM from here would be a
+    // coin flip. Record every distinct value the line takes instead, from inside the page.
+    await installActivityRecorder(panel);
+
+    // --- 1. It appears within 500ms of sending. The mock does not answer for ~3s, so if the line
+    // waited for the backend rather than for the send, it would not be up yet.
+    await panel.locator('textarea').fill(SLOW_PROMPT);
+    const sentAt = Date.now();
+    await panel.locator('.composer button.btn.primary').click();
+    await indicator.waitFor({ timeout: 2_000 });
+    const appearedIn = Date.now() - sentAt;
+    if (appearedIn > 500) fail(`the activity line took ${appearedIn}ms to appear, which is longer than the 500ms it promises`);
+
+    // --- 2. During the delay it says it is waiting for the model, and its timer ticks.
+    const waitingText = (await indicator.textContent())?.trim() ?? '';
+    if (!/waiting for model/i.test(waitingText)) fail(`the line did not say it was waiting for the model (it said ${JSON.stringify(waitingText)})`);
+
+    const firstTimer = await readTimer(panel);
+    if (firstTimer === null) fail(`the line showed no elapsed timer (it said ${JSON.stringify(waitingText)})`);
+    await panel.waitForTimeout(1600);
+    const secondTimer = await readTimer(panel);
+    if (secondTimer === null || secondTimer <= firstTimer) {
+      fail(`the elapsed timer did not tick: it read ${firstTimer}s then ${secondTimer}s`);
+    }
+
+    // --- 3. It follows the run into the tool call. A tool phase can be short, so rather than poll
+    // and hope to sample inside it, the recorder installed above has every value the line took.
+    const sawTool = await waitForRecorded(panel, /get_page|find_elements/, 30_000);
+    if (!sawTool) {
+      const seen = await recorded(panel);
+      const tools = await panel.locator('.messages .tool summary').allTextContents();
+      fail(`the line never showed the tool it was running. It showed: ${JSON.stringify(seen)}; transcript rows: ${tools.join(' | ') || 'none'}`);
+    }
+
+    // --- 4. It is gone once the run is over. The second scripted step is text-only, so 'done'
+    // follows it; the line must not linger.
+    await indicator.waitFor({ state: 'detached', timeout: 60_000 }).catch(() => {});
+    if (await indicator.count()) {
+      fail(`the activity line was still on screen after the run finished (it said ${JSON.stringify((await indicator.textContent())?.trim())})`);
+    }
+    // And the run really did finish, rather than the line vanishing for some other reason.
+    const replies = await panel.locator('.messages .msg.assistant').allTextContents();
+    if (!replies.some((t) => t.includes('article title'))) fail(`the scripted conversation did not finish (assistant said: ${replies.join(' | ')})`);
+
+    if (process.env.ACTIVITY_VERBOSE) console.log('[activity] the line showed:', await recorded(panel));
+    console.log('activity: OK — appears <500ms, waiting label with a ticking timer, tool label, gone after done');
+  } finally {
+    await b.close();
+  }
+}
+
+/** The elapsed seconds the line is showing, or null if it is not showing one. */
+async function readTimer(panel) {
+  const text = await panel.locator('.activity').textContent().catch(() => null);
+  const m = text?.match(/(\d+)s(?!\w)/);
+  return m ? Number(m[1]) : null;
+}
+
+/**
+ * Watch the panel's DOM and keep every distinct string the activity line has shown. A tool phase
+ * can last a couple of milliseconds, which no amount of polling from the test process would catch
+ * reliably; a MutationObserver inside the page sees all of them.
+ */
+async function installActivityRecorder(panel) {
+  await panel.evaluate(() => {
+    const seen = [];
+    globalThis.__activitySeen = seen;
+    const sample = () => {
+      const el = document.querySelector('.activity');
+      const text = el?.textContent?.trim();
+      if (text && seen[seen.length - 1] !== text) seen.push(text);
+    };
+    new MutationObserver(sample).observe(document.body, { subtree: true, childList: true, characterData: true });
+    sample();
+  });
+}
+
+/** Everything the activity line has shown since the recorder was installed. */
+async function recorded(panel) {
+  return panel.evaluate(() => globalThis.__activitySeen ?? []);
+}
+
+/** Wait until the line has shown something matching, at any point since the recorder went in. */
+async function waitForRecorded(panel, re, timeout) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    const seen = await recorded(panel).catch(() => []);
+    const hit = seen.find((t) => re.test(t));
+    if (hit) return hit;
+    await panel.waitForTimeout(100);
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Chats test: the panel always comes back to the last chat, and archiving is what takes it away.
 // ---------------------------------------------------------------------------
 
@@ -540,6 +658,7 @@ async function main() {
     }
     if (SMOKE) {
       await smoke();
+      await activityFlow();
       await chatsFlow();
       return;
     }

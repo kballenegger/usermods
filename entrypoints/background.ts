@@ -105,7 +105,11 @@ export default defineBackground(() => {
       // Stop clears the queue; otherwise anything still waiting starts the next turn.
       const next = queue.shift();
       if (next && !signal.aborted) void run(tabId, chatId, next);
-      else post({ type: 'done' });
+      else {
+        // The panel's activity line watches for this: 'idle' is what makes it disappear.
+        post({ type: 'status', phase: 'idle', detail: 'done' });
+        post({ type: 'done' });
+      }
     }
 
     port.onMessage.addListener((req: AgentPortRequest) => {

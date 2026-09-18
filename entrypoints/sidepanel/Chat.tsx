@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { Activity } from './Activity';
+import type { Phase } from '@/lib/activity';
 import { archivedChats, isArchived, liveChats, loadItems, pickChatToShow, relativeTime, saveItems, titleFromText, type Chat as ChatRecord } from '@/lib/chats';
 import { findByName } from '@/lib/modmatch';
 import { modFromProposal } from '@/lib/mods';
@@ -15,6 +17,10 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
   const [loaded, setLoaded] = useState(false);
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
+  /** What the live activity line shows. Driven entirely by port events; see Activity.tsx. */
+  const [activity, setActivity] = useState<ActivityState>(IDLE_ACTIVITY);
+  /** The last message sent, so the Retry action on a dead port can resend it. */
+  const lastSentRef = useRef<{ text: string; refs?: ElementRef[] } | null>(null);
   const [refs, setRefs] = useState<ElementRef[]>([]);
   const [picking, setPicking] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -111,6 +117,9 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
     // event after a reconnect we cannot recover the text we missed, so we just say so once.
     let first = true;
     port.onMessage.addListener((e: AgentEvent) => {
+      // Every event, whatever it is, is proof the run is alive: the stall detector measures the
+      // gap since this stamp and nothing else.
+      setActivity((a) => activityFromEvent(a, e));
       setItems((prev) => {
         const next = [...prev];
         if (first) {
@@ -157,6 +166,8 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
           case 'error':
             next.push({ kind: 'error', text: e.message });
             return next;
+          case 'status':
+            return next; // the activity line's business only; nothing goes in the transcript
           case 'done':
             return next;
         }
@@ -166,6 +177,9 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
     port.onDisconnect.addListener(() => {
       portRef.current = null;
       portChatRef.current = null;
+      // A port that dies while a run is in flight means the service worker went away under us.
+      // The line says so rather than just going quiet, and offers Retry.
+      setActivity((a) => (a.phase === 'idle' ? a : { ...a, disconnected: true }));
       setBusy(false);
     });
     portRef.current = port;
@@ -196,9 +210,15 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
     setText((prev) => prev.replace(new RegExp(`@${escapeRe(token)}(?![\\w.#-])\\s?`, 'g'), ''));
   }
 
-  /** Send now, or queue if a turn is running. Queued messages reach the model between its tool calls. */
-  async function send() {
-    const t = text.trim();
+  /**
+   * Send now, or queue if a turn is running. Queued messages reach the model between its tool calls.
+   *
+   * `resend` lets a caller supply the message explicitly rather than reading it out of the composer,
+   * which Retry needs: it runs from an event handler that closed over the previous render's state,
+   * so putting the text back with setText and calling send() would send the stale (empty) value.
+   */
+  async function send(resend?: { text: string; refs?: ElementRef[] }) {
+    const t = (resend?.text ?? text).trim();
     if (!t || tabId == null) return;
     // The chat is created lazily, on the first message that actually goes out.
     let id = chatId;
@@ -223,12 +243,23 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
       }
     }
     // Only send references whose token still appears in the message.
-    const used = refs.filter((r) => new RegExp(`@${escapeRe(r.token)}(?![\\w.#-])`).test(t));
+    const used = (resend?.refs ?? refs).filter((r) => new RegExp(`@${escapeRe(r.token)}(?![\\w.#-])`).test(t));
     const msgId = crypto.randomUUID();
     setItems((prev) => [...prev, { kind: 'user', id: msgId, text: t, refs: used.length ? used : undefined, queued: busy }]);
     setText('');
     setRefs([]);
     setBusy(true);
+    lastSentRef.current = { text: t, refs: used.length ? used : undefined };
+    // Start the line immediately, before any event comes back, so "is it stuck?" is answered from
+    // the very first frame rather than once the background gets round to us.
+    const at = Date.now();
+    setActivity((a) => ({
+      phase: 'model',
+      detail: 'waiting for model',
+      startedAt: a.phase === 'idle' ? at : (a.startedAt ?? at),
+      lastEventAt: at,
+      queued: a.phase === 'idle' ? 0 : a.queued + 1,
+    }));
     const req: AgentPortRequest = { type: 'send', tabId, chatId: id, id: msgId, text: t, refs: used.length ? used : undefined };
     portChatRef.current = id;
     titleFixRef.current = false;
@@ -259,11 +290,24 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
 
   function abort() {
     portRef.current?.postMessage({ type: 'abort' } satisfies AgentPortRequest);
+    setActivity(IDLE_ACTIVITY);
+  }
+
+  /**
+   * Retry after the worker died: resend the last message, which the dead port never delivered.
+   * connect() will open a fresh port, which wakes the service worker back up.
+   */
+  function retry() {
+    const last = lastSentRef.current;
+    setActivity(IDLE_ACTIVITY);
+    setBusy(false);
+    if (last) void send(last);
   }
 
   /** Stop any run and forget the port's chat, before the view lands somewhere else. */
   function detach() {
     if (busy) abort();
+    setActivity(IDLE_ACTIVITY);
     portChatRef.current = null;
     reconnectRef.current = false;
     titleFixRef.current = false;
@@ -494,6 +538,19 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
         })}
         <div ref={bottomRef} />
       </div>
+      <Activity
+        phase={activity.phase}
+        tool={activity.tool}
+        detail={activity.detail}
+        iteration={activity.iteration}
+        startedAt={activity.startedAt}
+        lastEventAt={activity.lastEventAt}
+        writing={activity.writing}
+        queued={activity.queued}
+        disconnected={activity.disconnected}
+        onStop={abort}
+        onRetry={retry}
+      />
       <div className="composer">
         {refs.length > 0 && (
           <div className="row">
@@ -530,6 +587,58 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
       </div>
     </div>
   );
+}
+
+/** Everything the activity line needs, kept in one state object so one setState updates it all. */
+interface ActivityState {
+  phase: Phase;
+  tool?: string;
+  detail?: string;
+  iteration?: number;
+  startedAt: number | null;
+  lastEventAt: number | null;
+  writing?: boolean;
+  queued: number;
+  disconnected?: boolean;
+}
+
+const IDLE_ACTIVITY: ActivityState = { phase: 'idle', startedAt: null, lastEventAt: null, queued: 0 };
+
+/**
+ * Fold a port event into the activity line. Two things matter here: every event refreshes
+ * lastEventAt (silence is the stall signal), and the first text delta of a model phase flips
+ * "waiting for model" to "writing".
+ */
+export function activityFromEvent(a: ActivityState, e: AgentEvent): ActivityState {
+  const at = Date.now();
+  switch (e.type) {
+    case 'status':
+      if (e.phase === 'idle') return IDLE_ACTIVITY;
+      return {
+        ...a,
+        phase: e.phase,
+        tool: e.tool,
+        detail: e.detail,
+        iteration: e.iteration,
+        startedAt: a.startedAt ?? at,
+        lastEventAt: at,
+        // A new phase has not written anything yet.
+        writing: false,
+        disconnected: false,
+      };
+    case 'text':
+      return { ...a, lastEventAt: at, writing: a.phase === 'model' ? true : a.writing };
+    case 'accepted':
+      return { ...a, lastEventAt: at, queued: Math.max(0, a.queued - 1) };
+    case 'unqueued':
+      return { ...a, lastEventAt: at, queued: Math.max(0, a.queued - 1) };
+    case 'done':
+      return IDLE_ACTIVITY;
+    case 'error':
+      return IDLE_ACTIVITY;
+    default:
+      return { ...a, lastEventAt: at };
+  }
 }
 
 /** The saved mod a proposal of this name would revise, or undefined to save a new one. */

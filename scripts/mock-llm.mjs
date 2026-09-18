@@ -169,6 +169,38 @@ setTimeout(() => observer.disconnect(), 10000);`,
       },
     ],
   },
+
+  {
+    // A deliberately slow first byte, for the side panel's activity indicator. The point of that
+    // line is to tell "the model is thinking" apart from "the thing is stuck", and there is no way
+    // to see it work without a backend that makes the panel wait. `firstByteDelay` holds the
+    // response open before anything is streamed, the way a thinking model does.
+    name: 'slow-first-byte',
+    match: /take your time/i,
+    steps: [
+      {
+        firstByteDelay: 3000,
+        text: 'Thanks for waiting. Let me look at the page.',
+        // Several big snapshots, executed one after another. The panel's activity line has to be
+        // observable while a tool runs, and a single page-inspection call against a local content
+        // script can finish inside one animation frame, leaving nothing for the smoke test to see.
+        // A run of them keeps the tool phase on screen for long enough to be asserted on honestly.
+        calls: [
+          { name: 'get_page', args: { max_chars: 60000 } },
+          { name: 'get_page', args: { max_chars: 60000 } },
+          { name: 'get_page', args: { max_chars: 60000 } },
+          { name: 'find_elements', args: { selector: '#firstHeading', limit: 3 } },
+        ],
+      },
+      {
+        // A second slow step, so the indicator is seen going back to a model phase after a tool
+        // one, rather than only at the very start of the run.
+        firstByteDelay: 2000,
+        text: 'That is the article title. Nothing to change here.',
+        calls: [],
+      },
+    ],
+  },
 ];
 
 /** A fallback so an unscripted message still produces something sane instead of hanging. */
@@ -208,6 +240,10 @@ async function streamStep(res, step, model) {
   const id = `chatcmpl-mock-${Date.now()}`;
   const base = { id, object: 'chat.completion.chunk', created: Math.floor(Date.now() / 1000), model };
   const chunk = (delta, finish_reason = null) => sse(res, { ...base, choices: [{ index: 0, delta, finish_reason }] });
+
+  // A step may hold the stream open before saying anything, the way a model that thinks first does.
+  // Nothing has been written yet at this point, so the panel is genuinely waiting on a first byte.
+  if (step.firstByteDelay) await sleep(step.firstByteDelay);
 
   chunk({ role: 'assistant' });
 
