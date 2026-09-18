@@ -58,6 +58,12 @@ Early. The core loop works end to end: chat, page inspection, live testing, prop
       <sub><b>Migrating.</b> One Tampermonkey backup file brings the whole library across, on/off state and stored values included.</sub>
     </td>
   </tr>
+  <tr>
+    <td width="100%" colspan="2" valign="top">
+      <img src="docs/screenshots/07-dashboard.png" alt="The dashboard: an overview strip, then chats grouped by host with a transcript preview open beside them.">
+      <sub><b>Dashboard.</b> Every chat and every mod in a full tab — see <a href="#dashboard">Dashboard</a> below.</sub>
+    </td>
+  </tr>
 </table>
 
 ## Install (from source)
@@ -78,6 +84,12 @@ Then in Chrome:
 For development, `npm run dev` starts WXT with hot reload and opens a Chrome profile with the extension loaded. `npm run typecheck` type-checks, and `npm test` runs the header/backup parser tests (Node's built-in runner, no browser needed).
 
 `npm run screenshots` regenerates the images above, and `npm run smoke` runs the same flow headless as an end-to-end check of the chat loop. Both build the extension, load it into Playwright's Chromium, and drive the real side panel against `scripts/mock-llm.mjs` — a local server that plays scripted conversations over the OpenAI wire protocol, so neither needs an API key or a live model. The page-inspection tools run for real against live pages, and the smoke run asserts that the reply streams, that `get_page`, `find_elements` and `get_styles` all succeed, that the proposal card appears with the expected name and match pattern, and that saving it writes a userscript to storage. A second scripted conversation covers the agent's guardrails: it makes four page reads in a row and then proposes an untested mod, and the smoke reads the mock's recorded requests back from `GET /__requests` to prove the read-budget nudge and the propose-time refusal actually reached the model. See the comments at the top of `scripts/screenshots.mjs` for how the side panel is driven without a real side panel.
+
+`npm run smoke` runs three flows: the chat loop above, the chats flow (`npm run smoke:chats` — the
+panel restoring the last chat, archiving, unarchiving on send) and the dashboard flow
+(`npm run smoke:dashboard` — host grouping and counts, search narrowing on titles, hosts and
+message text, the transcript preview, inline rename, archive, the "open this chat on its page"
+handoff, toggling a mod through to storage, editing a mod's source, and bulk actions).
 
 ## Providers
 
@@ -167,6 +179,45 @@ Scripts and their `@require` libraries are evaluated in their own function scope
 `@grant none` and `unsafeWindow` scripts run in the page's **MAIN** world, where they share globals with the page — which is what those scripts want. The trade-off is that extension messaging is unavailable there, so `GM_setValue` writes from a MAIN-world script update the in-page copy but **cannot be persisted**. Mod cards and the install preview mark those scripts with a *page world* badge. Everything else runs in Chrome's isolated `USER_SCRIPT` world.
 
 Regex-style `@include` lines (`/^https?:\/\/…$/`) are not supported; Chrome matches on patterns and globs only. The install preview warns when it drops one.
+
+## Dashboard
+
+The side panel is scoped to the page you are on: it shows that site's chats and highlights that
+site's mods. The dashboard is the other half — everything, everywhere, in a full tab.
+
+![The dashboard, showing the overview strip, chats grouped by host, and a transcript preview](docs/screenshots/07-dashboard.png)
+
+Open it from the **Dashboard** button in the side panel's tab bar, from the toolbar icon's context
+menu (**Options**), or from **Details → Extension options** in `chrome://extensions` — it is
+registered as the extension's options page, so all three land on the same tab. Opening it twice
+focuses the tab you already have rather than stacking up copies.
+
+**Chats.** Every chat across every site, grouped by host with counts, most recently used site
+first. The search box filters on title and host immediately, and on the message text inside stored
+transcripts as those load — transcripts live in their own storage keys, so they are read lazily,
+debounced and capped rather than all at once. Each chat can be renamed inline, archived, deleted,
+or opened; clicking one shows its transcript read-only beside the list, so you can re-read an old
+conversation without going back to the site. Select several for a bulk archive or delete.
+
+**Reopening a chat.** *Open* puts you back where the chat was: it opens the page the chat was last
+used on in a new tab, with the side panel showing that chat rather than whatever the panel would
+otherwise have restored. Chats remember their page from the turn they were last used on; chats
+recorded before that existed fall back to the site's front door. Opening an archived chat this way
+does not unarchive it — as in the panel, only sending a message does.
+
+**Mods.** Every saved script with its version, match patterns, grants, world, size, when it changed
+and where it came from (a download host, *written in chat*, or *imported*). Filter by site or by
+enabled state; toggle, export, update or delete one at a time, or select several to enable, disable,
+delete, or export together as a zip. Selecting a mod opens its source in an editor beside the list:
+saving re-parses the header, so editing an `@name` or a `@match` line updates the mod and
+re-registers it, with the same parse warnings the install screen shows. *Install from URL*, *Import
+file* and *Migrate from Tampermonkey* are all here too.
+
+**Settings** is the same view the side panel shows, so the dashboard is a complete home: Chats ·
+Mods · Settings. The strip across the top counts what you have, shows whether *Allow User Scripts*
+is on, and names the provider and model in use.
+
+Anything changed in the side panel shows up here without a reload, and vice versa.
 
 ## How it works
 

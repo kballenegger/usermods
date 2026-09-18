@@ -1,14 +1,14 @@
 import { runAgent, type AgentEnv } from '@/lib/agent/loop';
 import { buildRegisteredCode, gmValuesKey, loadGmValues, type GmMessage } from '@/lib/gm';
 import { checkConnect, connectOf } from '@/lib/connect';
-import { fetchText, previewFromUrl, resolveDependencies, toBase64 } from '@/lib/install';
+import { dependenciesChanged, fetchText, previewFromUrl, reparseEditedSource, resolveDependencies, toBase64 } from '@/lib/install';
 import { UPDATED_MARK } from '@/lib/importreport';
 import { scriptIdentity } from '@/lib/installurl';
 import { resyncPlan } from '@/lib/resync';
 import { mapStack, prepareRunScript, renderRunResult, type RunResult } from '@/lib/runscript';
 import { shouldUpdate } from '@/lib/version';
 import { loadMods, modFromSource, parseHeader, previewFromSource, upsertMod, deleteMod, saveMods } from '@/lib/mods';
-import { appendTurn, archiveChat, createChat, deleteChat, getChat, listChats, loadMessages, markTitleRefreshed, renameChat, saveMessages, setModelTitle, touchChat } from '@/lib/chats';
+import { appendTurn, archiveChat, bulkChats, countTurns, createChat, deleteChat, getChat, listChats, loadItems, loadMessages, markTitleRefreshed, renameChat, saveMessages, setModelTitle, touchChat } from '@/lib/chats';
 import { buildTitleInput, completedTurns, sanitizeTitle, titleDecision, TITLE_SYSTEM_PROMPT } from '@/lib/title';
 import { createProvider } from '@/lib/providers';
 import {
@@ -116,14 +116,18 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn): Promise<v
   // returns messages on success, so a provider error (429, a bad key) would otherwise leave
   // the whole chat unsaved and the user's turn lost.
   let history: Msg[] = [];
+  /** The page this turn was sent from, recorded on the chat so the dashboard can reopen it there. */
+  let url = '';
   try {
     settings = await loadSettings();
     const usesKey = settings.provider === 'anthropic' || settings.provider === 'openai-compatible';
     if (usesKey && !settings.apiKey && !settings.baseUrl) throw new Error('Add an API key in Settings first (or a base URL for a local server or proxy).');
     if (!settings.model) throw new Error('Choose a model in Settings first.');
     history = await loadMessages(chatId);
-    // The first message of a chat names it.
-    await touchChat(chatId, history.length ? {} : { title: turn.text });
+    // The first message of a chat names it. Every message records the page it was sent from, so
+    // the dashboard can reopen the chat on that page rather than the site's front door.
+    url = await tabUrl(session.tabId);
+    await touchChat(chatId, history.length ? { url } : { title: turn.text, url });
     const messages = await runAgent({
       settings,
       history,
@@ -142,15 +146,16 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn): Promise<v
       onCompacted: (msgs) => saveMessages(chatId, msgs),
     });
     await saveMessages(chatId, messages);
-    await touchChat(chatId);
+    await touchChat(chatId, { url, turns: countTurns(messages) });
     succeeded = !signal.aborted;
   } catch (e) {
     // Keep everything that was already in the chat, plus the turn that failed, so retrying
     // does not start from nothing. Partial assistant output inside the failed run is lost;
     // loop.ts should later attach its messages to the thrown error so we can keep those too.
     try {
-      await saveMessages(chatId, appendTurn(history, turn));
-      await touchChat(chatId);
+      const kept = appendTurn(history, turn);
+      await saveMessages(chatId, kept);
+      await touchChat(chatId, { url, turns: countTurns(kept) });
     } catch {
       /* storage failed too; the error below is still reported */
     }
@@ -358,6 +363,11 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
       await syncRegistrations();
       return mods;
     }
+    case 'mods.saveSource': {
+      const mods = await upsertMod(await saveEditedSource(req.id, req.source));
+      await syncRegistrations();
+      return mods;
+    }
     case 'mods.update':
       return updateMod(req.id);
     case 'mods.importBackup':
@@ -383,6 +393,10 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
     }
     case 'chats.list':
       return listChats(req.host);
+    case 'chats.listAll':
+      return listChats();
+    case 'chats.transcript':
+      return loadItems(req.id);
     case 'chats.create':
       return createChat(req.host);
     case 'chats.delete':
@@ -394,6 +408,30 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
     case 'chats.rename':
       await renameChat(req.id, req.title);
       return { ok: true };
+    case 'chats.bulk':
+      await bulkChats(req.ids, req.action);
+      return { ok: true };
+    case 'mods.bulk': {
+      const wanted = new Set(req.ids);
+      let mods = await loadMods();
+      if (req.action === 'delete') {
+        mods = mods.filter((m) => !wanted.has(m.id));
+        await saveMods(mods);
+        // Each deleted mod's GM value store goes with it, the way deleteMod does it one at a time.
+        await chrome.storage.local.remove([...wanted].map((id) => gmValuesKey(id)));
+      } else {
+        const enabled = req.action === 'enable';
+        const now = Date.now();
+        for (const m of mods) {
+          if (!wanted.has(m.id) || m.enabled === enabled) continue;
+          m.enabled = enabled;
+          m.updatedAt = now;
+        }
+        await saveMods(mods);
+      }
+      await syncRegistrations();
+      return mods;
+    }
     case 'oauth.status': {
       if (STORE_BUILD) return { signedIn: false };
       const t = await (await oauthModule()).loadTokens(req.kind);
@@ -442,6 +480,32 @@ async function installSource(
     const existing = opts.existing ? await loadGmValues(mod.id) : {};
     await chrome.storage.local.set({ [gmValuesKey(mod.id)]: { ...existing, ...opts.values } });
   }
+  return mod;
+}
+
+/**
+ * Save an edited source over an existing mod — what the dashboard's source editor saves through.
+ *
+ * The two things this does that mods.save cannot. First, the header is re-parsed from the edited
+ * text, so the name, patterns, grants, world and run-at all follow what the user actually wrote.
+ * Second, @require and @resource are refetched when (and only when) the header's dependency lines
+ * moved: re-registering with stale or empty bodies under a header that names new ones is exactly
+ * how an edited mod starts throwing ReferenceError at page load with nothing on screen to say why.
+ * A fetch failure throws before anything is written, so a broken mod is never saved — the editor
+ * shows the error and the installed mod is left as it was.
+ *
+ * The mod's identity survives untouched: same id, so its registration and its gm:<id> value store
+ * are the same ones; same enabled flag, same createdAt, same downloadUrl (so the Update button does
+ * not vanish because the edit dropped the @downloadURL comment).
+ */
+async function saveEditedSource(id: string, source: string): Promise<Mod> {
+  const existing = (await loadMods()).find((m) => m.id === id);
+  if (!existing) throw new Error('That mod no longer exists.');
+  const mod = reparseEditedSource(existing, source);
+  if (!mod.matches.length && !mod.includeGlobs.length) {
+    throw new Error(`"${mod.name}" has no @match or @include lines, so it would never run.`);
+  }
+  if (dependenciesChanged(source, existing)) await resolveDependencies(mod);
   return mod;
 }
 
@@ -945,6 +1009,18 @@ async function sendToContent<T = unknown>(tabId: number, req: ContentRequest): P
     // Content script not present (tab opened before install, or a reload). Inject and retry once.
     await chrome.scripting.executeScript({ target: { tabId }, files: ['content-scripts/content.js'] });
     return (await chrome.tabs.sendMessage(tabId, req)) as T;
+  }
+}
+
+/**
+ * The URL of a tab, or '' if it has gone away. Used to stamp a chat with the page it was used on;
+ * a turn must never fail because the tab closed mid-run, so this swallows the lookup error.
+ */
+async function tabUrl(tabId: number): Promise<string> {
+  try {
+    return (await chrome.tabs.get(tabId)).url ?? '';
+  } catch {
+    return '';
   }
 }
 

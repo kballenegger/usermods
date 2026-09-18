@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Activity } from './Activity';
 import { IDLE_ACTIVITY, activityFromEvent, allDisconnected, withActivity, withoutActivity, type ChatActivity } from '@/lib/activity';
 import { archivedChats, isArchived, liveChats, loadItems, pickChatToShow, relativeTime, saveItems, titleFromText, type Chat as ChatRecord } from '@/lib/chats';
+import { HANDOFF_KEY, resolveHandoff, type ChatHandoff } from '@/lib/dashboard';
 import { findByName } from '@/lib/modmatch';
 import { modFromProposal } from '@/lib/mods';
 import { rpc, type AgentPortRequest } from '@/lib/rpc';
@@ -91,6 +92,10 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
   // with empty chats. The list and the transcript are fetched together and committed in one go:
   // that way the panel never renders a chat id with someone else's items, and never shows the
   // empty state for a host that turns out to have a chat.
+  //
+  // Unless the dashboard sent us here. Its "Open" writes a handoff to session storage and then
+  // opens the page in a tab; when the panel lands on that host it opens THAT chat instead of the
+  // most recent one, and consumes the handoff so a later mount does not reopen it again.
   useEffect(() => {
     const gen = ++genRef.current;
     const live = () => genRef.current === gen;
@@ -108,9 +113,10 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
     }
     void (async () => {
       try {
-        const list = await rpc({ type: 'chats.list', host });
+        const [list, handoff] = await Promise.all([rpc({ type: 'chats.list', host }), readHandoff()]);
         if (!live()) return;
-        const show = pickChatToShow(list);
+        const { chat: show, clearHandoff } = resolveHandoff(handoff, host, list, pickChatToShow(list));
+        if (clearHandoff) void chrome.storage.session.remove(HANDOFF_KEY).catch(() => {});
         // Nothing to restore: land on an empty composer.
         if (!show) {
           setChats(list);
@@ -827,6 +833,23 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
       </div>
     </div>
   );
+}
+
+/**
+ * The dashboard's pending "open this chat" handoff, if there is one. Session storage can be
+ * unavailable (it is not exposed to every context and can be cleared), and a missing handoff is the
+ * normal case, so a failure here just means "no handoff" and the panel opens as it always did.
+ */
+async function readHandoff(): Promise<ChatHandoff | null> {
+  try {
+    const r = await chrome.storage.session.get(HANDOFF_KEY);
+    const h = r[HANDOFF_KEY] as Partial<ChatHandoff> | undefined;
+    return h && typeof h.chatId === 'string' && typeof h.host === 'string' && typeof h.at === 'number'
+      ? { chatId: h.chatId, host: h.host, at: h.at }
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 /** The saved mod a proposal of this name would revise, or undefined to save a new one. */

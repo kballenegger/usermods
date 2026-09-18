@@ -31,6 +31,21 @@ export interface Chat {
   titleSource?: TitleSource;
   /** Set once the one allowed model retitle (at the 4th turn) has happened, so it never repeats. */
   titleRefreshed?: boolean;
+  /**
+   * The page URL this chat was last used on, recorded by the background on every turn. It is what
+   * the dashboard's "Open" reopens the chat on, so returning to a chat lands on the actual page it
+   * was about rather than the site's front door.
+   *
+   * Chats created before this field existed have none, and where they were used is not recoverable
+   * — nothing recorded it. Those fall back to the host (see chatOpenUrl in lib/dashboard).
+   */
+  url?: string;
+  /**
+   * How many user turns this chat holds, kept on the index so the dashboard can show it without
+   * reading every transcript. Written by the background on each turn; absent on chats that predate
+   * the field, where the dashboard simply shows no count rather than guessing one.
+   */
+  turns?: number;
 }
 
 /** A chat's title source, defaulting for records written before the field existed. */
@@ -135,6 +150,18 @@ async function writeIndex(chats: Chat[]): Promise<void> {
   await chrome.storage.local.set({ [INDEX_KEY]: sortChats(chats) });
 }
 
+/**
+ * Write the index through the MAX_CHATS cap, deleting the transcript keys of anything it evicted.
+ * Every writer that can grow the index, or that can change which chats the cap would evict first
+ * (archiving does exactly that — archived chats go before live ones), goes through here, so the
+ * 200-chat ceiling is one rule in one place rather than a thing each caller remembers.
+ */
+async function writeIndexCapped(chats: Chat[]): Promise<void> {
+  const { kept, dropped } = capChats(chats);
+  await writeIndex(kept);
+  if (dropped.length) await chrome.storage.local.remove(dropped.flatMap((id) => [messagesKey(id), itemsKey(id)]));
+}
+
 export async function listChats(host?: string): Promise<Chat[]> {
   const all = await readIndex();
   return host ? all.filter((c) => c.host === host) : all;
@@ -147,17 +174,19 @@ export async function getChat(id: string): Promise<Chat | null> {
 export async function createChat(host: string): Promise<Chat> {
   const now = Date.now();
   const chat: Chat = { id: crypto.randomUUID(), host, title: 'New chat', titleSource: 'auto-first', createdAt: now, updatedAt: now };
-  const { kept, dropped } = capChats([chat, ...(await readIndex())]);
-  await writeIndex(kept);
-  if (dropped.length) await chrome.storage.local.remove(dropped.flatMap((id) => [messagesKey(id), itemsKey(id)]));
+  await writeIndexCapped([chat, ...(await readIndex())]);
   return chat;
 }
 
 /**
  * Bump updatedAt, and set the title if one is supplied and the chat has no real title yet.
  * Activity in an archived chat unarchives it: sending a message means the user is using it again.
+ *
+ * `url` records the page the turn happened on, overwriting whatever was there: the chat is "about"
+ * wherever it was last used, which is where the dashboard should reopen it. Only http(s) URLs are
+ * kept — an extension page or a chrome:// URL is not somewhere to come back to.
  */
-export async function touchChat(id: string, patch: { title?: string } = {}): Promise<void> {
+export async function touchChat(id: string, patch: { title?: string; url?: string; turns?: number } = {}): Promise<void> {
   const chats = await readIndex();
   const chat = chats.find((c) => c.id === id);
   if (!chat) return;
@@ -167,6 +196,8 @@ export async function touchChat(id: string, patch: { title?: string } = {}): Pro
     chat.title = titleFromText(patch.title);
     chat.titleSource = 'auto-first';
   }
+  if (patch.url && /^https?:\/\//i.test(patch.url)) chat.url = patch.url;
+  if (typeof patch.turns === 'number') chat.turns = patch.turns;
   await writeIndex(chats);
 }
 
@@ -204,6 +235,18 @@ export async function markTitleRefreshed(id: string): Promise<void> {
   await writeIndex(chats);
 }
 
+/**
+ * User turns in a stored model history — what the dashboard shows as a chat's length.
+ *
+ * Not every user-role message is a turn: the agent loop pushes tool results back as role 'user'
+ * too (lib/agent/loop.ts), so a single question that took six tool calls would otherwise read as
+ * seven turns. A turn is a user message carrying text the person actually typed, which is exactly
+ * the messages with a text part.
+ */
+export function countTurns(messages: Msg[]): number {
+  return messages.filter((m) => m.role === 'user' && m.content.some((p) => p.type === 'text')).length;
+}
+
 /** Archive or unarchive a chat. Reversible, so the UI does not confirm it. */
 export async function archiveChat(id: string, archived: boolean): Promise<void> {
   const chats = await readIndex();
@@ -229,6 +272,43 @@ export async function renameChat(id: string, title: string): Promise<void> {
 export async function deleteChat(id: string): Promise<void> {
   await writeIndex((await readIndex()).filter((c) => c.id !== id));
   await chrome.storage.local.remove([messagesKey(id), itemsKey(id)]);
+}
+
+/**
+ * Archive, unarchive or delete several chats in one pass. The dashboard's bulk actions go through
+ * here rather than looping over the single-chat calls: each of those does its own read-modify-write
+ * of the index, so twenty of them in a row is twenty chances for two of them to interleave and lose
+ * an edit. One read and one write cannot.
+ */
+export async function bulkChats(ids: string[], action: 'archive' | 'unarchive' | 'delete'): Promise<void> {
+  const wanted = new Set(ids);
+  if (!wanted.size) return;
+  const chats = await readIndex();
+  if (action === 'delete') {
+    await writeIndex(chats.filter((c) => !wanted.has(c.id)));
+    await chrome.storage.local.remove([...wanted].flatMap((id) => [messagesKey(id), itemsKey(id)]));
+    return;
+  }
+  // Capped like every other index write. A bulk unarchive is the case that needs it: an index of
+  // 200 where most are archived is within the cap only because archived chats are cheap to evict,
+  // and unarchiving them does not grow the index but does change which chats the next cap pass
+  // would drop. Going through the cap here keeps the ceiling and the transcript cleanup in one
+  // rule rather than leaving this one writer to grow the index past MAX_CHATS by another route.
+  await writeIndexCapped(applyBulkArchive(chats, wanted, action, Date.now()));
+}
+
+/**
+ * The archive/unarchive half of a bulk action as a pure decision: the index with archivedAt set or
+ * cleared on the named chats and nothing else touched. Separate from bulkChats so the rule is
+ * testable without chrome.storage.
+ */
+export function applyBulkArchive(chats: Chat[], wanted: Set<string>, action: 'archive' | 'unarchive', at: number): Chat[] {
+  return chats.map((chat) => {
+    if (!wanted.has(chat.id)) return chat;
+    if (action === 'archive') return { ...chat, archivedAt: at };
+    const { archivedAt: _dropped, ...rest } = chat;
+    return rest;
+  });
 }
 
 export async function loadMessages(id: string): Promise<Msg[]> {

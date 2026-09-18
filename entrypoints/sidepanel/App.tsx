@@ -9,6 +9,27 @@ import { SettingsView } from './SettingsView';
 
 type Tab = 'chat' | 'mods' | 'settings';
 
+/**
+ * Show the dashboard, reusing the tab it is already in rather than stacking up copies of a page
+ * there is only ever one useful instance of. The lookup is by URL prefix, not exact match, so a tab
+ * sitting on #mods or #settings still counts as "the dashboard tab".
+ */
+export async function openDashboard(): Promise<void> {
+  const url = chrome.runtime.getURL('dashboard.html');
+  try {
+    const open = await chrome.tabs.query({ url: `${url}*` });
+    const existing = open[0];
+    if (existing?.id != null) {
+      await chrome.tabs.update(existing.id, { active: true });
+      if (existing.windowId != null) await chrome.windows.update(existing.windowId, { focused: true }).catch(() => {});
+      return;
+    }
+  } catch {
+    // The query failed (no tabs permission in some future build, say); opening a new tab still works.
+  }
+  await chrome.tabs.create({ url });
+}
+
 export function App() {
   const [tab, setTab] = useState<Tab>('chat');
   const [tabId, setTabId] = useState<number | null>(null);
@@ -68,6 +89,9 @@ export function App() {
         {/* The page in view. A volt dot means a real page the panel can act on. */}
         {host && <span className="dot" aria-hidden="true" />}
         <span className="status" title={pageUrl}>{host}</span>
+        <button className="tab-action" onClick={() => void openDashboard()} title="Open the dashboard: every chat and every mod, in a full tab">
+          Dashboard
+        </button>
       </nav>
       {usStatus && !usStatus.available && <div className="notice">{usStatus.message}</div>}
       {tab === 'chat' &&
