@@ -1,0 +1,16 @@
+<!--
+  Concept F — "window + brace" (the synthesis that became assets/icon.svg).
+  Takes E's chromatic amber tile, which is what survives on a dark toolbar, and gives it D's
+  meaning: the tile is a browser window (title bar with two dots), and the content area holds a
+  dark code brace. A site, with a script inside it.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <rect x="12" y="16" width="104" height="96" rx="22" fill="#f59e0b"/>
+  <path d="M12 38 V38 h104 V38" stroke="#1c1917" stroke-width="7" stroke-linecap="butt"/>
+  <circle cx="30" cy="27" r="5" fill="#1c1917"/>
+  <circle cx="48" cy="27" r="5" fill="#1c1917"/>
+  <path d="M58 54 q-11 0 -11 11 v6 q0 7 -7 7 q7 0 7 7 v6 q0 11 11 11"
+        fill="none" stroke="#1c1917" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M78 54 q11 0 11 11 v6 q0 7 7 7 q-7 0 -7 7 v6 q0 11 -11 11"
+        fill="none" stroke="#1c1917" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

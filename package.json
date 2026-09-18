@@ -15,7 +15,8 @@
     "test": "node --experimental-strip-types --test test/*.test.ts",
     "postinstall": "wxt prepare",
     "screenshots": "wxt build && node scripts/screenshots.mjs",
-    "smoke": "wxt build && node scripts/screenshots.mjs --smoke"
+    "smoke": "wxt build && node scripts/screenshots.mjs --smoke",
+    "store-assets": "wxt build && node scripts/store-assets.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.126.0",
