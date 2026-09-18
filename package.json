@@ -18,6 +18,7 @@
     "postinstall": "wxt prepare",
     "screenshots": "wxt build && node scripts/screenshots.mjs",
     "smoke": "wxt build && node scripts/screenshots.mjs --smoke",
+    "smoke:chats": "wxt build && node scripts/screenshots.mjs --chats",
     "store-assets": "wxt build && node scripts/store-assets.mjs"
   },
   "dependencies": {

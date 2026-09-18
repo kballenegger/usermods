@@ -53,6 +53,7 @@ const PANEL = { width: 420, height: 820 };
 const SCALE = 2;
 
 const SMOKE = process.argv.includes('--smoke');
+const CHATS = process.argv.includes('--chats');
 
 /** See note 4: a first-run setup instruction, not the steady state the README should show. */
 const HIDE_SETUP_NOTICE = '.app > .notice { display: none !important; }';
@@ -417,13 +418,128 @@ async function smoke() {
 }
 
 // ---------------------------------------------------------------------------
+// Chats test: the panel always comes back to the last chat, and archiving is what takes it away.
+// ---------------------------------------------------------------------------
+
+const PROMPT = 'hide the sidebar and make the article full width';
+const PROPOSAL_TITLE = 'Wikipedia: full-width article';
+
+/** Reload the panel tab the way a user reopening the side panel would, and settle. */
+async function reopenPanel(panel) {
+  await panel.reload();
+  await panel.addStyleTag({ content: HIDE_SETUP_NOTICE }).catch(() => {});
+  // Long enough for the host lookup, the chat lookup and the transcript read to all resolve.
+  await panel.waitForTimeout(2500);
+}
+
+/** The switcher's options, as "<group>/<label>" so the Archived group can be asserted on. */
+async function switcherOptions(panel) {
+  return panel.locator('.chatbar select').evaluate((sel) =>
+    [...sel.querySelectorAll('option')].map((o) => `${o.parentElement.tagName === 'OPTGROUP' ? o.parentElement.label : ''}/${o.textContent}`),
+  );
+}
+
+async function chatsFlow() {
+  const b = await launch('light');
+  const fail = (m) => {
+    throw new Error(`chats: ${m}`);
+  };
+  try {
+    const panel = await openPanel(b.ctx, b.extId);
+    await openSite(b.ctx, 'https://en.wikipedia.org/wiki/Common_kingfisher');
+    await panel.waitForTimeout(1200);
+
+    // --- 1. A real conversation, so there is something to come back to.
+    await runConversation(panel, PROMPT);
+    const firstTitle = (await panel.locator('.messages .card h4').first().textContent())?.trim();
+    if (firstTitle !== PROPOSAL_TITLE) fail(`the conversation did not produce the expected proposal (got ${JSON.stringify(firstTitle)})`);
+
+    // The switcher must show the real title straight away — the background writes it while the run
+    // starts, and the panel used to keep saying "New chat" until the next reload.
+    const liveLabel = await panel.locator('.chatbar select option:checked').textContent();
+    if (!liveLabel?.includes(PROMPT.slice(0, 20))) fail(`the switcher still showed ${JSON.stringify(liveLabel)} instead of the chat's title right after the first send`);
+
+    // --- 2. Reopening the panel restores that chat with no click at all.
+    await reopenPanel(panel);
+    const restoredUser = await panel.locator('.messages .msg.user').first().textContent();
+    if (!restoredUser?.includes(PROMPT)) fail(`after reopening, the user message was not restored (messages pane held ${JSON.stringify(restoredUser)})`);
+    const restoredCard = (await panel.locator('.messages .card h4').first().textContent())?.trim();
+    if (restoredCard !== PROPOSAL_TITLE) fail(`after reopening, the proposal card was not restored (got ${JSON.stringify(restoredCard)})`);
+    if (await panel.locator('.messages .empty').count()) fail('the empty state was showing even though a chat was restored');
+
+    // --- 3. New chat is the only thing that empties the composer...
+    await panel.locator('.composer button.btn', { hasText: 'New chat' }).click();
+    await panel.waitForTimeout(400);
+    if (await panel.locator('.messages .msg.user').count()) fail('New chat left the previous transcript on screen');
+    if (!(await panel.locator('.messages .empty').count())) fail('New chat did not show the empty state');
+
+    // --- 4. ...and an unsent new chat is not persisted: reopening returns to the real one.
+    await reopenPanel(panel);
+    const afterNew = await panel.locator('.messages .msg.user').first().textContent();
+    if (!afterNew?.includes(PROMPT)) fail(`reopening after an unsent New chat did not return to the last real chat (got ${JSON.stringify(afterNew)})`);
+    const stored = await panel.evaluate(async () => (await chrome.storage.local.get('chats')).chats ?? []);
+    if (stored.length !== 1) fail(`an unsent New chat was persisted: the index holds ${stored.length} chats`);
+
+    // --- 5. Archiving takes it out of the default view, into an Archived group.
+    const archiveBtn = panel.locator('.chatbar button.btn', { hasText: 'Archive' });
+    if (!(await archiveBtn.count())) fail('the switcher had no Archive button');
+    await archiveBtn.click();
+    await panel.waitForTimeout(600);
+    if (!(await panel.locator('.messages .empty').count())) fail('archiving the only chat did not leave the empty state');
+    if (await panel.locator('.messages .msg.user').count()) fail('the archived chat was still on screen after archiving');
+
+    let options = await switcherOptions(panel);
+    if (!options.some((o) => o.startsWith('Archived/') && o.includes(PROMPT.slice(0, 20)))) {
+      fail(`the archived chat was not under an "Archived" group (options: ${JSON.stringify(options)})`);
+    }
+    if (options.some((o) => o.startsWith('/') && o.includes(PROMPT.slice(0, 20)))) {
+      fail(`the archived chat was still in the main list (options: ${JSON.stringify(options)})`);
+    }
+
+    // It stays archived across a reopen: the panel must not resurrect it.
+    await reopenPanel(panel);
+    if (await panel.locator('.messages .msg.user').count()) fail('reopening restored an archived chat, which the owner asked it never to do');
+
+    // --- 6. Selecting the archived chat opens it read-write, with Unarchive and Delete.
+    const archivedValue = await panel.locator('.chatbar select optgroup[label="Archived"] option').first().getAttribute('value');
+    if (!archivedValue) fail('no archived option to select');
+    await panel.locator('.chatbar select').selectOption(archivedValue);
+    await panel.waitForTimeout(1200);
+    const openedUser = await panel.locator('.messages .msg.user').first().textContent();
+    if (!openedUser?.includes(PROMPT)) fail(`selecting the archived chat did not open its transcript (got ${JSON.stringify(openedUser)})`);
+    if (!(await panel.locator('.chatbar button.btn', { hasText: 'Unarchive' }).count())) fail('an open archived chat offered no Unarchive button');
+    if (!(await panel.locator('.chatbar button.btn.danger', { hasText: 'Delete' }).count())) fail('an open archived chat offered no Delete button');
+
+    // --- 7. Sending in an archived chat brings it back to life.
+    await panel.locator('textarea').fill('and dim the images a little');
+    await panel.locator('.composer button.btn.primary').click();
+    await panel.waitForTimeout(1500);
+    await panel.locator('.chatbar button.btn', { hasText: 'Archive' }).waitFor({ timeout: 20_000 }).catch(() => {});
+    await reopenPanel(panel);
+    const revived = await panel.locator('.messages .msg.user').first().textContent();
+    if (!revived?.includes(PROMPT)) fail(`sending in an archived chat did not unarchive it: reopening showed ${JSON.stringify(revived)}`);
+    options = await switcherOptions(panel);
+    if (options.some((o) => o.startsWith('Archived/'))) fail(`the chat was still in the Archived group after a send (options: ${JSON.stringify(options)})`);
+
+    console.log('chats: OK — last chat restored on reopen, New chat not persisted, archive hides and unarchives on send');
+  } finally {
+    await b.close();
+  }
+}
+
+// ---------------------------------------------------------------------------
 
 async function main() {
   fs.mkdirSync(OUT_DIR, { recursive: true });
   const mock = await startMock();
   try {
+    if (CHATS) {
+      await chatsFlow();
+      return;
+    }
     if (SMOKE) {
       await smoke();
+      await chatsFlow();
       return;
     }
     await chatProposal('light', '01-chat-proposal.png');
