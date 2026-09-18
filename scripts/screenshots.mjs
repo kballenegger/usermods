@@ -126,7 +126,8 @@ async function openPanel(ctx, extId, { settings = {}, storage = {} } = {}) {
   await page.goto(`chrome-extension://${extId}/sidepanel.html`);
   await page.evaluate(
     async ([s, extra]) => {
-      await chrome.storage.local.set({ settings: s, ...extra });
+      // consent: the first-run data notice, acknowledged, so the panel opens straight into the chat.
+      await chrome.storage.local.set({ settings: s, consent: { version: 1, acceptedAt: Date.now() }, ...extra });
     },
     [{ provider: 'openai-compatible', baseUrl: BASE_URL, apiKey: '', model: 'demo', ...settings }, storage],
   );

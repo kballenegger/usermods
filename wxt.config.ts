@@ -6,7 +6,9 @@ export default defineConfig({
     name: 'usermods',
     description:
       'Vibe-code userscripts in place. Customize any website by chatting with any LLM.',
-    permissions: ['sidePanel', 'storage', 'scripting', 'activeTab', 'tabs', 'userScripts', 'declarativeNetRequest'],
+    // No activeTab: host_permissions <all_urls> already covers everything it would grant
+    // (captureVisibleTab, content-script injection), and nothing in the code depends on it.
+    permissions: ['sidePanel', 'storage', 'scripting', 'tabs', 'userScripts', 'declarativeNetRequest'],
     host_permissions: ['<all_urls>'],
     action: { default_title: 'Open usermods' },
     minimum_chrome_version: '135',

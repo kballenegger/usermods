@@ -186,6 +186,26 @@ side panel (React)  ──rpc──▶  background service worker  ──▶  LL
 - Scripts run in an isolated world: they see the DOM but not the page's JavaScript globals. Default `@match` is the current site only.
 - Your API key is stored in extension local storage and sent only to the endpoint you configure.
 
+## Privacy
+
+usermods has no server, no account and no telemetry. The author receives nothing.
+
+To change a page, the model has to see it, so when you send a message usermods sends — **directly
+from your browser to the endpoint you configured, and nowhere else** — your message, the page's
+address and title, a pruned copy of its HTML, details of elements it looks up or you point at, and a
+screenshot of the visible tab when the model asks for one. If the page is your mailbox or your bank,
+that content goes too; close the panel on pages you would rather not share. Point usermods at a
+local model and nothing leaves the machine at all.
+
+Your API key, subscription tokens, saved mods, their `GM_setValue` stores and your chat history all
+live in extension local storage on your device. Keys and tokens are sent only to the endpoint they
+authenticate.
+
+The panel says all of this in the side panel before your first message, and the notice is always
+available again from Settings → *Review data notice*. The full policy is in
+[docs/privacy.md](docs/privacy.md); the Chrome Web Store submission material is in
+[docs/store/](docs/store/).
+
 ## Roadmap
 
 - Agent mode with proper click, type and scroll tools plus screenshot-driven verification, for tasks the DOM-script approach handles poorly.
