@@ -1,0 +1,546 @@
+#!/usr/bin/env node
+// Builds the Chrome Web Store image set into docs/store/assets/, at the exact sizes the store
+// requires — it rejects anything off by a pixel.
+//
+//   npm run store-assets
+//
+//   01..05-*.png   1280x800   screenshots
+//   promo-tile.png  440x280   small promo tile
+//   marquee.png    1400x560   marquee (optional listing image)
+//
+// ---------------------------------------------------------------------------
+// How the screenshots are made
+// ---------------------------------------------------------------------------
+//
+// The store wants a picture of the product in use, at a fixed size that matches neither a side
+// panel nor a web page. So each screenshot is a COMPOSITE, assembled in three steps:
+//
+//   1. Drive the real extension exactly as scripts/screenshots.mjs does — real build, real
+//      content script, real page inspection, scripted mock LLM on localhost. See the long note
+//      at the top of that file for why the side panel is opened as a tab and why the site tab
+//      has to hold focus. Everything there applies here.
+//   2. Capture two rasters per subject: the site tab at 860x800 and the panel tab at 420x800,
+//      both at deviceScaleFactor 1 so they land as literal pixels in the composite.
+//   3. Lay them out side by side on a plain HTML page (composite()) with a thin window chrome
+//      and a caption bar, and screenshot THAT at exactly 1280x800.
+//
+// Step 3 is a separate browser page with no extension loaded: it only draws two PNGs and some
+// text, so nothing about the product is faked — the pixels inside the window frame are the real
+// extension's own output.
+//
+// 860 + 420 = 1280, so the two panes tile the frame exactly with no scaling.
+
+import { chromium } from 'playwright';
+import { spawn } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const EXT_DIR = path.join(ROOT, '.output', 'chrome-mv3');
+const OUT_DIR = path.join(ROOT, 'docs', 'store', 'assets');
+const PORT = Number(process.env.MOCK_LLM_PORT ?? 8793);
+const BASE_URL = `http://127.0.0.1:${PORT}/v1`;
+
+/** Store-mandated sizes. Verified against the PNG headers at the end of the run. */
+const SHOT = { width: 1280, height: 800 };
+const TILE = { width: 440, height: 280 };
+const MARQUEE = { width: 1400, height: 560 };
+
+/** The two panes of a screenshot composite. They sum to SHOT.width. */
+const SITE = { width: 860, height: 800 };
+const PANEL = { width: 420, height: 800 };
+
+/** Chrome fakes a real window; the caption bar explains the shot. Both come out of SHOT.height. */
+const CHROME_H = 34;
+const CAPTION_H = 56;
+const PANE_H = SHOT.height - CHROME_H - CAPTION_H;
+
+const WIKI = 'https://en.wikipedia.org/wiki/Common_kingfisher';
+const GREASY_FORK_URL =
+  'https://update.greasyfork.org/scripts/478687/GitHub%20Custom%20Global%20Navigation.user.js';
+
+/** See note 4 in scripts/screenshots.mjs: a first-run notice, not the steady state. */
+const HIDE_SETUP_NOTICE = '.app > .notice { display: none !important; }';
+
+const log = (...a) => console.log('[store-assets]', ...a);
+
+// ---------------------------------------------------------------------------
+// PNG header verification
+// ---------------------------------------------------------------------------
+
+/**
+ * Read width/height out of a PNG's IHDR, which is always the first chunk: 8-byte signature,
+ * then a 4-byte length, "IHDR", then width and height as big-endian uint32. Cheap enough that
+ * every asset is checked rather than trusted.
+ */
+function pngSize(file) {
+  const buf = fs.readFileSync(file);
+  const sig = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  if (!buf.subarray(0, 8).equals(sig)) throw new Error(`${file} is not a PNG`);
+  if (buf.subarray(12, 16).toString('ascii') !== 'IHDR') throw new Error(`${file} has no IHDR`);
+  return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+}
+
+function expectSize(file, want) {
+  const got = pngSize(file);
+  if (got.width !== want.width || got.height !== want.height) {
+    throw new Error(
+      `${path.basename(file)} is ${got.width}x${got.height}, expected ${want.width}x${want.height}`,
+    );
+  }
+  return got;
+}
+
+// ---------------------------------------------------------------------------
+// Mock backend (same scripted server the README screenshots and smoke test use)
+// ---------------------------------------------------------------------------
+
+async function startMock() {
+  const child = spawn(process.execPath, [path.join(ROOT, 'scripts', 'mock-llm.mjs'), String(PORT)], {
+    cwd: ROOT,
+    stdio: ['ignore', 'pipe', 'inherit'],
+  });
+  await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('mock-llm did not start in time')), 10_000);
+    child.stdout.on('data', (b) => {
+      if (String(b).includes('listening')) {
+        clearTimeout(timer);
+        resolve();
+      }
+    });
+    child.on('exit', (code) => reject(new Error(`mock-llm exited early with code ${code}`)));
+  });
+  log(`mock backend on ${BASE_URL}`);
+  return child;
+}
+
+// ---------------------------------------------------------------------------
+// Extension browser
+// ---------------------------------------------------------------------------
+
+async function launch() {
+  if (!fs.existsSync(path.join(EXT_DIR, 'manifest.json'))) {
+    throw new Error(`No build at ${EXT_DIR}. Run "npm run build" first.`);
+  }
+  const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'usermods-store-'));
+  const ctx = await chromium.launchPersistentContext(profile, {
+    headless: true,
+    channel: 'chromium',
+    colorScheme: 'light',
+    viewport: PANEL,
+    // Literal pixels: the captures are placed into a fixed-size composite, so no scaling.
+    deviceScaleFactor: 1,
+    args: [`--disable-extensions-except=${EXT_DIR}`, `--load-extension=${EXT_DIR}`],
+  });
+  let [sw] = ctx.serviceWorkers();
+  if (!sw) sw = await ctx.waitForEvent('serviceworker', { timeout: 20_000 });
+  return {
+    ctx,
+    extId: new URL(sw.url()).host,
+    async close() {
+      await ctx.close().catch(() => {});
+      fs.rmSync(profile, { recursive: true, force: true });
+    },
+  };
+}
+
+async function openPanel(ctx, extId, { settings = {}, storage = {} } = {}) {
+  const page = await ctx.newPage();
+  await page.setViewportSize({ width: PANEL.width, height: PANE_H });
+  await page.goto(`chrome-extension://${extId}/sidepanel.html`);
+  await page.evaluate(
+    async ([s, extra]) => {
+      await chrome.storage.local.set({ settings: s, ...extra });
+    },
+    [{ provider: 'openai-compatible', baseUrl: BASE_URL, apiKey: '', model: 'demo', ...settings }, storage],
+  );
+  await page.reload();
+  await page.addStyleTag({ content: HIDE_SETUP_NOTICE });
+  return page;
+}
+
+/** Open the site tab and focus it, so the panel targets it rather than itself. */
+async function openSite(ctx, url) {
+  const site = await ctx.newPage();
+  await site.setViewportSize({ width: SITE.width, height: PANE_H });
+  await site.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+  await site.bringToFront();
+  return site;
+}
+
+async function runConversation(panel, text) {
+  await panel.locator('textarea').fill(text);
+  await panel.locator('.composer button.btn.primary').click();
+  await panel.locator('.messages .card h4').first().waitFor({ timeout: 60_000 });
+  await panel.waitForTimeout(700);
+}
+
+/** The same seeded library the README screenshots use, so both sets tell one story. */
+function seedMods() {
+  const now = Date.now();
+  const mk = (over) => ({
+    id: crypto.randomUUID(),
+    description: '',
+    version: '1.0.0',
+    matches: [],
+    excludeMatches: [],
+    includeGlobs: [],
+    excludeGlobs: [],
+    runAt: 'document_idle',
+    world: 'USER_SCRIPT',
+    allFrames: false,
+    grants: [],
+    requires: [],
+    resources: [],
+    enabled: true,
+    createdAt: now,
+    updatedAt: now,
+    ...over,
+  });
+  const header = (name, desc, match, grants = []) =>
+    [
+      '// ==UserScript==',
+      `// @name         ${name}`,
+      `// @version      1.0.0`,
+      `// @description  ${desc}`,
+      `// @match        ${match}`,
+      ...grants.map((g) => `// @grant        ${g}`),
+      '// ==/UserScript==',
+    ].join('\n');
+
+  return [
+    mk({
+      name: 'Wikipedia: full-width article',
+      description: 'Hides the pinned table of contents and lets the article body use the whole window.',
+      matches: ['*://*.wikipedia.org/wiki/*'],
+      source: `${header('Wikipedia: full-width article', 'Hides the pinned table of contents and lets the article body use the whole window.', '*://*.wikipedia.org/wiki/*')}\n\nconst style = document.createElement('style');\nstyle.textContent = \`\n  #vector-toc-pinned-container, .vector-column-start { display: none !important; }\n  .mw-page-container, .vector-body { max-width: none !important; }\n\`;\ndocument.head.appendChild(style);\n`,
+    }),
+    mk({
+      name: 'Hacker News dark',
+      description: 'A dark theme for Hacker News: dark surfaces, dimmed orange header, readable link colors.',
+      matches: ['*://news.ycombinator.com/*'],
+      source: `${header('Hacker News dark', 'A dark theme for Hacker News.', '*://news.ycombinator.com/*')}\n\nconst style = document.createElement('style');\nstyle.textContent = \`\n  body, #hnmain { background: #16181c !important; color: #c9ccd1 !important; }\n\`;\ndocument.documentElement.appendChild(style);\n`,
+    }),
+    mk({
+      name: 'GitHub: wider diffs',
+      description: 'Lets pull-request diffs use the full width of the window.',
+      matches: ['*://github.com/*'],
+      grants: ['GM_addStyle'],
+      enabled: false,
+      source: `${header('GitHub: wider diffs', 'Lets pull-request diffs use the full width of the window.', '*://github.com/*', ['GM_addStyle'])}\n\nGM_addStyle('.container-xl { max-width: none !important; }');\n`,
+    }),
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// Compositing
+// ---------------------------------------------------------------------------
+
+const FONT = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+const b64 = (file) => `data:image/png;base64,${fs.readFileSync(file).toString('base64')}`;
+
+/**
+ * Lay a site capture and a panel capture into one 1280x800 frame: a thin window chrome with the
+ * page's URL, the two panes, and a caption bar under them.
+ *
+ * `left` and `right` are paths to PNGs captured at SITE/PANEL width and PANE_H height. When
+ * `right` is null the left capture spans the full frame width (used for the install page, which
+ * is a full tab rather than a panel).
+ */
+async function composite(browser, { left, right, url, title, caption, out }) {
+  const page = await browser.newPage({ viewport: SHOT, deviceScaleFactor: 1 });
+  const panes = right
+    ? `<img class="pane" src="${b64(left)}" style="width:${SITE.width}px">
+       <img class="pane divider" src="${b64(right)}" style="width:${PANEL.width}px">`
+    : `<img class="pane" src="${b64(left)}" style="width:${SHOT.width}px">`;
+
+  await page.setContent(`<!doctype html><html><head><meta charset="utf-8"><style>
+      *{box-sizing:border-box}
+      html,body{margin:0;padding:0;width:${SHOT.width}px;height:${SHOT.height}px;overflow:hidden;
+                font-family:${FONT};background:#fff}
+      .chrome{height:${CHROME_H}px;display:flex;align-items:center;gap:8px;padding:0 12px;
+              background:#e7e5e4;border-bottom:1px solid #d6d3d1}
+      .dot{width:10px;height:10px;border-radius:50%}
+      .omni{flex:1;margin-left:6px;height:20px;border-radius:10px;background:#fafaf9;
+            border:1px solid #d6d3d1;display:flex;align-items:center;padding:0 10px;
+            font-size:11px;color:#78716c;overflow:hidden;white-space:nowrap}
+      .panes{height:${PANE_H}px;display:flex;overflow:hidden;background:#fff}
+      .pane{display:block;height:${PANE_H}px;object-fit:cover;object-position:top left}
+      .divider{border-left:1px solid #d6d3d1}
+      .caption{height:${CAPTION_H}px;display:flex;flex-direction:column;justify-content:center;
+               padding:0 24px;background:#1c1917;color:#fafaf9}
+      .caption b{font-size:15px;font-weight:600}
+      .caption span{font-size:12.5px;color:#a8a29e;margin-top:2px}
+    </style></head><body>
+      <div class="chrome">
+        <div class="dot" style="background:#f87171"></div>
+        <div class="dot" style="background:#fbbf24"></div>
+        <div class="dot" style="background:#4ade80"></div>
+        <div class="omni">${url}</div>
+      </div>
+      <div class="panes">${panes}</div>
+      <div class="caption"><b>${title}</b><span>${caption}</span></div>
+    </body></html>`);
+
+  const file = path.join(OUT_DIR, out);
+  await page.screenshot({ path: file });
+  await page.close();
+  expectSize(file, SHOT);
+  log(`${out} ${SHOT.width}x${SHOT.height}`);
+  return file;
+}
+
+// ---------------------------------------------------------------------------
+// The five screenshots
+// ---------------------------------------------------------------------------
+
+const tmp = (name) => path.join(os.tmpdir(), `usermods-store-${name}-${process.pid}.png`);
+
+/** 01 — chat proposing a mod on Wikipedia. */
+async function shotChat(b, composer) {
+  const panel = await openPanel(b.ctx, b.extId);
+  const site = await openSite(b.ctx, WIKI);
+  await panel.waitForTimeout(1200);
+  await runConversation(panel, 'hide the sidebar and make the article full width');
+
+  const l = tmp('chat-site');
+  const r = tmp('chat-panel');
+  await site.screenshot({ path: l });
+  await panel.screenshot({ path: r });
+  return composite(composer, {
+    left: l,
+    right: r,
+    url: 'en.wikipedia.org/wiki/Common_kingfisher',
+    title: 'Describe the change. It writes the userscript.',
+    caption: 'The model reads the page, checks its selectors against the live DOM, and proposes a mod you can Try before you Save.',
+    out: '01-chat.png',
+  });
+}
+
+/** 02 — pointing at an element, which drops an @reference chip in the composer. */
+async function shotRefs(b, composer) {
+  const panel = await openPanel(b.ctx, b.extId);
+  const site = await openSite(b.ctx, WIKI);
+  await panel.waitForTimeout(1200);
+  await runConversation(panel, 'hide the sidebar and make the article full width');
+
+  // The genuine element picker: the panel starts it, the content script broadcasts the pick.
+  await panel.locator('.composer button.btn', { hasText: 'Point at element' }).click();
+  await panel.waitForTimeout(400);
+  const target = site.locator('.infobox, #mw-content-text table').first();
+  await target.scrollIntoViewIfNeeded();
+  const box = await target.boundingBox();
+  if (!box) throw new Error('could not find an element to point at');
+  const x = box.x + box.width / 2;
+  const y = box.y + Math.min(box.height / 2, 120);
+  await site.mouse.move(x, y);
+  await site.waitForTimeout(250);
+  await site.mouse.click(x, y);
+  await panel.locator('.composer .chip').first().waitFor({ timeout: 10_000 });
+  await panel
+    .locator('textarea')
+    .fill((await panel.locator('textarea').inputValue()).trim() + ' should open full size when I click it');
+  await panel.waitForTimeout(400);
+
+  const l = tmp('refs-site');
+  const r = tmp('refs-panel');
+  await site.screenshot({ path: l });
+  await panel.screenshot({ path: r });
+  return composite(composer, {
+    left: l,
+    right: r,
+    url: 'en.wikipedia.org/wiki/Common_kingfisher',
+    title: 'Point at anything and say "this".',
+    caption: 'Clicking an element on the page drops an @reference into your message, so the model knows exactly what you mean.',
+    out: '02-point.png',
+  });
+}
+
+/** 03 — the Mods view, split by what matches the page in view. */
+async function shotMods(b, composer) {
+  const panel = await openPanel(b.ctx, b.extId, { storage: { mods: seedMods() } });
+  const site = await openSite(b.ctx, WIKI);
+  await panel.waitForTimeout(1000);
+  await panel.locator('.tabs button', { hasText: 'Mods' }).click();
+  await panel.waitForTimeout(700);
+
+  const l = tmp('mods-site');
+  const r = tmp('mods-panel');
+  await site.screenshot({ path: l });
+  await panel.screenshot({ path: r });
+  return composite(composer, {
+    left: l,
+    right: r,
+    url: 'en.wikipedia.org/wiki/Common_kingfisher',
+    title: 'Your mods, running on every page load.',
+    caption: 'Saved scripts split by whether they match this site. Toggle, run, export or delete each one.',
+    out: '03-mods.png',
+  });
+}
+
+/**
+ * 04 — the install preview for a real Greasy Fork script.
+ *
+ * This one is a full tab rather than a side panel, so it spans the whole frame width.
+ */
+async function shotInstall(b, composer) {
+  const page = await b.ctx.newPage();
+  await page.setViewportSize({ width: SHOT.width, height: PANE_H });
+  await page.goto(`chrome-extension://${b.extId}/install.html#${GREASY_FORK_URL}`);
+  await page.locator('.card h4, .card .error').first().waitFor({ timeout: 45_000 });
+  const err = await page.locator('.card .error').first().textContent().catch(() => null);
+  if (err) throw new Error(`install preview failed: ${err}`);
+  await page.waitForTimeout(600);
+
+  // The install page is a centered column, so on a PANE_H-tall viewport the bottom is empty
+  // background. Center the column vertically instead, so the pane is filled by content.
+  const contentH = await page.evaluate(
+    () => document.querySelector('.page').getBoundingClientRect().height,
+  );
+  if (contentH < PANE_H) {
+    // Sits a little above true center, which reads as centered to the eye.
+    const pad = Math.round((PANE_H - contentH) * 0.42);
+    await page.addStyleTag({ content: `.page { padding-top: ${pad}px !important; }` });
+    await page.waitForTimeout(150);
+  }
+
+  const l = tmp('install');
+  await page.screenshot({ path: l });
+  return composite(composer, {
+    left: l,
+    right: null,
+    url: 'Install — GitHub Custom Global Navigation',
+    title: 'Install userscripts from anywhere.',
+    caption: 'A .user.js link shows what it matches, what it is granted and what it loads, before anything is saved.',
+    out: '04-install.png',
+  });
+}
+
+/** 05 — the Migrate from Tampermonkey card, expanded. */
+async function shotMigrate(b, composer) {
+  const panel = await openPanel(b.ctx, b.extId, { storage: { mods: seedMods() } });
+  const site = await openSite(b.ctx, WIKI);
+  await panel.waitForTimeout(900);
+  await panel.locator('.tabs button', { hasText: 'Mods' }).click();
+  await panel
+    .locator('.card', { hasText: 'Migrate from Tampermonkey' })
+    .locator('button.btn', { hasText: 'Show' })
+    .click();
+  await panel.waitForTimeout(500);
+
+  const l = tmp('migrate-site');
+  const r = tmp('migrate-panel');
+  await site.screenshot({ path: l });
+  await panel.screenshot({ path: r });
+  return composite(composer, {
+    left: l,
+    right: r,
+    url: 'en.wikipedia.org/wiki/Common_kingfisher',
+    title: 'Bring your Tampermonkey library across.',
+    caption: 'One backup file imports every script, with its on/off state and its stored values.',
+    out: '05-migrate.png',
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Promo tile and marquee — typography and the icon, no third-party sites.
+// ---------------------------------------------------------------------------
+
+/**
+ * Both promo images are the same composition at two aspect ratios: the icon, the name, the
+ * tagline, on the UI's dark ink with the amber accent. `scale` moves every dimension together
+ * so the 440x280 tile is not just the marquee with smaller text in a big empty field.
+ */
+async function promo(browser, { size, out, scale, tagline, sub }) {
+  const page = await browser.newPage({ viewport: size, deviceScaleFactor: 1 });
+  const px = (n) => `${Math.round(n * scale)}px`;
+
+  await page.setContent(`<!doctype html><html><head><meta charset="utf-8"><style>
+      *{box-sizing:border-box}
+      html,body{margin:0;padding:0;width:${size.width}px;height:${size.height}px;overflow:hidden}
+      /* A grid with one centered cell fills the frame exactly, so the block is optically
+         centered at both aspect ratios rather than floating above a dead band.
+         The amber glow is centred on the composition rather than the top-left corner: an
+         off-centre wash pulls the eye up and makes the lower half read as dead space. */
+      body{font-family:${FONT};background:#1c1917;color:#fafaf9;display:grid;place-items:center;
+           background-image:
+             radial-gradient(70% 90% at 50% 46%, rgba(245,158,11,0.17), transparent 70%),
+             radial-gradient(90% 70% at 8% 4%, rgba(245,158,11,0.10), transparent 60%);}
+      .stack{display:flex;flex-direction:column;align-items:center;text-align:center;
+             padding:0 ${px(28)}}
+      img{width:${px(104)};height:${px(104)};display:block;margin-bottom:${px(22)}}
+      h1{margin:0;font-size:${px(60)};font-weight:650;letter-spacing:-0.025em;line-height:1}
+      p{margin:${px(14)} 0 0;font-size:${px(26)};font-weight:450;color:#f59e0b;line-height:1.25;
+        max-width:${px(860)}}
+      small{display:block;margin-top:${px(16)};font-size:${px(17)};color:#a8a29e;line-height:1.4;
+            max-width:${px(680)}}
+    </style></head><body>
+      <div class="stack">
+        <img src="${b64(path.join(ROOT, 'public', 'icon', '128.png'))}">
+        <h1>usermods</h1>
+        <p>${tagline}</p>
+        ${sub ? `<small>${sub}</small>` : ''}
+      </div>
+    </body></html>`);
+
+  const file = path.join(OUT_DIR, out);
+  await page.screenshot({ path: file });
+  await page.close();
+  expectSize(file, size);
+  log(`${out} ${size.width}x${size.height}`);
+  return file;
+}
+
+// ---------------------------------------------------------------------------
+
+async function main() {
+  fs.mkdirSync(OUT_DIR, { recursive: true });
+  const mock = await startMock();
+  const composer = await chromium.launch({ channel: 'chromium' });
+  const made = [];
+  try {
+    // Each screenshot gets a fresh profile, so seeded storage from one never leaks into the next.
+    for (const shot of [shotChat, shotRefs, shotMods, shotInstall, shotMigrate]) {
+      const b = await launch();
+      try {
+        made.push(await shot(b, composer));
+      } finally {
+        await b.close();
+      }
+    }
+
+    made.push(
+      await promo(composer, {
+        size: TILE,
+        out: 'promo-tile.png',
+        scale: 0.52,
+        tagline: 'Vibe-code userscripts in place',
+      }),
+    );
+    made.push(
+      await promo(composer, {
+        size: MARQUEE,
+        out: 'marquee.png',
+        scale: 1.25,
+        tagline: 'Vibe-code userscripts in place',
+        sub: 'Customize any website by chatting with the LLM of your choice. Your key, your machine, no account.',
+      }),
+    );
+  } finally {
+    await composer.close();
+    mock.kill();
+  }
+
+  // Re-verify every file from disk at the end, so the summary is read back rather than assumed.
+  console.log('');
+  for (const file of made) {
+    const { width, height } = pngSize(file);
+    const kb = Math.round(fs.statSync(file).size / 1024);
+    console.log(`  ${path.relative(ROOT, file).padEnd(36)} ${width}x${height}  ${kb} KB`);
+  }
+  log(`wrote ${made.length} store assets to ${path.relative(ROOT, OUT_DIR)}/`);
+}
+
+await main();

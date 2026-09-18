@@ -1,0 +1,12 @@
+<!--
+  Concept G — "window + wand stroke".
+  Amber window tile, with a single bold dark diagonal stroke and two sparks: the page being
+  rewritten by the model. Very legible at 16px but the diagonal reads as "prohibited"/"no".
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <rect x="12" y="16" width="104" height="96" rx="22" fill="#f59e0b"/>
+  <circle cx="30" cy="30" r="5" fill="#1c1917"/>
+  <circle cx="48" cy="30" r="5" fill="#1c1917"/>
+  <path d="M40 96 L92 50" stroke="#1c1917" stroke-width="13" stroke-linecap="round"/>
+  <path d="M74 84 l6 -6 M88 94 l8 -8" stroke="#1c1917" stroke-width="9" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,13 @@
+<!--
+  Concept A — "window + wedge".
+  A browser window in dark ink; an amber wedge cuts across the content area, standing for the
+  mod rewriting the page. Reads as a window at 16px, but the wedge fights the title bar.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <rect x="10" y="16" width="108" height="96" rx="16" fill="#1c1917"/>
+  <circle cx="26" cy="32" r="4" fill="#57534e"/>
+  <circle cx="40" cy="32" r="4" fill="#57534e"/>
+  <circle cx="54" cy="32" r="4" fill="#57534e"/>
+  <path d="M10 46 H118 V96 a16 16 0 0 1-16 16 H26 a16 16 0 0 1-16-16 Z" fill="#292524"/>
+  <path d="M18 92 L64 52 L110 92 Z" fill="#f59e0b"/>
+</svg>

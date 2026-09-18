@@ -1,0 +1,16 @@
+<!--
+  Concept B — "window + slider".
+  A browser window with a single amber control slider across it: the site, with a knob you turn.
+  Legible, but the slider reads as a generic settings icon rather than anything about scripts.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <rect x="10" y="16" width="108" height="96" rx="16" fill="#1c1917"/>
+  <path d="M10 44 H118" stroke="#44403c" stroke-width="4"/>
+  <circle cx="26" cy="30" r="4" fill="#57534e"/>
+  <circle cx="40" cy="30" r="4" fill="#57534e"/>
+  <rect x="26" y="58" width="76" height="8" rx="4" fill="#44403c"/>
+  <rect x="26" y="58" width="44" height="8" rx="4" fill="#f59e0b"/>
+  <circle cx="70" cy="62" r="13" fill="#f59e0b" stroke="#1c1917" stroke-width="5"/>
+  <rect x="26" y="86" width="52" height="8" rx="4" fill="#44403c"/>
+  <rect x="26" y="86" width="20" height="8" rx="4" fill="#44403c"/>
+</svg>

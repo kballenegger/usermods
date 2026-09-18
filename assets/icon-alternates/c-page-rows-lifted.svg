@@ -1,0 +1,13 @@
+<!--
+  Concept C — "page rows, one lifted".
+  Page content as stacked rows of dark ink; one row lifts out of the stack and is rewritten in
+  amber, wider than the rest. Literally "a site being modded", and the lifted amber bar survives
+  down to 16px because it is the only chromatic shape.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <rect x="12" y="12" width="104" height="104" rx="22" fill="#1c1917"/>
+  <rect x="30" y="34" width="52" height="9" rx="4.5" fill="#57534e"/>
+  <rect x="30" y="52" width="68" height="9" rx="4.5" fill="#44403c"/>
+  <rect x="22" y="70" width="84" height="14" rx="7" fill="#f59e0b"/>
+  <rect x="30" y="93" width="40" height="9" rx="4.5" fill="#44403c"/>
+</svg>

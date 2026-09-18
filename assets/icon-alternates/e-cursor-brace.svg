@@ -1,0 +1,13 @@
+<!--
+  Concept E — "brace on a page".
+  The page as an amber rounded square, with a dark code brace { } punched through it: script
+  applied to a site. Strong at large sizes; at 16px the two brace arms thin out and the counter
+  between them closes up.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <rect x="14" y="14" width="100" height="100" rx="24" fill="#f59e0b"/>
+  <path d="M54 34 q-12 0 -12 12 v10 q0 8 -8 8 q8 0 8 8 v10 q0 12 12 12"
+        fill="none" stroke="#1c1917" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M74 34 q12 0 12 12 v10 q0 8 8 8 q-8 0 -8 8 v10 q0 12 -12 12"
+        fill="none" stroke="#1c1917" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
