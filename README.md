@@ -13,6 +13,7 @@ Userscripts, userstyles, usermods.
 ## Why
 
 - **Any backend.** Anthropic's API, OpenAI, OpenRouter, or anything OpenAI-compatible: Ollama, LM Studio, vLLM, mlx_lm. Your key, your machine, no account, no hosted service.
+- **Use the subscription you already pay for.** Sign in with ChatGPT (Plus, Pro, Team) or SuperGrok / X Premium+ straight from Settings. No API key, no local proxy, no per-token bill. [Details](#using-a-subscription-instead-of-an-api-key).
 - **The model actually sees the page.** It has tools to read a pruned DOM, list elements, read computed styles, take screenshots, and run scripts to test its work before proposing anything.
 - **One-off tasks too.** "Scroll to the bottom, open every carousel, and give me download links for all the photos" runs as a script, no mod required.
 - **Portable.** Mods are plain userscripts with a `==UserScript==` header. Nothing proprietary.
