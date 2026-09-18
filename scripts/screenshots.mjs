@@ -334,7 +334,9 @@ async function install() {
     // The install page is a full page, not a panel, so give it a page-sized viewport.
     const page = await b.ctx.newPage();
     await page.setViewportSize({ width: 860, height: 900 });
-    await page.goto(`chrome-extension://${b.extId}/install.html?url=${encodeURIComponent(GREASY_FORK_URL)}`);
+    // The script URL travels in the fragment, taken verbatim, the way the .user.js redirect rule
+    // writes it — a query parameter would let the fetched URL smuggle its own `url=` past us.
+    await page.goto(`chrome-extension://${b.extId}/install.html#${GREASY_FORK_URL}`);
     // Wait for the fetched preview (or an error, which should fail the run rather than be shot).
     await page.locator('.card h4, .card .error').first().waitFor({ timeout: 45_000 });
     const err = await page.locator('.card .error').first().textContent().catch(() => null);

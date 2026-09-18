@@ -1,7 +1,12 @@
 // The page a .user.js link lands on: a dynamic declarativeNetRequest rule redirects userscript
-// navigations here with ?url=<the script>, the way Tampermonkey intercepts them.
+// navigations here as install.html#<the script URL>, the way Tampermonkey intercepts them.
+//
+// The URL arrives in the fragment and everything after the first '#' is taken verbatim, so a script
+// URL carrying its own `url=` parameter cannot decide what this page previews. Whatever it turns
+// out to be is shown in full below, and only http(s) is fetched.
 import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom/client';
+import { isInstallableUrl, scriptUrlFromLocation } from '@/lib/installurl';
 import { rpc } from '@/lib/rpc';
 import type { ScriptPreview } from '@/lib/types';
 import { InstallPreview } from '../sidepanel/components/InstallPreview';
@@ -14,11 +19,15 @@ function InstallPage() {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
 
-  const url = new URLSearchParams(location.search).get('url') ?? '';
+  const url = scriptUrlFromLocation(location);
 
   useEffect(() => {
     if (!url) {
       setError('No script URL. Open a .user.js link, or install from the usermods side panel.');
+      return;
+    }
+    if (!isInstallableUrl(url)) {
+      setError(`Only http and https userscripts can be installed. This link was: ${url}`);
       return;
     }
     rpc({ type: 'mods.preview', url })
@@ -47,6 +56,12 @@ function InstallPage() {
   return (
     <div className="page">
       <h2>Install userscript</h2>
+      {url && (
+        <div className="card">
+          <div className="muted label">Fetching from</div>
+          <div className="break"><code>{url}</code></div>
+        </div>
+      )}
       {error && <div className="card"><div className="error">{error}</div></div>}
       {done && preview && (
         <div className="card">
