@@ -1,0 +1,12 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/kballenegger/usermods/security/advisories/new
+    about: >
+      Please do not file exploitable issues publicly. This opens a private security advisory,
+      visible only to you and the maintainer. See SECURITY.md for scope.
+  - name: Question or idea
+    url: https://github.com/kballenegger/usermods/discussions
+    about: >
+      For anything that is not a bug or a concrete feature request: how something works, whether an
+      approach makes sense, showing off a mod you built.

@@ -1,0 +1,137 @@
+name: Bug report
+description: Something in usermods does not work the way it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. The three things that make a bug fixable here are: which provider you
+        were using, whether **Allow User Scripts** is on, and whatever the console said.
+
+        If the problem is a userscript that works in Tampermonkey but not here, use the
+        *Userscript works in Tampermonkey but not in usermods* template instead — it asks for the
+        right details.
+
+        If you think it is a security vulnerability, do not file it here. See
+        [SECURITY.md](https://github.com/kballenegger/usermods/blob/main/SECURITY.md) for private
+        reporting.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+      placeholder: |
+        I asked it to hide the sidebar on example.com. It streamed a reply, then the proposal card
+        never appeared and the panel went blank.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: >
+        The smallest sequence that shows it. A public URL helps enormously — page structure is
+        usually part of the story.
+      placeholder: |
+        1. Open the panel on https://en.wikipedia.org/wiki/Cat
+        2. Send "make the article full width"
+        3. Wait for the reply to finish
+    validations:
+      required: true
+
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Which provider
+      description: Which backend was configured in Settings when this happened.
+      options:
+        - Anthropic (API key)
+        - OpenAI (API key)
+        - xAI Grok (API key)
+        - OpenRouter
+        - Local model (Ollama, LM Studio, vLLM, mlx_lm)
+        - Other OpenAI-compatible endpoint
+        - ChatGPT subscription sign-in
+        - SuperGrok / xAI subscription sign-in
+        - Not applicable / no model involved
+    validations:
+      required: true
+
+  - type: input
+    id: model
+    attributes:
+      label: Model
+      description: The model id you had set, if one is relevant.
+      placeholder: claude-opus-5
+    validations:
+      required: false
+
+  - type: input
+    id: chrome-version
+    attributes:
+      label: Chrome version
+      description: "From `chrome://version` — the first line. usermods needs Chrome 135+."
+      placeholder: "141.0.7390.55 (Official Build) (arm64)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: allow-user-scripts
+    attributes:
+      label: Is "Allow User Scripts" turned on?
+      description: >
+        `chrome://extensions` → Details on usermods → the **Allow User Scripts** toggle. Chrome
+        requires it for any extension that runs user scripts, and most "nothing happens" reports
+        are this.
+      options:
+        - "Yes, it is on"
+        - "No, it is off"
+        - "I do not see that toggle"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: build
+    attributes:
+      label: Which build
+      description: >
+        The two builds differ — the Web Store build has no subscription sign-in.
+      options:
+        - Built from source (npm run build) or dev
+        - Chrome Web Store
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: usermods version or commit
+      description: The version shown in the panel, or the commit you built from.
+      placeholder: 0.1.0, or commit abc1234
+    validations:
+      required: false
+
+  - type: textarea
+    id: console
+    attributes:
+      label: Console output
+      description: >
+        Errors from wherever the failure was. The side panel has its own console (right-click inside
+        the panel → Inspect); the background worker's is at `chrome://extensions` → Details →
+        **Inspect views: service worker**; a failing mod logs to the page's own console. Include
+        whichever is relevant, or all three if you are not sure. This is pasted as code — no need
+        for backticks.
+      render: text
+    validations:
+      required: false
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Screenshots, the generated script, how often it happens, what you already ruled out.
+    validations:
+      required: false

@@ -180,13 +180,16 @@ side panel (React)  ──rpc──▶  background service worker  ──▶  LL
 - **Provider adapters** live in `lib/providers/`. Anthropic uses the official SDK; the OpenAI-compatible adapter speaks `chat/completions` with function calling over raw fetch. Adding a provider means implementing one `chat()` method.
 - **The agent loop** (`lib/agent/`) is provider-neutral. Tools: `get_page`, `find_elements`, `get_styles`, `run_script`, `screenshot`, `propose_mod`.
 - **Mods** are stored in `chrome.storage.local` as full userscript text. The header is parsed for name, description, `@match`/`@include`/`@exclude`, `@grant`, `@require`, `@resource`, `@run-at` and `@noframes`. Enabled mods are registered with `chrome.userScripts`, each wrapped in a closure that provides the `GM_*` and `GM.*` API, in the world and at the run-at its header asks for.
-- **Chat history** is kept per tab in `chrome.storage.session`, so it survives the service worker sleeping but not a browser restart.
+- **Chat history** is kept per site in `chrome.storage.local`, so conversations survive the service worker sleeping and a browser restart. The index is capped at 200 chats, oldest dropped, and screenshots are stripped from stored history.
 
 ## Security notes
 
 - Page content that the model reads is untrusted. The system prompt tells the model to treat it as data, and every generated script is shown to you before it is saved. Read it.
 - Scripts run in an isolated world: they see the DOM but not the page's JavaScript globals. Default `@match` is the current site only.
 - Your API key is stored in extension local storage and sent only to the endpoint you configure.
+
+Found a vulnerability? Please report it privately through GitHub's **Report a vulnerability** button
+rather than opening an issue. [SECURITY.md](SECURITY.md) has the scope and what to expect.
 
 ## Privacy
 
@@ -205,7 +208,7 @@ authenticate.
 
 The panel says all of this in the side panel before your first message, and the notice is always
 available again from Settings → *Review data notice*. The full policy is in
-[docs/privacy.md](docs/privacy.md); the Chrome Web Store submission material is in
+[PRIVACY.md](PRIVACY.md); the Chrome Web Store submission material is in
 [docs/store/](docs/store/).
 
 ## Roadmap
@@ -215,6 +218,12 @@ available again from Settings → *Review data notice*. The full policy is in
 - Mod sharing: export is there; a gallery is not.
 - CSS-only mods via a `@usermods-style` header, so pure restyles need no JavaScript.
 - Firefox, once its side panel story is settled.
+
+## Contributing
+
+Issues and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) covers the setup, the npm
+scripts, where everything lives, how to add a provider, and the one hard rule: every fix lands with a
+regression test. Participation is governed by the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Author
 

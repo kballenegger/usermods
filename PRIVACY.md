@@ -11,8 +11,9 @@ telemetry. The author of usermods receives no data from the extension — none, 
 describes data that either stays on your own computer or travels directly from your browser to a
 service that *you* chose and configured.
 
-The source code for every claim on this page is public at
-<https://github.com/kballenegger/usermods>.
+The canonical address of this policy — the one given to the Chrome Web Store — is
+<https://github.com/kballenegger/usermods/blob/main/PRIVACY.md>. The source code for every claim on
+this page is public at <https://github.com/kballenegger/usermods>.
 
 **Two builds.** The build published on the Chrome Web Store omits ChatGPT and SuperGrok subscription
 sign-in; it contacts no vendor authentication endpoint at all. The sections below marked
@@ -112,7 +113,7 @@ No request is ever made to a server operated by the author of usermods, because 
 
 Each permission usermods requests exists for a feature described on its store listing. A detailed,
 per-permission justification is published alongside this policy at
-[docs/store/permissions.md](store/permissions.md).
+[docs/store/permissions.md](docs/store/permissions.md).
 
 In short: broad host access (`<all_urls>`) exists because usermods works on whatever site you are
 looking at, and cannot know in advance which sites those are — the same access a userscript manager

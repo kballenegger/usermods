@@ -1,0 +1,71 @@
+name: Feature request
+description: Suggest something usermods should be able to do.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Worth knowing before you write: usermods has **no server, no account and no telemetry**, and
+        that is a deliberate constraint rather than a missing feature. Anything needing a
+        usermods-operated backend is out of scope. The
+        [Roadmap](https://github.com/kballenegger/usermods/blob/main/README.md#roadmap) says what is
+        already intended.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: >
+        The problem, not the solution. What were you doing when you wanted this, and what stopped
+        you?
+      placeholder: >
+        I have a mod that hides a sidebar, and I wanted to tweak it after saving, but the only way
+        is to export it, edit the file and import it again.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What should it do?
+      description: How you picture it working, in as much or as little detail as you have.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you tried instead
+      description: >
+        Workarounds you found, and why they fall short. If another userscript manager or extension
+        does this well, naming it is useful.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of usermods
+      options:
+        - The chat / agent loop
+        - Mods management (list, toggle, export)
+        - Installing outside scripts and the install page
+        - GM API compatibility
+        - Tampermonkey migration
+        - Providers and Settings
+        - The side panel UI
+        - Something else / not sure
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Would you like to implement it?
+      description: >
+        Entirely optional, and a "no" costs nothing. If yes, read
+        [CONTRIBUTING.md](https://github.com/kballenegger/usermods/blob/main/CONTRIBUTING.md) and
+        wait for a reply on the design before writing much code.
+      options:
+        - label: I would be willing to open a PR for this
+          required: false
