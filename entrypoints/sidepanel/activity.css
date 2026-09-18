@@ -1,45 +1,52 @@
 /*
- * The live activity line. Self-contained on purpose: it uses the restyle's custom properties where
- * they exist and falls back to the current palette where they do not, so it looks right before and
- * after that lands.
+ * The live activity line, in Volt OS terms.
  *
- * The row reserves its own height only while it is busy, and it sits outside the scrolling message
- * list, so appearing and disappearing never moves the transcript or its scroll position.
+ * The dot is the design system's own `.dot` (styles.css): volt with the glow while things are
+ * going well, amber for a stall, coral for a lost connection — the same three states the tool rows
+ * use, so a reader learns one vocabulary rather than two. This file adds only what is specific to
+ * a status LINE: where it sits, how it is typed, and the pulse.
+ *
+ * The row sits between the scrolling message list and the composer and reserves height only while
+ * it is showing, so appearing and disappearing never moves the transcript or its scroll position.
+ * It is `flex: none` inside the same column, which means it grows downward into the composer's
+ * gap rather than pushing the messages up.
  */
 
 .activity {
   flex: none;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--sp-2);
   min-height: 20px;
-  padding: 2px 2px 4px;
-  font-size: 11.5px;
-  line-height: 1.3;
-  color: var(--text-2, #78716c);
+  padding: var(--sp-2) var(--sp-4);
+  border-top: 1px solid var(--border-hair);
+  font: 400 var(--fs-meta) / 1.3 var(--font-ui);
+  color: var(--text-2);
   overflow: hidden;
 }
 
-.activity-dot {
-  flex: none;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--volt, #d97706);
-  box-shadow: var(--glow-dot, none);
+/* Volt dot, pulsing: this is the one place in the panel where something is happening right now. */
+.activity .dot {
   animation: activity-pulse 1s ease-in-out infinite;
 }
 
-.activity.warn { color: var(--warn, #e8b84b); }
-.activity.warn .activity-dot { background: var(--warn, #e8b84b); }
-.activity.error { color: var(--error, #f26d5e); }
-.activity.error .activity-dot { background: var(--error, #f26d5e); }
-
-/* A line that is no longer moving should not pretend it is. */
-.activity.warn .activity-dot,
-.activity.error .activity-dot {
+/* Warning and error never glow, and a line that is no longer moving should not pretend it is. */
+.activity.warn {
+  color: var(--warn-text);
+}
+.activity.error {
+  color: var(--error-text);
+}
+.activity.warn .dot,
+.activity.error .dot {
   animation: none;
   box-shadow: none;
+}
+.activity.warn .dot {
+  background: var(--warn);
+}
+.activity.error .dot {
+  background: var(--error);
 }
 
 .activity-label {
@@ -49,30 +56,55 @@
   white-space: nowrap;
 }
 
+/* A tool name or a selector is an identifier, so it wears the mono face the rest of the UI uses. */
 .activity-mono {
-  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-family: var(--font-mono);
+  color: var(--text-1);
 }
 
-.activity-sep { flex: none; opacity: 0.6; }
-.activity-seg { flex: none; font-variant-numeric: tabular-nums; }
+.activity-sep {
+  flex: none;
+  color: var(--text-3);
+}
+.activity-seg {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
 
+/* The inline action is a quiet text button, not a third button competing with the composer's. */
 .activity button.activity-action {
   flex: none;
   margin-left: auto;
-  font: inherit;
+  font: 600 var(--fs-label) / 1 var(--font-ui);
+  text-transform: uppercase;
+  letter-spacing: var(--lbl-tracking);
   background: none;
   border: 0;
-  padding: 0 2px;
-  color: inherit;
+  padding: 2px 0;
+  color: var(--accent-text);
   cursor: pointer;
+}
+.activity button.activity-action:hover {
+  color: var(--volt-bright);
+}
+.activity.warn button.activity-action,
+.activity.error button.activity-action {
+  color: inherit;
   text-decoration: underline;
 }
 
 @keyframes activity-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.35; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .activity-dot { animation: none; }
+  .activity .dot {
+    animation: none;
+  }
 }

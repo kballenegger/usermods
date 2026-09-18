@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Activity } from './Activity';
-import type { Phase } from '@/lib/activity';
+import { IDLE_ACTIVITY, activityFromEvent, allDisconnected, withActivity, withoutActivity, type ChatActivity } from '@/lib/activity';
 import { archivedChats, isArchived, liveChats, loadItems, pickChatToShow, relativeTime, saveItems, titleFromText, type Chat as ChatRecord } from '@/lib/chats';
 import { findByName } from '@/lib/modmatch';
 import { modFromProposal } from '@/lib/mods';
@@ -30,7 +30,7 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
    * else. Every event updates its own chat's entry, including chats that are off screen, so
    * switching to a running chat shows that chat's real progress rather than starting from nothing.
    */
-  const [activities, setActivities] = useState<ReadonlyMap<string, ActivityState>>(() => new Map());
+  const [activities, setActivities] = useState<ReadonlyMap<string, ChatActivity>>(() => new Map());
   /**
    * The last message sent in each chat, so Retry on a dead port resends into the chat the failed
    * message belonged to and not into whatever happens to be on screen.
@@ -298,15 +298,7 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
       // The port is the panel's only link to every chat at once, so a dead port marks EVERY chat
       // that was mid-run as disconnected — not just the visible one. Each such chat then offers
       // its own Retry, which resends that chat's own last message.
-      setActivities((prev) => {
-        let next: Map<string, ActivityState> | null = null;
-        for (const [id, a] of prev) {
-          if (a.phase === 'idle' || a.disconnected) continue;
-          next ??= new Map(prev);
-          next.set(id, { ...a, disconnected: true });
-        }
-        return next ?? prev;
-      });
+      setActivities(allDisconnected);
     });
     portRef.current = port;
     return port;
@@ -828,60 +820,6 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
   );
 }
 
-/** Everything one chat's activity line needs, kept in one object so one setState updates it all. */
-interface ActivityState {
-  phase: Phase;
-  tool?: string;
-  detail?: string;
-  iteration?: number;
-  startedAt: number | null;
-  lastEventAt: number | null;
-  writing?: boolean;
-  queued: number;
-  disconnected?: boolean;
-}
-
-const IDLE_ACTIVITY: ActivityState = { phase: 'idle', startedAt: null, lastEventAt: null, queued: 0 };
-
-/**
- * Fold one port event into ONE chat's activity. Two things matter here: every event refreshes
- * lastEventAt (silence is the stall signal), and the first text delta of a model phase flips
- * "waiting for model" to "writing".
- */
-function activityFromEvent(a: ActivityState, e: AgentEvent): ActivityState {
-  const at = Date.now();
-  switch (e.type) {
-    case 'status':
-      if (e.phase === 'idle') return IDLE_ACTIVITY;
-      return {
-        ...a,
-        phase: e.phase,
-        tool: e.tool,
-        detail: e.detail,
-        iteration: e.iteration,
-        startedAt: a.startedAt ?? at,
-        lastEventAt: at,
-        // A new phase has not written anything yet.
-        writing: false,
-        disconnected: false,
-      };
-    case 'text':
-      return { ...a, lastEventAt: at, writing: a.phase === 'model' ? true : a.writing };
-    case 'accepted':
-    case 'unqueued':
-      return { ...a, lastEventAt: at, queued: Math.max(0, a.queued - 1) };
-    case 'done':
-    case 'error':
-      return IDLE_ACTIVITY;
-    case 'chat_title':
-      // A rename arrives AFTER 'done', from the tool-free naming call. It is not the run, so it
-      // neither revives a finished line nor counts as proof of life for one still going.
-      return a;
-    default:
-      return { ...a, lastEventAt: at };
-  }
-}
-
 /** The saved mod a proposal of this name would revise, or undefined to save a new one. */
 async function findModByName(name: string): Promise<Mod | undefined> {
   try {
@@ -895,34 +833,6 @@ async function findModByName(name: string): Promise<Mod | undefined> {
 function withoutChat(set: ReadonlySet<string>, id: string): ReadonlySet<string> {
   if (!set.has(id)) return set;
   const next = new Set(set);
-  next.delete(id);
-  return next;
-}
-
-/**
- * Apply an update to one chat's activity entry. An entry that comes out idle is dropped rather
- * than kept as an idle row, so the map holds only chats that have something to say and a chat that
- * finished leaves nothing behind. Returns the same map when nothing changed, so React can skip.
- */
-function withActivity(
-  map: ReadonlyMap<string, ActivityState>,
-  id: string,
-  fn: (prev: ActivityState) => ActivityState,
-): ReadonlyMap<string, ActivityState> {
-  const prev = map.get(id) ?? IDLE_ACTIVITY;
-  const updated = fn(prev);
-  if (updated === prev) return map;
-  // A disconnected line is kept even though its phase reads idle: it is still saying something.
-  if (updated.phase === 'idle' && !updated.disconnected) return withoutActivity(map, id);
-  const next = new Map(map);
-  next.set(id, updated);
-  return next;
-}
-
-/** One chat's activity entry removed, or the same map when it had none. */
-function withoutActivity(map: ReadonlyMap<string, ActivityState>, id: string): ReadonlyMap<string, ActivityState> {
-  if (!map.has(id)) return map;
-  const next = new Map(map);
   next.delete(id);
   return next;
 }

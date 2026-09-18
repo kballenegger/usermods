@@ -10,6 +10,11 @@ import './activity.css';
  * It renders nothing at all when the run is over, so it cannot leave an empty row behind. It is
  * mounted outside the scrolling message list (above the composer), so appearing and disappearing
  * never moves the transcript.
+ *
+ * It shows ONE chat: the visible one. Runs are keyed by chat and several can be in flight at once,
+ * so the panel keeps a line per chat (lib/activity.ts) and hands this component the entry for the
+ * chat on screen. Switching chats therefore swaps the line rather than carrying one chat's progress
+ * over to another.
  */
 export interface ActivityProps {
   /** What the background last said it was doing. 'idle' hides the line. */
@@ -62,7 +67,8 @@ export function Activity(props: ActivityProps) {
 
   return (
     <div className={`activity${a.tone === 'live' ? '' : ` ${a.tone}`}`} role="status" aria-live="polite">
-      <span className="activity-dot" aria-hidden="true" />
+      {/* The design system's own dot, so a running line reads like a running tool row. */}
+      <span className="dot" aria-hidden="true" />
       {a.mono && <span className="activity-mono activity-seg">{a.mono}</span>}
       {a.mono && a.label && a.monoJoin === ' · ' && <span className="activity-sep">·</span>}
       {a.label && <span className="activity-label">{a.label}</span>}

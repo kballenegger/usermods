@@ -197,3 +197,123 @@ test('elapsed switches to minutes and zero-padded seconds at a minute', () => {
 test('a negative clock (a machine that slept) reads zero rather than a minus sign', () => {
   assert.equal(formatElapsed(-5_000), '0s');
 });
+
+// ---------- per chat, not per panel ----------
+//
+// Runs are keyed by chat and several can be in flight at once, so the indicator is a property of a
+// conversation. These are the cases that would have leaked one chat's run into another's line.
+
+import { IDLE_ACTIVITY, activityFromEvent, allDisconnected, withActivity, withoutActivity, type ChatActivity } from '../lib/activity.ts';
+
+/** Fold a sequence of events into a map the way the panel's port listener does. */
+function fold(events: Array<{ chatId: string; e: Parameters<typeof activityFromEvent>[1]; at?: number }>) {
+  let map: ReadonlyMap<string, ChatActivity> = new Map();
+  for (const { chatId, e, at } of events) {
+    map = withActivity(map, chatId, (a) => activityFromEvent(a, e, at ?? 1000));
+  }
+  return map;
+}
+
+test('two chats running at once keep separate lines', () => {
+  const map = fold([
+    { chatId: 'a', e: { type: 'status', phase: 'model', detail: 'waiting for model', iteration: 1 } },
+    { chatId: 'b', e: { type: 'status', phase: 'tool', tool: 'run_script', detail: 'hide the sidebar', iteration: 2 } },
+  ]);
+  assert.equal(map.get('a')?.phase, 'model');
+  assert.equal(map.get('a')?.detail, 'waiting for model');
+  assert.equal(map.get('b')?.phase, 'tool');
+  assert.equal(map.get('b')?.tool, 'run_script');
+});
+
+test('one chat finishing does not silence another that is still running', () => {
+  const map = fold([
+    { chatId: 'a', e: { type: 'status', phase: 'model' } },
+    { chatId: 'b', e: { type: 'status', phase: 'tool', tool: 'get_page' } },
+    { chatId: 'a', e: { type: 'done' } },
+  ]);
+  assert.equal(map.has('a'), false, "the finished chat's line is gone");
+  assert.equal(map.get('b')?.tool, 'get_page', "the other chat's line is untouched");
+});
+
+test('a finished chat leaves no entry for the next run to inherit', () => {
+  const map = fold([
+    { chatId: 'a', e: { type: 'status', phase: 'tool', tool: 'get_page', iteration: 3 } },
+    { chatId: 'a', e: { type: 'status', phase: 'idle' } },
+  ]);
+  assert.equal(map.size, 0);
+  // Which is to say: an unknown chat reads as idle, so the line shows nothing.
+  assert.equal(map.get('a') ?? IDLE_ACTIVITY, IDLE_ACTIVITY);
+});
+
+test("a chat's elapsed clock starts at its own first event, not another chat's", () => {
+  const map = fold([
+    { chatId: 'a', e: { type: 'status', phase: 'model' }, at: 1_000 },
+    { chatId: 'b', e: { type: 'status', phase: 'model' }, at: 5_000 },
+    { chatId: 'a', e: { type: 'text' }, at: 6_000 },
+  ]);
+  assert.equal(map.get('a')?.startedAt, 1_000);
+  assert.equal(map.get('b')?.startedAt, 5_000);
+  assert.equal(map.get('a')?.lastEventAt, 6_000, 'and its own last event drives its stall detection');
+  assert.equal(map.get('b')?.lastEventAt, 5_000);
+});
+
+test('an error ends only the chat it happened in', () => {
+  const map = fold([
+    { chatId: 'a', e: { type: 'status', phase: 'model' } },
+    { chatId: 'b', e: { type: 'status', phase: 'model' } },
+    { chatId: 'a', e: { type: 'error' } },
+  ]);
+  assert.equal(map.has('a'), false);
+  assert.equal(map.get('b')?.phase, 'model');
+});
+
+test('a dead port marks every mid-run chat disconnected, and leaves idle ones alone', () => {
+  const before = fold([
+    { chatId: 'a', e: { type: 'status', phase: 'model' } },
+    { chatId: 'b', e: { type: 'status', phase: 'tool', tool: 'get_page' } },
+  ]);
+  const after = allDisconnected(before);
+  assert.equal(after.get('a')?.disconnected, true);
+  assert.equal(after.get('b')?.disconnected, true);
+  // A map with nothing running is returned unchanged (identity), so React can skip the render.
+  const nothingRunning: ReadonlyMap<string, ChatActivity> = new Map();
+  assert.equal(allDisconnected(nothingRunning), nothingRunning);
+  // …and a second disconnect changes nothing either.
+  assert.equal(allDisconnected(after), after);
+});
+
+test('a disconnected line survives even though its phase reads idle, because it still says something', () => {
+  const map = withActivity(new Map(), 'a', () => ({ ...IDLE_ACTIVITY, disconnected: true }));
+  assert.equal(map.get('a')?.disconnected, true);
+  assert.equal(activityFor({ phase: 'idle', elapsed: 0, sinceLastEvent: 0, disconnected: true })?.action, 'retry');
+});
+
+test('stopping one chat clears its line and only its line', () => {
+  const before = fold([
+    { chatId: 'a', e: { type: 'status', phase: 'model' } },
+    { chatId: 'b', e: { type: 'status', phase: 'model' } },
+  ]);
+  const after = withoutActivity(before, 'a');
+  assert.equal(after.has('a'), false);
+  assert.equal(after.has('b'), true);
+  // Removing a chat that has no line is a no-op, identity included.
+  assert.equal(withoutActivity(after, 'a'), after);
+});
+
+test('a chat_title event neither revives a finished line nor counts as proof of life', () => {
+  const running = fold([{ chatId: 'a', e: { type: 'status', phase: 'model' }, at: 1_000 }]);
+  const after = withActivity(running, 'a', (a) => activityFromEvent(a, { type: 'chat_title' }, 9_000));
+  assert.equal(after.get('a')?.lastEventAt, 1_000, 'the stall clock is not reset by a rename');
+  // And on a chat that already finished it creates nothing.
+  const finished = withActivity(new Map(), 'a', (a) => activityFromEvent(a, { type: 'chat_title' }, 9_000));
+  assert.equal(finished.size, 0);
+});
+
+test("queued counts are each chat's own", () => {
+  let map: ReadonlyMap<string, ChatActivity> = new Map();
+  map = withActivity(map, 'a', () => ({ ...IDLE_ACTIVITY, phase: 'model', startedAt: 0, lastEventAt: 0, queued: 2 }));
+  map = withActivity(map, 'b', () => ({ ...IDLE_ACTIVITY, phase: 'model', startedAt: 0, lastEventAt: 0, queued: 0 }));
+  map = withActivity(map, 'a', (a) => activityFromEvent(a, { type: 'accepted' }, 1_000));
+  assert.equal(map.get('a')?.queued, 1);
+  assert.equal(map.get('b')?.queued, 0);
+});

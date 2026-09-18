@@ -151,3 +151,129 @@ export function activityText(a: Activity): string {
   const head = [a.mono, a.label].filter(Boolean).join(a.monoJoin);
   return [head, ...a.segments].filter(Boolean).join(' · ');
 }
+
+// ---------------------------------------------------------------------------
+// The per-chat layer: which chat's run each event belongs to.
+//
+// Runs are keyed by chat (lib/sessions.ts), several can be in flight at once, and one panel port
+// carries all of their events. So "what is the run doing" is a question about a CHAT, never about
+// the panel — exactly as `busy` and the transcript are. A single activity object would have shown
+// chat A's tool call to someone reading chat B, and would have gone blank the moment A finished
+// while B was still working. These two reducers are what keeps each chat's line its own; they live
+// here rather than in Chat.tsx so the routing can be tested without a browser.
+// ---------------------------------------------------------------------------
+
+/** What the panel records about one chat's run. The clock deltas are computed at render time. */
+export interface ChatActivity {
+  phase: Phase;
+  tool?: string;
+  detail?: string;
+  iteration?: number;
+  /** When this chat's run started, as Date.now(). */
+  startedAt: number | null;
+  /** …and when its last event of any kind arrived. Silence here is what a stall is. */
+  lastEventAt: number | null;
+  /** True once the model has streamed text in this model phase. */
+  writing?: boolean;
+  /** Messages sent into this chat that have not entered its conversation yet. */
+  queued: number;
+  /** The port went away while this chat was mid-run. */
+  disconnected?: boolean;
+}
+
+/** A chat with nothing to say. Also what an unknown chat reads as, so lookups need no null check. */
+export const IDLE_ACTIVITY: ChatActivity = { phase: 'idle', startedAt: null, lastEventAt: null, queued: 0 };
+
+/** The shape of a port event this layer cares about. Structurally satisfied by AgentEvent. */
+type ActivityEvent =
+  | { type: 'status'; phase: Phase; tool?: string; detail?: string; iteration?: number }
+  | { type: 'text' }
+  | { type: 'accepted' }
+  | { type: 'unqueued' }
+  | { type: 'done' }
+  | { type: 'error' }
+  | { type: 'chat_title' }
+  | { type: string };
+
+/**
+ * Fold one event into ONE chat's activity. Two things matter: every event of the run refreshes
+ * lastEventAt (silence is the stall signal), and the first text delta of a model phase flips
+ * "waiting for model" to "writing". `now` is injected so the thresholds are testable.
+ */
+export function activityFromEvent(a: ChatActivity, e: ActivityEvent, now: number = Date.now()): ChatActivity {
+  switch (e.type) {
+    case 'status': {
+      const s = e as Extract<ActivityEvent, { type: 'status' }>;
+      if (s.phase === 'idle') return IDLE_ACTIVITY;
+      return {
+        ...a,
+        phase: s.phase,
+        tool: s.tool,
+        detail: s.detail,
+        iteration: s.iteration,
+        startedAt: a.startedAt ?? now,
+        lastEventAt: now,
+        // A new phase has not written anything yet.
+        writing: false,
+        disconnected: false,
+      };
+    }
+    case 'text':
+      return { ...a, lastEventAt: now, writing: a.phase === 'model' ? true : a.writing };
+    case 'accepted':
+    case 'unqueued':
+      return { ...a, lastEventAt: now, queued: Math.max(0, a.queued - 1) };
+    case 'done':
+    case 'error':
+      return IDLE_ACTIVITY;
+    case 'chat_title':
+      // A rename arrives AFTER 'done', from the tool-free naming call. It is not the run, so it
+      // neither revives a finished line nor counts as proof of life for one still going.
+      return a;
+    default:
+      return { ...a, lastEventAt: now };
+  }
+}
+
+/**
+ * Apply an update to one chat's entry in the panel's map. An entry that comes out idle is dropped
+ * rather than kept as an idle row, so the map holds only chats with something to say and a chat
+ * that finished leaves nothing behind for the next one to inherit. Returns the same map when
+ * nothing changed, so React can skip the render.
+ */
+export function withActivity(
+  map: ReadonlyMap<string, ChatActivity>,
+  id: string,
+  fn: (prev: ChatActivity) => ChatActivity,
+): ReadonlyMap<string, ChatActivity> {
+  const prev = map.get(id) ?? IDLE_ACTIVITY;
+  const updated = fn(prev);
+  if (updated === prev) return map;
+  // A disconnected line is kept even though its phase reads idle: it is still saying something.
+  if (updated.phase === 'idle' && !updated.disconnected) return withoutActivity(map, id);
+  const next = new Map(map);
+  next.set(id, updated);
+  return next;
+}
+
+/** One chat's entry removed, or the same map when it had none. */
+export function withoutActivity(map: ReadonlyMap<string, ChatActivity>, id: string): ReadonlyMap<string, ChatActivity> {
+  if (!map.has(id)) return map;
+  const next = new Map(map);
+  next.delete(id);
+  return next;
+}
+
+/**
+ * Every mid-run chat marked as having lost its connection. The port is the panel's only link to all
+ * of them at once, so when it dies they all did — each then offers its own Retry.
+ */
+export function allDisconnected(map: ReadonlyMap<string, ChatActivity>): ReadonlyMap<string, ChatActivity> {
+  let next: Map<string, ChatActivity> | null = null;
+  for (const [id, a] of map) {
+    if (a.phase === 'idle' || a.disconnected) continue;
+    next ??= new Map(map);
+    next.set(id, { ...a, disconnected: true });
+  }
+  return next ?? map;
+}
