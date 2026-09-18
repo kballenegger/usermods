@@ -1370,6 +1370,52 @@ async function openDashboard(ctx, extId, { storage = {} } = {}) {
   return page;
 }
 
+/**
+ * Type a new source into the mod editor and save it, waiting on the states that actually gate the
+ * save rather than on a fixed number of milliseconds.
+ *
+ * Two real waits. Save is disabled until React has seen an onChange, so a fill() followed by a
+ * sleep and a click can land on a disabled button and save nothing — the assertion that follows
+ * then blames the feature for a timing miss. And the click starts an async round trip through the
+ * background (re-parse, maybe refetch dependencies, re-register), during which the button reads
+ * "Saving…"; waiting for it to stop saying that is what "the save finished" actually means.
+ *
+ * `settle` is the grace after that for the storage write to land and the list to re-render.
+ */
+async function editAndSave(page, source, { settle = 600 } = {}) {
+  const editor = page.locator('[data-testid="mod-editor-source"]');
+  const save = page.locator('[data-testid="mod-editor-save"]');
+  await editor.fill(source);
+  await save.waitFor({ state: 'visible', timeout: 10_000 });
+  await page
+    .waitForFunction(
+      () => {
+        const b = document.querySelector('[data-testid="mod-editor-save"]');
+        return b && !b.disabled;
+      },
+      undefined,
+      { timeout: 10_000 },
+    )
+    .catch(() => {
+      throw new Error('dashboard: Save never became enabled after an edit — the editor did not register the new text');
+    });
+  await save.click();
+  // The save is over when the button stops reporting it, whether it succeeded or threw.
+  await page
+    .waitForFunction(
+      () => {
+        const b = document.querySelector('[data-testid="mod-editor-save"]');
+        return b && !/Saving/.test(b.textContent ?? '');
+      },
+      undefined,
+      { timeout: 30_000 },
+    )
+    .catch(() => {
+      throw new Error('dashboard: the editor was still saving after 30s');
+    });
+  await page.waitForTimeout(settle);
+}
+
 async function dashboardFlow({ capture = false } = {}) {
   const b = await launch('light');
   const fail = (m) => {
@@ -1660,10 +1706,7 @@ async function dashboardFlow({ capture = false } = {}) {
     await editor.waitFor({ timeout: 10_000 });
     const original = await editor.inputValue();
     if (!original.includes('==UserScript==')) fail('the editor did not load the mod source');
-    await editor.fill(original.replace(/@name\s+.*/, '@name         Renamed by the editor'));
-    await page.waitForTimeout(300);
-    await page.locator('[data-testid="mod-editor-save"]').click();
-    await page.waitForTimeout(1200);
+    await editAndSave(page, original.replace(/@name\s+.*/, '@name         Renamed by the editor'), { settle: 1200 });
     const storedName = await page.evaluate(async (id) => {
       const { mods } = await chrome.storage.local.get('mods');
       return mods.find((m) => m.id === id)?.name;
@@ -1683,15 +1726,55 @@ async function dashboardFlow({ capture = false } = {}) {
       const editor = page.locator('[data-testid="mod-editor-source"]');
       const requireUrl = `${BASE_URL.replace(/\/v1$/, '')}/__require.js?name=firstLib`;
       const withRequire = (await editor.inputValue()).replace('// ==/UserScript==', `// @require      ${requireUrl}\n// ==/UserScript==`);
-      await editor.fill(withRequire);
-      await page.waitForTimeout(200);
-      await page.locator('[data-testid="mod-editor-save"]').click();
-      await page.waitForTimeout(2000);
-      const stored = await page.evaluate(async (id) => {
+      // Warm the BACKGROUND's path to the mock server before the assertion depends on it. In
+      // headless Chromium the extension service worker's very first fetch to plain-HTTP localhost
+      // intermittently comes back "Failed to fetch" — the network service is still coming up — and
+      // the save is then correctly refused, which would read here as the feature being broken. A
+      // mods.preview-shaped round trip is not available, so this drives the same fetchText the save
+      // uses, through the same worker, and simply waits for it to start working.
+      await page
+        .waitForFunction(
+          async (u) => {
+            try {
+              const r = await fetch(u, { cache: 'no-store' });
+              return r.ok;
+            } catch {
+              return false;
+            }
+          },
+          requireUrl,
+          { timeout: 20_000 },
+        )
+        .catch(() => fail(`the mock server never served ${requireUrl}; the @require assertions cannot mean anything`));
+      await editAndSave(page, withRequire);
+      let stored = await page.evaluate(async (id) => {
         const { mods } = await chrome.storage.local.get('mods');
         const m = mods.find((x) => x.id === id);
         return { requires: m?.requires ?? [], enabled: m?.enabled, source: m?.source };
       }, modId);
+      // One retry, and only for the one failure that is the harness rather than the feature: the
+      // MV3 service worker can be evicted mid-save, and the fetch it was in the middle of dies with
+      // a bare "Failed to fetch". The save is correctly refused when that happens — nothing is
+      // written and the error is shown — so the assertion below still has to pass on the retry.
+      // Any other error, or a second failure, fails the flow.
+      if (stored.requires.length !== 1) {
+        const err = (await page.locator('.error').first().textContent().catch(() => '')) ?? '';
+        if (!/Failed to fetch/.test(err)) {
+          fail(`adding an @require line saved ${stored.requires.length} dependency bodies — the mod would throw ReferenceError on its next page load (editor said ${JSON.stringify(err)})`);
+        }
+        console.log('dashboard: the service worker dropped the @require fetch; retrying once');
+        await page.reload();
+        await page.locator('[data-testid="overview"]').waitFor({ timeout: 15_000 });
+        await page.locator('.dash-tabs button', { hasText: 'Mods' }).click();
+        await page.locator(`[data-testid="mod-row"][data-mod-id="${modId}"] [data-testid="mod-name"]`).click();
+        await page.locator('[data-testid="mod-editor-source"]').waitFor({ timeout: 10_000 });
+        await editAndSave(page, withRequire);
+        stored = await page.evaluate(async (id) => {
+          const { mods } = await chrome.storage.local.get('mods');
+          const m = mods.find((x) => x.id === id);
+          return { requires: m?.requires ?? [], enabled: m?.enabled, source: m?.source };
+        }, modId);
+      }
       if (stored.requires.length !== 1) {
         fail(`adding an @require line saved ${stored.requires.length} dependency bodies — the mod would throw ReferenceError on its next page load`);
       }
@@ -1702,10 +1785,7 @@ async function dashboardFlow({ capture = false } = {}) {
 
       // Changing the URL refetches: the stale body must not survive an edit that repointed it.
       const secondUrl = `${BASE_URL.replace(/\/v1$/, '')}/__require.js?name=secondLib`;
-      await editor.fill(withRequire.replace(requireUrl, secondUrl));
-      await page.waitForTimeout(200);
-      await page.locator('[data-testid="mod-editor-save"]').click();
-      await page.waitForTimeout(2000);
+      await editAndSave(page, withRequire.replace(requireUrl, secondUrl));
       const after = await page.evaluate(async (id) => {
         const { mods } = await chrome.storage.local.get('mods');
         return mods.find((x) => x.id === id)?.requires ?? [];
@@ -1717,10 +1797,7 @@ async function dashboardFlow({ capture = false } = {}) {
       // A dependency that will not fetch fails the save and says so, rather than writing a mod that
       // is broken from the moment it is registered.
       const badUrl = `${BASE_URL.replace(/\/v1$/, '')}/__nothing-here.js`;
-      await editor.fill(withRequire.replace(requireUrl, badUrl));
-      await page.waitForTimeout(200);
-      await page.locator('[data-testid="mod-editor-save"]').click();
-      await page.waitForTimeout(2500);
+      await editAndSave(page, withRequire.replace(requireUrl, badUrl), { settle: 2500 });
       const unchanged = await page.evaluate(async (id) => {
         const { mods } = await chrome.storage.local.get('mods');
         return mods.find((x) => x.id === id)?.requires ?? [];
@@ -1735,10 +1812,7 @@ async function dashboardFlow({ capture = false } = {}) {
 
       // Back to a clean, saved, dependency-free mod for the steps that follow.
       const plain = withRequire.replace(new RegExp(`// @require.*\\n`), '');
-      await editor.fill(plain);
-      await page.waitForTimeout(200);
-      await page.locator('[data-testid="mod-editor-save"]').click();
-      await page.waitForTimeout(2000);
+      await editAndSave(page, plain);
     }
 
     // --- 8b. Finding 6: the editor follows an external change when it is clean, and refuses to
