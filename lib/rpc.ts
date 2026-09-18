@@ -1,4 +1,4 @@
-import type { AgentEvent, Mod, UserTurn } from './types';
+import type { AgentEvent, Mod, ScriptPreview, UserTurn } from './types';
 
 export type OAuthKind = 'chatgpt' | 'xai';
 export type OAuthLoginState =
@@ -13,7 +13,19 @@ export type RpcRequest =
   | { type: 'mods.save'; mod: Mod }
   | { type: 'mods.delete'; id: string }
   | { type: 'mods.toggle'; id: string; enabled: boolean }
+  /** Run a draft once. With `modId`, runs that saved mod through the GM wrapper in its own world. */
   | { type: 'mods.try'; tabId: number; code: string }
+  | { type: 'mods.try'; tabId: number; modId: string }
+  /** Describe a script before installing it, from a URL or from text the user picked. */
+  | { type: 'mods.preview'; url: string }
+  | { type: 'mods.preview'; source: string }
+  /** Install an outside userscript: parse, fetch @require/@resource, save, register. */
+  | { type: 'mods.install'; source: string; downloadUrl?: string; enabled?: boolean; values?: Record<string, unknown> }
+  /** Refetch from downloadUrl and replace the source if @version moved. */
+  | { type: 'mods.update'; id: string }
+  /** Import a Tampermonkey backup (JSON text, or a base64 ZIP). */
+  | { type: 'mods.importBackup'; json: string }
+  | { type: 'mods.importBackup'; zipBase64: string }
   | { type: 'userScripts.status' }
   | { type: 'page.pick'; tabId: number }
   | { type: 'page.info'; tabId: number }
@@ -26,23 +38,27 @@ export type RpcRequest =
   | { type: 'oauth.signout'; kind: OAuthKind }
   | { type: 'models.list' };
 
-export type RpcResponse<T extends RpcRequest['type']> = T extends 'mods.list' | 'mods.save' | 'mods.delete' | 'mods.toggle'
-  ? Mod[]
-  : T extends 'mods.try'
-    ? { ok: boolean; result?: string; logs: string[]; error?: string }
-    : T extends 'userScripts.status'
-      ? { available: boolean; message: string }
-      : T extends 'page.info'
-        ? { url: string; title: string }
-        : T extends 'chat.hasHistory'
-          ? boolean
-          : T extends 'oauth.status'
-            ? { signedIn: boolean; label?: string }
-            : T extends 'oauth.start' | 'oauth.poll'
-              ? OAuthLoginState
-              : T extends 'models.list'
-                ? string[]
-                : { ok: true };
+/** Response shape per request type. Anything not listed here answers { ok: true }. */
+interface RpcResults {
+  'mods.list': Mod[];
+  'mods.save': Mod[];
+  'mods.delete': Mod[];
+  'mods.toggle': Mod[];
+  'mods.install': Mod[];
+  'mods.preview': ScriptPreview;
+  'mods.update': { updated: boolean; version: string };
+  'mods.importBackup': { imported: number; skipped: string[]; mods: Mod[] };
+  'mods.try': { ok: boolean; result?: string; logs: string[]; error?: string };
+  'userScripts.status': { available: boolean; message: string };
+  'page.info': { url: string; title: string };
+  'chat.hasHistory': boolean;
+  'oauth.status': { signedIn: boolean; label?: string };
+  'oauth.start': OAuthLoginState;
+  'oauth.poll': OAuthLoginState;
+  'models.list': string[];
+}
+
+export type RpcResponse<T extends RpcRequest['type']> = T extends keyof RpcResults ? RpcResults[T] : { ok: true };
 
 export async function rpc<T extends RpcRequest['type']>(req: Extract<RpcRequest, { type: T }>): Promise<RpcResponse<T>> {
   const res = (await chrome.runtime.sendMessage(req)) as { ok: true; data: RpcResponse<T> } | { ok: false; error: string };
