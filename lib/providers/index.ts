@@ -1,4 +1,9 @@
-import { CHATGPT_CODEX_BASE, XAI_PROXY_BASE, chatgptHeaders, getValidTokens, xaiProxyHeaders } from '../oauth';
+import {
+  CHATGPT_CODEX_BASE,
+  STORE_BUILD,
+  XAI_PROXY_BASE,
+  unavailableProviderMessage,
+} from '../buildflags';
 import type { Settings } from '../types';
 import { createAnthropicProvider } from './anthropic';
 import { createOpenAIProvider } from './openai';
@@ -12,22 +17,46 @@ export function createProvider(settings: Settings): Provider {
     case 'openai-compatible':
       return createOpenAIProvider(settings);
     case 'chatgpt':
-      return createResponsesProvider({
-        tag: 'chatgpt',
-        baseUrl: settings.baseUrl || CHATGPT_CODEX_BASE,
-        model: settings.model,
-        headers: async () => chatgptHeaders(await getValidTokens('chatgpt')),
-        body: { reasoning: { effort: 'medium', summary: 'auto' } },
-      });
     case 'xai':
-      return createResponsesProvider({
-        tag: 'xai',
-        baseUrl: settings.baseUrl || XAI_PROXY_BASE,
-        model: settings.model,
-        headers: async () => xaiProxyHeaders(settings.model, (await getValidTokens('xai')).access),
-        body: xaiSupportsReasoning(settings.model) ? { reasoning: { effort: 'high' } } : {},
-      });
+      return createSubscriptionProvider(settings, settings.provider);
   }
+}
+
+/**
+ * ChatGPT / SuperGrok, which sign in with an account instead of an API key.
+ *
+ * Absent from the Chrome Web Store build. The guard is a compile-time constant, so the bundler
+ * drops this whole branch there — including the dynamic import of ../oauth, and with it every
+ * vendor auth endpoint. The import is deliberately dynamic for that reason: a static one would
+ * pull the auth module into every bundle that reaches createProvider.
+ */
+function createSubscriptionProvider(settings: Settings, kind: 'chatgpt' | 'xai'): Provider {
+  if (STORE_BUILD) throw new Error(unavailableProviderMessage(kind));
+  const oauth = () => import('../oauth');
+
+  if (kind === 'chatgpt') {
+    return createResponsesProvider({
+      tag: 'chatgpt',
+      baseUrl: settings.baseUrl || CHATGPT_CODEX_BASE,
+      model: settings.model,
+      headers: async () => {
+        const o = await oauth();
+        return o.chatgptHeaders(await o.getValidTokens('chatgpt'));
+      },
+      body: { reasoning: { effort: 'medium', summary: 'auto' } },
+    });
+  }
+
+  return createResponsesProvider({
+    tag: 'xai',
+    baseUrl: settings.baseUrl || XAI_PROXY_BASE,
+    model: settings.model,
+    headers: async () => {
+      const o = await oauth();
+      return o.xaiProxyHeaders(settings.model, (await o.getValidTokens('xai')).access);
+    },
+    body: xaiSupportsReasoning(settings.model) ? { reasoning: { effort: 'high' } } : {},
+  });
 }
 
 /** Effort-capable models per xAI's catalog; "non-reasoning" and "-fast" variants reject the field. */

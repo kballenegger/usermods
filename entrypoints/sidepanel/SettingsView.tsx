@@ -1,29 +1,57 @@
 import { useEffect, useRef, useState } from 'react';
+import { STORE_BUILD, migrateSettingsForBuild } from '@/lib/buildflags';
 import { rpc, type OAuthKind, type OAuthLoginState } from '@/lib/rpc';
 import { loadSettings, saveSettings } from '@/lib/settings';
 import { DEFAULT_SETTINGS, type Settings } from '@/lib/types';
 
-const PRESETS: Array<{ label: string; apply: Partial<Settings> }> = [
+type Preset = { label: string; apply: Partial<Settings> };
+
+const KEY_PRESETS: Preset[] = [
   { label: 'Anthropic', apply: { provider: 'anthropic', baseUrl: '', model: 'claude-opus-5' } },
   { label: 'OpenAI', apply: { provider: 'openai-compatible', baseUrl: 'https://api.openai.com/v1', model: 'gpt-5' } },
   { label: 'xAI Grok', apply: { provider: 'openai-compatible', baseUrl: 'https://api.x.ai/v1', model: 'grok-4' } },
   { label: 'OpenRouter', apply: { provider: 'openai-compatible', baseUrl: 'https://openrouter.ai/api/v1', model: 'anthropic/claude-opus-5' } },
   { label: 'Ollama', apply: { provider: 'openai-compatible', baseUrl: 'http://localhost:11434/v1', model: '' } },
   { label: 'LM Studio', apply: { provider: 'openai-compatible', baseUrl: 'http://localhost:1234/v1', model: '' } },
-  { label: 'ChatGPT subscription', apply: { provider: 'chatgpt', baseUrl: '', apiKey: '', model: '' } },
-  { label: 'SuperGrok subscription', apply: { provider: 'xai', baseUrl: '', apiKey: '', model: 'grok-4.6' } },
+];
+
+const CUSTOM_PRESETS: Preset[] = [
   { label: 'Custom Anthropic API', apply: { provider: 'anthropic', baseUrl: 'http://localhost:', model: '' } },
   { label: 'Custom OpenAI API', apply: { provider: 'openai-compatible', baseUrl: 'http://localhost:', model: '' } },
 ];
+
+/**
+ * The subscription presets, kept in a separate array spread in behind the compile-time flag so the
+ * store bundle carries neither the entries nor their labels — a filter at runtime would leave both.
+ */
+const SUBSCRIPTION_PRESETS: Preset[] = STORE_BUILD
+  ? []
+  : [
+      { label: 'ChatGPT subscription', apply: { provider: 'chatgpt', baseUrl: '', apiKey: '', model: '' } },
+      { label: 'SuperGrok subscription', apply: { provider: 'xai', baseUrl: '', apiKey: '', model: 'grok-4.6' } },
+    ];
+
+const PRESETS: Preset[] = [...KEY_PRESETS, ...SUBSCRIPTION_PRESETS, ...CUSTOM_PRESETS];
 
 export function SettingsView() {
   const [s, setS] = useState<Settings | null>(null);
   const [saved, setSaved] = useState(true);
   const [models, setModels] = useState<string[]>([]);
   const [modelsError, setModelsError] = useState('');
+  /** Set when this build dropped a provider the stored settings were using. */
+  const [migrated, setMigrated] = useState(false);
 
   useEffect(() => {
-    loadSettings().then(setS);
+    // A profile saved by a build that had subscription sign-in would otherwise leave this build
+    // on a provider it cannot create. Fall back to the default and say so, rather than render a
+    // provider select with no matching option and fail on the first message.
+    void loadSettings().then((loaded) => {
+      const fallback = migrateSettingsForBuild(loaded);
+      if (!fallback) return setS(loaded);
+      setS(fallback);
+      setMigrated(true);
+      void saveSettings(fallback);
+    });
   }, []);
 
   // Autosave: every change is persisted after a short pause, so nothing depends on a Save button.
@@ -54,10 +82,18 @@ export function SettingsView() {
   }
 
   if (!s) return <div className="view muted">Loading…</div>;
-  const subscription = s.provider === 'chatgpt' || s.provider === 'xai';
+  // Constant-folded in a store build, where migrateSettingsForBuild has already ruled these out.
+  const subscription = !STORE_BUILD && (s.provider === 'chatgpt' || s.provider === 'xai');
 
   return (
     <div className="view">
+      {migrated && (
+        <p className="error" style={{ marginTop: 0 }}>
+          This build of usermods does not include subscription sign-in, so your ChatGPT / SuperGrok
+          provider was switched back to the default. Add an API key below, or install the GitHub
+          build to sign in with a subscription again.
+        </p>
+      )}
       <div className="row" style={{ marginBottom: 12 }}>
         {PRESETS.map((p) => (
           <button key={p.label} className="btn" onClick={() => update(p.apply)}>{p.label}</button>
@@ -68,8 +104,8 @@ export function SettingsView() {
         <select value={s.provider} onChange={(e) => update({ provider: e.target.value as Settings['provider'] })}>
           <option value="anthropic">Anthropic (Messages API)</option>
           <option value="openai-compatible">OpenAI-compatible (chat/completions)</option>
-          <option value="chatgpt">ChatGPT subscription (Sign in with ChatGPT)</option>
-          <option value="xai">xAI subscription (SuperGrok / X Premium+)</option>
+          {!STORE_BUILD && <option value="chatgpt">ChatGPT subscription (Sign in with ChatGPT)</option>}
+          {!STORE_BUILD && <option value="xai">xAI subscription (SuperGrok / X Premium+)</option>}
         </select>
       </label>
 

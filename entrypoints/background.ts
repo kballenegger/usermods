@@ -10,16 +10,11 @@ import { loadMods, modFromSource, parseHeader, previewFromSource, upsertMod, del
 import { appendTurn, createChat, deleteChat, listChats, loadMessages, renameChat, saveMessages, touchChat } from '@/lib/chats';
 import {
   CHATGPT_CODEX_BASE,
+  STORE_BUILD,
   XAI_PROXY_BASE,
-  chatgptHeaders,
-  getValidTokens,
-  loadTokens,
-  saveTokens,
-  startChatgptLogin,
-  startXaiLogin,
-  xaiProxyHeaders,
-  type OAuthKind,
-} from '@/lib/oauth';
+  unavailableProviderMessage,
+} from '@/lib/buildflags';
+import type { OAuthKind } from '@/lib/oauth';
 import type { AgentPortRequest, OAuthLoginState, RpcRequest } from '@/lib/rpc';
 import { loadSettings } from '@/lib/settings';
 import { looksLikeZip, parseTampermonkeyJson, parseTampermonkeyZipEntries, type TmScript } from '@/lib/tampermonkey';
@@ -242,21 +237,26 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
       await renameChat(req.id, req.title);
       return { ok: true };
     case 'oauth.status': {
-      const t = await loadTokens(req.kind);
+      if (STORE_BUILD) return { signedIn: false };
+      const t = await (await oauthModule()).loadTokens(req.kind);
       return { signedIn: !!t, label: t?.label };
     }
     case 'oauth.start':
+      if (STORE_BUILD) return { status: 'error', message: unavailableProviderMessage(req.kind) };
       return startLogin(req.kind);
     case 'oauth.poll':
+      if (STORE_BUILD) return { status: 'error', message: unavailableProviderMessage(req.kind) };
       return logins.get(req.kind)?.state ?? { status: 'idle' };
     case 'oauth.cancel':
+      if (STORE_BUILD) return { ok: true };
       logins.get(req.kind)?.controller.abort();
       logins.delete(req.kind);
       return { ok: true };
     case 'oauth.signout':
+      if (STORE_BUILD) return { ok: true };
       logins.get(req.kind)?.controller.abort();
       logins.delete(req.kind);
-      await saveTokens(req.kind, null);
+      await (await oauthModule()).saveTokens(req.kind, null);
       return { ok: true };
     case 'models.list':
       return listModels();
@@ -518,18 +518,27 @@ async function handleGm(msg: GmMessage, sender: chrome.runtime.MessageSender): P
 
 const logins = new Map<OAuthKind, { state: OAuthLoginState; controller: AbortController }>();
 
+/**
+ * lib/oauth, loaded on demand. Every call site is behind `if (STORE_BUILD)`, so the bundler drops
+ * this import — and the vendor auth endpoints it reaches — from the store build. See lib/buildflags.
+ */
+function oauthModule() {
+  return import('@/lib/oauth');
+}
+
 async function startLogin(kind: OAuthKind): Promise<OAuthLoginState> {
   logins.get(kind)?.controller.abort();
   const controller = new AbortController();
   const entry = { state: { status: 'idle' } as OAuthLoginState, controller };
   logins.set(kind, entry);
   try {
-    const login = kind === 'chatgpt' ? await startChatgptLogin() : await startXaiLogin();
+    const o = await oauthModule();
+    const login = kind === 'chatgpt' ? await o.startChatgptLogin() : await o.startXaiLogin();
     entry.state = { status: 'pending', userCode: login.userCode, verificationUri: login.verificationUri, expiresAt: login.expiresAt };
     void login
       .poll(controller.signal)
       .then(async (tokens) => {
-        await saveTokens(kind, tokens);
+        await o.saveTokens(kind, tokens);
         entry.state = { status: 'done' };
       })
       .catch((e: unknown) => {
@@ -548,14 +557,19 @@ async function listModels(): Promise<string[]> {
   let url: string;
   let headers: Record<string, string>;
   switch (s.provider) {
-    case 'chatgpt':
+    case 'chatgpt': {
+      if (STORE_BUILD) throw new Error(unavailableProviderMessage('chatgpt'));
+      const o = await oauthModule();
       url = `${(s.baseUrl || CHATGPT_CODEX_BASE).replace(/\/+$/, '')}/models`;
-      headers = chatgptHeaders(await getValidTokens('chatgpt'));
+      headers = o.chatgptHeaders(await o.getValidTokens('chatgpt'));
       break;
+    }
     case 'xai': {
-      const t = await getValidTokens('xai');
+      if (STORE_BUILD) throw new Error(unavailableProviderMessage('xai'));
+      const o = await oauthModule();
+      const t = await o.getValidTokens('xai');
       url = `${(s.baseUrl || XAI_PROXY_BASE).replace(/\/+$/, '')}/models`;
-      const h = xaiProxyHeaders('', t.access);
+      const h = o.xaiProxyHeaders('', t.access);
       delete h['x-grok-model-override'];
       headers = h;
       break;
