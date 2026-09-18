@@ -54,6 +54,9 @@ export interface ScriptPreview {
 
 export type ProviderKind = 'anthropic' | 'openai-compatible' | 'chatgpt' | 'xai';
 
+/** Which palette the UI wears. 'system' follows the OS; the other two are deliberate choices. */
+export type ThemeChoice = 'system' | 'dark' | 'light';
+
 export interface Settings {
   provider: ProviderKind;
   /** Optional base URL override. For openai-compatible this is required (e.g. http://localhost:11434/v1). */
@@ -65,6 +68,7 @@ export interface Settings {
    * Optional so a profile saved before this existed reads as the default (on).
    */
   autoNameChats?: boolean;
+  theme: ThemeChoice;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -73,6 +77,8 @@ export const DEFAULT_SETTINGS: Settings = {
   apiKey: '',
   model: 'claude-opus-5',
   autoNameChats: true,
+  // Dark is the design system's default, so it is this extension's default too.
+  theme: 'dark',
 };
 
 // Provider-neutral conversation format. Adapters translate to each API's wire shape.

@@ -1,85 +1,769 @@
-:root {
-  color-scheme: light dark;
-  --bg: #fafaf9;
-  --fg: #1c1917;
-  --muted: #78716c;
-  --border: #e7e5e4;
-  --card: #ffffff;
-  --accent: #d97706;
-  --accent-fg: #fff;
-  --danger: #dc2626;
-  --code-bg: #f5f5f4;
-  font: 13px/1.45 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+/*
+ * usermods, dressed in Volt OS.
+ *
+ * Volt on charcoal: one neon accent, glowing only where something is alive — the active tab, an
+ * enabled mod, a primary action, the proposal card that is the hero of the Chat screen. Everything
+ * else is quiet: white text on gradient cards, grey metadata, hairline separators, no sharp corners.
+ * Identifiers (tool names, selectors, match patterns, model ids, @tokens, versions) are mono.
+ */
+
+@import './tokens.css';
+
+/* Bundled locally: an extension must never fetch a font from a remote origin. */
+@import '@fontsource/ibm-plex-mono/latin-400.css';
+@import '@fontsource/ibm-plex-mono/latin-500.css';
+@import '@fontsource/ibm-plex-mono/latin-600.css';
+
+* {
+  box-sizing: border-box;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #1c1917;
-    --fg: #f5f5f4;
-    --muted: #a8a29e;
-    --border: #44403c;
-    --card: #292524;
-    --accent: #f59e0b;
-    --accent-fg: #1c1917;
-    --code-bg: #0c0a09;
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg-ambient);
+  background-attachment: fixed;
+  color: var(--text-1);
+  font-family: var(--font-ui);
+  font-size: var(--fs-body);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+code,
+pre,
+.mono {
+  font-family: var(--font-mono);
+}
+
+/* Focus: a single volt hairline, never a browser default halo. */
+:focus-visible {
+  outline: 1px solid var(--volt);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------------------
+ * Shell — the app column never exceeds the viewport; only the message list scrolls.
+ * ------------------------------------------------------------------------ */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.tabs {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-3) var(--sp-4) var(--sp-2);
+  border-bottom: 1px solid var(--border-hair);
+}
+
+.tabs button {
+  background: none;
+  border: 0;
+  border-radius: var(--r-pill);
+  color: var(--text-3);
+  font: 600 var(--fs-label) / 1 var(--font-ui);
+  letter-spacing: var(--lbl-tracking);
+  text-transform: uppercase;
+  padding: 7px 11px;
+  cursor: pointer;
+  transition: color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+
+.tabs button:hover {
+  color: var(--text-2);
+}
+
+/* The one tab that is live carries the volt treatment. */
+.tabs button.active {
+  color: var(--volt);
+  background: var(--volt-a12);
+  box-shadow: var(--glow-tab);
+}
+
+.tabs button.active:hover {
+  color: var(--volt);
+}
+
+.tabs .spacer {
+  flex: 1;
+}
+
+/* The host of the page in view: an identifier, so mono. */
+.tabs .status {
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  color: var(--text-2);
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.view {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--sp-4);
+}
+
+/* ---------------------------------------------------------------------------
+ * Chat
+ * ------------------------------------------------------------------------ */
+
+.chat {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The chat switcher: a quiet strip above the transcript. */
+.chatbar {
+  flex: none;
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+  padding: var(--sp-2) var(--sp-4);
+  border-bottom: 1px solid var(--border-hair);
+}
+
+.chatbar select {
+  flex: 1;
+  min-width: 0;
+  font: 400 var(--fs-meta) / 1.4 var(--font-ui);
+  color: var(--text-1);
+  background: var(--surface-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--r-field);
+  padding: 7px 9px;
+  cursor: pointer;
+}
+
+.chatbar .btn {
+  padding: 6px 11px;
+  font-size: var(--fs-meta);
+}
+
+/*
+ * Rename mode: the input stands exactly where the select was, so the bar does not jump. The volt
+ * border is the "you are editing this" state — the one live thing in the strip.
+ */
+.chatbar input.rename {
+  flex: 1;
+  min-width: 0;
+  font: 400 var(--fs-meta) / 1.4 var(--font-ui);
+  padding: 7px 9px;
+  border: 1px solid var(--volt);
+  border-radius: var(--r-field);
+  background: var(--surface-card);
+  color: var(--text-1);
+}
+
+.chatbar input.rename:focus-visible {
+  outline: none;
+}
+
+.messages {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack-gap);
+}
+
+.msg {
+  max-width: 100%;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.msg.user {
+  align-self: flex-end;
+  max-width: 90%;
+  background: var(--surface-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--r-field);
+  padding: 9px 12px;
+  font-size: var(--fs-body);
+}
+
+/* Queued: waiting its turn, so dimmed rather than decorated. */
+.msg.user.queued {
+  opacity: 0.65;
+  border-style: dashed;
+}
+
+.msg.assistant {
+  padding: 0 2px;
+  color: var(--text-1);
+  font-size: var(--fs-body);
+}
+
+/* A tool row: a hairline rail, a status dot and the tool's name in mono. */
+.tool {
+  font-size: var(--fs-meta);
+  color: var(--text-2);
+  border-left: 1px solid var(--border-card);
+  padding: 2px 0 2px var(--sp-3);
+}
+
+.tool.error {
+  border-left-color: var(--error);
+}
+
+/*
+ * The dot sits on the first line's optical centre rather than on the block's, so a tool row whose
+ * name wraps to two lines keeps its dot beside the name and not floating in the middle.
+ */
+.tool summary {
+  cursor: pointer;
+  list-style: none;
+  display: grid;
+  grid-template-columns: 7px 1fr;
+  align-items: start;
+  gap: var(--sp-2);
+  font-family: var(--font-mono);
+  word-break: break-word;
+}
+
+.tool summary .dot {
+  align-self: start;
+  margin-top: 6px;
+}
+
+.tool summary::-webkit-details-marker {
+  display: none;
+}
+
+.tool pre {
+  margin: var(--sp-2) 0 0;
+  white-space: pre-wrap;
+  max-height: 200px;
+  overflow: auto;
+  background: var(--surface-lo);
+  border: 1px solid var(--border-hair);
+  border-radius: var(--r-field);
+  padding: var(--sp-2) var(--sp-3);
+  font-size: var(--fs-label);
+  line-height: 1.6;
+}
+
+/* Status dots. Volt is the only one that glows. */
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: inline-block;
+  align-self: center;
+  background: var(--volt);
+  box-shadow: var(--glow-dot);
+}
+
+.dot.running {
+  background: var(--warn);
+  box-shadow: none;
+}
+
+.dot.error {
+  background: var(--error);
+  box-shadow: none;
+}
+
+/* Not running: nothing to glow about. */
+.dot.off {
+  background: var(--text-3);
+  box-shadow: none;
+}
+
+.toggle {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: var(--fs-label);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--lbl-tracking);
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.toggle input[type='checkbox'] {
+  margin: 0;
+}
+
+/* ---------------------------------------------------------------------------
+ * Composer
+ * ------------------------------------------------------------------------ */
+
+.composer {
+  flex: none;
+  border-top: 1px solid var(--border-hair);
+  padding: var(--sp-3) var(--sp-4) var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.composer textarea {
+  width: 100%;
+  resize: none;
+  font: 400 var(--fs-body) / 1.5 var(--font-ui);
+  background: var(--surface-card);
+  color: var(--text-1);
+  border: 1px solid var(--border-card);
+  border-radius: var(--r-field);
+  padding: 10px 12px;
+  min-height: 64px;
+  transition: border-color 160ms ease;
+}
+
+.composer textarea::placeholder {
+  color: var(--text-3);
+}
+
+.composer textarea:focus-visible {
+  border-color: var(--volt);
+  outline: none;
+}
+
+.row {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.row .grow {
+  flex: 1;
+}
+
+/* ---------------------------------------------------------------------------
+ * Buttons — primary is a volt fill on near-black; danger is coral text, never a fill.
+ * ------------------------------------------------------------------------ */
+
+button.btn {
+  font: 600 var(--fs-meta) / 1 var(--font-ui);
+  border: 1px solid var(--border-card);
+  background: var(--surface-card);
+  color: var(--text-1);
+  border-radius: var(--r-pill);
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: opacity 160ms ease, box-shadow 160ms ease;
+}
+
+button.btn:hover:not(:disabled) {
+  opacity: 0.8;
+}
+
+button.btn:active:not(:disabled) {
+  opacity: 0.8;
+}
+
+button.btn.primary {
+  background: var(--volt);
+  color: #0a0d0b;
+  border-color: transparent;
+  box-shadow: var(--glow-fill);
+}
+
+button.btn.danger {
+  color: var(--error-text);
+  background: none;
+  border-color: var(--border-card);
+  box-shadow: none;
+}
+
+button.btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+  box-shadow: none;
+}
+
+button.linklike {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--accent-text);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+button.linklike:hover {
+  opacity: 0.8;
+}
+
+/* ---------------------------------------------------------------------------
+ * Chips — identifiers, fully round
+ * ------------------------------------------------------------------------ */
+
+.chip {
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  line-height: 1.5;
+  color: var(--text-1);
+  background: var(--surface-lo);
+  border: 1px solid var(--border-card);
+  border-radius: var(--r-pill);
+  padding: 3px 10px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* An element the user pointed at: alive, so it carries the accent. */
+.chip.ref {
+  color: var(--accent-text);
+  border-color: var(--volt-a28);
+  background: var(--volt-a10);
+}
+
+.chip.warn {
+  color: var(--warn-text);
+  border-color: var(--warn-text);
+  background: var(--warn-bg);
+}
+
+.chip-x {
+  background: none;
+  border: 0;
+  color: var(--text-2);
+  cursor: pointer;
+  padding: 0 0 0 2px;
+  font: inherit;
+  line-height: 1;
+}
+
+.chip-x:hover {
+  color: var(--text-1);
+}
+
+/* ---------------------------------------------------------------------------
+ * Cards — gradient surface, hairline border, 20px radius, no drop shadow in dark
+ * ------------------------------------------------------------------------ */
+
+.card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--r-card);
+  padding: var(--card-pad);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+/* One hero per screen. In Chat that is the proposal card. */
+.card.hero {
+  border-color: var(--volt-a28);
+  box-shadow: var(--glow-hero);
+}
+
+.card h4 {
+  margin: 0;
+  font-size: var(--fs-ui);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.card .desc {
+  color: var(--text-2);
+  font-size: var(--fs-meta);
+}
+
+.card pre {
+  margin: 0;
+  background: var(--surface-lo);
+  border: 1px solid var(--border-hair);
+  border-radius: var(--r-field);
+  padding: var(--sp-3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  line-height: 1.6;
+  overflow: auto;
+  max-height: 260px;
+}
+
+.card .notice {
+  margin: 0;
+}
+
+details > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.card details > summary,
+.disclose {
+  color: var(--text-2);
+  font-size: var(--fs-meta);
+}
+
+.card details > summary:hover,
+.disclose:hover {
+  color: var(--text-1);
+}
+
+/* ---------------------------------------------------------------------------
+ * Text roles
+ * ------------------------------------------------------------------------ */
+
+.error {
+  color: var(--error-text);
+  font-size: var(--fs-meta);
+}
+
+.ok {
+  color: var(--accent-text);
+  font-size: var(--fs-meta);
+}
+
+.muted {
+  color: var(--text-2);
+}
+
+.empty {
+  color: var(--text-2);
+  text-align: center;
+  padding: var(--sp-5) var(--sp-3);
+  font-size: var(--fs-meta);
+}
+
+/* Section labels: 11px, 600, uppercase, tracked out. */
+.label,
+.muted.label {
+  font-size: var(--fs-label);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--lbl-tracking);
+  color: var(--text-2);
+  margin-bottom: var(--sp-1);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack-gap);
+}
+
+/* Cards in a column keep the 12px stack rhythm. */
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack-gap);
+}
+
+/* ---------------------------------------------------------------------------
+ * Fields
+ * ------------------------------------------------------------------------ */
+
+label.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  margin-bottom: var(--sp-3);
+  font-size: var(--fs-label);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--lbl-tracking);
+  color: var(--text-2);
+}
+
+/* The helper text under a field is prose, not a label. */
+label.field > span {
+  font-size: var(--fs-meta);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-2);
+}
+
+label.field input,
+label.field select,
+.field-row input {
+  font: 400 var(--fs-body) / 1.4 var(--font-mono);
+  text-transform: none;
+  letter-spacing: 0;
+  padding: 9px 11px;
+  border: 1px solid var(--border-card);
+  border-radius: var(--r-field);
+  background: var(--surface-card);
+  color: var(--text-1);
+  transition: border-color 160ms ease;
+}
+
+label.field select {
+  font-family: var(--font-ui);
+  cursor: pointer;
+}
+
+label.field input::placeholder,
+.field-row input::placeholder {
+  color: var(--text-3);
+}
+
+label.field input:focus-visible,
+label.field select:focus-visible,
+.field-row input:focus-visible {
+  border-color: var(--volt);
+  outline: none;
+}
+
+.field-row {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+}
+
+.field-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+/*
+ * The on/off control on a mod card. The native checkbox's tick is a shape the design system does
+ * not own, so this is a round track with a volt fill when on — a mod that is running glows, and one
+ * that is off is a quiet grey track.
+ */
+input[type='checkbox'] {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+  width: 30px;
+  height: 17px;
+  flex-shrink: 0;
+  border-radius: var(--r-pill);
+  background: var(--track);
+  border: 1px solid var(--border-card);
+  position: relative;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+input[type='checkbox']::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--text-2);
+  transition: transform 160ms ease, background 160ms ease;
+}
+
+input[type='checkbox']:checked {
+  background: var(--volt-a25);
+  border-color: var(--volt);
+  box-shadow: var(--glow-fill);
+}
+
+input[type='checkbox']:checked::after {
+  background: var(--volt);
+  transform: translateX(13px);
+}
+
+/* ---------------------------------------------------------------------------
+ * Notices
+ * ------------------------------------------------------------------------ */
+
+.notice {
+  flex: none;
+  background: var(--surface-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--r-field);
+  padding: var(--sp-3) var(--sp-4);
+  margin: var(--sp-3) var(--sp-4) 0;
+  font-size: var(--fs-meta);
+  color: var(--text-2);
+  white-space: pre-wrap;
+}
+
+/* A notice inside a card is already inset: no outer margin, quieter surface. */
+.card > .notice {
+  margin: 0;
+  background: var(--surface-lo);
+  border-color: var(--border-hair);
+}
+
+.steps {
+  margin: 0;
+  padding-left: var(--sp-5);
+  color: var(--text-2);
+  font-size: var(--fs-meta);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.steps li {
+  padding-left: 2px;
+}
+
+.steps li::marker {
+  color: var(--text-3);
+}
+
+/* ---------------------------------------------------------------------------
+ * The full-tab install page
+ * ------------------------------------------------------------------------ */
+
+.page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: var(--sp-5) var(--sp-4) 48px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack-gap);
+}
+
+/* 26px display type has room here, unlike the 420px panel. */
+.page h2 {
+  font-size: var(--fs-title);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+/* The wordmark where a logo would go: plain type, no mark. */
+.wordmark {
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  font-weight: 600;
+  letter-spacing: var(--lbl-tracking);
+  text-transform: uppercase;
+  color: var(--accent-text);
+}
+
+.break {
+  word-break: break-all;
+}
+
+/* ---------------------------------------------------------------------------
+ * Motion: opacity and glow only, and none of it for anyone who asked for less.
+ * ------------------------------------------------------------------------ */
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
   }
 }
-* { box-sizing: border-box; }
-html, body, #root { height: 100%; margin: 0; }
-body { background: var(--bg); color: var(--fg); }
-.app { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
-.tabs { flex: none; display: flex; border-bottom: 1px solid var(--border); padding: 0 8px; gap: 2px; }
-.tabs button { background: none; border: 0; border-bottom: 2px solid transparent; color: var(--muted); padding: 10px 10px 8px; font: inherit; cursor: pointer; }
-.tabs button.active { color: var(--fg); border-bottom-color: var(--accent); }
-.tabs .spacer { flex: 1; }
-.tabs .status { align-self: center; font-size: 11px; color: var(--muted); padding-right: 6px; }
-.view { flex: 1; min-height: 0; overflow: auto; padding: 12px; }
-.chat { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.messages { flex: 1; min-height: 0; overflow: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
-.msg { max-width: 100%; white-space: pre-wrap; word-break: break-word; }
-.msg.user { align-self: flex-end; background: var(--card); border: 1px solid var(--border); border-radius: 12px 12px 2px 12px; padding: 8px 10px; max-width: 90%; }
-.msg.user.queued { opacity: 0.6; border-style: dashed; }
-.msg.assistant { padding: 0 2px; }
-.tool { font-size: 12px; color: var(--muted); border-left: 2px solid var(--border); padding: 2px 8px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-.tool.error { border-left-color: var(--danger); }
-.tool summary { cursor: pointer; list-style: none; }
-.tool pre { margin: 4px 0 0; white-space: pre-wrap; max-height: 200px; overflow: auto; }
-.composer { flex: none; border-top: 1px solid var(--border); padding: 8px; display: flex; flex-direction: column; gap: 6px; }
-.composer textarea { width: 100%; resize: none; font: inherit; background: var(--card); color: var(--fg); border: 1px solid var(--border); border-radius: 8px; padding: 8px; min-height: 60px; }
-.row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-.row .grow { flex: 1; }
-button.btn { font: inherit; border: 1px solid var(--border); background: var(--card); color: var(--fg); border-radius: 6px; padding: 5px 10px; cursor: pointer; }
-button.btn.primary { background: var(--accent); color: var(--accent-fg); border-color: transparent; }
-button.btn.danger { color: var(--danger); }
-button.btn:disabled { opacity: 0.5; cursor: default; }
-.chip-x { background: none; border: 0; color: var(--muted); cursor: pointer; padding: 0 2px; font: inherit; }
-.chip { font-size: 11px; background: var(--code-bg); border: 1px solid var(--border); border-radius: 999px; padding: 2px 8px; font-family: ui-monospace, monospace; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 6px; }
-.card h4 { margin: 0; font-size: 13px; }
-.card .desc { color: var(--muted); }
-.card pre { margin: 0; background: var(--code-bg); border-radius: 6px; padding: 8px; font-size: 11.5px; overflow: auto; max-height: 260px; }
-.error { color: var(--danger); font-size: 12px; }
-button.linklike { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); cursor: pointer; text-decoration: underline; }
-.muted { color: var(--muted); }
-.empty { color: var(--muted); text-align: center; padding: 30px 10px; }
-.list { display: flex; flex-direction: column; gap: 8px; }
-label.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; font-size: 12px; color: var(--muted); }
-label.field input, label.field select { font: inherit; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); color: var(--fg); }
-.notice { flex: none; background: var(--card); border: 1px solid var(--accent); border-radius: 8px; padding: 10px; margin-bottom: 10px; font-size: 12px; white-space: pre-wrap; }
-
-/* Install preview + migration, shared by the side panel and the full-tab install page. */
-.page { max-width: 720px; margin: 0 auto; padding: 24px 16px 48px; }
-.page h2 { font-size: 18px; margin: 0 0 12px; }
-.muted.label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 3px; }
-.break { word-break: break-all; }
-.chip.warn { border-color: var(--accent); color: var(--accent); }
-.card .notice { margin: 0; }
-.steps { margin: 4px 0 8px; padding-left: 20px; color: var(--muted); display: flex; flex-direction: column; gap: 2px; }
-.steps li { padding-left: 2px; }
-.field-row { display: flex; gap: 6px; align-items: center; }
-.field-row input { flex: 1; min-width: 0; font: inherit; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); color: var(--fg); }
-.ok { color: var(--accent); font-size: 12px; }
-.chatbar { flex: none; display: flex; gap: 6px; align-items: center; padding: 6px 8px; border-bottom: 1px solid var(--border); }
-.chatbar select { flex: 1; min-width: 0; font: inherit; font-size: 12px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); color: var(--fg); }
-.chatbar .btn { padding: 4px 8px; font-size: 12px; }
-/* Rename mode: the input stands exactly where the select was, so the bar does not jump. */
-.chatbar input.rename { flex: 1; min-width: 0; font: inherit; font-size: 12px; padding: 4px 6px; border: 1px solid var(--accent); border-radius: 6px; background: var(--card); color: var(--fg); }

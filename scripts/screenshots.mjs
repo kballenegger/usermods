@@ -402,7 +402,11 @@ async function smoke() {
     for (const name of ['get_page', 'find_elements', 'get_styles', 'propose_mod']) {
       if (!tools.some((t) => t.includes(name))) fail(`no ${name} row in the transcript (rows: ${tools.join(' | ')})`);
     }
-    if (tools.some((t) => t.startsWith('✗'))) fail(`a tool call failed: ${tools.filter((t) => t.startsWith('✗')).join(' | ')}`);
+    // A failed call is a coral dot on its row, not a glyph in the text.
+    const failed = await panel.locator('.messages .tool summary .dot.error').count();
+    if (failed) fail(`${failed} tool call(s) failed`);
+    const stillRunning = await panel.locator('.messages .tool summary .dot.running').count();
+    if (stillRunning) fail(`${stillRunning} tool call(s) never returned`);
 
     // The generated code is present and is the real script, not a placeholder.
     const code = await panel.locator('.messages .card pre').first().textContent();
@@ -410,7 +414,7 @@ async function smoke() {
 
     // Saving it puts a real mod in storage.
     await panel.locator('.messages .card button.btn.primary').click();
-    await panel.locator('.messages .card button.btn.primary', { hasText: 'Saved & enabled' }).waitFor({ timeout: 10_000 });
+    await panel.locator('.messages .card button.btn.primary', { hasText: 'Saved · enabled' }).waitFor({ timeout: 10_000 });
     const saved = await panel.evaluate(async () => (await chrome.storage.local.get('mods')).mods ?? []);
     if (saved.length !== 1) fail(`expected 1 saved mod, got ${saved.length}`);
     if (!saved[0].source.includes('==UserScript==')) fail('saved mod has no userscript header');

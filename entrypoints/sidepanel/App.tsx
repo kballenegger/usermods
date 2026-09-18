@@ -65,12 +65,14 @@ export function App() {
         <button className={tab === 'mods' ? 'active' : ''} onClick={() => setTab('mods')}>Mods</button>
         <button className={tab === 'settings' ? 'active' : ''} onClick={() => setTab('settings')}>Settings</button>
         <span className="spacer" />
+        {/* The page in view. A volt dot means a real page the panel can act on. */}
+        {host && <span className="dot" aria-hidden="true" />}
         <span className="status" title={pageUrl}>{host}</span>
       </nav>
       {usStatus && !usStatus.available && <div className="notice">{usStatus.message}</div>}
       {tab === 'chat' &&
         (consented === null ? (
-          <div className="view muted">Loading…</div>
+          <div className="view muted">loading…</div>
         ) : gateChat ? (
           <Consent
             onAccept={() => {
