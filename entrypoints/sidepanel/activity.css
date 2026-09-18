@@ -43,10 +43,10 @@
   box-shadow: none;
 }
 .activity.warn .dot {
-  background: var(--warn);
+  background: var(--dot-warn);
 }
 .activity.error .dot {
-  background: var(--error);
+  background: var(--dot-error);
 }
 
 .activity-label {
@@ -84,8 +84,25 @@
   color: var(--accent-text);
   cursor: pointer;
 }
+/*
+ * Hover brightens on charcoal. On white "brighter" is the wrong direction — --volt-bright is
+ * #8FBF00 there, lighter than the accent and so a hover that fades — hence the opacity press the
+ * design system recommends instead of a colour change.
+ */
 .activity button.activity-action:hover {
   color: var(--volt-bright);
+}
+
+:root[data-theme='light'] .activity button.activity-action:hover {
+  color: var(--accent-text);
+  opacity: 0.8;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) .activity button.activity-action:hover {
+    color: var(--accent-text);
+    opacity: 0.8;
+  }
 }
 .activity.warn button.activity-action,
 .activity.error button.activity-action {

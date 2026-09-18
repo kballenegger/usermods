@@ -35,15 +35,35 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Selection: the browser's default blue belongs to neither theme. */
+::selection {
+  background: var(--selection-bg);
+  color: var(--selection-fg);
+}
+
+/*
+ * Scrollbars. `color-scheme` on <html> (lib/theme.ts) already tells the engine which native
+ * scrollbar to paint, and that alone is the right answer for the overlay scrollbars macOS uses.
+ * This only narrows them and tints the thumb to the theme's own grey, so a scrolling transcript
+ * does not introduce a colour the palette never named.
+ */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--track) transparent;
+}
+
 code,
 pre,
 .mono {
   font-family: var(--font-mono);
 }
 
-/* Focus: a single volt hairline, never a browser default halo. */
+/*
+ * Focus: a single volt hairline, never a browser default halo. Light uses the deeper chartreuse
+ * (--focus-ring): full volt is only 3.1:1 on white, which is too faint to find a focused control by.
+ */
 :focus-visible {
-  outline: 1px solid var(--volt);
+  outline: 1px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -84,19 +104,80 @@ pre,
   color: var(--text-2);
 }
 
-/* The one tab that is live carries the volt treatment. */
+/*
+ * The one tab that is live carries the volt treatment. The label is --accent-text rather than
+ * --volt: they are the same colour in dark, but in light --volt on the --volt-a12 tint is 2.9:1,
+ * and this is the label that says which screen you are on.
+ */
 .tabs button.active {
-  color: var(--volt);
+  color: var(--accent-text);
   background: var(--volt-a12);
   box-shadow: var(--glow-tab);
 }
 
 .tabs button.active:hover {
-  color: var(--volt);
+  color: var(--accent-text);
+}
+
+/*
+ * Light has no --glow-tab to separate the active pill from the bar, so the tint gets a hairline of
+ * the accent to sit in. Dark does not need it: the glow already draws that edge.
+ */
+:root[data-theme='light'] .tabs button.active {
+  box-shadow: inset 0 0 0 1px var(--volt-a28);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) .tabs button.active {
+    box-shadow: inset 0 0 0 1px var(--volt-a28);
+  }
 }
 
 .tabs .spacer {
   flex: 1;
+}
+
+/*
+ * The theme toggle: a quiet ◐ that cycles Dark → Light → System.
+ *
+ * It is deliberately the least loud control in the bar — it is a preference, not navigation, so it
+ * takes the faint text step and only comes up to the accent on hover. The glyph rotates with the
+ * mode so the three states are distinguishable at a glance without a label: ◐ dark, ◑ light (the
+ * filled half follows the palette), and System keeps ◐ at reduced opacity, since it is "whichever
+ * the OS says" rather than a colour of its own.
+ */
+.theme-toggle {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: none;
+  color: var(--text-3);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 160ms ease, background 160ms ease, opacity 160ms ease;
+}
+
+.theme-toggle:hover {
+  color: var(--accent-text);
+  background: var(--volt-a12);
+}
+
+/* Light flips the glyph, so the filled half reads as the side the theme is on. */
+.theme-toggle[data-theme-choice='light'] span {
+  display: inline-block;
+  transform: rotate(180deg);
+}
+
+/* System: the same mark, stated less firmly — it is a deferral, not a choice of palette. */
+.theme-toggle[data-theme-choice='system'] {
+  opacity: 0.65;
 }
 
 /* The host of the page in view: an identifier, so mono. */
@@ -220,8 +301,9 @@ pre,
   padding: 2px 0 2px var(--sp-3);
 }
 
+/* The rail is the only marker an errored row has, so it takes the tone that survives on white. */
 .tool.error {
-  border-left-color: var(--error);
+  border-left-color: var(--dot-error);
 }
 
 /*
@@ -253,8 +335,8 @@ pre,
   white-space: pre-wrap;
   max-height: 200px;
   overflow: auto;
-  background: var(--surface-lo);
-  border: 1px solid var(--border-hair);
+  background: var(--surface-well);
+  border: 1px solid var(--border-card);
   border-radius: var(--r-field);
   padding: var(--sp-2) var(--sp-3);
   font-size: var(--fs-label);
@@ -269,17 +351,17 @@ pre,
   flex-shrink: 0;
   display: inline-block;
   align-self: center;
-  background: var(--volt);
+  background: var(--dot-ok);
   box-shadow: var(--glow-dot);
 }
 
 .dot.running {
-  background: var(--warn);
+  background: var(--dot-warn);
   box-shadow: none;
 }
 
 .dot.error {
-  background: var(--error);
+  background: var(--dot-error);
   box-shadow: none;
 }
 
@@ -364,6 +446,7 @@ button.btn {
   padding: 8px 14px;
   cursor: pointer;
   transition: opacity 160ms ease, box-shadow 160ms ease;
+  box-shadow: var(--shadow-raise);
 }
 
 button.btn:hover:not(:disabled) {
@@ -374,9 +457,13 @@ button.btn:active:not(:disabled) {
   opacity: 0.8;
 }
 
+/*
+ * The one filled button. Light uses the brighter chartreuse with a near-black label rather than
+ * white on --volt, which is only 3.1:1 — see --btn-primary-* in tokens.css.
+ */
 button.btn.primary {
-  background: var(--volt);
-  color: #0a0d0b;
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-fg);
   border-color: transparent;
   box-shadow: var(--glow-fill);
 }
@@ -388,10 +475,49 @@ button.btn.danger {
   box-shadow: none;
 }
 
+/*
+ * Disabled. 0.4 opacity is right on charcoal, where a dimmed label still separates from a dark
+ * surface; on white the same value fades a label to roughly 2:1 and the control reads as absent
+ * rather than as unavailable. Light dims less and states it with a muted fill instead.
+ */
 button.btn:disabled {
   opacity: 0.4;
   cursor: default;
   box-shadow: none;
+}
+
+:root[data-theme='light'] button.btn:disabled {
+  opacity: 1;
+  color: var(--text-3);
+  background: var(--surface-well);
+  border-color: var(--border-card);
+}
+
+/*
+ * A disabled primary keeps the accent so it still reads as the main action, on the volt tint rather
+ * than the full fill. The label is --volt-deep rather than --accent-text: on that pale tint the
+ * accent is 4.1:1, just under AA, and a disabled control is exactly where text is most often too
+ * faint to read.
+ */
+:root[data-theme='light'] button.btn.primary:disabled {
+  background: var(--volt-a25);
+  color: var(--btn-disabled-fg);
+  border-color: transparent;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) button.btn:disabled {
+    opacity: 1;
+    color: var(--text-3);
+    background: var(--surface-well);
+    border-color: var(--border-card);
+  }
+
+  :root:not([data-theme]) button.btn.primary:disabled {
+    background: var(--volt-a25);
+    color: var(--btn-disabled-fg);
+    border-color: transparent;
+  }
 }
 
 button.linklike {
@@ -417,7 +543,7 @@ button.linklike:hover {
   font-size: var(--fs-label);
   line-height: 1.5;
   color: var(--text-1);
-  background: var(--surface-lo);
+  background: var(--surface-well);
   border: 1px solid var(--border-card);
   border-radius: var(--r-pill);
   padding: 3px 10px;
@@ -466,6 +592,31 @@ button.linklike:hover {
   display: flex;
   flex-direction: column;
   gap: var(--sp-3);
+  box-shadow: var(--shadow-card);
+}
+
+/*
+ * A card for something switched off. On charcoal, dimming the whole card is enough — the surface is
+ * dark, so a dimmed card still reads. On white, 0.55 opacity takes body text to roughly 2.5:1 and
+ * the card reads as broken rather than as off, so light recedes it by flattening the surface and
+ * dropping the lift instead, and leaves the text alone.
+ */
+.card.disabled {
+  opacity: 0.55;
+}
+
+:root[data-theme='light'] .card.disabled {
+  opacity: 1;
+  background: var(--surface-well);
+  box-shadow: none;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) .card.disabled {
+    opacity: 1;
+    background: var(--surface-well);
+    box-shadow: none;
+  }
 }
 
 /* One hero per screen. In Chat that is the proposal card. */
@@ -488,8 +639,8 @@ button.linklike:hover {
 
 .card pre {
   margin: 0;
-  background: var(--surface-lo);
-  border: 1px solid var(--border-hair);
+  background: var(--surface-well);
+  border: 1px solid var(--border-card);
   border-radius: var(--r-field);
   padding: var(--sp-3);
   font-family: var(--font-mono);
@@ -557,6 +708,23 @@ details > summary::-webkit-details-marker {
   letter-spacing: var(--lbl-tracking);
   color: var(--text-2);
   margin-bottom: var(--sp-1);
+}
+
+/*
+ * The caveat on the hero card: "not tested on this page · <why>".
+ *
+ * It carries .label so the capture path can mask it by selector (scripts/screenshots.mjs) and the
+ * guardrails flow can assert it renders, but a section label's form — 11px uppercase, tracked out —
+ * is meant for one or two words. This is a sentence with a reason attached, and set in caps it
+ * wrapped to two shouting lines that read louder than the proposal they qualify. Sentence case in
+ * the amber the design system reserves for "attention, not failure" says it at the right volume.
+ */
+.label.untested {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--fs-meta);
+  font-weight: 400;
+  color: var(--warn-text);
 }
 
 .list {
@@ -682,6 +850,32 @@ input[type='checkbox']:checked::after {
   transform: translateX(13px);
 }
 
+/*
+ * In dark, "on" is a volt-tinted track plus the glow, and the glow is what carries it. Light has no
+ * glow, and a pale tint with a chartreuse knob is a weak signal for the most important state on the
+ * Mods screen — whether a mod is running. So light states it the other way round: a solid volt
+ * track with a white knob, which is unmistakable at a glance and still the same hue.
+ */
+:root[data-theme='light'] input[type='checkbox']:checked {
+  background: var(--volt);
+  border-color: var(--volt);
+}
+
+:root[data-theme='light'] input[type='checkbox']:checked::after {
+  background: #ffffff;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) input[type='checkbox']:checked {
+    background: var(--volt);
+    border-color: var(--volt);
+  }
+
+  :root:not([data-theme]) input[type='checkbox']:checked::after {
+    background: #ffffff;
+  }
+}
+
 /* ---------------------------------------------------------------------------
  * Notices
  * ------------------------------------------------------------------------ */
@@ -696,13 +890,14 @@ input[type='checkbox']:checked::after {
   font-size: var(--fs-meta);
   color: var(--text-2);
   white-space: pre-wrap;
+  box-shadow: var(--shadow-card);
 }
 
 /* A notice inside a card is already inset: no outer margin, quieter surface. */
 .card > .notice {
   margin: 0;
-  background: var(--surface-lo);
-  border-color: var(--border-hair);
+  background: var(--surface-well);
+  border-color: var(--border-card);
 }
 
 .steps {
@@ -734,6 +929,14 @@ input[type='checkbox']:checked::after {
   display: flex;
   flex-direction: column;
   gap: var(--stack-gap);
+}
+
+/* The wordmark and title on the left, the theme toggle sitting out at the right margin. */
+.page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-4);
 }
 
 /* 26px display type has room here, unlike the 420px panel. */

@@ -66,9 +66,10 @@ const SMOKE = process.argv.includes('--smoke');
 const CHATS = process.argv.includes('--chats');
 const ISOLATION = process.argv.includes('--isolation');
 const COMPACTION = process.argv.includes('--compaction');
+const THEME = process.argv.includes('--theme');
 
 /** True when this run is capturing screenshots rather than asserting behaviour (see MASK below). */
-const CAPTURING = !SMOKE && !CHATS && !ISOLATION && !COMPACTION;
+const CAPTURING = !SMOKE && !CHATS && !ISOLATION && !COMPACTION && !THEME;
 
 /** See note 4: a first-run setup instruction, not the steady state the README should show. */
 const HIDE_SETUP_NOTICE = '.app > .notice { display: none !important; }';
@@ -156,7 +157,13 @@ async function launch(colorScheme = 'light') {
   };
 }
 
-/** Open the panel page, seed settings and storage, and return the page. */
+/**
+ * Open the panel page, seed settings and storage, and return the page.
+ *
+ * The theme comes from the stored setting, not from the emulated OS scheme: `theme` defaults to
+ * 'system', so a capture that only set colorScheme would be at the mercy of the default. Pass
+ * `settings: { theme: 'light' | 'dark' }` to pin it, or 'system' to exercise the OS path on purpose.
+ */
 async function openPanel(ctx, extId, { settings = {}, storage = {} } = {}) {
   const page = await ctx.newPage();
   await page.goto(`chrome-extension://${extId}/sidepanel.html`);
@@ -294,11 +301,17 @@ async function fetchRequests() {
 // The captures
 // ---------------------------------------------------------------------------
 
-/** 01 — a finished conversation with the proposal card, in one color scheme. */
-async function chatProposal(colorScheme, name) {
-  const b = await launch(colorScheme);
+/**
+ * 01 — a finished conversation with the proposal card, in one theme.
+ *
+ * The theme is forced through the stored setting rather than by emulating the OS, so the shot shows
+ * the palette it is named after whatever the default happens to be. The OS scheme is emulated to
+ * match, so native controls and any prefers-color-scheme rule agree with it.
+ */
+async function chatProposal(theme, name) {
+  const b = await launch(theme);
   try {
-    const panel = await openPanel(b.ctx, b.extId);
+    const panel = await openPanel(b.ctx, b.extId, { settings: { theme } });
     await openSite(b.ctx, 'https://en.wikipedia.org/wiki/Common_kingfisher');
     await waitForComposer(panel);
     await runConversation(panel, 'hide the sidebar and make the article full width', { refreshTitle: true });
@@ -406,42 +419,53 @@ function seedMods() {
 }
 
 /** 03 — the Mods view with saved mods, one matching the page in view. */
-async function mods() {
-  const b = await launch('light');
+async function mods(theme = 'dark', name = '03-mods.png') {
+  const b = await launch(theme);
   try {
-    const panel = await openPanel(b.ctx, b.extId, { storage: { mods: seedMods() } });
+    const panel = await openPanel(b.ctx, b.extId, { settings: { theme }, storage: { mods: seedMods() } });
     await openSite(b.ctx, 'https://en.wikipedia.org/wiki/Common_kingfisher');
     await panel.waitForTimeout(1000);
     await panel.locator('.tabs button', { hasText: 'Mods' }).click();
     await panel.waitForTimeout(600);
-    return await shot(panel, '03-mods.png');
+    return await shot(panel, name);
   } finally {
     await b.close();
   }
 }
 
 /** 04 — Settings, provider presets and the ChatGPT subscription card, not signed in. */
-async function settings() {
-  const b = await launch('light');
+async function settings(theme = 'dark', name = '04-settings.png') {
+  const b = await launch(theme);
   try {
-    const panel = await openPanel(b.ctx, b.extId, { settings: { provider: 'chatgpt', baseUrl: '', apiKey: '', model: '' } });
+    const panel = await openPanel(b.ctx, b.extId, {
+      settings: { provider: 'chatgpt', baseUrl: '', apiKey: '', model: '', theme },
+    });
     await openSite(b.ctx, 'https://en.wikipedia.org/wiki/Common_kingfisher');
     await panel.waitForTimeout(800);
     await panel.locator('.tabs button', { hasText: 'Settings' }).click();
     await panel.waitForTimeout(600);
-    return await shot(panel, '04-settings.png');
+    return await shot(panel, name);
   } finally {
     await b.close();
   }
 }
 
 /** 05 — the install page for a real Greasy Fork script, fetched live. */
-async function install() {
-  const b = await launch('light');
+async function install(theme = 'dark', name = '05-install.png') {
+  const b = await launch(theme);
   try {
     // The install page is a full page, not a panel, so give it a page-sized viewport.
     const page = await b.ctx.newPage();
     await page.setViewportSize({ width: 860, height: 900 });
+    // The install page reads the same stored setting the panel does, so pin it there too. Seeded
+    // from the panel page rather than this one: install.html with no fragment renders its "no
+    // script URL" error, which the preview check below would then pick up.
+    const seed = await b.ctx.newPage();
+    await seed.goto(`chrome-extension://${b.extId}/sidepanel.html`);
+    await seed.evaluate(async (t) => {
+      await chrome.storage.local.set({ settings: { theme: t } });
+    }, theme);
+    await seed.close();
     // The script URL travels in the fragment, taken verbatim, the way the .user.js redirect rule
     // writes it — a query parameter would let the fetched URL smuggle its own `url=` past us.
     await page.goto(`chrome-extension://${b.extId}/install.html#${GREASY_FORK_URL}`);
@@ -455,17 +479,17 @@ async function install() {
     const height = await page.evaluate(() => Math.ceil(document.querySelector('.page').getBoundingClientRect().bottom + 24));
     await page.setViewportSize({ width: 860, height: Math.max(360, Math.min(height, 1200)) });
     await page.waitForTimeout(200);
-    return await shot(page, '05-install.png');
+    return await shot(page, name);
   } finally {
     await b.close();
   }
 }
 
 /** 06 — the Migrate from Tampermonkey card, expanded. */
-async function migrate() {
-  const b = await launch('light');
+async function migrate(theme = 'dark') {
+  const b = await launch(theme);
   try {
-    const panel = await openPanel(b.ctx, b.extId, { storage: { mods: seedMods() } });
+    const panel = await openPanel(b.ctx, b.extId, { settings: { theme }, storage: { mods: seedMods() } });
     await openSite(b.ctx, 'https://en.wikipedia.org/wiki/Common_kingfisher');
     await panel.waitForTimeout(800);
     await panel.locator('.tabs button', { hasText: 'Mods' }).click();
@@ -535,6 +559,162 @@ async function smoke() {
 
     await assertNoViolations('smoke');
     console.log('smoke: OK — streamed reply, 3 page-inspection tools, proposal card, save to storage, zero invalid requests');
+  } finally {
+    await b.close();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Theme test: the default follows the OS, the toggle cycles and persists, and nothing flashes.
+// ---------------------------------------------------------------------------
+//
+// The three things that can only be checked in a real browser:
+//
+//   1. A fresh profile follows the emulated OS scheme. That is the changed default ('system'), and
+//      it is the one behaviour a unit test cannot see, because it depends on the media query.
+//   2. The toggle cycles, persists across a reload, and the reloaded page paints the right palette
+//      on its FIRST frame. The flash is the whole point: an init script samples the computed
+//      background before any of the page's own script has run, so a panel that started dark and
+//      corrected itself would be caught rather than looking fine by the time we screenshot it.
+//   3. `color-scheme` follows the theme, which is what makes native selects, checkboxes, date
+//      inputs and scrollbars render light rather than staying dark on a light panel.
+
+/** What the document is actually wearing, by the tokens the theme sets. */
+async function themeState(page) {
+  return await page.evaluate(() => {
+    const cs = getComputedStyle(document.documentElement);
+    return {
+      attr: document.documentElement.getAttribute('data-theme'),
+      colorScheme: cs.colorScheme,
+      // --bg-app is the clearest single tell: near-black in dark, near-white in light.
+      bgApp: cs.getPropertyValue('--bg-app').trim(),
+      toggleTitle: document.querySelector('.theme-toggle')?.getAttribute('title') ?? null,
+    };
+  });
+}
+
+/** 'dark' or 'light', read from --bg-app rather than from what we asked for. */
+function paletteOf(bgApp) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(bgApp.replace(/\s/g, ''));
+  if (!m) throw new Error(`--bg-app is not a plain hex colour: ${JSON.stringify(bgApp)}`);
+  const n = parseInt(m[1], 16);
+  const lum = ((n >> 16) & 255) * 0.299 + ((n >> 8) & 255) * 0.587 + (n & 255) * 0.114;
+  return lum < 128 ? 'dark' : 'light';
+}
+
+async function themeFlow() {
+  const fail = (m) => {
+    throw new Error(`theme: ${m}`);
+  };
+
+  // --- 1. A fresh profile follows the OS, both ways -------------------------
+  for (const os of ['light', 'dark']) {
+    const b = await launch(os);
+    try {
+      const page = await b.ctx.newPage();
+      await page.goto(`chrome-extension://${b.extId}/sidepanel.html`);
+      // Nothing seeded: this is what someone sees the first time they open the panel.
+      const s = await themeState(page);
+      if (paletteOf(s.bgApp) !== os) {
+        fail(`a fresh profile on a ${os} OS painted the ${paletteOf(s.bgApp)} palette (--bg-app ${s.bgApp})`);
+      }
+      if (s.attr !== null) fail(`a fresh profile should leave data-theme off (System), got ${JSON.stringify(s.attr)}`);
+      // On System the right answer is either the resolved scheme or the literal `light dark` that
+      // defers to the OS — both make native controls follow it. What would be wrong is the
+      // opposite scheme pinned.
+      if (s.colorScheme !== os && s.colorScheme !== 'light dark') {
+        fail(`color-scheme on a ${os} OS was ${JSON.stringify(s.colorScheme)}`);
+      }
+    } finally {
+      await b.close();
+    }
+  }
+  log('theme: a fresh profile follows the OS, light and dark');
+
+  // --- 2. The toggle cycles, persists, and does not flash -------------------
+  const b = await launch('dark');
+  try {
+    const panel = await openPanel(b.ctx, b.extId, { settings: { theme: 'dark' } });
+    await panel.waitForTimeout(400);
+
+    const toggle = panel.locator('.theme-toggle');
+    if (!(await toggle.count())) fail('no theme toggle in the side panel tab bar');
+    if (!(await themeState(panel)).toggleTitle?.includes('Dark')) fail('the toggle does not name the current theme');
+
+    // Dark -> Light -> System -> Dark, checking the palette really changes under the click.
+    for (const [from, to] of [['dark', 'light'], ['light', 'system'], ['system', 'dark']]) {
+      const before = await themeState(panel);
+      if (before.attr !== (from === 'system' ? null : from)) {
+        fail(`expected to be on ${from}, data-theme is ${JSON.stringify(before.attr)}`);
+      }
+      await toggle.click();
+      await panel.waitForTimeout(250);
+      const after = await themeState(panel);
+      const wanted = to === 'system' ? null : to;
+      if (after.attr !== wanted) fail(`clicking from ${from} gave data-theme ${JSON.stringify(after.attr)}, wanted ${JSON.stringify(wanted)}`);
+      const stored = await panel.evaluate(async () => (await chrome.storage.local.get('settings')).settings?.theme);
+      if (stored !== to) fail(`clicking from ${from} stored ${JSON.stringify(stored)}, wanted ${to}`);
+    }
+    log('theme: the toggle cycles Dark -> Light -> System and persists each step');
+
+    // Settle on light, then reload and sample the very first paint.
+    await toggle.click(); // dark -> light
+    await panel.waitForTimeout(250);
+    if ((await themeState(panel)).attr !== 'light') fail('expected to be on light before the reload check');
+
+    // The init script runs before any page script, so this is the first frame's background.
+    await panel.addInitScript(() => {
+      // An init script runs before the document has an element, and before the stylesheet has been
+      // applied, so sampling immediately would read nothing. requestAnimationFrame fires just
+      // before the browser paints: whatever is computed then is what the user's first frame shows.
+      const sample = () => {
+        try {
+          const v = getComputedStyle(document.documentElement).getPropertyValue('--bg-app').trim();
+          if (v) window.__firstPaintBg ??= v;
+        } catch {
+          /* nothing to read yet */
+        }
+      };
+      requestAnimationFrame(() => {
+        sample();
+        requestAnimationFrame(sample);
+      });
+      document.addEventListener('DOMContentLoaded', sample, { once: true });
+    });
+    await panel.reload({ waitUntil: 'domcontentloaded' });
+    await panel.waitForTimeout(400);
+
+    const first = await panel.evaluate(() => window.__firstPaintBg ?? null);
+    if (!first) fail('could not sample the first paint background');
+    if (paletteOf(first) !== 'light') {
+      fail(`the panel painted the ${paletteOf(first)} palette on its first frame after a reload on light (--bg-app ${first}) — that is the dark flash`);
+    }
+    const afterReload = await themeState(panel);
+    if (afterReload.attr !== 'light') fail(`the choice did not survive a reload: data-theme ${JSON.stringify(afterReload.attr)}`);
+    log('theme: the choice survives a reload and the first paint is already light — no flash');
+
+    // --- 3. Native controls follow the theme -------------------------------
+    if (afterReload.colorScheme !== 'light') {
+      fail(`color-scheme on a light panel was ${JSON.stringify(afterReload.colorScheme)} — native selects and scrollbars would stay dark`);
+    }
+    // And the other way, so this is not just a light-only assertion.
+    await toggle.click(); // light -> system
+    await toggle.click(); // system -> dark
+    await panel.waitForTimeout(250);
+    const dark = await themeState(panel);
+    if (dark.colorScheme !== 'dark') fail(`color-scheme on a dark panel was ${JSON.stringify(dark.colorScheme)}`);
+    log('theme: color-scheme matches the theme in both directions');
+
+    // The install page is a second entry point and reads the same setting.
+    const install = await b.ctx.newPage();
+    await install.goto(`chrome-extension://${b.extId}/install.html`);
+    await install.waitForTimeout(400);
+    const ip = await themeState(install);
+    if (ip.attr !== 'dark') fail(`the install page ignored the saved choice: data-theme ${JSON.stringify(ip.attr)}`);
+    if (!(await install.locator('.theme-toggle').count())) fail('no theme toggle on the install page');
+    log('theme: the install page wears the same saved choice and carries the toggle');
+
+    console.log('theme: OK — OS default, cycling toggle, persistence with no first-paint flash, color-scheme both ways');
   } finally {
     await b.close();
   }
@@ -1309,6 +1489,10 @@ async function main() {
   fs.mkdirSync(OUT_DIR, { recursive: true });
   const mock = await startMock();
   try {
+    if (THEME) {
+      await themeFlow();
+      return;
+    }
     if (COMPACTION) {
       await compactionFlow();
       return;
@@ -1328,15 +1512,21 @@ async function main() {
       await chatsFlow();
       await isolationFlow();
       await compactionFlow();
+      await themeFlow();
       return;
     }
-    await chatProposal('light', '01-chat-proposal.png');
-    await chatProposal('dark', '01-chat-proposal-dark.png');
+    // The dark set: the design system's own palette, and what the README leads with.
+    await chatProposal('dark', '01-chat-proposal.png');
     await chatRefs();
-    await mods();
-    await settings();
-    await install();
-    await migrate();
+    await mods('dark', '03-mods.png');
+    await settings('dark', '04-settings.png');
+    await install('dark', '05-install.png');
+    await migrate('dark');
+
+    // The light set: the same three screens the README puts side by side with their dark twins.
+    await chatProposal('light', '01-chat-proposal-light.png');
+    await mods('light', '03-mods-light.png');
+    await settings('light', '04-settings-light.png');
 
     const files = fs.readdirSync(OUT_DIR).filter((f) => f.endsWith('.png')).sort();
     log(`wrote ${files.length} screenshots to docs/screenshots/`);

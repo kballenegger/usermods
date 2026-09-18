@@ -257,9 +257,10 @@ function ModCard({
   onUpdate: (m: Mod) => void;
 }) {
   // An enabled mod is alive: the toggle at the foot of the card carries the volt. A disabled one
-  // recedes rather than being decorated with an "off" marker.
+  // recedes rather than being decorated with an "off" marker. How it recedes is the theme's
+  // business (styles.css): dark can simply dim it, light has to keep the text legible.
   return (
-    <div className="card" style={{ opacity: m.enabled ? 1 : 0.55 }}>
+    <div className={m.enabled ? 'card' : 'card disabled'}>
       <div className="row">
         <h4 className="grow">{m.name}</h4>
         {m.version && <span className="chip">v{m.version}</span>}

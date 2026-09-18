@@ -30,12 +30,12 @@ Early. The core loop works end to end: chat, page inspection, live testing, prop
 <table>
   <tr>
     <td width="50%" valign="top">
-      <img src="docs/screenshots/01-chat-proposal-dark.png" alt="The same proposal conversation in dark mode.">
-      <sub><b>Dark mode.</b> The panel follows the browser's color scheme.</sub>
-    </td>
-    <td width="50%" valign="top">
       <img src="docs/screenshots/02-chat-refs.png" alt="The composer holding an @img.mw-file-element chip produced by the element picker.">
       <sub><b>Point at an element.</b> Clicking one on the page drops an <code>@reference</code> into your message, so you can say "this" and mean it.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/06-migrate.png" alt="The Migrate from Tampermonkey card expanded, showing the four export steps.">
+      <sub><b>Migrating.</b> One Tampermonkey backup file brings the whole library across, on/off state and stored values included.</sub>
     </td>
   </tr>
   <tr>
@@ -53,9 +53,46 @@ Early. The core loop works end to end: chat, page inspection, live testing, prop
       <img src="docs/screenshots/05-install.png" alt="The install page previewing a script fetched from Greasy Fork, with its matches, GM permissions and required library.">
       <sub><b>Installing an outside script.</b> A <code>.user.js</code> link shows what it matches, what it is granted and what it loads, before anything is saved.</sub>
     </td>
+  </tr>
+</table>
+
+### Light and dark
+
+The panel follows your OS by default, and the ◐ in the tab bar cycles Dark → Light → System from
+anywhere. Light is its own design pass, not the dark palette inverted: volt darkens to chartreuse
+so it can carry text and fills on white, every glow turns off, and cards take a faint shadow in
+place of the border they cannot rely on at that contrast. Both themes meet WCAG AA, which
+`test/contrast.test.ts` enforces against the token file.
+
+<table>
+  <tr>
     <td width="50%" valign="top">
-      <img src="docs/screenshots/06-migrate.png" alt="The Migrate from Tampermonkey card expanded, showing the four export steps.">
-      <sub><b>Migrating.</b> One Tampermonkey backup file brings the whole library across, on/off state and stored values included.</sub>
+      <img src="docs/screenshots/01-chat-proposal-light.png" alt="The proposal conversation in light mode: white cards on a pale green-grey background, the hero card outlined in chartreuse.">
+      <sub><b>Chat, light.</b></sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/01-chat-proposal.png" alt="The same proposal conversation in dark mode: volt on charcoal, the hero card glowing.">
+      <sub><b>Chat, dark.</b></sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/03-mods-light.png" alt="The Mods view in light mode.">
+      <sub><b>Mods, light.</b></sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/03-mods.png" alt="The Mods view in dark mode.">
+      <sub><b>Mods, dark.</b></sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/04-settings-light.png" alt="Settings in light mode.">
+      <sub><b>Settings, light.</b></sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/04-settings.png" alt="Settings in dark mode.">
+      <sub><b>Settings, dark.</b></sub>
     </td>
   </tr>
 </table>

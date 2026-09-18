@@ -3,6 +3,7 @@ import { hostFromUrl } from '@/lib/chats';
 import { hasConsented } from '@/lib/consent';
 import { rpc } from '@/lib/rpc';
 import { Chat } from './Chat';
+import { ThemeToggle } from './components/ThemeToggle';
 import { Consent } from './Consent';
 import { ModsView } from './ModsView';
 import { SettingsView } from './SettingsView';
@@ -68,6 +69,7 @@ export function App() {
         {/* The page in view. A volt dot means a real page the panel can act on. */}
         {host && <span className="dot" aria-hidden="true" />}
         <span className="status" title={pageUrl}>{host}</span>
+        <ThemeToggle />
       </nav>
       {usStatus && !usStatus.available && <div className="notice">{usStatus.message}</div>}
       {tab === 'chat' &&

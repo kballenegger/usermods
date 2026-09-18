@@ -1,10 +1,18 @@
 <!doctype html>
-<!-- data-theme starts on the default so the first paint is dark; main.tsx corrects it to the saved choice. -->
-<html lang="en" data-theme="dark" style="color-scheme: dark">
+<!--
+  No data-theme here: see the note in sidepanel/index.html. The attribute is left off so the first
+  paint is whatever the OS asks for, and main.tsx writes one only for an explicit choice.
+
+  The stylesheet is linked rather than left to the module import so the page has its background and
+  palette on the first paint; imported from main.tsx it arrives only once the module graph has
+  loaded, and this page is a full white tab until then.
+-->
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Install userscript — usermods</title>
+    <link rel="stylesheet" href="../sidepanel/styles.css" />
   </head>
   <body>
     <div id="root"></div>
