@@ -767,3 +767,26 @@ input[type='checkbox']:checked::after {
     transition: none !important;
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * The one control that leaves the panel
+ * ------------------------------------------------------------------------ */
+
+/* Opens the full-tab dashboard. An outlined pill beside the host label rather than a fourth tab:
+   it navigates away, so it must not read as another section of this panel. Everything else the
+   panel wears is styled above; this is the only rule the dashboard added. */
+.tabs button.tab-action {
+  align-self: center;
+  border: 1px solid var(--border-hair);
+  border-radius: var(--r-pill);
+  padding: var(--sp-1) var(--sp-3);
+  font: 600 var(--fs-label) / 1 var(--font-ui);
+  letter-spacing: var(--lbl-tracking);
+  color: var(--text-3);
+}
+
+.tabs button.tab-action:hover {
+  color: var(--volt);
+  border-color: var(--volt-a28);
+}
+

@@ -31,6 +31,21 @@ export interface Chat {
   titleSource?: TitleSource;
   /** Set once the one allowed model retitle (at the 4th turn) has happened, so it never repeats. */
   titleRefreshed?: boolean;
+  /**
+   * The page URL this chat was last used on, recorded by the background on every turn. It is what
+   * the dashboard's "Open" reopens the chat on, so returning to a chat lands on the actual page it
+   * was about rather than the site's front door.
+   *
+   * Chats created before this field existed have none, and where they were used is not recoverable
+   * — nothing recorded it. Those fall back to the host (see chatOpenUrl in lib/dashboard).
+   */
+  url?: string;
+  /**
+   * How many user turns this chat holds, kept on the index so the dashboard can show it without
+   * reading every transcript. Written by the background on each turn; absent on chats that predate
+   * the field, where the dashboard simply shows no count rather than guessing one.
+   */
+  turns?: number;
 }
 
 /** A chat's title source, defaulting for records written before the field existed. */
@@ -156,8 +171,12 @@ export async function createChat(host: string): Promise<Chat> {
 /**
  * Bump updatedAt, and set the title if one is supplied and the chat has no real title yet.
  * Activity in an archived chat unarchives it: sending a message means the user is using it again.
+ *
+ * `url` records the page the turn happened on, overwriting whatever was there: the chat is "about"
+ * wherever it was last used, which is where the dashboard should reopen it. Only http(s) URLs are
+ * kept — an extension page or a chrome:// URL is not somewhere to come back to.
  */
-export async function touchChat(id: string, patch: { title?: string } = {}): Promise<void> {
+export async function touchChat(id: string, patch: { title?: string; url?: string; turns?: number } = {}): Promise<void> {
   const chats = await readIndex();
   const chat = chats.find((c) => c.id === id);
   if (!chat) return;
@@ -167,6 +186,8 @@ export async function touchChat(id: string, patch: { title?: string } = {}): Pro
     chat.title = titleFromText(patch.title);
     chat.titleSource = 'auto-first';
   }
+  if (patch.url && /^https?:\/\//i.test(patch.url)) chat.url = patch.url;
+  if (typeof patch.turns === 'number') chat.turns = patch.turns;
   await writeIndex(chats);
 }
 
@@ -204,6 +225,18 @@ export async function markTitleRefreshed(id: string): Promise<void> {
   await writeIndex(chats);
 }
 
+/**
+ * User turns in a stored model history — what the dashboard shows as a chat's length.
+ *
+ * Not every user-role message is a turn: the agent loop pushes tool results back as role 'user'
+ * too (lib/agent/loop.ts), so a single question that took six tool calls would otherwise read as
+ * seven turns. A turn is a user message carrying text the person actually typed, which is exactly
+ * the messages with a text part.
+ */
+export function countTurns(messages: Msg[]): number {
+  return messages.filter((m) => m.role === 'user' && m.content.some((p) => p.type === 'text')).length;
+}
+
 /** Archive or unarchive a chat. Reversible, so the UI does not confirm it. */
 export async function archiveChat(id: string, archived: boolean): Promise<void> {
   const chats = await readIndex();
@@ -229,6 +262,30 @@ export async function renameChat(id: string, title: string): Promise<void> {
 export async function deleteChat(id: string): Promise<void> {
   await writeIndex((await readIndex()).filter((c) => c.id !== id));
   await chrome.storage.local.remove([messagesKey(id), itemsKey(id)]);
+}
+
+/**
+ * Archive, unarchive or delete several chats in one pass. The dashboard's bulk actions go through
+ * here rather than looping over the single-chat calls: each of those does its own read-modify-write
+ * of the index, so twenty of them in a row is twenty chances for two of them to interleave and lose
+ * an edit. One read and one write cannot.
+ */
+export async function bulkChats(ids: string[], action: 'archive' | 'unarchive' | 'delete'): Promise<void> {
+  const wanted = new Set(ids);
+  if (!wanted.size) return;
+  const chats = await readIndex();
+  if (action === 'delete') {
+    await writeIndex(chats.filter((c) => !wanted.has(c.id)));
+    await chrome.storage.local.remove([...wanted].flatMap((id) => [messagesKey(id), itemsKey(id)]));
+    return;
+  }
+  const at = Date.now();
+  for (const chat of chats) {
+    if (!wanted.has(chat.id)) continue;
+    if (action === 'archive') chat.archivedAt = at;
+    else delete chat.archivedAt;
+  }
+  await writeIndex(chats);
 }
 
 export async function loadMessages(id: string): Promise<Msg[]> {

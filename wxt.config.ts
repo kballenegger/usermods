@@ -21,6 +21,10 @@ export default defineConfig({
     permissions: ['sidePanel', 'storage', 'scripting', 'tabs', 'userScripts', 'declarativeNetRequest'],
     host_permissions: ['<all_urls>'],
     action: { default_title: 'Open usermods' },
+    // The dashboard doubles as the options page, which is what puts it behind "Extension options"
+    // in chrome://extensions and in the toolbar icon's context menu. open_in_tab because it is a
+    // full page — every chat and every mod — not a popup-sized settings dialog.
+    options_ui: { page: 'dashboard.html', open_in_tab: true },
     minimum_chrome_version: '135',
     // The .user.js redirect rule sends navigations to this page, so it must be web accessible.
     web_accessible_resources: [{ resources: ['install.html'], matches: ['<all_urls>'] }],

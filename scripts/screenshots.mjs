@@ -2,12 +2,14 @@
 // Regenerates docs/screenshots/*.png with Playwright, driving the real extension against the
 // scripted mock backend in scripts/mock-llm.mjs. No API key and no network model call.
 //
-//   npm run screenshots     capture everything into docs/screenshots/
-//   npm run smoke            headless: the chat, guardrails, activity, chats, isolation and
-//                            compaction flows, all asserted
+//   npm run screenshots      capture everything into docs/screenshots/
+//   npm run smoke            headless: the chat, guardrails, activity, chats, isolation,
+//                            compaction and dashboard flows, all asserted
 //   npm run smoke:chats      headless: the chats flow alone (restore, New chat, archive/unarchive)
 //   npm run smoke:isolation  headless: the isolation flow alone (two chats running at once, no bleed)
 //   npm run smoke:compaction headless: the compaction flow alone (both tiers, on a shrunken budget)
+//   npm run smoke:dashboard  headless: the dashboard flow alone (grouping, search, handoff, mods)
+//   node scripts/screenshots.mjs --dashboard-capture   that flow, also writing 07-dashboard.png
 //
 // Every flow ends by asserting that the mock backend received zero structurally invalid requests
 // (see "History validity" below).
@@ -66,12 +68,15 @@ const SMOKE = process.argv.includes('--smoke');
 const CHATS = process.argv.includes('--chats');
 const ISOLATION = process.argv.includes('--isolation');
 const COMPACTION = process.argv.includes('--compaction');
+const DASHBOARD = process.argv.includes('--dashboard');
+/** The dashboard flow, asserted AND capturing 07-dashboard.png, without re-running the other flows. */
+const DASHBOARD_SHOT = process.argv.includes('--dashboard-capture');
 
 /** True when this run is capturing screenshots rather than asserting behaviour (see MASK below). */
-const CAPTURING = !SMOKE && !CHATS && !ISOLATION && !COMPACTION;
+const CAPTURING = !SMOKE && !CHATS && !ISOLATION && !COMPACTION && !DASHBOARD && !DASHBOARD_SHOT;
 
 /** See note 4: a first-run setup instruction, not the steady state the README should show. */
-const HIDE_SETUP_NOTICE = '.app > .notice { display: none !important; }';
+const HIDE_SETUP_NOTICE = '.app > .notice, .dash-inner > .notice { display: none !important; }';
 
 /**
  * The "not tested on this page · …" line on the proposal card, hidden for the captures ONLY.
@@ -1304,6 +1309,284 @@ async function compactionFlow() {
 }
 
 // ---------------------------------------------------------------------------
+// Dashboard: the full-tab page — grouping, search, rename, archive, mod toggle,
+// mod source editing, and the "open this chat on its page with the sidebar" handoff.
+// ---------------------------------------------------------------------------
+
+/** Chat records and their stored transcripts, on two hosts, for the dashboard flow. */
+function seedChats() {
+  const now = Date.now();
+  const mk = (id, host, title, updatedAt, over = {}) => ({
+    id,
+    host,
+    title,
+    createdAt: updatedAt - 60_000,
+    updatedAt,
+    turns: 1,
+    ...over,
+  });
+  const chats = [
+    mk('chat-wiki-1', 'en.wikipedia.org', 'hide the sidebar and widen the article', now - 5 * 60_000, {
+      url: 'https://en.wikipedia.org/wiki/Common_kingfisher',
+    }),
+    mk('chat-wiki-2', 'en.wikipedia.org', 'dim the infobox images', now - 40 * 60_000, {
+      url: 'https://en.wikipedia.org/wiki/Common_kingfisher',
+    }),
+    mk('chat-hn-1', 'news.ycombinator.com', 'make the comment threads readable', now - 2 * 60 * 60_000, {
+      url: 'https://news.ycombinator.com/news',
+    }),
+  ];
+  // The panel transcript each chat's preview pane renders, and which search reads for message text.
+  const items = {
+    'chat:chat-wiki-1:items': [
+      { kind: 'user', id: 'u1', text: 'hide the sidebar and widen the article' },
+      { kind: 'assistant', text: 'Hiding the pinned table of contents and letting the body use the window.' },
+    ],
+    'chat:chat-wiki-2:items': [
+      { kind: 'user', id: 'u2', text: 'dim the infobox images' },
+      { kind: 'assistant', text: 'Reducing the opacity of images inside the infobox.' },
+    ],
+    'chat:chat-hn-1:items': [
+      { kind: 'user', id: 'u3', text: 'make the comment threads readable' },
+      { kind: 'assistant', text: 'Widening the indentation and raising the contrast on replies.' },
+    ],
+  };
+  return { chats, ...items };
+}
+
+/** Open dashboard.html with chats and mods already in storage. */
+async function openDashboard(ctx, extId, { storage = {} } = {}) {
+  const page = await ctx.newPage();
+  await page.setViewportSize({ width: 1280, height: 950 });
+  await page.goto(`chrome-extension://${extId}/dashboard.html`);
+  await page.evaluate(
+    async ([s, extra]) => {
+      await chrome.storage.local.set({ settings: s, consent: { version: 1, acceptedAt: Date.now() }, ...extra });
+    },
+    [{ provider: 'openai-compatible', baseUrl: BASE_URL, apiKey: '', model: 'demo' }, storage],
+  );
+  await page.reload();
+  await page.locator('[data-testid="overview"]').waitFor({ timeout: 15_000 });
+  return page;
+}
+
+async function dashboardFlow({ capture = false } = {}) {
+  const b = await launch('light');
+  const fail = (m) => {
+    throw new Error(`dashboard: ${m}`);
+  };
+  try {
+    const page = await openDashboard(b.ctx, b.extId, { storage: { ...seedChats(), mods: seedMods() } });
+
+    // --- 1. Chats are grouped by host, newest site first, with per-group counts.
+    const groups = page.locator('[data-testid="hostgroup"]');
+    if ((await groups.count()) !== 2) fail(`expected 2 host groups, got ${await groups.count()}`);
+    const hosts = await groups.evaluateAll((els) => els.map((e) => e.dataset.host));
+    if (hosts[0] !== 'en.wikipedia.org') fail(`the most recently used site was not first (order: ${hosts.join(', ')})`);
+    const wikiCount = await groups.first().locator('[data-testid="hostgroup-count"]').textContent();
+    if (!wikiCount?.includes('2 chats')) fail(`the wikipedia group did not count its 2 chats (said ${JSON.stringify(wikiCount)})`);
+    if ((await page.locator('[data-testid="chat-row"]').count()) !== 3) fail('not every chat was listed');
+
+    // The overview strip counts what is actually in storage.
+    const overviewText = await page.locator('[data-testid="overview"]').textContent();
+    if (!overviewText?.includes('2/3')) fail(`the overview did not show 2 of 3 mods enabled (said ${JSON.stringify(overviewText)})`);
+
+    // --- 2. Search narrows the list, including on message text from a stored transcript.
+    await page.locator('[data-testid="chat-search"]').fill('infobox');
+    await page.waitForTimeout(700);
+    let titles = await page.locator('[data-testid="chat-title"]').allTextContents();
+    if (titles.length !== 1 || !titles[0].includes('infobox')) fail(`searching for a title left ${JSON.stringify(titles)}`);
+
+    await page.locator('[data-testid="chat-search"]').fill('ycombinator');
+    await page.waitForTimeout(700);
+    titles = await page.locator('[data-testid="chat-title"]').allTextContents();
+    if (titles.length !== 1 || !titles[0].includes('comment threads')) fail(`searching by host left ${JSON.stringify(titles)}`);
+
+    // Message text lives in a separate storage key and is read lazily; "indentation" appears only
+    // inside the HN transcript, in neither title nor host.
+    await page.locator('[data-testid="chat-search"]').fill('indentation');
+    await page.waitForTimeout(1200);
+    titles = await page.locator('[data-testid="chat-title"]').allTextContents();
+    if (titles.length !== 1 || !titles[0].includes('comment threads')) fail(`searching message text left ${JSON.stringify(titles)}`);
+
+    await page.locator('[data-testid="chat-search"]').fill('');
+    await page.waitForTimeout(500);
+
+    // --- 3. Clicking a chat opens a read-only transcript preview.
+    const firstRow = page.locator('[data-testid="chat-row"]').first();
+    await firstRow.locator('[data-testid="chat-title"]').click();
+    // The pane appears first and fills once the transcript read lands, so wait for the content
+    // rather than the container — asserting on the container races the storage read.
+    await page
+      .locator('[data-testid="chat-preview"] .msg.assistant')
+      .filter({ hasText: 'Hiding the pinned table of contents' })
+      .first()
+      .waitFor({ timeout: 10_000 })
+      .catch(async () => {
+        const held = await page.locator('[data-testid="chat-preview"]').textContent();
+        fail(`the preview pane did not render the stored transcript (it held ${JSON.stringify(held)})`);
+      });
+
+    // --- 4. Rename is inline and persists to storage.
+    await firstRow.locator('[data-testid="chat-rename"]').click();
+    const renameBox = page.locator('[data-testid="chat-rename-input"]');
+    await renameBox.waitFor({ timeout: 5_000 });
+    await renameBox.fill('renamed by the dashboard');
+    await renameBox.press('Enter');
+    await page.waitForTimeout(800);
+    const storedTitle = await page.evaluate(async () => {
+      const { chats } = await chrome.storage.local.get('chats');
+      return chats.find((c) => c.id === 'chat-wiki-1')?.title;
+    });
+    if (storedTitle !== 'renamed by the dashboard') fail(`the rename did not persist (storage holds ${JSON.stringify(storedTitle)})`);
+    const shownTitle = await page.locator('[data-testid="chat-row"]').first().locator('[data-testid="chat-title"]').textContent();
+    if (shownTitle?.trim() !== 'renamed by the dashboard') fail(`the renamed chat still showed ${JSON.stringify(shownTitle)}`);
+
+    // --- 5. Archiving badges the chat and writes archivedAt.
+    const hnRow = page.locator('[data-testid="chat-row"][data-chat-id="chat-hn-1"]');
+    await hnRow.locator('[data-testid="chat-archive"]').click();
+    await page.waitForTimeout(800);
+    if (!(await hnRow.locator('[data-testid="chat-archived"]').count())) fail('the archived chat had no archived badge');
+    const archivedAt = await page.evaluate(async () => {
+      const { chats } = await chrome.storage.local.get('chats');
+      return chats.find((c) => c.id === 'chat-hn-1')?.archivedAt;
+    });
+    if (typeof archivedAt !== 'number') fail('archiving did not write archivedAt to the index');
+    const hnGroupCount = await page
+      .locator('[data-testid="hostgroup"][data-host="news.ycombinator.com"] [data-testid="hostgroup-count"]')
+      .textContent();
+    if (!hnGroupCount?.includes('1 archived')) fail(`the host group did not report the archived chat (said ${JSON.stringify(hnGroupCount)})`);
+
+    // --- 6. Open: the handoff, then the tab.
+    //
+    // Note what actually happens here. chrome.sidePanel.open({windowId}) SUCCEEDS from this
+    // extension page — Playwright's click is a trusted gesture — so the real side panel opens, sees
+    // the handoff for the host it lands on, opens that chat and DELETES the handoff. Measured at
+    // roughly 300ms. So this cannot poll for the handoff after a fixed wait: it has to catch the
+    // write. It watches chrome.storage.onChanged from inside the page, which sees the write whether
+    // or not the panel consumes it a moment later.
+    //
+    // The handoff being consumed is the feature working, not a failure — but a test that asserted
+    // on it after the fact would read an empty key and call the feature broken.
+    const before = b.ctx.pages().length;
+    const openRow = page.locator('[data-testid="chat-row"]').first();
+    if ((await openRow.getAttribute('data-chat-id')) !== 'chat-wiki-1') fail('the row under test was not the renamed wikipedia chat');
+    await page.evaluate(() => {
+      window.__handoffSeen = null;
+      chrome.storage.onChanged.addListener((changes, area) => {
+        if (area === 'session' && changes.openChat?.newValue) window.__handoffSeen = changes.openChat.newValue;
+      });
+    });
+    await openRow.locator('[data-testid="chat-open"]').click();
+    await page.waitForFunction(() => window.__handoffSeen !== null, { timeout: 10_000 }).catch(() => {});
+    const handoff = await page.evaluate(() => window.__handoffSeen);
+    if (!handoff) fail('clicking Open wrote no handoff to session storage');
+    if (handoff.chatId !== 'chat-wiki-1') fail(`the handoff named ${JSON.stringify(handoff.chatId)}`);
+    if (handoff.host !== 'en.wikipedia.org') fail(`the handoff carried host ${JSON.stringify(handoff.host)}`);
+    if (typeof handoff.at !== 'number') fail('the handoff carried no timestamp, so the panel cannot age it out');
+
+    // And a tab on the URL the chat recorded, not just the site's front door.
+    await page.waitForTimeout(2500);
+    const opened = b.ctx.pages().slice(before).map((p) => p.url());
+    if (!opened.some((u) => u.startsWith('https://en.wikipedia.org/wiki/Common_kingfisher'))) {
+      fail(`Open did not create a tab on the chat's recorded URL (new tabs: ${JSON.stringify(opened)})`);
+    }
+    // The page must still be usable: whatever sidePanel.open did, it cannot break the view.
+    if ((await page.locator('[data-testid="chat-row"]').count()) !== 3) fail('the dashboard broke after the Open click');
+
+    // --- 7. Mods: toggling writes through to storage.
+    await page.locator('.dash-tabs button', { hasText: 'Mods' }).click();
+    await page.locator('[data-testid="mod-row"]').first().waitFor({ timeout: 10_000 });
+    if ((await page.locator('[data-testid="mod-row"]').count()) !== 3) fail('not every mod was listed');
+
+    const firstMod = page.locator('[data-testid="mod-row"]').first();
+    const modId = await firstMod.getAttribute('data-mod-id');
+    await firstMod.locator('[data-testid="mod-toggle"]').click();
+    await page.waitForTimeout(800);
+    const nowEnabled = await page.evaluate(async (id) => {
+      const { mods } = await chrome.storage.local.get('mods');
+      return mods.find((m) => m.id === id)?.enabled;
+    }, modId);
+    if (nowEnabled !== false) fail(`toggling a mod off did not reach storage (stored enabled=${nowEnabled})`);
+
+    // The enabled filter is driven by that same state.
+    await page.locator('[data-testid="mod-enabled"]').selectOption('disabled');
+    await page.waitForTimeout(400);
+    const disabledCount = await page.locator('[data-testid="mod-row"]').count();
+    if (disabledCount !== 2) fail(`the "disabled only" filter showed ${disabledCount} mods, expected 2`);
+    await page.locator('[data-testid="mod-enabled"]').selectOption('all');
+    await page.waitForTimeout(400);
+
+    // --- 8. Editing a mod's source re-parses its header: the name follows the @name line.
+    await page.locator('[data-testid="mod-row"]').first().locator('[data-testid="mod-name"]').click();
+    const editor = page.locator('[data-testid="mod-editor-source"]');
+    await editor.waitFor({ timeout: 10_000 });
+    const original = await editor.inputValue();
+    if (!original.includes('==UserScript==')) fail('the editor did not load the mod source');
+    await editor.fill(original.replace(/@name\s+.*/, '@name         Renamed by the editor'));
+    await page.waitForTimeout(300);
+    await page.locator('[data-testid="mod-editor-save"]').click();
+    await page.waitForTimeout(1200);
+    const storedName = await page.evaluate(async (id) => {
+      const { mods } = await chrome.storage.local.get('mods');
+      return mods.find((m) => m.id === id)?.name;
+    }, modId);
+    if (storedName !== 'Renamed by the editor') fail(`editing the source did not update the parsed name (storage holds ${JSON.stringify(storedName)})`);
+    const shownName = await page.locator(`[data-testid="mod-row"][data-mod-id="${modId}"] [data-testid="mod-name"]`).textContent();
+    if (!shownName?.includes('Renamed by the editor')) fail(`the mod list still showed ${JSON.stringify(shownName)}`);
+
+    // --- 9. Bulk: selecting every visible mod and disabling them writes through in one pass.
+    await page.locator('.dash-toolbar button.pill', { hasText: 'Select all' }).click();
+    await page.locator('[data-testid="mod-bulkbar"]').waitFor({ timeout: 5_000 });
+    await page.locator('[data-testid="mod-bulkbar"] button.pill', { hasText: 'Disable' }).click();
+    await page.waitForTimeout(1200);
+    const allOff = await page.evaluate(async () => {
+      const { mods } = await chrome.storage.local.get('mods');
+      return mods.every((m) => m.enabled === false);
+    });
+    if (!allOff) fail('a bulk disable did not turn every mod off');
+
+    if (capture) {
+      // Re-enable everything the bulk step just turned off: the shot should show the page in its
+      // normal state, not with every mod disabled and "0 sites customised" in the overview.
+      await page.locator('.dash-toolbar button.pill', { hasText: 'Select all' }).click();
+      await page.locator('[data-testid="mod-bulkbar"] button.pill', { hasText: 'Enable' }).click();
+      await page.waitForTimeout(1000);
+      // Back to Chats for the screenshot: the grouped list plus a transcript preview is the page.
+      await page.locator('.dash-tabs button', { hasText: 'Chats' }).click();
+      await page.locator('[data-testid="chat-row"]').first().locator('[data-testid="chat-title"]').click();
+      await page.locator('[data-testid="chat-preview"]').waitFor({ timeout: 10_000 });
+      await page.waitForTimeout(600);
+      // Crop to the content: the page is a centred column on a tall viewport, and a shot that is
+      // half empty background tells the reader nothing.
+      await page.addStyleTag({ content: HIDE_SETUP_NOTICE });
+      // Park the cursor off the list: a row left under the pointer draws its hover border and reads
+      // as selected in a still image.
+      await page.mouse.move(1260, 8);
+      await page.waitForTimeout(200);
+      // The tallest of the two panes decides the crop; .dash-inner keeps its padding-bottom, which
+      // would leave a band of empty background under the content.
+      const height = await page.evaluate(() => {
+        const bottoms = [...document.querySelectorAll('.panes > *')].map((e) => e.getBoundingClientRect().bottom);
+        return Math.ceil(Math.max(...bottoms) + window.scrollY + 28);
+      });
+      await page.setViewportSize({ width: 1280, height: Math.max(560, Math.min(height, 1100)) });
+      await page.waitForTimeout(300);
+      await shot(page, '07-dashboard.png');
+    }
+
+    // Nothing structurally invalid went over the wire. The dashboard does not run a conversation
+    // itself, but the handoff step opens the side panel on a seeded chat and the mod edits
+    // re-register scripts, so this asserts the same contract every other flow does.
+    await assertNoViolations('dashboard');
+
+    console.log('dashboard: OK — grouping, search over titles/hosts/message text, preview, rename, archive, handoff + tab, mod toggle, source edit, bulk disable, zero invalid requests');
+  } finally {
+    await b.close();
+  }
+}
+
+// ---------------------------------------------------------------------------
 
 async function main() {
   fs.mkdirSync(OUT_DIR, { recursive: true });
@@ -1317,6 +1600,10 @@ async function main() {
       await isolationFlow();
       return;
     }
+    if (DASHBOARD || DASHBOARD_SHOT) {
+      await dashboardFlow({ capture: DASHBOARD_SHOT });
+      return;
+    }
     if (CHATS) {
       await chatsFlow();
       return;
@@ -1328,6 +1615,7 @@ async function main() {
       await chatsFlow();
       await isolationFlow();
       await compactionFlow();
+      await dashboardFlow();
       return;
     }
     await chatProposal('light', '01-chat-proposal.png');
@@ -1337,6 +1625,7 @@ async function main() {
     await settings();
     await install();
     await migrate();
+    await dashboardFlow({ capture: true });
 
     const files = fs.readdirSync(OUT_DIR).filter((f) => f.endsWith('.png')).sort();
     log(`wrote ${files.length} screenshots to docs/screenshots/`);

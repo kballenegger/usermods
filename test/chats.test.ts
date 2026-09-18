@@ -3,7 +3,8 @@
 //   npm test
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { archivedChats, capChats, isArchived, liveChats, pickChatToShow, sortChats, titleFromText, type Chat } from '../lib/chats.ts';
+import { archivedChats, capChats, countTurns, isArchived, liveChats, pickChatToShow, sortChats, titleFromText, type Chat } from '../lib/chats.ts';
+import type { Msg } from '../lib/types.ts';
 
 /** A chat record with only the fields these functions read. */
 function chat(id: string, updatedAt: number, archivedAt?: number): Chat {
@@ -112,4 +113,20 @@ test('sortChats does not mutate its input', () => {
   const chats = [chat('a', 100), chat('b', 200)];
   sortChats(chats);
   assert.deepEqual(chats.map((c) => c.id), ['a', 'b']);
+});
+
+// ---------- turn counts, shown on the dashboard ----------
+
+test('a chat\'s turn count is its user messages, not every message in the history', () => {
+  const history: Msg[] = [
+    { role: 'user', content: [{ type: 'text', text: 'hide the sidebar' }] },
+    { role: 'assistant', content: [{ type: 'text', text: 'on it' }] },
+    { role: 'assistant', content: [{ type: 'tool_call', id: 't1', name: 'get_page', input: {} }] },
+    { role: 'user', content: [{ type: 'tool_result', toolCallId: 't1', content: [] }] },
+    { role: 'user', content: [{ type: 'text', text: 'and dim the images' }] },
+  ];
+  // The tool-result message is role 'user' too (that is how lib/agent/loop.ts feeds results back),
+  // so counting user-role messages would say 3. Only the two the person actually typed are turns.
+  assert.equal(countTurns(history), 2);
+  assert.equal(countTurns([]), 0);
 });

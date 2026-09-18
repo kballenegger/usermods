@@ -1,0 +1,448 @@
+/*
+ * The full-tab dashboard. Loaded after sidepanel/styles.css, which it reuses wholesale for the
+ * shared pieces (.card, .btn, .chip, .row, install preview, Tampermonkey migration), so a mod card
+ * looks the same here as it does in the panel.
+ *
+ * Colors are written against the Volt OS custom properties, each with a fallback to the palette the
+ * panel uses today: var(--surface-card, var(--card)). A visual restyle landing those tokens on
+ * :root makes this page follow along with no edit here; until it does, every one of these resolves
+ * to the current palette. Do not hard-code a hex in this file — that is the thing the fallbacks
+ * exist to avoid.
+ */
+
+.dash {
+  min-height: 100vh;
+  background: var(--bg-app, var(--bg));
+  color: var(--text-1, var(--fg));
+  display: flex;
+  flex-direction: column;
+}
+
+.dash-inner {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 20px 24px 64px;
+}
+
+/* ---------- header, tabs ---------- */
+
+.dash-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.dash-head h1 {
+  font-size: 19px;
+  margin: 0;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.dash-head .sub {
+  color: var(--text-3, var(--muted));
+  font-size: 12px;
+}
+
+.dash-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border-hair, var(--border));
+  margin-bottom: 16px;
+}
+.dash-tabs button {
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--text-3, var(--muted));
+  padding: 8px 12px 7px;
+  font: inherit;
+  cursor: pointer;
+}
+.dash-tabs button.active {
+  color: var(--text-1, var(--fg));
+  border-bottom-color: var(--volt, var(--accent));
+}
+
+/* ---------- section labels: uppercase, tracked, small ---------- */
+
+.dash-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-3, var(--muted));
+  margin: 0 0 6px;
+  font-weight: 500;
+}
+
+/* ---------- overview strip ---------- */
+
+.overview {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.stat {
+  background: var(--surface-card, var(--card));
+  border: 1px solid var(--border-card, var(--border));
+  border-radius: var(--r-card, 12px);
+  padding: 12px 14px;
+}
+.stat .n {
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  line-height: 1.1;
+}
+.stat .k {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-3, var(--muted));
+  margin-top: 4px;
+}
+
+/* A full-width card under the stats: userScripts status, provider, model. */
+.overview-notes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  align-items: center;
+  background: var(--surface-card, var(--card));
+  border: 1px solid var(--border-card, var(--border));
+  border-radius: var(--r-card, 12px);
+  padding: 10px 14px;
+  margin-bottom: 18px;
+  font-size: 12px;
+}
+.overview-notes .sep {
+  color: var(--text-3, var(--muted));
+}
+
+/* Status dots: a filled dot plus a word, no emoji. */
+.dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: baseline;
+  background: var(--text-3, var(--muted));
+}
+.dot.ok { background: var(--volt, var(--accent)); }
+.dot.warn { background: var(--warn, var(--accent)); }
+.dot.bad { background: var(--error, var(--danger)); }
+
+/* ---------- toolbar above a list ---------- */
+
+.dash-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.dash-toolbar input[type='search'],
+.dash-toolbar input[type='text'],
+.dash-toolbar select {
+  font: inherit;
+  padding: 6px 10px;
+  border: 1px solid var(--border-card, var(--border));
+  border-radius: var(--r-field, 8px);
+  background: var(--surface-card, var(--card));
+  color: var(--text-1, var(--fg));
+}
+.dash-toolbar input[type='search'] {
+  flex: 1;
+  min-width: 180px;
+}
+
+/* The bulk bar appears only with a selection, so it must not shift the layout when it does. */
+.bulkbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  background: var(--surface-card, var(--card));
+  border: 1px solid var(--border-card, var(--border));
+  border-radius: var(--r-field, 8px);
+  padding: 7px 10px;
+  margin-bottom: 10px;
+  font-size: 12px;
+}
+
+/* ---------- the two-pane layout ---------- */
+
+.panes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+/* Single column on a narrow window: the detail pane drops below the list. */
+@media (max-width: 760px) {
+  .panes { grid-template-columns: minmax(0, 1fr); }
+  .dash-inner { padding: 16px 16px 48px; }
+}
+
+.pane-detail {
+  position: sticky;
+  top: 20px;
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+}
+@media (max-width: 760px) {
+  .pane-detail { position: static; max-height: none; }
+}
+
+/* ---------- host groups and chat rows ---------- */
+
+.hostgroup { margin-bottom: 18px; }
+.hostgroup-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.hostgroup-head .host {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 12px;
+  color: var(--text-2, var(--fg));
+}
+.hostgroup-head .count {
+  font-size: 11px;
+  color: var(--text-3, var(--muted));
+}
+
+.rows { display: flex; flex-direction: column; gap: 6px; }
+
+.rowcard {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  background: var(--surface-card, var(--card));
+  border: 1px solid var(--border-card, var(--border));
+  border-radius: var(--r-field, 10px);
+  padding: 9px 11px;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  font: inherit;
+  color: inherit;
+}
+.rowcard:hover { border-color: var(--volt, var(--accent)); }
+.rowcard.selected { border-color: var(--volt, var(--accent)); }
+.rowcard.dimmed { opacity: 0.62; }
+.rowcard .body { flex: 1; min-width: 0; }
+.rowcard .title {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rowcard .meta {
+  font-size: 11px;
+  color: var(--text-3, var(--muted));
+  margin-top: 3px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.rowcard .actions { display: flex; gap: 4px; align-items: center; flex: none; }
+.rowcard input[type='checkbox'] { margin-top: 3px; flex: none; }
+
+/* On a narrow window four action pills beside the title squeeze it down to a few characters. Wrap
+   the row instead, so the title gets the full width and the actions sit under it. */
+@media (max-width: 560px) {
+  .rowcard { flex-wrap: wrap; }
+  .rowcard .body { flex: 1 1 100%; }
+  .rowcard .actions { flex: 1 1 100%; justify-content: flex-start; flex-wrap: wrap; }
+}
+
+/* Pill buttons, small enough to sit inside a row. */
+button.pill {
+  font: inherit;
+  font-size: 11px;
+  border: 1px solid var(--border-card, var(--border));
+  background: transparent;
+  color: var(--text-2, var(--fg));
+  border-radius: var(--r-pill, 999px);
+  padding: 3px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+button.pill:hover { border-color: var(--volt, var(--accent)); color: var(--text-1, var(--fg)); }
+button.pill.primary {
+  background: var(--volt, var(--accent));
+  color: var(--accent-fg, #fff);
+  border-color: transparent;
+}
+button.pill.danger { color: var(--error, var(--danger)); }
+button.pill:disabled { opacity: 0.45; cursor: default; }
+
+.badge {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border: 1px solid var(--border-hair, var(--border));
+  border-radius: var(--r-pill, 999px);
+  padding: 1px 7px;
+  color: var(--text-3, var(--muted));
+}
+.badge.warn { color: var(--warn, var(--accent)); border-color: var(--warn, var(--accent)); }
+
+/* Inline rename: an input that sits exactly where the title was. */
+.rename-input {
+  font: inherit;
+  font-size: 13px;
+  width: 100%;
+  padding: 2px 6px;
+  border: 1px solid var(--volt, var(--accent));
+  border-radius: var(--r-field, 6px);
+  background: var(--bg-app, var(--bg));
+  color: var(--text-1, var(--fg));
+}
+
+/* ---------- detail pane ---------- */
+
+.detail {
+  background: var(--surface-card, var(--card));
+  border: 1px solid var(--border-card, var(--border));
+  border-radius: var(--r-card, 12px);
+  padding: 14px;
+}
+.detail h3 {
+  margin: 0 0 2px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.detail .detail-meta {
+  font-size: 11px;
+  color: var(--text-3, var(--muted));
+  margin-bottom: 12px;
+  word-break: break-word;
+}
+
+/* The read-only transcript preview: same shapes as the panel's transcript, at page scale. */
+.preview {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  max-height: 60vh;
+  overflow: auto;
+  padding-right: 4px;
+}
+.preview .msg.user {
+  align-self: flex-end;
+  background: var(--bg-app, var(--bg));
+  border: 1px solid var(--border-hair, var(--border));
+  border-radius: 12px 12px 2px 12px;
+  padding: 7px 10px;
+  max-width: 92%;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.preview .msg.assistant {
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding: 0 2px;
+}
+.preview .prev-note {
+  font-size: 11px;
+  color: var(--text-3, var(--muted));
+  text-align: center;
+}
+.preview .prev-tool {
+  font-size: 11.5px;
+  color: var(--text-3, var(--muted));
+  border-left: 2px solid var(--border-hair, var(--border));
+  padding: 2px 8px;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+}
+.preview .prev-tool.is-error { border-left-color: var(--error, var(--danger)); }
+.preview .prev-tool summary { cursor: pointer; list-style: none; }
+.preview .prev-tool pre {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+  max-height: 200px;
+  overflow: auto;
+}
+.preview .prev-proposal {
+  border: 1px solid var(--border-hair, var(--border));
+  border-radius: var(--r-field, 10px);
+  padding: 9px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.preview .prev-proposal h4 { margin: 0; font-size: 13px; }
+.preview pre {
+  background: var(--code-bg, var(--bg-ambient, var(--bg)));
+  border-radius: 6px;
+  padding: 8px;
+  font-size: 11.5px;
+  overflow: auto;
+  max-height: 260px;
+  margin: 0;
+}
+
+/* ---------- the source editor ---------- */
+
+.editor {
+  width: 100%;
+  min-height: 340px;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 12px;
+  line-height: 1.5;
+  tab-size: 2;
+  padding: 10px;
+  border: 1px solid var(--border-card, var(--border));
+  border-radius: var(--r-field, 8px);
+  background: var(--bg-ambient, var(--code-bg));
+  color: var(--text-1, var(--fg));
+  resize: vertical;
+  white-space: pre;
+  overflow-wrap: normal;
+  overflow-x: auto;
+}
+.editor:focus { outline: 1px solid var(--volt, var(--accent)); outline-offset: -1px; }
+
+.editor-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+
+.kv {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 3px 12px;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+.kv dt {
+  color: var(--text-3, var(--muted));
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  padding-top: 2px;
+}
+.kv dd { margin: 0; word-break: break-word; }
+
+.dash-empty {
+  color: var(--text-3, var(--muted));
+  text-align: center;
+  padding: 36px 12px;
+  border: 1px dashed var(--border-hair, var(--border));
+  border-radius: var(--r-card, 12px);
+}
+
+/* The install / import / migrate block reuses the panel's .card, but at page width it should not
+   stretch the whole 1100px: it reads better as a column. */
+.install-col { max-width: 560px; display: flex; flex-direction: column; gap: 10px; }
