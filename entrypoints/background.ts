@@ -1,5 +1,7 @@
 import { runAgent, type AgentEnv } from '@/lib/agent/loop';
-import { loadMods, upsertMod, deleteMod, saveMods } from '@/lib/mods';
+import { buildRegisteredCode, gmValuesKey, loadGmValues, type GmMessage } from '@/lib/gm';
+import { fetchText, previewFromUrl, resolveDependencies } from '@/lib/install';
+import { loadMods, modFromSource, parseHeader, previewFromSource, upsertMod, deleteMod, saveMods } from '@/lib/mods';
 import {
   CHATGPT_CODEX_BASE,
   XAI_PROXY_BASE,
@@ -14,13 +16,25 @@ import {
 } from '@/lib/oauth';
 import type { AgentPortRequest, OAuthLoginState, RpcRequest } from '@/lib/rpc';
 import { loadSettings } from '@/lib/settings';
-import type { ContentRequest, Msg, UserTurn } from '@/lib/types';
+import { looksLikeZip, parseTampermonkeyJson, parseTampermonkeyZipEntries, type TmScript } from '@/lib/tampermonkey';
+import type { ContentRequest, Mod, Msg, UserTurn } from '@/lib/types';
 
 export default defineBackground(() => {
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
 
   chrome.runtime.onInstalled.addListener(() => void bootstrap());
   chrome.runtime.onStartup.addListener(() => void bootstrap());
+
+  // Registered mods call back here for GM_setValue, GM_xmlhttpRequest and friends. The listener is
+  // permanent (not per-run) so it survives the worker sleeping between page loads.
+  chrome.runtime.onUserScriptMessage.addListener((msg: unknown, sender: chrome.runtime.MessageSender, sendResponse: (r?: unknown) => void) => {
+    const m = msg as Partial<GmMessage> | null;
+    if (!m || m.__usermods !== true || typeof m.modId !== 'string' || typeof m.type !== 'string') return false;
+    handleGm(m as GmMessage, sender)
+      .then((result) => sendResponse({ result }))
+      .catch((e: unknown) => sendResponse({ error: e instanceof Error ? e.message : String(e) }));
+    return true;
+  });
 
   chrome.runtime.onMessage.addListener((msg: RpcRequest | { type?: string }, _sender, sendResponse) => {
     if (!msg || typeof msg.type !== 'string' || !msg.type.includes('.')) return false; // not an RPC (e.g. content events)
@@ -97,6 +111,35 @@ async function bootstrap() {
   } catch (e) {
     console.warn('[usermods] bootstrap', e);
   }
+  try {
+    await installUserJsRedirect();
+  } catch (e) {
+    console.warn('[usermods] .user.js redirect', e);
+  }
+}
+
+/**
+ * Clicking a .user.js link should open our install page rather than showing the raw source, which
+ * is what Tampermonkey does. \0 in the substitution is the whole matched URL.
+ */
+const USER_JS_RULE_ID = 1;
+
+async function installUserJsRedirect(): Promise<void> {
+  const target = chrome.runtime.getURL('install.html');
+  await chrome.declarativeNetRequest.updateDynamicRules({
+    removeRuleIds: [USER_JS_RULE_ID],
+    addRules: [
+      {
+        id: USER_JS_RULE_ID,
+        priority: 1,
+        action: { type: 'redirect', redirect: { regexSubstitution: `${target}?url=\\0` } },
+        condition: {
+          regexFilter: String.raw`^https?://[^?#]+\.user\.js(\?.*)?$`,
+          resourceTypes: ['main_frame'],
+        },
+      },
+    ],
+  });
 }
 
 // ---------- RPC ----------
@@ -126,8 +169,28 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
       await syncRegistrations();
       return mods;
     }
-    case 'mods.try':
+    case 'mods.preview':
+      return 'url' in req ? previewFromUrl(req.url) : previewFromSource(req.source);
+    case 'mods.install': {
+      const mod = await installSource(req.source, { downloadUrl: req.downloadUrl, enabled: req.enabled, values: req.values });
+      const mods = await upsertMod(mod);
+      await syncRegistrations();
+      return mods;
+    }
+    case 'mods.update':
+      return updateMod(req.id);
+    case 'mods.importBackup':
+      return importBackup(req);
+    case 'mods.try': {
+      // A saved mod runs exactly as it would on a page load: GM shim, @require bodies, its world.
+      if ('modId' in req) {
+        const mod = (await loadMods()).find((m) => m.id === req.modId);
+        if (!mod) throw new Error('That mod no longer exists.');
+        const code = buildRegisteredCode(mod, await loadGmValues(mod.id));
+        return executeInTab(req.tabId, code, { world: mod.world });
+      }
       return executeInTab(req.tabId, req.code);
+    }
     case 'userScripts.status':
       return userScriptsStatus();
     case 'page.pick':
@@ -161,6 +224,160 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
       return { ok: true };
     case 'models.list':
       return listModels();
+  }
+}
+
+// ---------- installing outside userscripts ----------
+
+/**
+ * Parse a userscript, fetch its dependencies and seed its GM store. Shared by URL install, file
+ * import and Tampermonkey migration so all three behave identically.
+ */
+async function installSource(
+  source: string,
+  opts: { downloadUrl?: string; enabled?: boolean; values?: Record<string, unknown>; existing?: Mod } = {},
+): Promise<Mod> {
+  const mod = modFromSource(source, opts.existing);
+  if (opts.downloadUrl) mod.downloadUrl = opts.downloadUrl;
+  if (opts.enabled !== undefined) mod.enabled = opts.enabled;
+  if (!mod.matches.length && !mod.includeGlobs.length) {
+    throw new Error(`"${mod.name}" has no @match or @include lines, so it would never run.`);
+  }
+  await resolveDependencies(mod);
+  if (opts.values && Object.keys(opts.values).length) {
+    const existing = opts.existing ? await loadGmValues(mod.id) : {};
+    await chrome.storage.local.set({ [gmValuesKey(mod.id)]: { ...existing, ...opts.values } });
+  }
+  return mod;
+}
+
+/** Refetch from @downloadURL and swap in the new source when @version moved. */
+async function updateMod(id: string): Promise<{ updated: boolean; version: string }> {
+  const mods = await loadMods();
+  const mod = mods.find((m) => m.id === id);
+  if (!mod) throw new Error('That mod no longer exists.');
+  if (!mod.downloadUrl) throw new Error(`"${mod.name}" has no @downloadURL, so there is nothing to update from.`);
+  const source = await fetchText(mod.downloadUrl);
+  if (!/\/\/\s*==UserScript==/.test(source)) throw new Error(`${mod.downloadUrl} did not return a userscript.`);
+  const next = parseHeader(source);
+  if (next.version && mod.version && next.version === mod.version) return { updated: false, version: mod.version };
+  // Keep identity, enabled state and GM values; replace source and dependencies.
+  const fresh = await installSource(source, { downloadUrl: mod.downloadUrl, enabled: mod.enabled, existing: mod });
+  await upsertMod(fresh);
+  await syncRegistrations();
+  return { updated: true, version: fresh.version || next.version };
+}
+
+/** Import a Tampermonkey backup: JSON text, or a base64-encoded ZIP. */
+async function importBackup(req: { json: string } | { zipBase64: string }): Promise<{ imported: number; skipped: string[]; mods: Mod[] }> {
+  let parsed: { scripts: TmScript[]; skipped: string[] };
+  if ('zipBase64' in req) {
+    const bytes = Uint8Array.from(atob(req.zipBase64), (c) => c.charCodeAt(0));
+    if (!looksLikeZip(bytes)) throw new Error('That file is not a ZIP archive.');
+    const { unzipSync, strFromU8 } = await import('fflate');
+    const entries = unzipSync(bytes);
+    const text: Record<string, string> = {};
+    for (const [path, data] of Object.entries(entries)) {
+      if (!data.length) continue;
+      try {
+        text[path] = strFromU8(data);
+      } catch {
+        /* binary entry, not a script */
+      }
+    }
+    parsed = parseTampermonkeyZipEntries(text);
+  } else {
+    parsed = parseTampermonkeyJson(req.json);
+  }
+
+  const mods = await loadMods();
+  const skipped = [...parsed.skipped];
+  let imported = 0;
+  for (const s of parsed.scripts) {
+    const dupe = mods.find((m) => m.name === s.name && m.version === parseHeader(s.source).version);
+    if (dupe) {
+      skipped.push(`${s.name} (already installed)`);
+      continue;
+    }
+    try {
+      const mod = await installSource(s.source, { downloadUrl: s.downloadUrl, enabled: s.enabled, values: s.values });
+      mods.push(mod);
+      imported++;
+    } catch (e) {
+      skipped.push(`${s.name} (${e instanceof Error ? e.message : String(e)})`);
+    }
+  }
+  await saveMods(mods);
+  await syncRegistrations();
+  return { imported, skipped, mods };
+}
+
+// ---------- GM API host ----------
+
+/** Re-register a mod shortly after its GM store changes, so the next page load sees new values. */
+const gmResyncTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function scheduleResync(modId: string): void {
+  clearTimeout(gmResyncTimers.get(modId));
+  gmResyncTimers.set(
+    modId,
+    setTimeout(() => {
+      gmResyncTimers.delete(modId);
+      void syncRegistrations();
+    }, 500),
+  );
+}
+
+async function handleGm(msg: GmMessage, sender: chrome.runtime.MessageSender): Promise<unknown> {
+  switch (msg.type) {
+    case 'gm.setValue':
+    case 'gm.deleteValue': {
+      const key = gmValuesKey(msg.modId);
+      const values = await loadGmValues(msg.modId);
+      if (msg.type === 'gm.setValue') values[String(msg.key)] = msg.value;
+      else delete values[String(msg.key)];
+      await chrome.storage.local.set({ [key]: values });
+      scheduleResync(msg.modId);
+      return true;
+    }
+    case 'gm.xhr': {
+      const d = msg.details;
+      if (!d?.url) throw new Error('GM_xmlhttpRequest needs a url');
+      const controller = new AbortController();
+      const timer = d.timeout ? setTimeout(() => controller.abort(), d.timeout) : undefined;
+      try {
+        const res = await fetch(d.url, {
+          method: d.method || 'GET',
+          headers: d.headers ?? {},
+          body: d.data ?? null,
+          signal: controller.signal,
+          credentials: 'omit',
+        });
+        const responseText = await res.text();
+        const responseHeaders = [...res.headers.entries()].map(([k, v]) => `${k}: ${v}`).join('\r\n');
+        let response: unknown = responseText;
+        if (d.responseType === 'json') {
+          try {
+            response = JSON.parse(responseText) as unknown;
+          } catch {
+            response = null;
+          }
+        }
+        return { status: res.status, statusText: res.statusText, responseHeaders, responseText, response, finalUrl: res.url || d.url };
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+    case 'gm.openInTab': {
+      if (!msg.url) throw new Error('GM_openInTab needs a url');
+      const tab = await chrome.tabs.create({ url: msg.url, active: msg.active !== false, openerTabId: sender.tab?.id });
+      return { id: tab.id };
+    }
+    case 'gm.log':
+      console.log(`[usermods ${msg.modId}]`, ...(msg.args ?? []));
+      return true;
+    default:
+      throw new Error(`Unknown GM call: ${String((msg as { type: string }).type)}`);
   }
 }
 
@@ -253,24 +470,32 @@ async function syncRegistrations(): Promise<void> {
   const mods = await loadMods();
   const existing = await chrome.userScripts.getScripts();
   if (existing.length) await chrome.userScripts.unregister({ ids: existing.map((s) => s.id) });
-  const enabled = mods.filter((m) => m.enabled && m.matches.length);
+  // register() rejects a script with neither matches nor includeGlobs, which would take the whole
+  // batch down with it, so those are dropped here.
+  const enabled = mods.filter((m) => m.enabled && (m.matches.length || m.includeGlobs.length));
   if (!enabled.length) return;
-  await chrome.userScripts.register(
-    enabled.map((m) => ({
+  const scripts = await Promise.all(
+    enabled.map(async (m) => ({
       id: m.id,
-      matches: m.matches,
-      js: [{ code: m.source }],
-      runAt: 'document_idle',
-      world: 'USER_SCRIPT',
+      js: [{ code: buildRegisteredCode(m, await loadGmValues(m.id)) }],
+      ...(m.matches.length ? { matches: m.matches } : {}),
+      ...(m.excludeMatches.length ? { excludeMatches: m.excludeMatches } : {}),
+      ...(m.includeGlobs.length ? { includeGlobs: m.includeGlobs } : {}),
+      ...(m.excludeGlobs.length ? { excludeGlobs: m.excludeGlobs } : {}),
+      runAt: m.runAt,
+      world: m.world,
+      allFrames: m.allFrames,
     })),
   );
+  await chrome.userScripts.register(scripts);
 }
 
 /**
  * Run code once in a tab, in the USER_SCRIPT world. The wrapper captures console output and the
  * final value (awaiting promises), then reports back over runtime messaging so async code works.
  */
-async function executeInTab(tabId: number, code: string, timeoutMs = 20_000) {
+async function executeInTab(tabId: number, code: string, opts: { world?: Mod['world']; timeoutMs?: number } = {}) {
+  const { world = 'USER_SCRIPT', timeoutMs = 20_000 } = opts;
   const status = userScriptsStatus();
   if (!status.available) throw new Error(status.message);
   const runId = crypto.randomUUID();
@@ -305,7 +530,7 @@ async function executeInTab(tabId: number, code: string, timeoutMs = 20_000) {
     chrome.runtime.onUserScriptMessage.addListener(listener);
   });
 
-  await chrome.userScripts.execute({ target: { tabId }, js: [{ code: wrapped }], world: 'USER_SCRIPT' });
+  await chrome.userScripts.execute({ target: { tabId }, js: [{ code: wrapped }], world });
   return result;
 }
 

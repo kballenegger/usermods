@@ -64,3 +64,16 @@ button.btn:disabled { opacity: 0.5; cursor: default; }
 label.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; font-size: 12px; color: var(--muted); }
 label.field input, label.field select { font: inherit; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); color: var(--fg); }
 .notice { flex: none; background: var(--card); border: 1px solid var(--accent); border-radius: 8px; padding: 10px; margin-bottom: 10px; font-size: 12px; white-space: pre-wrap; }
+
+/* Install preview + migration, shared by the side panel and the full-tab install page. */
+.page { max-width: 720px; margin: 0 auto; padding: 24px 16px 48px; }
+.page h2 { font-size: 18px; margin: 0 0 12px; }
+.muted.label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 3px; }
+.break { word-break: break-all; }
+.chip.warn { border-color: var(--accent); color: var(--accent); }
+.card .notice { margin: 0; }
+.steps { margin: 4px 0 8px; padding-left: 20px; color: var(--muted); display: flex; flex-direction: column; gap: 2px; }
+.steps li { padding-left: 2px; }
+.field-row { display: flex; gap: 6px; align-items: center; }
+.field-row input { flex: 1; min-width: 0; font: inherit; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); color: var(--fg); }
+.ok { color: var(--accent); font-size: 12px; }

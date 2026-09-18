@@ -2,7 +2,7 @@
 
 **Vibe-code userscripts in place.** An open-source browser extension that lets you customize any website by chatting with the LLM of your choice.
 
-Open the side panel on any page, describe what you want changed, and usermods inspects the page, writes a userscript, tests it live, and hands it to you with *Try* and *Save* buttons. Saved mods run automatically on every matching page load. Export them as standard `.user.js` files, or import ones from Greasy Fork.
+Open the side panel on any page, describe what you want changed, and usermods inspects the page, writes a userscript, tests it live, and hands it to you with *Try* and *Save* buttons. Saved mods run automatically on every matching page load. Export them as standard `.user.js` files, install ones from Greasy Fork, or [migrate your whole Tampermonkey library in one file](#migrating-from-tampermonkey).
 
 Userscripts, userstyles, usermods.
 
@@ -16,7 +16,7 @@ Userscripts, userstyles, usermods.
 
 ## Status
 
-Early. The core loop works end to end: chat, page inspection, live testing, propose, save, run on load, import and export. See [Roadmap](#roadmap).
+Early. The core loop works end to end: chat, page inspection, live testing, propose, save, run on load, import and export. Outside userscripts install from a URL, a `.user.js` link or a file, with the `GM_*` API and `@require`/`@resource` support they expect, and a Tampermonkey backup imports in one step. See [Roadmap](#roadmap).
 
 ## Install (from source)
 
@@ -33,7 +33,7 @@ Then in Chrome:
 2. Click **Details** on usermods and turn on **Allow User Scripts**. Chrome requires this toggle for any extension that runs user scripts, including Tampermonkey.
 3. Click the usermods icon to open the side panel. Go to **Settings**, pick a provider, paste a key (or a local server URL), and save.
 
-For development, `npm run dev` starts WXT with hot reload and opens a Chrome profile with the extension loaded.
+For development, `npm run dev` starts WXT with hot reload and opens a Chrome profile with the extension loaded. `npm run typecheck` type-checks, and `npm test` runs the header/backup parser tests (Node's built-in runner, no browser needed).
 
 ## Providers
 
@@ -70,6 +70,50 @@ Caveats worth knowing:
 
 For any other subscription, the same rule applies: run a local proxy that exposes it as an Anthropic- or OpenAI-compatible endpoint and point a Custom preset at it.
 
+## Importing scripts and migrating from Tampermonkey
+
+usermods runs ordinary userscripts, so you can bring in scripts from Greasy Fork, OpenUserJS or your own collection.
+
+**Install from a URL.** Paste a `.user.js` URL into *Install from URL* in the Mods tab and click **Fetch**. You get a preview — name, version, what it matches, which `GM_*` permissions it asks for, the libraries it loads, and the full source — before anything is saved.
+
+**Click a `.user.js` link.** usermods redirects `.user.js` navigations to its own install page, the way Tampermonkey does, so clicking an install link on Greasy Fork shows the same preview instead of a wall of raw JavaScript.
+
+**Import a file.** *Import file* in the Mods tab takes a `.user.js` file from disk through the same preview.
+
+`@require` libraries and `@resource` files are downloaded at install time and stored with the mod, because registered scripts cannot fetch them later. If one of those downloads fails, the install fails and names the URL. Scripts with a `@downloadURL` get an **Update** button that refetches and compares `@version`.
+
+### Migrating from Tampermonkey
+
+Chrome extensions cannot read each other's storage, so migration goes through Tampermonkey's own export file:
+
+1. Open the Tampermonkey dashboard (its toolbar icon → **Dashboard**).
+2. Go to the **Utilities** tab.
+3. Under **File**, click **Export** to save the backup (`.zip` or `.json`).
+4. In usermods, open the **Mods** tab, expand **Migrate from Tampermonkey**, and pick that file.
+
+Both export shapes work: the JSON document (an object with a `scripts` array) and the ZIP (one `.user.js` per script plus its `.options.json` and `.storage.json` sidecars, or the older JSON-in-`.txt` entries). Each script comes across with its enabled/disabled state, its `GM_setValue` store and its update URL. Scripts already installed at the same name and version are skipped, and the import reports how many came in and what it passed over.
+
+### GM API compatibility
+
+| Function | Status |
+|---|---|
+| `GM_info` / `GM.info` | Supported |
+| `GM_addStyle`, `GM_addElement` | Supported |
+| `GM_getValue`, `GM_setValue`, `GM_deleteValue`, `GM_listValues` (and `GM.*`) | Supported. Reads come from a snapshot taken when the script was registered; writes persist and re-register the script, so the new value is visible on the next page load. |
+| `GM_getResourceText`, `GM_getResourceURL` | Supported, from `@resource` files fetched at install time |
+| `GM_xmlhttpRequest` / `GM.xmlHttpRequest` | Supported, cross-origin, via the background worker. `onload`, `onerror`, `onloadend` and `abort()` work; streaming and upload progress events do not. |
+| `GM_openInTab` / `GM.openInTab` | Supported. The returned handle is a stub: `close()` does nothing. |
+| `GM_setClipboard`, `GM_log` | Supported |
+| `GM_registerMenuCommand`, `GM_unregisterMenuCommand` | **Stub.** Commands are recorded but there is no menu UI to invoke them. |
+| `GM_notification` / `GM.notification` | **Stub.** Logs to the console instead of showing a desktop notification. |
+| `GM_getTab`, `GM_saveTab`, `GM_getTabs` | **Stub.** Return empty objects. |
+| `GM_addValueChangeListener`, `GM_removeValueChangeListener` | **Stub.** Never fire. |
+| `GM_download`, `GM_cookie`, `GM_webRequest` | Not implemented |
+
+`@grant none` and `unsafeWindow` scripts run in the page's **MAIN** world, where they share globals with the page — which is what those scripts want. The trade-off is that extension messaging is unavailable there, so `GM_setValue` writes from a MAIN-world script update the in-page copy but **cannot be persisted**. Mod cards and the install preview mark those scripts with a *page world* badge. Everything else runs in Chrome's isolated `USER_SCRIPT` world.
+
+Regex-style `@include` lines (`/^https?:\/\/…$/`) are not supported; Chrome matches on patterns and globs only. The install preview warns when it drops one.
+
 ## How it works
 
 ```
@@ -83,7 +127,7 @@ side panel (React)  ──rpc──▶  background service worker  ──▶  LL
 
 - **Provider adapters** live in `lib/providers/`. Anthropic uses the official SDK; the OpenAI-compatible adapter speaks `chat/completions` with function calling over raw fetch. Adding a provider means implementing one `chat()` method.
 - **The agent loop** (`lib/agent/`) is provider-neutral. Tools: `get_page`, `find_elements`, `get_styles`, `run_script`, `screenshot`, `propose_mod`.
-- **Mods** are stored in `chrome.storage.local` as full userscript text. The header is parsed for name, description and `@match` patterns. Enabled mods are registered with `chrome.userScripts` in the `USER_SCRIPT` world at `document_idle`.
+- **Mods** are stored in `chrome.storage.local` as full userscript text. The header is parsed for name, description, `@match`/`@include`/`@exclude`, `@grant`, `@require`, `@resource`, `@run-at` and `@noframes`. Enabled mods are registered with `chrome.userScripts`, each wrapped in a closure that provides the `GM_*` and `GM.*` API, in the world and at the run-at its header asks for.
 - **Chat history** is kept per tab in `chrome.storage.session`, so it survives the service worker sleeping but not a browser restart.
 
 ## Security notes
