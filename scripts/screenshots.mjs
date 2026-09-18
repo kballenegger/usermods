@@ -425,6 +425,30 @@ async function smoke() {
 const PROMPT = 'hide the sidebar and make the article full width';
 const PROPOSAL_TITLE = 'Wikipedia: full-width article';
 
+/**
+ * What the mock replies to the title call, once lib/title.ts has stripped the quotes and the
+ * trailing period the mock deliberately wraps it in. Kept as a literal rather than imported from
+ * mock-llm.mjs, because importing that file starts a second server on the same port.
+ */
+const MODEL_TITLE = 'Full-width Wikipedia articles';
+
+/** The label of the option the switcher currently has selected. */
+function selectedLabel(panel) {
+  return panel.locator('.chatbar select option:checked').textContent();
+}
+
+/** Wait until the switcher's selected option contains `text`, or give up and return what it says. */
+async function waitForSwitcherLabel(panel, text, timeout = 25_000) {
+  const until = Date.now() + timeout;
+  let label = '';
+  while (Date.now() < until) {
+    label = (await selectedLabel(panel).catch(() => '')) ?? '';
+    if (label.includes(text)) return label;
+    await panel.waitForTimeout(250);
+  }
+  return label;
+}
+
 /** Reload the panel tab the way a user reopening the side panel would, and settle. */
 async function reopenPanel(panel) {
   await panel.reload();
@@ -455,10 +479,20 @@ async function chatsFlow() {
     const firstTitle = (await panel.locator('.messages .card h4').first().textContent())?.trim();
     if (firstTitle !== PROPOSAL_TITLE) fail(`the conversation did not produce the expected proposal (got ${JSON.stringify(firstTitle)})`);
 
-    // The switcher must show the real title straight away — the background writes it while the run
-    // starts, and the panel used to keep saying "New chat" until the next reload.
-    const liveLabel = await panel.locator('.chatbar select option:checked').textContent();
-    if (!liveLabel?.includes(PROMPT.slice(0, 20))) fail(`the switcher still showed ${JSON.stringify(liveLabel)} instead of the chat's title right after the first send`);
+    // The switcher must show a real title straight away — the background writes the first-message
+    // one while the run starts, and the panel used to keep saying "New chat" until the next reload.
+    // By now the model's title may already have replaced it (that is asserted next), so either the
+    // truncated first message or the model's name counts; "New chat" does not.
+    const liveLabel = await selectedLabel(panel);
+    const namedAtAll = liveLabel?.includes(PROMPT.slice(0, 20)) || liveLabel?.includes(MODEL_TITLE);
+    if (!namedAtAll) fail(`the switcher still showed ${JSON.stringify(liveLabel)} instead of the chat's title right after the first send`);
+
+    // --- 1b. …and once the turn is done, the model's own title replaces it, live, over the port.
+    const named = await waitForSwitcherLabel(panel, MODEL_TITLE);
+    if (!named.includes(MODEL_TITLE)) fail(`the switcher never took the model's title: it still reads ${JSON.stringify(named)}`);
+    const namedRecord = await panel.evaluate(async () => ((await chrome.storage.local.get('chats')).chats ?? [])[0]);
+    if (namedRecord?.title !== MODEL_TITLE) fail(`the model title was not stored (chat record title: ${JSON.stringify(namedRecord?.title)})`);
+    if (namedRecord?.titleSource !== 'auto-model') fail(`the stored titleSource was ${JSON.stringify(namedRecord?.titleSource)}, not "auto-model"`);
 
     // --- 2. Reopening the panel restores that chat with no click at all.
     await reopenPanel(panel);
@@ -489,11 +523,13 @@ async function chatsFlow() {
     if (!(await panel.locator('.messages .empty').count())) fail('archiving the only chat did not leave the empty state');
     if (await panel.locator('.messages .msg.user').count()) fail('the archived chat was still on screen after archiving');
 
+    // The chat is identified by whatever it is now called — by this point the model has named it,
+    // so matching on the raw prompt would only ever find the option before the first turn finished.
     let options = await switcherOptions(panel);
-    if (!options.some((o) => o.startsWith('Archived/') && o.includes(PROMPT.slice(0, 20)))) {
+    if (!options.some((o) => o.startsWith('Archived/') && o.includes(MODEL_TITLE))) {
       fail(`the archived chat was not under an "Archived" group (options: ${JSON.stringify(options)})`);
     }
-    if (options.some((o) => o.startsWith('/') && o.includes(PROMPT.slice(0, 20)))) {
+    if (options.some((o) => o.startsWith('/') && o.includes(MODEL_TITLE))) {
       fail(`the archived chat was still in the main list (options: ${JSON.stringify(options)})`);
     }
 
@@ -511,18 +547,48 @@ async function chatsFlow() {
     if (!(await panel.locator('.chatbar button.btn', { hasText: 'Unarchive' }).count())) fail('an open archived chat offered no Unarchive button');
     if (!(await panel.locator('.chatbar button.btn.danger', { hasText: 'Delete' }).count())) fail('an open archived chat offered no Delete button');
 
-    // --- 7. Sending in an archived chat brings it back to life.
+    // --- 7. Renaming by hand: the select becomes an input, Escape abandons it, Enter commits.
+    const MY_NAME = 'Kingfisher reading layout';
+    await panel.locator('.chatbar button.btn', { hasText: 'Rename' }).click();
+    await panel.locator('.chatbar input.rename').waitFor({ timeout: 5000 });
+    await panel.locator('.chatbar input.rename').fill('this one is abandoned');
+    await panel.locator('.chatbar input.rename').press('Escape');
+    await panel.waitForTimeout(400);
+    if (await panel.locator('.chatbar input.rename').count()) fail('Escape did not take the switcher out of rename mode');
+    const afterEscape = await selectedLabel(panel);
+    if (afterEscape?.includes('abandoned')) fail(`Escape saved the abandoned name anyway (switcher reads ${JSON.stringify(afterEscape)})`);
+
+    await panel.locator('.chatbar button.btn', { hasText: 'Rename' }).click();
+    await panel.locator('.chatbar input.rename').waitFor({ timeout: 5000 });
+    await panel.locator('.chatbar input.rename').fill(MY_NAME);
+    await panel.locator('.chatbar input.rename').press('Enter');
+    await panel.waitForTimeout(600);
+    if (await panel.locator('.chatbar input.rename').count()) fail('Enter did not take the switcher out of rename mode');
+    const renamed = await selectedLabel(panel);
+    if (!renamed?.includes(MY_NAME)) fail(`the rename did not reach the switcher (it reads ${JSON.stringify(renamed)})`);
+    const userNamed = await panel.evaluate(async () => ((await chrome.storage.local.get('chats')).chats ?? [])[0]);
+    if (userNamed?.titleSource !== 'user') fail(`a hand-typed rename stored titleSource ${JSON.stringify(userNamed?.titleSource)} instead of "user"`);
+
+    // --- 8. Sending in an archived chat brings it back to life — and the user's name survives it.
     await panel.locator('textarea').fill('and dim the images a little');
     await panel.locator('.composer button.btn.primary').click();
     await panel.waitForTimeout(1500);
     await panel.locator('.chatbar button.btn', { hasText: 'Archive' }).waitFor({ timeout: 20_000 }).catch(() => {});
+    // Long enough for a title call to have landed, had the chat been eligible for one.
+    await panel.waitForTimeout(3000);
     await reopenPanel(panel);
     const revived = await panel.locator('.messages .msg.user').first().textContent();
     if (!revived?.includes(PROMPT)) fail(`sending in an archived chat did not unarchive it: reopening showed ${JSON.stringify(revived)}`);
     options = await switcherOptions(panel);
     if (options.some((o) => o.startsWith('Archived/'))) fail(`the chat was still in the Archived group after a send (options: ${JSON.stringify(options)})`);
 
-    console.log('chats: OK — last chat restored on reopen, New chat not persisted, archive hides and unarchives on send');
+    const survived = await selectedLabel(panel);
+    if (!survived?.includes(MY_NAME)) fail(`a later turn overwrote the name the user chose: the switcher reads ${JSON.stringify(survived)}`);
+    const finalRecord = await panel.evaluate(async () => ((await chrome.storage.local.get('chats')).chats ?? [])[0]);
+    if (finalRecord?.title !== MY_NAME) fail(`the stored title was changed after a user rename (now ${JSON.stringify(finalRecord?.title)})`);
+    if (finalRecord?.titleSource !== 'user') fail(`titleSource fell back to ${JSON.stringify(finalRecord?.titleSource)} after a later turn`);
+
+    console.log('chats: OK — model title live on the port, user rename sticks through a later turn, last chat restored on reopen, New chat not persisted, archive hides and unarchives on send');
   } finally {
     await b.close();
   }

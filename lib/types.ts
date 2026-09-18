@@ -60,6 +60,11 @@ export interface Settings {
   baseUrl: string;
   apiKey: string;
   model: string;
+  /**
+   * Let the model name chats after the first turn. Off keeps the truncated first message.
+   * Optional so a profile saved before this existed reads as the default (on).
+   */
+  autoNameChats?: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -67,6 +72,7 @@ export const DEFAULT_SETTINGS: Settings = {
   baseUrl: '',
   apiKey: '',
   model: 'claude-opus-5',
+  autoNameChats: true,
 };
 
 // Provider-neutral conversation format. Adapters translate to each API's wire shape.
@@ -109,6 +115,8 @@ export type AgentEvent =
   /** A queued message was dropped because the run was stopped; the panel gets its text back. */
   | { type: 'unqueued'; id: string }
   | { type: 'done' }
+  /** A chat was renamed by the model after a turn finished, so the switcher can follow along. */
+  | { type: 'chat_title'; chatId: string; title: string }
   | { type: 'error'; message: string };
 
 /**

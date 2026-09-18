@@ -3,6 +3,7 @@
 //   'chats'              — Chat[] metadata index, newest activity first
 //   'chat:<id>:messages' — Msg[] model history, written by the background worker
 //   'chat:<id>:items'    — ChatItem[] panel transcript, written by the side panel
+import type { TitleSource } from './title';
 import type { ChatItem, Msg } from './types';
 
 const INDEX_KEY = 'chats';
@@ -20,6 +21,21 @@ export interface Chat {
   /** When the user archived this chat. Archived chats are hidden from the main switcher list and
    *  are never auto-selected, but they are still readable and writable; sending unarchives. */
   archivedAt?: number;
+  /**
+   * Where `title` came from, so a better title never clobbers a more deliberate one:
+   * 'auto-first' — the truncated first message, written when the chat's first turn starts.
+   * 'auto-model' — the model named it after a turn completed.
+   * 'user'       — the user renamed it in the switcher. Nothing overwrites this.
+   * Absent on chats written by an older build; treated as 'auto-first'.
+   */
+  titleSource?: TitleSource;
+  /** Set once the one allowed model retitle (at the 4th turn) has happened, so it never repeats. */
+  titleRefreshed?: boolean;
+}
+
+/** A chat's title source, defaulting for records written before the field existed. */
+export function titleSourceOf(chat: Pick<Chat, 'titleSource'>): TitleSource {
+  return chat.titleSource ?? 'auto-first';
 }
 
 /** Archived chats are the ones with a timestamp; everything else is live. */
@@ -130,7 +146,7 @@ export async function getChat(id: string): Promise<Chat | null> {
 
 export async function createChat(host: string): Promise<Chat> {
   const now = Date.now();
-  const chat: Chat = { id: crypto.randomUUID(), host, title: 'New chat', createdAt: now, updatedAt: now };
+  const chat: Chat = { id: crypto.randomUUID(), host, title: 'New chat', titleSource: 'auto-first', createdAt: now, updatedAt: now };
   const { kept, dropped } = capChats([chat, ...(await readIndex())]);
   await writeIndex(kept);
   if (dropped.length) await chrome.storage.local.remove(dropped.flatMap((id) => [messagesKey(id), itemsKey(id)]));
@@ -147,7 +163,44 @@ export async function touchChat(id: string, patch: { title?: string } = {}): Pro
   if (!chat) return;
   chat.updatedAt = Date.now();
   delete chat.archivedAt;
-  if (patch.title && (!chat.title || chat.title === 'New chat')) chat.title = titleFromText(patch.title);
+  if (patch.title && (!chat.title || chat.title === 'New chat')) {
+    chat.title = titleFromText(patch.title);
+    chat.titleSource = 'auto-first';
+  }
+  await writeIndex(chats);
+}
+
+/**
+ * Write a model-written title, unless the user has since named the chat themselves. `refresh` marks
+ * the one allowed retitle as spent, whether or not it produced a different string.
+ *
+ * Returns the stored title when it changed, so the caller knows whether to tell the panel.
+ */
+export async function setModelTitle(id: string, title: string, { refresh = false } = {}): Promise<string | null> {
+  const clean = titleFromText(title);
+  if (!clean || clean === 'New chat') return null;
+  const chats = await readIndex();
+  const chat = chats.find((c) => c.id === id);
+  if (!chat) return null;
+  // The user may have renamed it while the title call was in flight; their name wins.
+  if (titleSourceOf(chat) === 'user') return null;
+  const changed = chat.title !== clean;
+  chat.title = clean;
+  chat.titleSource = 'auto-model';
+  if (refresh) chat.titleRefreshed = true;
+  await writeIndex(chats);
+  return changed ? clean : null;
+}
+
+/**
+ * Spend the one allowed retitle without changing the title. Used when the refresh call came back
+ * empty or refused: keeping the existing name is right, but asking again on every later turn is not.
+ */
+export async function markTitleRefreshed(id: string): Promise<void> {
+  const chats = await readIndex();
+  const chat = chats.find((c) => c.id === id);
+  if (!chat) return;
+  chat.titleRefreshed = true;
   await writeIndex(chats);
 }
 
@@ -161,11 +214,15 @@ export async function archiveChat(id: string, archived: boolean): Promise<void> 
   await writeIndex(chats);
 }
 
+/** The user naming a chat by hand. This is the one title source nothing else overwrites. */
 export async function renameChat(id: string, title: string): Promise<void> {
   const chats = await readIndex();
   const chat = chats.find((c) => c.id === id);
   if (!chat) return;
-  chat.title = titleFromText(title);
+  const clean = titleFromText(title);
+  if (!clean || clean === 'New chat') return;
+  chat.title = clean;
+  chat.titleSource = 'user';
   await writeIndex(chats);
 }
 
