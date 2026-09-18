@@ -248,8 +248,13 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
 
       // Route by the event's own chat, never by "the chat this port last started". One port serves
       // the whole panel, and the panel may well be showing a different chat than the one running.
+      //
+      // 'chat_title' is deliberately neither: it is posted by the naming call, which runs AFTER
+      // 'done' and is not part of the turn. Treating it as proof of life put the finished chat
+      // straight back into runningChats, which left Stop and Queue on screen for a chat that had
+      // stopped — with no activity line beside them, since the run really was over.
       if (e.type === 'done') setRunningChats((prev) => withoutChat(prev, e.chatId));
-      else setRunningChats((prev) => (prev.has(e.chatId) ? prev : new Set(prev).add(e.chatId)));
+      else if (e.type !== 'chat_title') setRunningChats((prev) => (prev.has(e.chatId) ? prev : new Set(prev).add(e.chatId)));
 
       // The background named the chat after its turn finished. This renames a row in the switcher,
       // not a message, so it is patched in place here rather than refetched — and it is done above

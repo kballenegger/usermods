@@ -619,6 +619,16 @@ async function chatsFlow() {
     if (namedRecord?.title !== MODEL_TITLE) fail(`the model title was not stored (chat record title: ${JSON.stringify(namedRecord?.title)})`);
     if (namedRecord?.titleSource !== 'auto-model') fail(`the stored titleSource was ${JSON.stringify(namedRecord?.titleSource)}, not "auto-model"`);
 
+    // --- 1c. The chat is finished, so the composer says so. The naming call posts its title AFTER
+    // 'done', and the panel used to read any event as proof the chat was running again — which put
+    // Stop and Queue back on screen permanently, next to an activity line that had correctly gone
+    // away. A chat that has stopped must offer Send.
+    await panel.waitForTimeout(400);
+    const settled = await panel.locator('.composer .btn').allTextContents();
+    if (settled.includes('Stop')) fail(`the composer still offered Stop after the run finished and was renamed: ${settled.join(' | ')}`);
+    if (!settled.includes('Send')) fail(`the composer did not go back to Send after the run finished: ${settled.join(' | ')}`);
+    if (await panel.locator('.activity').count()) fail('the activity line was still up after the run finished');
+
     // --- 2. Reopening the panel restores that chat with no click at all.
     await reopenPanel(panel);
     const restoredUser = await panel.locator('.messages .msg.user').first().textContent();
