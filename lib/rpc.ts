@@ -73,6 +73,10 @@ export async function rpc<T extends RpcRequest['type']>(req: Extract<RpcRequest,
   return res.data;
 }
 
-/** Messages over the long-lived "agent" port. */
-export type AgentPortRequest = ({ type: 'send'; tabId: number; chatId: string } & UserTurn) | { type: 'abort' };
+/**
+ * Messages over the long-lived "agent" port. Both carry the chat they are about: one port serves
+ * the whole panel, and the panel may be looking at a different chat than the one that is running,
+ * so nothing may be inferred from "the port's current chat".
+ */
+export type AgentPortRequest = ({ type: 'send'; tabId: number; chatId: string } & UserTurn) | { type: 'abort'; chatId: string };
 export type AgentPortEvent = AgentEvent;

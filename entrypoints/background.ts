@@ -18,9 +18,10 @@ import {
 } from '@/lib/buildflags';
 import type { OAuthKind } from '@/lib/oauth';
 import type { AgentPortRequest, OAuthLoginState, RpcRequest } from '@/lib/rpc';
+import { SessionMap } from '@/lib/sessions';
 import { loadSettings } from '@/lib/settings';
 import { looksLikeZip, parseTampermonkeyJson, parseTampermonkeyZipEntries, type TmScript } from '@/lib/tampermonkey';
-import type { AgentEvent, ContentRequest, Mod, Msg, Part, Settings, UserTurn } from '@/lib/types';
+import type { AgentEvent, AgentEventBody, ContentRequest, Mod, Msg, Part, Settings, UserTurn } from '@/lib/types';
 
 export default defineBackground(() => {
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
@@ -52,86 +53,115 @@ export default defineBackground(() => {
     // same mod running in another tab or frame.
     if (port.name.startsWith('gm:')) return registerGmPort(port);
     if (port.name !== 'agent') return;
-    // One session per side panel: a running turn, plus messages queued while it runs.
-    let controller: AbortController | null = null;
-    let running = false;
-    const queue: UserTurn[] = [];
-    const post = (e: unknown) => {
-      try {
-        port.postMessage(e);
-      } catch {
-        /* panel closed */
-      }
-    };
-
-    async function run(tabId: number, chatId: string, turn: UserTurn) {
-      running = true;
-      controller = new AbortController();
-      const signal = controller.signal;
-      // Only a turn that finished cleanly is worth naming: an aborted or failed one has nothing
-      // the model could summarise, and the user's own message is already the placeholder title.
-      let succeeded = false;
-      let settings: Settings | null = null;
-      // Held outside the try so the catch can still write the conversation back. runAgent only
-      // returns messages on success, so a provider error (429, a bad key) would otherwise leave
-      // the whole chat unsaved and the user's turn lost.
-      let history: Msg[] = [];
-      try {
-        settings = await loadSettings();
-        const usesKey = settings.provider === 'anthropic' || settings.provider === 'openai-compatible';
-        if (usesKey && !settings.apiKey && !settings.baseUrl) throw new Error('Add an API key in Settings first (or a base URL for a local server or proxy).');
-        if (!settings.model) throw new Error('Choose a model in Settings first.');
-        history = await loadMessages(chatId);
-        // The first message of a chat names it.
-        await touchChat(chatId, history.length ? {} : { title: turn.text });
-        const messages = await runAgent({
-          settings,
-          history,
-          turn,
-          pullQueued: () => queue.splice(0),
-          env: envForTab(tabId),
-          emit: post,
-          signal,
-        });
-        await saveMessages(chatId, messages);
-        await touchChat(chatId);
-        succeeded = !signal.aborted;
-      } catch (e) {
-        // Keep everything that was already in the chat, plus the turn that failed, so retrying
-        // does not start from nothing. Partial assistant output inside the failed run is lost;
-        // loop.ts should later attach its messages to the thrown error so we can keep those too.
-        try {
-          await saveMessages(chatId, appendTurn(history, turn));
-          await touchChat(chatId);
-        } catch {
-          /* storage failed too; the error below is still reported */
-        }
-        post({ type: 'error', message: e instanceof Error ? e.message : String(e) });
-      }
-      running = false;
-      // Stop clears the queue; otherwise anything still waiting starts the next turn.
-      const next = queue.shift();
-      if (next && !signal.aborted) return void run(tabId, chatId, next);
-      post({ type: 'done' });
-      // Naming the chat is a second, tool-free model call. It runs only after 'done' has been
-      // posted and its result is never awaited by the turn, so a slow or failing title call cannot
-      // delay, break or fail what the user actually asked for. Errors are swallowed and logged.
-      if (succeeded && settings) void nameChat(chatId, settings, post);
-    }
-
+    agentPorts.add(port);
     port.onMessage.addListener((req: AgentPortRequest) => {
       if (req.type === 'abort') {
-        for (const q of queue.splice(0)) post({ type: 'unqueued', id: q.id });
-        controller?.abort();
+        // Only this chat. Stop used to abort whatever the port last started, which meant pressing
+        // Stop in the chat you were reading killed a run belonging to a different tab.
+        for (const id of sessions.abort(req.chatId)) postAgentEvent(req.chatId, { type: 'unqueued', id });
         return;
       }
       const turn: UserTurn = { id: req.id, text: req.text, refs: req.refs };
-      if (running) queue.push(turn);
-      else void run(req.tabId, req.chatId, turn);
+      const { start } = sessions.accept(req.chatId, req.tabId, turn);
+      if (start) void runChat(req.chatId, req.tabId, turn);
     });
-    port.onDisconnect.addListener(() => controller?.abort());
+    // The panel going away does NOT stop a run. History and the transcript are both keyed by chat
+    // id and written by the background, so a run that finishes with no panel attached still lands
+    // in the right chat; killing it instead would throw away work the moment the user switched to
+    // a window without the side panel. Events posted meanwhile go nowhere, and the panel says
+    // "reconnected" when it comes back to a transcript that stops mid-turn.
+    port.onDisconnect.addListener(() => agentPorts.delete(port));
   });
 });
+
+// ---------- agent sessions ----------
+
+/**
+ * One run per chat, not one per panel. See lib/sessions.ts for why. The map is module-scoped so a
+ * run survives the side panel closing and reopening (the panel reconnects and picks the stream up
+ * by chat id).
+ */
+const sessions = new SessionMap();
+
+/** Every open side-panel port. A chat's events go to all of them; each panel routes by chat id. */
+const agentPorts = new Set<chrome.runtime.Port>();
+
+/**
+ * The single chokepoint where an agent event is stamped with its chat and put on the wire. The
+ * agent loop emits AgentEventBody, which has no chat id at all, so no emitter can forget one.
+ */
+function postAgentEvent(chatId: string, body: AgentEventBody): void {
+  const event: AgentEvent = { ...body, chatId };
+  for (const port of agentPorts) {
+    try {
+      port.postMessage(event);
+    } catch {
+      /* that panel closed; others still get it */
+    }
+  }
+}
+
+async function runChat(chatId: string, tabId: number, turn: UserTurn): Promise<void> {
+  const session = sessions.ensure(chatId, tabId);
+  session.running = true;
+  session.controller = new AbortController();
+  const signal = session.controller.signal;
+  const post = (e: AgentEventBody) => postAgentEvent(chatId, e);
+  // Only a turn that finished cleanly is worth naming: an aborted or failed one has nothing
+  // the model could summarise, and the user's own message is already the placeholder title.
+  let succeeded = false;
+  let settings: Settings | null = null;
+  // Held outside the try so the catch can still write the conversation back. runAgent only
+  // returns messages on success, so a provider error (429, a bad key) would otherwise leave
+  // the whole chat unsaved and the user's turn lost.
+  let history: Msg[] = [];
+  try {
+    settings = await loadSettings();
+    const usesKey = settings.provider === 'anthropic' || settings.provider === 'openai-compatible';
+    if (usesKey && !settings.apiKey && !settings.baseUrl) throw new Error('Add an API key in Settings first (or a base URL for a local server or proxy).');
+    if (!settings.model) throw new Error('Choose a model in Settings first.');
+    history = await loadMessages(chatId);
+    // The first message of a chat names it.
+    await touchChat(chatId, history.length ? {} : { title: turn.text });
+    const messages = await runAgent({
+      settings,
+      history,
+      turn,
+      pullQueued: () => session.queue.splice(0),
+      env: envForTab(session.tabId),
+      emit: post,
+      signal,
+    });
+    await saveMessages(chatId, messages);
+    await touchChat(chatId);
+    succeeded = !signal.aborted;
+  } catch (e) {
+    // Keep everything that was already in the chat, plus the turn that failed, so retrying
+    // does not start from nothing. Partial assistant output inside the failed run is lost;
+    // loop.ts should later attach its messages to the thrown error so we can keep those too.
+    try {
+      await saveMessages(chatId, appendTurn(history, turn));
+      await touchChat(chatId);
+    } catch {
+      /* storage failed too; the error below is still reported */
+    }
+    post({ type: 'error', message: e instanceof Error ? e.message : String(e) });
+  }
+  session.running = false;
+  // Stop clears the queue; otherwise anything still waiting starts the next turn.
+  const next = session.queue.shift();
+  if (next && !signal.aborted) {
+    void runChat(chatId, session.tabId, next);
+  } else {
+    post({ type: 'done' });
+    sessions.release(chatId);
+    // Naming the chat is a second, tool-free model call. It runs only after 'done' has been
+    // posted and its result is never awaited by the turn, so a slow or failing title call cannot
+    // delay, break or fail what the user actually asked for. Errors are swallowed and logged.
+    // It posts through this chat's own post(), so the rename lands on this chat and no other.
+    if (succeeded && settings) void nameChat(chatId, settings, post);
+  }
+}
 
 async function bootstrap() {
   try {
@@ -213,7 +243,7 @@ const TITLE_TIMEOUT_MS = 20_000;
  * Every failure — no provider, a 429, a nonsense reply, the chat being deleted meanwhile — leaves
  * the existing title in place and is logged, never surfaced as a chat error.
  */
-async function nameChat(chatId: string, settings: Settings, post: (e: AgentEvent) => void): Promise<void> {
+async function nameChat(chatId: string, settings: Settings, post: (e: AgentEventBody) => void): Promise<void> {
   try {
     if (settings.autoNameChats === false) return;
     const chat = await getChat(chatId);
@@ -244,7 +274,7 @@ async function nameChat(chatId: string, settings: Settings, post: (e: AgentEvent
     }
     const stored = await setModelTitle(chatId, title, { refresh });
     // The panel may be closed, in which case the title is simply stored and read back next open.
-    if (stored) post({ type: 'chat_title', chatId, title: stored });
+    if (stored) post({ type: 'chat_title', title: stored });
   } catch (e) {
     console.warn('[usermods] chat title', e);
   }

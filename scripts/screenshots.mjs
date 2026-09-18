@@ -3,8 +3,9 @@
 // scripted mock backend in scripts/mock-llm.mjs. No API key and no network model call.
 //
 //   npm run screenshots     capture everything into docs/screenshots/
-//   npm run smoke           headless: the chat flow (proposal card) then the chats flow, both asserted
+//   npm run smoke           headless: the chat flow, the chats flow and the isolation flow, all asserted
 //   npm run smoke:chats     headless: the chats flow alone (restore, New chat, archive/unarchive)
+//   npm run smoke:isolation headless: the isolation flow alone (two chats running at once, no bleed)
 //
 // ---------------------------------------------------------------------------
 // How this works, and why it is shaped this way
@@ -38,6 +39,7 @@
 
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
+import { FAST_MARKER, SLOW_MARKER } from './mock-llm.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -55,6 +57,7 @@ const SCALE = 2;
 
 const SMOKE = process.argv.includes('--smoke');
 const CHATS = process.argv.includes('--chats');
+const ISOLATION = process.argv.includes('--isolation');
 
 /** See note 4: a first-run setup instruction, not the steady state the README should show. */
 const HIDE_SETUP_NOTICE = '.app > .notice { display: none !important; }';
@@ -595,11 +598,198 @@ async function chatsFlow() {
 }
 
 // ---------------------------------------------------------------------------
+// Isolation test: two chats, two tabs, two hosts, one side panel — and no bleed between them.
+//
+// This is the regression test for the bug the owner reported with a screenshot: a run started in
+// one chat kept streaming into whatever chat was on screen, so a GitHub conversation answered with
+// another site's output. The background used to keep ONE session per panel port (one `running`
+// flag, one queue, one AbortController) and events carried no chat id, so the panel had nothing to
+// route on and simply appended everything to the visible transcript — and then saved it there.
+//
+// What is asserted, in order of how badly each one bit:
+//   1. B's transcript contains B's marker and never A's, while A is still running.
+//   2. A's transcript, on switching back, holds A's FULL output — including the part that streamed
+//      while B was on screen — and never B's text.
+//   3. Both survive a panel reload, i.e. what was persisted is clean, not just what was rendered.
+//   4. Over /__requests: no request for conversation A carries B's user text, and vice versa. This
+//      is the invisible half — B's message used to be pushed onto A's queue and injected into A's
+//      model conversation, which no transcript would show.
+//   5. Stop pressed in B does not abort A.
+// ---------------------------------------------------------------------------
+
+const SLOW_PROMPT = 'walk the ancestry of the slow marker on this page';
+const FAST_PROMPT = 'name the fast marker for this site';
+
+/** The panel's transcript as plain text, for "contains / does not contain" assertions. */
+async function transcriptText(panel) {
+  return (await panel.locator('.messages').innerText()).trim();
+}
+
+/** Every chat's stored transcript, straight out of chrome.storage.local. */
+async function storedTranscripts(panel) {
+  return panel.evaluate(async () => {
+    const all = await chrome.storage.local.get(null);
+    const out = {};
+    for (const [k, v] of Object.entries(all)) {
+      if (k.startsWith('chat:') && k.endsWith(':items')) out[k.slice(5, -6)] = JSON.stringify(v);
+    }
+    return out;
+  });
+}
+
+/** Every chat's stored MODEL history, which is what actually went to the provider. */
+async function storedMessages(panel) {
+  return panel.evaluate(async () => {
+    const all = await chrome.storage.local.get(null);
+    const out = {};
+    for (const [k, v] of Object.entries(all)) {
+      if (k.startsWith('chat:') && k.endsWith(':messages')) out[k.slice(5, -9)] = JSON.stringify(v);
+    }
+    return out;
+  });
+}
+
+async function isolationFlow() {
+  const b = await launch('light');
+  const fail = (m) => {
+    throw new Error(`isolation: ${m}`);
+  };
+  try {
+    const panel = await openPanel(b.ctx, b.extId);
+
+    // --- Tab 1: the slow chat, A.
+    const tab1 = await openSite(b.ctx, 'https://en.wikipedia.org/wiki/Common_kingfisher');
+    await panel.waitForTimeout(1200);
+    await panel.locator('textarea').fill(SLOW_PROMPT);
+    await panel.locator('.composer button.btn.primary').click();
+
+    // The Stop button is the panel saying "the chat you are looking at is running".
+    await panel.locator('.composer button.btn.danger', { hasText: 'Stop' }).waitFor({ timeout: 10_000 });
+
+    // --- Tab 2 on a DIFFERENT host, while A is still waiting for its first byte.
+    const tab2 = await openSite(b.ctx, 'https://example.com/');
+    await panel.waitForTimeout(1500);
+
+    const afterSwitch = await transcriptText(panel);
+    if (afterSwitch.includes(SLOW_PROMPT)) fail(`switching hosts left chat A's message on screen: ${JSON.stringify(afterSwitch.slice(0, 200))}`);
+    if (await panel.locator('.composer button.btn.danger', { hasText: 'Stop' }).count()) {
+      fail('the new, empty chat B showed a Stop button: "busy" is still panel-wide rather than per chat');
+    }
+
+    // Stop in B must not touch A. There is nothing running in B, so this is the clean version of
+    // the old bug where the button aborted whatever the port last started.
+    await panel.locator('textarea').fill(FAST_PROMPT);
+    await panel.locator('.composer button.btn.primary').click();
+    await panel.locator('.messages .msg.assistant', { hasText: FAST_MARKER }).waitFor({ timeout: 30_000 });
+    // B has answered; pressing Stop here is the user tidying up their own chat.
+    const stopInB = panel.locator('.composer button.btn.danger', { hasText: 'Stop' });
+    if (await stopInB.count()) await stopInB.click();
+
+    const bText = await transcriptText(panel);
+    if (!bText.includes(FAST_MARKER)) fail(`chat B did not get its own answer (transcript: ${JSON.stringify(bText.slice(0, 300))})`);
+    if (bText.includes(SLOW_MARKER)) fail(`chat A's output bled into chat B's transcript: ${JSON.stringify(bText.slice(0, 400))}`);
+    if (bText.includes(SLOW_PROMPT)) fail(`chat A's user message appeared in chat B: ${JSON.stringify(bText.slice(0, 400))}`);
+
+    // --- Let A finish while B is on screen, then go back to it.
+    await panel.waitForTimeout(12_000);
+    await tab1.bringToFront();
+    await panel.waitForTimeout(3000);
+
+    const aText = await transcriptText(panel);
+    if (!aText.includes(SLOW_PROMPT)) fail(`switching back did not restore chat A (transcript: ${JSON.stringify(aText.slice(0, 300))})`);
+    if (!aText.includes(`${SLOW_MARKER} step one`)) fail(`chat A lost the output that streamed before the switch: ${JSON.stringify(aText.slice(0, 400))}`);
+    if (!aText.includes(`${SLOW_MARKER} step two`)) {
+      fail(`chat A lost the output that streamed WHILE chat B was visible — the run's tail went missing: ${JSON.stringify(aText.slice(0, 600))}`);
+    }
+    if (aText.includes(FAST_MARKER)) fail(`chat B's output bled into chat A's transcript: ${JSON.stringify(aText.slice(0, 400))}`);
+    if (aText.includes(FAST_PROMPT)) fail(`chat B's user message appeared in chat A: ${JSON.stringify(aText.slice(0, 400))}`);
+
+    // --- What was PERSISTED is clean too, not just what was on screen.
+    await reopenPanel(panel);
+    const stored = await storedTranscripts(panel);
+    const ids = Object.keys(stored);
+    if (ids.length !== 2) fail(`expected two stored transcripts, got ${ids.length}: ${JSON.stringify(ids)}`);
+    const slowStored = Object.values(stored).filter((v) => v.includes(SLOW_MARKER));
+    const fastStored = Object.values(stored).filter((v) => v.includes(FAST_MARKER));
+    if (slowStored.length !== 1) fail(`${SLOW_MARKER} appears in ${slowStored.length} stored transcripts; it belongs to exactly one`);
+    if (fastStored.length !== 1) fail(`${FAST_MARKER} appears in ${fastStored.length} stored transcripts; it belongs to exactly one`);
+    if (slowStored[0].includes(FAST_MARKER)) fail("the stored transcript for chat A also holds chat B's output");
+    if (fastStored[0].includes(SLOW_MARKER)) fail("the stored transcript for chat B also holds chat A's output");
+    if (slowStored[0].includes(FAST_PROMPT)) fail("chat A's stored transcript holds chat B's user message");
+    if (fastStored[0].includes(SLOW_PROMPT)) fail("chat B's stored transcript holds chat A's user message");
+
+    // --- The model histories, which is where an injected message would hide.
+    const messages = await storedMessages(panel);
+    for (const [id, json] of Object.entries(messages)) {
+      const hasSlow = json.includes(SLOW_PROMPT);
+      const hasFast = json.includes(FAST_PROMPT);
+      if (hasSlow && hasFast) fail(`chat ${id}'s model history holds BOTH users' messages — one was injected into the other's conversation`);
+    }
+
+    // --- The requests the provider actually received. A transcript can look clean while the model
+    //     was handed the other chat's text; only the wire shows that.
+    const recorded = await panel.evaluate(async (url) => (await (await fetch(url)).json()).requests, `${BASE_URL.replace(/\/v1$/, '')}/__requests`);
+    if (!recorded.length) fail('the mock backend recorded no requests at all');
+    let sawSlow = false;
+    let sawFast = false;
+    for (const r of recorded) {
+      const text = JSON.stringify(r.messages);
+      const hasSlow = text.includes(SLOW_PROMPT);
+      const hasFast = text.includes(FAST_PROMPT);
+      if (hasSlow && hasFast) {
+        fail(`a single request carried BOTH conversations' user text (script ${r.script}) — one chat's message was injected into the other's conversation`);
+      }
+      sawSlow ||= hasSlow;
+      sawFast ||= hasFast;
+    }
+    if (!sawSlow || !sawFast) fail(`the recorded requests did not cover both conversations (slow: ${sawSlow}, fast: ${sawFast})`);
+
+    // --- Stop in B while A runs must not abort A. Run it again, for real this time.
+    await tab2.bringToFront();
+    await panel.waitForTimeout(1500);
+    await panel.locator('.composer button.btn', { hasText: 'New chat' }).click();
+    await panel.waitForTimeout(400);
+    await tab1.bringToFront();
+    await panel.waitForTimeout(2000);
+    await panel.locator('.composer button.btn', { hasText: 'New chat' }).click();
+    await panel.waitForTimeout(400);
+    await panel.locator('textarea').fill(SLOW_PROMPT);
+    await panel.locator('.composer button.btn.primary').click();
+    await panel.locator('.composer button.btn.danger', { hasText: 'Stop' }).waitFor({ timeout: 10_000 });
+
+    await tab2.bringToFront();
+    await panel.waitForTimeout(1500);
+    await panel.locator('textarea').fill(FAST_PROMPT);
+    await panel.locator('.composer button.btn.primary').click();
+    await panel.locator('.messages .msg.assistant', { hasText: FAST_MARKER }).waitFor({ timeout: 30_000 });
+    const stopB = panel.locator('.composer button.btn.danger', { hasText: 'Stop' });
+    if (await stopB.count()) await stopB.click();
+    await panel.waitForTimeout(1000);
+
+    // Back to A: it must have run to completion despite the Stop pressed in B.
+    await tab1.bringToFront();
+    await panel.waitForTimeout(12_000);
+    const aAfterStop = await transcriptText(panel);
+    if (!aAfterStop.includes(`${SLOW_MARKER} step two`)) {
+      fail(`Stop pressed in chat B aborted chat A's run (chat A holds: ${JSON.stringify(aAfterStop.slice(0, 600))})`);
+    }
+
+    console.log('isolation: OK — two chats ran at once with no bleed on screen, in storage, or on the wire; Stop in B left A alone');
+  } finally {
+    await b.close();
+  }
+}
+
+// ---------------------------------------------------------------------------
 
 async function main() {
   fs.mkdirSync(OUT_DIR, { recursive: true });
   const mock = await startMock();
   try {
+    if (ISOLATION) {
+      await isolationFlow();
+      return;
+    }
     if (CHATS) {
       await chatsFlow();
       return;
@@ -607,6 +797,7 @@ async function main() {
     if (SMOKE) {
       await smoke();
       await chatsFlow();
+      await isolationFlow();
       return;
     }
     await chatProposal('light', '01-chat-proposal.png');
