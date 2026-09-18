@@ -5,9 +5,12 @@ import { DEFAULT_SETTINGS, type Settings } from '@/lib/types';
 const PRESETS: Array<{ label: string; apply: Partial<Settings> }> = [
   { label: 'Anthropic', apply: { provider: 'anthropic', baseUrl: '', model: 'claude-opus-5' } },
   { label: 'OpenAI', apply: { provider: 'openai-compatible', baseUrl: 'https://api.openai.com/v1', model: 'gpt-5' } },
+  { label: 'xAI Grok', apply: { provider: 'openai-compatible', baseUrl: 'https://api.x.ai/v1', model: 'grok-4' } },
   { label: 'OpenRouter', apply: { provider: 'openai-compatible', baseUrl: 'https://openrouter.ai/api/v1', model: 'anthropic/claude-opus-5' } },
   { label: 'Ollama', apply: { provider: 'openai-compatible', baseUrl: 'http://localhost:11434/v1', model: '' } },
   { label: 'LM Studio', apply: { provider: 'openai-compatible', baseUrl: 'http://localhost:1234/v1', model: '' } },
+  { label: 'Custom Anthropic API', apply: { provider: 'anthropic', baseUrl: 'http://localhost:', model: '' } },
+  { label: 'Custom OpenAI API', apply: { provider: 'openai-compatible', baseUrl: 'http://localhost:', model: '' } },
 ];
 
 export function SettingsView() {
@@ -42,11 +45,14 @@ export function SettingsView() {
         </select>
       </label>
       <label className="field">
-        Base URL {s.provider === 'anthropic' ? '(optional, for proxies)' : ''}
-        <input value={s.baseUrl} onChange={(e) => update({ baseUrl: e.target.value })} placeholder={s.provider === 'anthropic' ? 'https://api.anthropic.com' : 'http://localhost:11434/v1'} />
+        Base URL
+        <input value={s.baseUrl} onChange={(e) => update({ baseUrl: e.target.value })} placeholder={s.provider === 'anthropic' ? 'https://api.anthropic.com' : 'https://api.openai.com/v1'} />
+        <span>
+          Any endpoint that speaks the {s.provider === 'anthropic' ? 'Anthropic Messages' : 'OpenAI chat completions'} API works here, including a local proxy in front of a subscription.
+        </span>
       </label>
       <label className="field">
-        API key {s.provider === 'openai-compatible' ? '(leave empty for local servers)' : ''}
+        API key (leave empty for local servers and proxies that do not need one)
         <input type="password" value={s.apiKey} onChange={(e) => update({ apiKey: e.target.value })} autoComplete="off" />
       </label>
       <label className="field">

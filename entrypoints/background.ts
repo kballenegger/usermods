@@ -39,7 +39,7 @@ export default defineBackground(() => {
         };
         try {
           const settings = await loadSettings();
-          if (!settings.apiKey && settings.provider === 'anthropic') throw new Error('Add an API key in Settings first.');
+          if (!settings.apiKey && !settings.baseUrl) throw new Error('Add an API key in Settings first (or a base URL for a local server or proxy).');
           if (!settings.model) throw new Error('Choose a model in Settings first.');
           const history = await loadHistory(req.tabId);
           const messages = await runAgent({

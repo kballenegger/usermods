@@ -42,7 +42,8 @@ function toAnthropicTools(tools: ToolDef[]): Anthropic.Tool[] {
 
 export function createAnthropicProvider(settings: Settings): Provider {
   const client = new Anthropic({
-    apiKey: settings.apiKey,
+    // The SDK insists on a key; local proxies usually ignore it.
+    apiKey: settings.apiKey || (settings.baseUrl ? 'none' : ''),
     baseURL: settings.baseUrl || undefined,
     // We run inside an extension service worker, which the SDK treats as a browser.
     // The key never leaves the user's own machine except to the endpoint they configured.

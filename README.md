@@ -35,6 +35,25 @@ Then in Chrome:
 
 For development, `npm run dev` starts WXT with hot reload and opens a Chrome profile with the extension loaded.
 
+## Providers
+
+Two wire protocols, any endpoint:
+
+| Preset | Protocol | Base URL |
+|---|---|---|
+| Anthropic | Anthropic Messages | `https://api.anthropic.com` |
+| OpenAI | OpenAI chat completions | `https://api.openai.com/v1` |
+| xAI Grok | OpenAI chat completions | `https://api.x.ai/v1` |
+| OpenRouter | OpenAI chat completions | `https://openrouter.ai/api/v1` |
+| Ollama, LM Studio, vLLM, mlx_lm | OpenAI chat completions | your local server |
+| Custom | either | anything you type |
+
+The base URL is always editable. Anything that speaks one of the two protocols will work, so a self-hosted gateway, a corporate proxy, or a model router all drop in.
+
+### Using a subscription instead of an API key
+
+usermods talks only to the two APIs above and never handles vendor logins. If you want to run it against a Claude, ChatGPT or other subscription, run a local proxy that exposes that login as an Anthropic- or OpenAI-compatible endpoint, and point a Custom preset at it. Several open-source projects do this. Whether that is allowed depends on the vendor's terms, which have changed more than once in 2026, so check before you rely on it. Anthropic's sanctioned route for subscriptions is the Agent SDK credit, which requires the Claude Code CLI on your machine; a proxy built on that is the clean option.
+
 ## How it works
 
 ```
