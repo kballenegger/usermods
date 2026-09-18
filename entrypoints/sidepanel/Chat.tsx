@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { loadItems, relativeTime, saveItems, type Chat as ChatRecord } from '@/lib/chats';
+import { findByName } from '@/lib/modmatch';
 import { modFromProposal } from '@/lib/mods';
 import { rpc, type AgentPortRequest } from '@/lib/rpc';
-import type { AgentEvent, ChatItem, ContentEvent, ElementRef, ModProposal } from '@/lib/types';
+import type { AgentEvent, ChatItem, ContentEvent, ElementRef, Mod, ModProposal } from '@/lib/types';
 
 const SAVE_DEBOUNCE_MS = 400;
 
@@ -292,8 +293,14 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
     setItems((prev) => [...prev, { kind: 'tool', id: crypto.randomUUID(), name: 'try', input: { description: 'Ran the proposed mod once' }, summary: r.ok ? `OK${r.logs.length ? ': ' + r.logs.join(' | ') : ''}` : r.error, isError: !r.ok }]);
   }
 
+  /**
+   * Save a proposal, updating the mod it revises rather than minting a new id. Asking the model to
+   * change a mod produces a fresh proposal under the same name; without this, each save left another
+   * copy behind and every copy ran on the page.
+   */
   async function saveProposal(p: ModProposal, idx: number) {
-    await rpc({ type: 'mods.save', mod: modFromProposal(p) });
+    const existing = await findModByName(p.name);
+    await rpc({ type: 'mods.save', mod: modFromProposal(p, existing) });
     setItems((prev) => prev.map((it, i) => (i === idx && it.kind === 'proposal' ? { ...it, saved: true } : it)));
   }
 
@@ -418,6 +425,15 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
       </div>
     </div>
   );
+}
+
+/** The saved mod a proposal of this name would revise, or undefined to save a new one. */
+async function findModByName(name: string): Promise<Mod | undefined> {
+  try {
+    return findByName(await rpc({ type: 'mods.list' }), name);
+  } catch {
+    return undefined; // could not check; saving a new mod is better than failing the save
+  }
 }
 
 /**

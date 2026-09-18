@@ -1,8 +1,13 @@
 import { runAgent, type AgentEnv } from '@/lib/agent/loop';
 import { buildRegisteredCode, gmValuesKey, loadGmValues, type GmMessage } from '@/lib/gm';
-import { fetchText, previewFromUrl, resolveDependencies } from '@/lib/install';
+import { checkConnect, connectOf } from '@/lib/connect';
+import { fetchText, previewFromUrl, resolveDependencies, toBase64 } from '@/lib/install';
+import { UPDATED_MARK } from '@/lib/importreport';
+import { scriptIdentity } from '@/lib/installurl';
+import { resyncPlan } from '@/lib/resync';
+import { shouldUpdate } from '@/lib/version';
 import { loadMods, modFromSource, parseHeader, previewFromSource, upsertMod, deleteMod, saveMods } from '@/lib/mods';
-import { createChat, deleteChat, listChats, loadMessages, renameChat, saveMessages, touchChat } from '@/lib/chats';
+import { appendTurn, createChat, deleteChat, listChats, loadMessages, renameChat, saveMessages, touchChat } from '@/lib/chats';
 import {
   CHATGPT_CODEX_BASE,
   XAI_PROXY_BASE,
@@ -46,6 +51,9 @@ export default defineBackground(() => {
   });
 
   chrome.runtime.onConnect.addListener((port) => {
+    // A registered mod's GM shim connects as "gm:<modId>" to hear about value changes made by the
+    // same mod running in another tab or frame.
+    if (port.name.startsWith('gm:')) return registerGmPort(port);
     if (port.name !== 'agent') return;
     // One session per side panel: a running turn, plus messages queued while it runs.
     let controller: AbortController | null = null;
@@ -63,12 +71,16 @@ export default defineBackground(() => {
       running = true;
       controller = new AbortController();
       const signal = controller.signal;
+      // Held outside the try so the catch can still write the conversation back. runAgent only
+      // returns messages on success, so a provider error (429, a bad key) would otherwise leave
+      // the whole chat unsaved and the user's turn lost.
+      let history: Msg[] = [];
       try {
         const settings = await loadSettings();
         const usesKey = settings.provider === 'anthropic' || settings.provider === 'openai-compatible';
         if (usesKey && !settings.apiKey && !settings.baseUrl) throw new Error('Add an API key in Settings first (or a base URL for a local server or proxy).');
         if (!settings.model) throw new Error('Choose a model in Settings first.');
-        const history = await loadMessages(chatId);
+        history = await loadMessages(chatId);
         // The first message of a chat names it.
         await touchChat(chatId, history.length ? {} : { title: turn.text });
         const messages = await runAgent({
@@ -83,6 +95,15 @@ export default defineBackground(() => {
         await saveMessages(chatId, messages);
         await touchChat(chatId);
       } catch (e) {
+        // Keep everything that was already in the chat, plus the turn that failed, so retrying
+        // does not start from nothing. Partial assistant output inside the failed run is lost;
+        // loop.ts should later attach its messages to the thrown error so we can keep those too.
+        try {
+          await saveMessages(chatId, appendTurn(history, turn));
+          await touchChat(chatId);
+        } catch {
+          /* storage failed too; the error below is still reported */
+        }
         post({ type: 'error', message: e instanceof Error ? e.message : String(e) });
       }
       running = false;
@@ -125,6 +146,11 @@ async function bootstrap() {
 /**
  * Clicking a .user.js link should open our install page rather than showing the raw source, which
  * is what Tampermonkey does. \0 in the substitution is the whole matched URL.
+ *
+ * The matched URL goes in the FRAGMENT, not a query parameter. A query parameter is parsed by the
+ * install page, so an attacker URL carrying its own `&url=…` would decide what the page previewed;
+ * everything after the first '#' is taken verbatim instead, which nothing can smuggle past. It also
+ * means a script URL with a fragment of its own survives, because we never parse the remainder.
  */
 const USER_JS_RULE_ID = 1;
 
@@ -136,9 +162,10 @@ async function installUserJsRedirect(): Promise<void> {
       {
         id: USER_JS_RULE_ID,
         priority: 1,
-        action: { type: 'redirect', redirect: { regexSubstitution: `${target}?url=\\0` } },
+        action: { type: 'redirect', redirect: { regexSubstitution: `${target}#\\0` } },
         condition: {
-          regexFilter: String.raw`^https?://[^?#]+\.user\.js(\?.*)?$`,
+          regexFilter: String.raw`^https?://[^?#]+\.user\.js([?#].*)?$`,
+          isUrlFilterCaseSensitive: false,
           resourceTypes: ['main_frame'],
         },
       },
@@ -260,7 +287,7 @@ async function installSource(
   return mod;
 }
 
-/** Refetch from @downloadURL and swap in the new source when @version moved. */
+/** Refetch from @downloadURL and swap in the new source when the remote @version is newer. */
 async function updateMod(id: string): Promise<{ updated: boolean; version: string }> {
   const mods = await loadMods();
   const mod = mods.find((m) => m.id === id);
@@ -269,7 +296,12 @@ async function updateMod(id: string): Promise<{ updated: boolean; version: strin
   const source = await fetchText(mod.downloadUrl);
   if (!/\/\/\s*==UserScript==/.test(source)) throw new Error(`${mod.downloadUrl} did not return a userscript.`);
   const next = parseHeader(source);
-  if (next.version && mod.version && next.version === mod.version) return { updated: false, version: mod.version };
+  // Versions are compared ordinally, so a downgrade (1.9 published after 1.10 was installed, or a
+  // rolled-back file) does not overwrite what is installed. With no version on either side there
+  // is nothing to order by, so the source text decides.
+  if (!shouldUpdate({ version: mod.version, source: mod.source }, { version: next.version, source })) {
+    return { updated: false, version: mod.version || next.version };
+  }
   // Keep identity, enabled state and GM values; replace source and dependencies.
   const fresh = await installSource(source, { downloadUrl: mod.downloadUrl, enabled: mod.enabled, existing: mod });
   await upsertMod(fresh);
@@ -302,16 +334,31 @@ async function importBackup(req: { json: string } | { zipBase64: string }): Prom
   const mods = await loadMods();
   const skipped = [...parsed.skipped];
   let imported = 0;
+  // Identity is @downloadURL, else @namespace + @name — never name + version, which treated every
+  // new version of a script as a different script and installed a second copy of it.
+  const byIdentity = new Map<string, Mod>();
+  for (const m of mods) {
+    byIdentity.set(scriptIdentity({ downloadUrl: m.downloadUrl, raw: parseHeader(m.source).raw, name: m.name }), m);
+  }
+
   for (const s of parsed.scripts) {
-    const dupe = mods.find((m) => m.name === s.name && m.version === parseHeader(s.source).version);
-    if (dupe) {
-      skipped.push(`${s.name} (already installed)`);
-      continue;
-    }
+    const header = parseHeader(s.source);
+    const existing = byIdentity.get(scriptIdentity({ downloadUrl: s.downloadUrl, raw: header.raw, name: s.name }));
     try {
-      const mod = await installSource(s.source, { downloadUrl: s.downloadUrl, enabled: s.enabled, values: s.values });
-      mods.push(mod);
-      imported++;
+      // A duplicate updates in place: same mod id, so its registration and its gm:<id> store are
+      // kept, and the backup's values are merged over what is there (the backup wins for the keys
+      // it carries, other keys survive).
+      const mod = await installSource(s.source, { downloadUrl: s.downloadUrl, enabled: s.enabled, values: s.values, existing });
+      if (existing) {
+        const i = mods.findIndex((m) => m.id === existing.id);
+        if (i >= 0) mods[i] = mod;
+        else mods.push(mod);
+        skipped.push(`${s.name} (already installed — ${UPDATED_MARK})`);
+      } else {
+        mods.push(mod);
+        imported++;
+      }
+      byIdentity.set(scriptIdentity({ downloadUrl: mod.downloadUrl, raw: parseHeader(mod.source).raw, name: mod.name }), mod);
     } catch (e) {
       skipped.push(`${s.name} (${e instanceof Error ? e.message : String(e)})`);
     }
@@ -323,7 +370,12 @@ async function importBackup(req: { json: string } | { zipBase64: string }): Prom
 
 // ---------- GM API host ----------
 
-/** Re-register a mod shortly after its GM store changes, so the next page load sees new values. */
+/**
+ * Re-register a mod after its GM store changes, so a page loaded later sees the new values.
+ * Only that mod is updated: a full syncRegistrations() unregisters and re-registers every script,
+ * which is both slower and a window in which nothing is registered. Install, delete and toggle
+ * still go through the full sync, because those change which scripts exist.
+ */
 const gmResyncTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 function scheduleResync(modId: string): void {
@@ -332,9 +384,65 @@ function scheduleResync(modId: string): void {
     modId,
     setTimeout(() => {
       gmResyncTimers.delete(modId);
-      void syncRegistrations();
+      void resyncOne(modId);
     }, 500),
   );
+}
+
+async function resyncOne(modId: string): Promise<void> {
+  if (!userScriptsAvailable()) return;
+  try {
+    const mod = (await loadMods()).find((m) => m.id === modId);
+    const registered = (await chrome.userScripts.getScripts({ ids: [modId] })).length > 0;
+    const plan = resyncPlan(mod, registered);
+    if (plan === 'none') return;
+    if (plan === 'full') return void (await syncRegistrations());
+    await chrome.userScripts.update([{ id: modId, js: [{ code: buildRegisteredCode(mod!, await loadGmValues(modId)) }] }]);
+  } catch (e) {
+    console.warn('[usermods] resync', modId, e);
+  }
+}
+
+// ---------- live GM value changes (CONTRACT C3) ----------
+
+/**
+ * Open ports, per mod. A registered script in the USER_SCRIPT world connects as `gm:<modId>`;
+ * when one frame writes a value, every OTHER frame running that mod is told, so
+ * GM_addValueChangeListener fires with remote: true the way Tampermonkey's does.
+ */
+const gmPorts = new Map<string, Set<chrome.runtime.Port>>();
+
+function registerGmPort(port: chrome.runtime.Port): void {
+  const modId = port.name.slice('gm:'.length);
+  if (!modId) return;
+  let set = gmPorts.get(modId);
+  if (!set) gmPorts.set(modId, (set = new Set()));
+  set.add(port);
+  port.onDisconnect.addListener(() => {
+    const current = gmPorts.get(modId);
+    if (!current) return;
+    current.delete(port);
+    if (!current.size) gmPorts.delete(modId);
+  });
+}
+
+function broadcastValueChange(modId: string, key: string, oldValue: unknown, newValue: unknown, from: chrome.runtime.Port | null): void {
+  for (const port of gmPorts.get(modId) ?? []) {
+    if (port === from) continue;
+    try {
+      port.postMessage({ type: 'gm.valueChanged', key, oldValue, newValue, remote: true });
+    } catch {
+      /* the frame went away; onDisconnect will clean it up */
+    }
+  }
+}
+
+/** The port belonging to the frame this message came from, so it is not told about its own write. */
+function portForSender(modId: string, sender: chrome.runtime.MessageSender): chrome.runtime.Port | null {
+  for (const port of gmPorts.get(modId) ?? []) {
+    if (port.sender?.tab?.id === sender.tab?.id && port.sender?.frameId === sender.frameId) return port;
+  }
+  return null;
 }
 
 async function handleGm(msg: GmMessage, sender: chrome.runtime.MessageSender): Promise<unknown> {
@@ -343,15 +451,23 @@ async function handleGm(msg: GmMessage, sender: chrome.runtime.MessageSender): P
     case 'gm.deleteValue': {
       const key = gmValuesKey(msg.modId);
       const values = await loadGmValues(msg.modId);
-      if (msg.type === 'gm.setValue') values[String(msg.key)] = msg.value;
-      else delete values[String(msg.key)];
+      const name = String(msg.key);
+      const oldValue = values[name];
+      if (msg.type === 'gm.setValue') values[name] = msg.value;
+      else delete values[name];
       await chrome.storage.local.set({ [key]: values });
+      broadcastValueChange(msg.modId, name, oldValue, msg.type === 'gm.setValue' ? msg.value : undefined, portForSender(msg.modId, sender));
       scheduleResync(msg.modId);
       return true;
     }
     case 'gm.xhr': {
       const d = msg.details;
       if (!d?.url) throw new Error('GM_xmlhttpRequest needs a url');
+      // @connect gates which hosts a script may reach (CONTRACT C1). A script that declared
+      // nothing can still talk to the sites it runs on only if it said "self".
+      const mod = (await loadMods()).find((m) => m.id === msg.modId);
+      const check = checkConnect(d.url, connectOf(mod), mod ? [...mod.matches, ...mod.includeGlobs] : []);
+      if (!check.allowed) throw new Error(check.reason);
       const controller = new AbortController();
       const timer = d.timeout ? setTimeout(() => controller.abort(), d.timeout) : undefined;
       try {
@@ -362,8 +478,15 @@ async function handleGm(msg: GmMessage, sender: chrome.runtime.MessageSender): P
           signal: controller.signal,
           credentials: 'omit',
         });
-        const responseText = await res.text();
         const responseHeaders = [...res.headers.entries()].map(([k, v]) => `${k}: ${v}`).join('\r\n');
+        const base = { status: res.status, statusText: res.statusText, responseHeaders, finalUrl: res.url || d.url };
+        // Binary responses cannot cross the messaging boundary, so they travel as base64 and the
+        // shim rebuilds the ArrayBuffer or Blob on the other side (CONTRACT C2).
+        if (d.responseType === 'arraybuffer' || d.responseType === 'blob') {
+          const buf = new Uint8Array(await res.arrayBuffer());
+          return { ...base, base64: toBase64(buf) };
+        }
+        const responseText = await res.text();
         let response: unknown = responseText;
         if (d.responseType === 'json') {
           try {
@@ -372,7 +495,8 @@ async function handleGm(msg: GmMessage, sender: chrome.runtime.MessageSender): P
             response = null;
           }
         }
-        return { status: res.status, statusText: res.statusText, responseHeaders, responseText, response, finalUrl: res.url || d.url };
+        // 'document' and '' both come back as text; the shim runs DOMParser where it can.
+        return { ...base, responseText, response };
       } finally {
         clearTimeout(timer);
       }

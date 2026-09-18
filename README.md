@@ -118,7 +118,7 @@ usermods runs ordinary userscripts, so you can bring in scripts from Greasy Fork
 
 **Install from a URL.** Paste a `.user.js` URL into *Install from URL* in the Mods tab and click **Fetch**. You get a preview — name, version, what it matches, which `GM_*` permissions it asks for, the libraries it loads, and the full source — before anything is saved.
 
-**Click a `.user.js` link.** usermods redirects `.user.js` navigations to its own install page, the way Tampermonkey does, so clicking an install link on Greasy Fork shows the same preview instead of a wall of raw JavaScript.
+**Click a `.user.js` link.** usermods redirects `.user.js` navigations to its own install page, the way Tampermonkey does, so clicking an install link on Greasy Fork shows the same preview instead of a wall of raw JavaScript. The script's URL travels in the install page's fragment (`install.html#https://…`) and everything after the first `#` is taken verbatim, so a link whose own query string carries another `url=` cannot change which script is previewed. The page shows the exact URL it is about to fetch, and refuses anything that is not `http`/`https`.
 
 **Import a file.** *Import file* in the Mods tab takes a `.user.js` file from disk through the same preview.
 
@@ -133,7 +133,9 @@ Chrome extensions cannot read each other's storage, so migration goes through Ta
 3. Under **File**, click **Export** to save the backup (`.zip` or `.json`).
 4. In usermods, open the **Mods** tab, expand **Migrate from Tampermonkey**, and pick that file.
 
-Both export shapes work: the JSON document (an object with a `scripts` array) and the ZIP (one `.user.js` per script plus its `.options.json` and `.storage.json` sidecars, or the older JSON-in-`.txt` entries). Each script comes across with its enabled/disabled state, its `GM_setValue` store and its update URL. Scripts already installed at the same name and version are skipped, and the import reports how many came in and what it passed over.
+Both export shapes work: the JSON document (an object with a `scripts` array) and the ZIP (one `.user.js` per script plus its `.options.json` and `.storage.json` sidecars, or the older JSON-in-`.txt` entries). Each script comes across with its enabled/disabled state, its `GM_setValue` store and its update URL.
+
+A script already installed is recognised by its `@downloadURL`, or by `@namespace` + `@name` when it has none — not by name and version, so a newer version of a script you already have updates it in place instead of installing a second copy beside it. Updating in place keeps the mod's id, its registration and its existing stored values, with the backup's values merged over the top for the keys the backup carries. The import reports how many scripts came in, how many were updated, and what it could not read.
 
 ### GM API compatibility
 
@@ -141,16 +143,20 @@ Both export shapes work: the JSON document (an object with a `scripts` array) an
 |---|---|
 | `GM_info` / `GM.info` | Supported |
 | `GM_addStyle`, `GM_addElement` | Supported |
-| `GM_getValue`, `GM_setValue`, `GM_deleteValue`, `GM_listValues` (and `GM.*`) | Supported. Reads come from a snapshot taken when the script was registered; writes persist and re-register the script, so the new value is visible on the next page load. |
+| `GM_getValue`, `GM_setValue`, `GM_deleteValue`, `GM_listValues` (and `GM.*`) | Supported. Reads come from a snapshot taken when the script was registered, kept current by writes from any tab (see `GM_addValueChangeListener`). A write persists and re-registers that one script — not the whole library — so the next page load starts from the new value. |
 | `GM_getResourceText`, `GM_getResourceURL` | Supported, from `@resource` files fetched at install time |
-| `GM_xmlhttpRequest` / `GM.xmlHttpRequest` | Supported, cross-origin, via the background worker. `onload`, `onerror`, `onloadend` and `abort()` work; streaming and upload progress events do not. |
+| `GM_xmlhttpRequest` / `GM.xmlHttpRequest` | Supported, cross-origin, via the background worker, subject to `@connect` (below). `onload`, `onerror`, `onloadend` and `abort()` work; streaming and upload progress events do not. `responseType` is honoured: `arraybuffer` and `blob` cross the worker boundary as base64 and are rebuilt in the page, `json` is parsed, and `document` is parsed with `DOMParser` into both `response` and `responseXML`. |
 | `GM_openInTab` / `GM.openInTab` | Supported. The returned handle is a stub: `close()` does nothing. |
 | `GM_setClipboard`, `GM_log` | Supported |
 | `GM_registerMenuCommand`, `GM_unregisterMenuCommand` | **Stub.** Commands are recorded but there is no menu UI to invoke them. |
 | `GM_notification` / `GM.notification` | **Stub.** Logs to the console instead of showing a desktop notification. |
 | `GM_getTab`, `GM_saveTab`, `GM_getTabs` | **Stub.** Return empty objects. |
-| `GM_addValueChangeListener`, `GM_removeValueChangeListener` | **Stub.** Never fire. |
+| `GM_addValueChangeListener`, `GM_removeValueChangeListener` | Supported for scripts in the `USER_SCRIPT` world. A write from one tab reaches the same mod running in every other tab, with `remote: true`. `MAIN`-world scripts cannot listen, since they have no extension messaging. |
 | `GM_download`, `GM_cookie`, `GM_webRequest` | Not implemented |
+
+#### `@connect`
+
+`GM_xmlhttpRequest` is cross-origin, so a script may only reach the hosts its header declares. A request is allowed when its host equals or is a subdomain of a `@connect` entry, when the script declared `@connect *`, or when it declared `@connect self` and the host is one the script's own `@match`/`@include` lines cover (a `*://*.example.com/*` pattern covers `example.com` and its subdomains; a script matching every site gains nothing from `self`). Anything else is refused with an error naming the host and the `// @connect <host>` line that would permit it. The install preview lists the `@connect` entries next to the `GM_*` permissions, so you can see what a script intends to talk to before it is saved.
 
 `@grant none` and `unsafeWindow` scripts run in the page's **MAIN** world, where they share globals with the page — which is what those scripts want. The trade-off is that extension messaging is unavailable there, so `GM_setValue` writes from a MAIN-world script update the in-page copy but **cannot be persisted**. Mod cards and the install preview mark those scripts with a *page world* badge. Everything else runs in Chrome's isolated `USER_SCRIPT` world.
 

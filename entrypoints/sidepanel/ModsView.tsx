@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { summarizeImport } from '@/lib/importreport';
 import { rpc } from '@/lib/rpc';
 import type { Mod, ScriptPreview } from '@/lib/types';
 import { urlMatches } from '@/lib/mods';
@@ -117,7 +118,7 @@ export function ModsView({ tabId, pageUrl }: { tabId: number | null; pageUrl: st
       <TampermonkeyCard
         onImported={(r) => {
           setMods(r.mods);
-          setStatus(`Imported ${r.imported} script${r.imported === 1 ? '' : 's'}.${r.skipped.length ? ` Skipped: ${r.skipped.join('; ')}` : ''}`);
+          setStatus(summarizeImport(r));
         }}
         onError={fail}
       />

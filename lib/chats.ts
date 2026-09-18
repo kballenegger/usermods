@@ -136,6 +136,20 @@ export function slimMessages(messages: Msg[]): Msg[] {
   }));
 }
 
+/**
+ * The history to persist when a run failed before runAgent could return one: everything that was
+ * already there, plus the user's turn, so the conversation survives a provider error. The turn is
+ * not appended twice if a retry already recorded identical text at the end.
+ */
+export function appendTurn(history: Msg[], turn: { text: string }): Msg[] {
+  const text = turn.text.trim();
+  if (!text) return [...history];
+  const last = history[history.length - 1];
+  const lastText = last?.role === 'user' ? last.content.find((p) => p.type === 'text')?.text?.trim() : undefined;
+  if (lastText === text) return [...history];
+  return [...history, { role: 'user', content: [{ type: 'text', text: turn.text }] }];
+}
+
 export async function saveMessages(id: string, messages: Msg[]): Promise<void> {
   await chrome.storage.local.set({ [messagesKey(id)]: slimMessages(messages) });
 }
