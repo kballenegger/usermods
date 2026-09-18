@@ -1,0 +1,64 @@
+:root {
+  color-scheme: light dark;
+  --bg: #fafaf9;
+  --fg: #1c1917;
+  --muted: #78716c;
+  --border: #e7e5e4;
+  --card: #ffffff;
+  --accent: #d97706;
+  --accent-fg: #fff;
+  --danger: #dc2626;
+  --code-bg: #f5f5f4;
+  font: 13px/1.45 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1c1917;
+    --fg: #f5f5f4;
+    --muted: #a8a29e;
+    --border: #44403c;
+    --card: #292524;
+    --accent: #f59e0b;
+    --accent-fg: #1c1917;
+    --code-bg: #0c0a09;
+  }
+}
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--fg); }
+.app { display: flex; flex-direction: column; height: 100%; }
+.tabs { display: flex; border-bottom: 1px solid var(--border); padding: 0 8px; gap: 2px; }
+.tabs button { background: none; border: 0; border-bottom: 2px solid transparent; color: var(--muted); padding: 10px 10px 8px; font: inherit; cursor: pointer; }
+.tabs button.active { color: var(--fg); border-bottom-color: var(--accent); }
+.tabs .spacer { flex: 1; }
+.tabs .status { align-self: center; font-size: 11px; color: var(--muted); padding-right: 6px; }
+.view { flex: 1; overflow: auto; padding: 12px; }
+.chat { display: flex; flex-direction: column; height: 100%; }
+.messages { flex: 1; overflow: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.msg { max-width: 100%; white-space: pre-wrap; word-break: break-word; }
+.msg.user { align-self: flex-end; background: var(--card); border: 1px solid var(--border); border-radius: 12px 12px 2px 12px; padding: 8px 10px; max-width: 90%; }
+.msg.assistant { padding: 0 2px; }
+.tool { font-size: 12px; color: var(--muted); border-left: 2px solid var(--border); padding: 2px 8px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.tool.error { border-left-color: var(--danger); }
+.tool summary { cursor: pointer; list-style: none; }
+.tool pre { margin: 4px 0 0; white-space: pre-wrap; max-height: 200px; overflow: auto; }
+.composer { border-top: 1px solid var(--border); padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+.composer textarea { width: 100%; resize: none; font: inherit; background: var(--card); color: var(--fg); border: 1px solid var(--border); border-radius: 8px; padding: 8px; min-height: 60px; }
+.row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.row .grow { flex: 1; }
+button.btn { font: inherit; border: 1px solid var(--border); background: var(--card); color: var(--fg); border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+button.btn.primary { background: var(--accent); color: var(--accent-fg); border-color: transparent; }
+button.btn.danger { color: var(--danger); }
+button.btn:disabled { opacity: 0.5; cursor: default; }
+.chip { font-size: 11px; background: var(--code-bg); border: 1px solid var(--border); border-radius: 999px; padding: 2px 8px; font-family: ui-monospace, monospace; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+.card h4 { margin: 0; font-size: 13px; }
+.card .desc { color: var(--muted); }
+.card pre { margin: 0; background: var(--code-bg); border-radius: 6px; padding: 8px; font-size: 11.5px; overflow: auto; max-height: 260px; }
+.error { color: var(--danger); font-size: 12px; }
+.muted { color: var(--muted); }
+.empty { color: var(--muted); text-align: center; padding: 30px 10px; }
+.list { display: flex; flex-direction: column; gap: 8px; }
+label.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; font-size: 12px; color: var(--muted); }
+label.field input, label.field select { font: inherit; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); color: var(--fg); }
+.notice { background: var(--card); border: 1px solid var(--accent); border-radius: 8px; padding: 10px; margin-bottom: 10px; font-size: 12px; white-space: pre-wrap; }
