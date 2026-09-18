@@ -1,7 +1,17 @@
 import { defineConfig } from 'wxt';
 
+/**
+ * The Chrome Web Store build drops subscription sign-in; see lib/buildflags.ts. Set by
+ * `npm run build:store` / `npm run zip:store`. A literal define, so the bundler folds the flag
+ * and tree-shakes lib/oauth out of the store build entirely.
+ */
+const storeBuild = process.env.USERMODS_STORE === '1';
+
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
+  vite: () => ({
+    define: { __STORE_BUILD__: JSON.stringify(storeBuild) },
+  }),
   manifest: {
     name: 'usermods',
     description:
