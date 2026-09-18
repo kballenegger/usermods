@@ -494,7 +494,7 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
         {/* Until the lookup resolves we do not know whether this host has a chat to restore, so
             neither the empty state nor a transcript is shown — the panel must not flash "describe
             how you want this page to change" over a conversation that is about to appear. */}
-        {!loaded && !unsupported && <div className="empty muted">Loading…</div>}
+        {!loaded && !unsupported && <div className="empty muted">loading…</div>}
         {loaded && items.length === 0 && (
           <div className="empty">
             {unsupported ? (

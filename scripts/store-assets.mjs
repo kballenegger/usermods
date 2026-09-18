@@ -152,7 +152,9 @@ async function openPanel(ctx, extId, { settings = {}, storage = {} } = {}) {
   await page.goto(`chrome-extension://${extId}/sidepanel.html`);
   await page.evaluate(
     async ([s, extra]) => {
-      await chrome.storage.local.set({ settings: s, ...extra });
+      // consent: the first-run data notice, acknowledged. Without it the notice stands in for the
+      // chat and there is no composer to drive — the same seeding scripts/screenshots.mjs does.
+      await chrome.storage.local.set({ settings: s, consent: { version: 1, acceptedAt: Date.now() }, ...extra });
     },
     [{ provider: 'openai-compatible', baseUrl: BASE_URL, apiKey: '', model: 'demo', ...settings }, storage],
   );
@@ -269,10 +271,11 @@ async function composite(browser, { left, right, url, title, caption, out }) {
       .panes{height:${PANE_H}px;display:flex;overflow:hidden;background:#fff}
       .pane{display:block;height:${PANE_H}px;object-fit:cover;object-position:top left}
       .divider{border-left:1px solid #d6d3d1}
+      /* The caption bar is usermods speaking, so it wears the app's own charcoal and volt. */
       .caption{height:${CAPTION_H}px;display:flex;flex-direction:column;justify-content:center;
-               padding:0 24px;background:#1c1917;color:#fafaf9}
+               padding:0 24px;background:#0A0D0B;color:#E8EDE8}
       .caption b{font-size:15px;font-weight:600}
-      .caption span{font-size:12.5px;color:#a8a29e;margin-top:2px}
+      .caption span{font-size:12.5px;color:#8A948B;margin-top:2px}
     </style></head><body>
       <div class="chrome">
         <div class="dot" style="background:#f87171"></div>
@@ -450,7 +453,7 @@ async function shotMigrate(b, composer) {
 
 /**
  * Both promo images are the same composition at two aspect ratios: the icon, the name, the
- * tagline, on the UI's dark ink with the amber accent. `scale` moves every dimension together
+ * tagline, on the UI's charcoal with the volt accent. `scale` moves every dimension together
  * so the 440x280 tile is not just the marquee with smaller text in a big empty field.
  */
 async function promo(browser, { size, out, scale, tagline, sub }) {
@@ -462,19 +465,20 @@ async function promo(browser, { size, out, scale, tagline, sub }) {
       html,body{margin:0;padding:0;width:${size.width}px;height:${size.height}px;overflow:hidden}
       /* A grid with one centered cell fills the frame exactly, so the block is optically
          centered at both aspect ratios rather than floating above a dead band.
-         The amber glow is centred on the composition rather than the top-left corner: an
+         The volt glow is centred on the composition rather than the top-left corner: an
          off-centre wash pulls the eye up and makes the lower half read as dead space. */
-      body{font-family:${FONT};background:#1c1917;color:#fafaf9;display:grid;place-items:center;
+      body{font-family:${FONT};background:#0A0D0B;color:#E8EDE8;display:grid;place-items:center;
            background-image:
-             radial-gradient(70% 90% at 50% 46%, rgba(245,158,11,0.17), transparent 70%),
-             radial-gradient(90% 70% at 8% 4%, rgba(245,158,11,0.10), transparent 60%);}
+             radial-gradient(70% 90% at 50% 46%, rgba(200,255,46,0.15), transparent 70%),
+             radial-gradient(90% 70% at 8% 4%, rgba(200,255,46,0.08), transparent 60%);}
       .stack{display:flex;flex-direction:column;align-items:center;text-align:center;
              padding:0 ${px(28)}}
       img{width:${px(104)};height:${px(104)};display:block;margin-bottom:${px(22)}}
       h1{margin:0;font-size:${px(60)};font-weight:650;letter-spacing:-0.025em;line-height:1}
-      p{margin:${px(14)} 0 0;font-size:${px(26)};font-weight:450;color:#f59e0b;line-height:1.25;
+      /* The tagline is the one volt line: the accent carries it, and only it. */
+      p{margin:${px(14)} 0 0;font-size:${px(26)};font-weight:450;color:#C8FF2E;line-height:1.25;
         max-width:${px(860)}}
-      small{display:block;margin-top:${px(16)};font-size:${px(17)};color:#a8a29e;line-height:1.4;
+      small{display:block;margin-top:${px(16)};font-size:${px(17)};color:#8A948B;line-height:1.4;
             max-width:${px(680)}}
     </style></head><body>
       <div class="stack">
