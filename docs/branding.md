@@ -31,11 +31,17 @@ The generated banner has texture and color variation; these are consistent imple
 ## Assets installed
 
 - `docs/banner.png` — canonical full-width README banner, 2171 × 724.
-- `assets/icon.svg` — editable canonical icon on a 16-unit grid, no fonts or filters.
+- `assets/icon-source.png` — the owner's original artwork, 256 × 256, kept byte for byte. A true
+  16 × 16 grid at 16px per block, RGBA, with genuinely transparent corners and exactly five
+  colours: the blue, lime, cyan and ink above, plus transparent.
+- `assets/icon.svg` — editable canonical icon on a 16-unit grid, no fonts or filters. Verified to
+  render pixel-for-pixel identical to `icon-source.png` at 256 × 256 (0 differing pixels of 65,536).
 - `public/icon/{16,32,48,96,128}.png` — extension icons, rendered independently at each size.
 - `docs/branding/icon-1024.png` — large PNG for avatars and external branding.
+- `assets/icon-alternates/` — superseded explorations, including
+  `h-volt-window-brace-shipped.svg`, the window-and-brace mark this replaced.
 
-Regenerate the extension PNGs after changing the SVG:
+Regenerate the extension PNGs (and `icon-1024.png`) after changing the SVG:
 
 ```sh
 node scripts/render-icons.mjs
@@ -43,9 +49,36 @@ node scripts/render-icons.mjs
 
 Preserve the square pixel grid and hard edges. Prefer the SVG or an exact-size PNG rather than a softened rescale. Leave space around the mark; avoid adding the full wordmark, mascot, or tiny details inside toolbar icons.
 
-## Handoff for the local worker
+The script enforces that rather than trusting it: it re-reads everything it wrote and fails if a
+file is off by a pixel, or if any output pixel is a colour that is **not** in `icon-source.png`.
+Interpolated rescaling is the one failure mode that never shows up in a diff — a `sips`-scaled
+48px icon trips this check with 138 invented colours. Draw the mark only at whole multiples of 16,
+and use `image-rendering: pixelated` wherever CSS scales it, or HiDPI will smooth the edges back off.
 
-The canonical banner, primary icon, extension PNGs and README header are installed. The broader interface still uses the previous design and needs a coordinated follow-up:
+## Brand marks in the product — done
+
+The mark now appears on every surface that had one or should have had one:
+
+- **Toolbar and manifest.** All five sizes in `icons`, and an explicit `action.default_icon`, so
+  Chrome picks the real 16/32 pixel renders instead of downscaling the 128.
+- **Favicons** on all three extension pages — side panel, dashboard, install.
+- **Dashboard and install headers.** Both showed the wordmark in plain type because there was no
+  logo; both now carry the mark beside it, at 32px and 16px respectively, with
+  `image-rendering: pixelated`. Checked in light and dark; the mark brings its own blue tile, so
+  it needs no per-theme variant.
+- **Store promo tile and marquee** (`scripts/store-assets.mjs`), rebuilt in this brand rather than
+  the in-product charcoal, since they sit beside the banner in the listing.
+- **`docs/store/listing.md`** describes the mark and the no-interpolation rule.
+
+The five store screenshots keep the neutral window frame and charcoal caption bar: the pixels
+inside the frame are real product output, and the frame is deliberately quiet so it does not
+compete with them.
+
+## Remaining follow-up — the app UI itself
+
+**Pending owner confirmation.** Restyling the interface would replace the current Volt OS look and
+the light mode added the day before this decision, so it is deliberately *not* part of the icon
+work and is being confirmed with Kenneth separately before anyone starts:
 
 1. Apply this BBS direction to the side panel, dashboard, install flow and shared branding surfaces. Start with `entrypoints/sidepanel/tokens.css`, then the corresponding styles and brand marks.
 2. Preserve usable light/dark themes and current functionality. Validate contrast and focus states as tokens change; keep dense content readable.
