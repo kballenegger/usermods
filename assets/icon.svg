@@ -1,33 +1,9 @@
-<!--
-  usermods icon — "a site being modded".
-
-  A volt browser window with a charcoal code brace in its content area: a site, with a script
-  inside it. Design constraints that shaped it, in order of how much they cost:
-
-  - The silhouette is VOLT (#C8FF2E), not dark ink. Chrome's toolbar is dark in dark mode and
-    light in light mode, so a dark-ink body dissolves against one of them. Making the chromatic
-    colour carry the shape is what keeps the mark readable on both (see assets/icon-alternates/c,
-    which is the same idea in dark ink and disappears on a dark toolbar). Volt is the Volt OS
-    accent, and it is the one colour in the system that is allowed to carry this much weight.
-  - The title bar is a DEEPER VOLT band (#AEE822), not black. At 128px a black band looks fine;
-    at 16px it is one solid row of near-black across the top quarter of the mark and it reads as
-    damage. A tonal band separates window from content without spending contrast.
-  - One dot, not three. Three dots at 16px land on ~1px each and alias into a grey smear; one
-    dot at this radius stays a dot.
-  - The braces are stroke-width 11 with the arms pulled apart (the centre cusp reaches x=42/x=86
-    rather than meeting near the middle). Thinner arms or a tighter gap and the counter between
-    them closes up at 16px, which is what the first version of this did.
-  - The ink is the app's own charcoal (#0A0D0B) rather than a neutral black, so the mark is made
-    of the same two colours as every surface in the extension.
-
-  Rendered to public/icon/{16,32,48,96,128}.png by scripts/render-icons.mjs. Edit here, not there.
--->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
-  <rect x="10" y="16" width="108" height="96" rx="22" fill="#C8FF2E"/>
-  <path d="M10 38 a22 22 0 0 1 22-22 h64 a22 22 0 0 1 22 22 z" fill="#AEE822"/>
-  <circle cx="30" cy="27" r="5.5" fill="#0A0D0B"/>
-  <path d="M56 52 q-12 0 -12 12 v5 q0 7 -8 7 q8 0 8 7 v5 q0 12 12 12"
-        fill="none" stroke="#0A0D0B" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M80 52 q12 0 12 12 v5 q0 7 8 7 q-8 0 -8 7 v5 q0 12 -12 12"
-        fill="none" stroke="#0A0D0B" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+<!-- usermods canonical BBS Underground icon. 16-unit pixel grid; no fonts or filters. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 16 16" shape-rendering="crispEdges" role="img" aria-labelledby="title desc">
+  <title id="title">usermods</title>
+  <desc id="desc">A lime pixel u with a cyan lower edge and black shadow on an electric-blue tile.</desc>
+  <path fill="#1008C8" d="M1 0h14v1h1v14h-1v1H1v-1H0V1h1z"/>
+  <path fill="#030B16" stroke="#030B16" stroke-width="2" stroke-linejoin="miter" d="M3 4h3v6h1v1h2v-1h1V4h3v9H5v-1H3z"/>
+  <path fill="#00E5F2" d="M3 4h3v6h1v1h2v-1h1V4h3v9H5v-1H3z"/>
+  <path fill="#AEFF24" d="M3 3h3v6h1v1h2V9h1V3h3v9H5v-1H3z"/>
 </svg>
