@@ -100,6 +100,10 @@ side panel (React)  ──rpc──▶  background service worker  ──▶  LL
 - CSS-only mods via a `@usermods-style` header, so pure restyles need no JavaScript.
 - Firefox, once its side panel story is settled.
 
+## Author
+
+Made by [Kenneth Ballenegger](https://github.com/kballenegger).
+
 ## License
 
-MIT
+MIT © Kenneth Ballenegger
