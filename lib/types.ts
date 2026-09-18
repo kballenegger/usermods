@@ -99,7 +99,11 @@ export interface ModProposal {
 }
 
 // Events streamed from the background agent loop to the side panel over a Port.
-export type AgentEvent =
+//
+// The port is only a transport: one panel carries the events of every chat that is running, so
+// every event says which chat it belongs to. The agent loop emits AgentEventBody and the
+// background stamps `chatId` on at its single post() chokepoint, so no emitter can forget it.
+export type AgentEventBody =
   | { type: 'text'; delta: string }
   | { type: 'tool_call'; id: string; name: string; input: Record<string, unknown> }
   | { type: 'tool_result'; id: string; summary: string; isError: boolean }
@@ -110,6 +114,9 @@ export type AgentEvent =
   | { type: 'unqueued'; id: string }
   | { type: 'done' }
   | { type: 'error'; message: string };
+
+/** An event as it travels over the port: a body plus the chat it belongs to. */
+export type AgentEvent = AgentEventBody & { chatId: string };
 
 /**
  * One row of the side-panel transcript. Stored as-is in chrome.storage.local, so every member

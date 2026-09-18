@@ -1,5 +1,5 @@
 import { createProvider } from '../providers';
-import type { AgentEvent, ElementRef, ModProposal, Msg, Part, Settings, UserTurn } from '../types';
+import type { AgentEventBody, ElementRef, ModProposal, Msg, Part, Settings, UserTurn } from '../types';
 import { SYSTEM_PROMPT } from './prompt';
 import { TOOLS } from './tools';
 
@@ -20,7 +20,7 @@ export interface AgentInput {
   /** Messages the user sent while this run was in progress. Drained between model calls. */
   pullQueued: () => UserTurn[];
   env: AgentEnv;
-  emit: (e: AgentEvent) => void;
+  emit: (e: AgentEventBody) => void;
   signal: AbortSignal;
 }
 
@@ -124,7 +124,7 @@ async function executeTool(
   name: string,
   input: Record<string, unknown>,
   env: AgentEnv,
-  emit: (e: AgentEvent) => void,
+  emit: (e: AgentEventBody) => void,
 ): Promise<{ content: Part[]; isError?: boolean }> {
   try {
     switch (name) {

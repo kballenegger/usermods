@@ -19,6 +19,7 @@
     "screenshots": "wxt build && node scripts/screenshots.mjs",
     "smoke": "wxt build && node scripts/screenshots.mjs --smoke",
     "smoke:chats": "wxt build && node scripts/screenshots.mjs --chats",
+    "smoke:isolation": "wxt build && node scripts/screenshots.mjs --isolation",
     "store-assets": "wxt build && node scripts/store-assets.mjs"
   },
   "dependencies": {

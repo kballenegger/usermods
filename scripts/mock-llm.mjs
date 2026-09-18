@@ -9,6 +9,10 @@
 //        -> text/event-stream of `data: {choices:[{delta:{...}, finish_reason}]}` lines,
 //           terminated by `data: [DONE]`.
 //   GET  /v1/models            -> {data: [{id}, ...]}  (Settings' "Fetch models" button)
+//   GET  /__requests           -> {requests: [{at, script, messages}, ...]}  every body received,
+//        DELETE /__requests    in order; the isolation flow reads this back to prove that one
+//                              chat's user text never entered another chat's model conversation.
+//                              DELETE empties the log.
 //
 // Scripting. A conversation is picked by matching the FIRST user message in the request against
 // a script's `match` regex; the agent prefixes each turn with "[Current page: <title> — <url>]",
@@ -26,6 +30,16 @@ import http from 'node:http';
 // ---------------------------------------------------------------------------
 // Scripted conversations
 // ---------------------------------------------------------------------------
+
+/**
+ * The two markers the isolation flow asserts on. Each appears in exactly one script's output, so
+ * finding one in the other chat's transcript is proof of a leak and nothing else.
+ */
+export const SLOW_MARKER = 'SLOWMARKER-6f3a';
+export const FAST_MARKER = 'FASTMARKER-b21c';
+
+/** How long the slow conversation holds its first byte, so a run is demonstrably still in flight. */
+const FIRST_BYTE_MS = Number(process.env.MOCK_LLM_SLOW_MS ?? 4000);
 
 /**
  * Each step is one assistant turn: `text` streams out as content deltas, `calls` become tool_calls.
@@ -169,6 +183,39 @@ setTimeout(() => observer.disconnect(), 10000);`,
       },
     ],
   },
+
+  // ---------------------------------------------------------------------------
+  // The chat-isolation flow (screenshots.mjs --isolation). Two conversations whose output cannot
+  // be mistaken for one another, and one of them is slow enough to still be streaming while the
+  // user has moved to another tab and started the other.
+  // ---------------------------------------------------------------------------
+  {
+    name: 'isolation-slow',
+    match: /walk the ancestry of the slow marker/i,
+    // First byte only after FIRST_BYTE_MS, so the panel is still waiting when the user switches.
+    slowFirstByte: true,
+    steps: [
+      {
+        text: `${SLOW_MARKER} step one: reading the page before I touch anything.`,
+        calls: [{ name: 'get_page', args: { max_chars: 4000 } }],
+      },
+      {
+        text: `${SLOW_MARKER} step two: the selectors check out, here is the rest of the answer.`,
+        calls: [],
+      },
+    ],
+  },
+
+  {
+    name: 'isolation-fast',
+    match: /name the fast marker/i,
+    steps: [
+      {
+        text: `${FAST_MARKER} answered immediately, in a different chat on a different site.`,
+        calls: [],
+      },
+    ],
+  },
 ];
 
 /** A fallback so an unscripted message still produces something sane instead of hanging. */
@@ -199,15 +246,27 @@ function stepFor(script, messages) {
   return script.steps[Math.min(turns, script.steps.length - 1)];
 }
 
+/**
+ * Every chat-completions body this server has been handed, in order. The isolation flow reads this
+ * back over GET /__requests to prove the two conversations never saw each other's text — a leak
+ * that the transcripts alone could hide, because injecting B's message into A's model history is
+ * invisible on screen until the model answers the wrong question.
+ */
+const requests = [];
+
 function sse(res, obj) {
   res.write(`data: ${JSON.stringify(obj)}\n\n`);
 }
 
 /** Stream one scripted step as chat-completion chunks, the way a real backend would. */
-async function streamStep(res, step, model) {
+async function streamStep(res, step, model, { slowFirstByte = false } = {}) {
   const id = `chatcmpl-mock-${Date.now()}`;
   const base = { id, object: 'chat.completion.chunk', created: Math.floor(Date.now() / 1000), model };
   const chunk = (delta, finish_reason = null) => sse(res, { ...base, choices: [{ index: 0, delta, finish_reason }] });
+
+  // A slow conversation holds its first byte, so the run is demonstrably still in flight while the
+  // test switches tabs and starts the other chat.
+  if (slowFirstByte) await sleep(FIRST_BYTE_MS);
 
   chunk({ role: 'assistant' });
 
@@ -261,6 +320,18 @@ const server = http.createServer(async (req, res) => {
 
   const url = new URL(req.url, 'http://localhost');
 
+  // The recorded request log, for the isolation flow's cross-conversation assertions.
+  if (url.pathname === '/__requests') {
+    if (req.method === 'DELETE') {
+      requests.length = 0;
+      res.writeHead(204).end();
+      return;
+    }
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ requests }));
+    return;
+  }
+
   if (url.pathname.endsWith('/models')) {
     res.writeHead(200, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ object: 'list', data: [{ id: 'demo' }, { id: 'demo-mini' }] }));
@@ -279,6 +350,8 @@ const server = http.createServer(async (req, res) => {
     const messages = body.messages ?? [];
     const script = pickScript(messages);
     const step = stepFor(script, messages);
+    // Recorded before anything is streamed, so a hung run still leaves its evidence behind.
+    requests.push({ at: Date.now(), script: script.name ?? 'fallback', messages });
     if (process.env.MOCK_LLM_VERBOSE) {
       console.log(`[mock-llm] ${script.name ?? 'fallback'} step ${script.steps.indexOf(step)}: ${(step.calls ?? []).map((c) => c.name).join(', ') || 'text only'}`);
     }
@@ -287,7 +360,7 @@ const server = http.createServer(async (req, res) => {
       'cache-control': 'no-cache',
       connection: 'keep-alive',
     });
-    await streamStep(res, step, body.model ?? 'demo');
+    await streamStep(res, step, body.model ?? 'demo', { slowFirstByte: !!script.slowFirstByte });
     return;
   }
 
@@ -295,10 +368,15 @@ const server = http.createServer(async (req, res) => {
   res.end(JSON.stringify({ error: { message: `no route for ${req.method} ${url.pathname}` } }));
 });
 
-const port = Number(process.env.MOCK_LLM_PORT ?? process.argv[2] ?? 8791);
-server.listen(port, '127.0.0.1', () => {
-  // screenshots.mjs waits for this line before launching the browser.
-  console.log(`mock-llm listening on http://127.0.0.1:${port}/v1`);
-});
+// Only listen when this file is the program. screenshots.mjs imports it for SLOW_MARKER and
+// FAST_MARKER — the markers must be defined in exactly one place, or the assertions could drift
+// away from what the server actually streams — and an import must not bind a port.
+if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+  const port = Number(process.env.MOCK_LLM_PORT ?? process.argv[2] ?? 8791);
+  server.listen(port, '127.0.0.1', () => {
+    // screenshots.mjs waits for this line before launching the browser.
+    console.log(`mock-llm listening on http://127.0.0.1:${port}/v1`);
+  });
 
-for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => server.close(() => process.exit(0)));
+  for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => server.close(() => process.exit(0)));
+}

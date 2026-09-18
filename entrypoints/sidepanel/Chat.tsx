@@ -3,6 +3,7 @@ import { archivedChats, isArchived, liveChats, loadItems, pickChatToShow, relati
 import { findByName } from '@/lib/modmatch';
 import { modFromProposal } from '@/lib/mods';
 import { rpc, type AgentPortRequest } from '@/lib/rpc';
+import { RECONNECT_NOTE, looksUnfinished, reduceItems, unqueuedItem } from '@/lib/transcript';
 import type { AgentEvent, ChatItem, ContentEvent, ElementRef, Mod, ModProposal } from '@/lib/types';
 
 const SAVE_DEBOUNCE_MS = 400;
@@ -14,16 +15,35 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
   /** False while the panel is still working out which chat to show, so nothing flashes. */
   const [loaded, setLoaded] = useState(false);
   const [text, setText] = useState('');
-  const [busy, setBusy] = useState(false);
+  /**
+   * Which chats are running right now, by chat id. Runs are per chat, not per panel: chat A can be
+   * streaming on one tab while the user reads chat B, so "busy" is a question you ask about a chat,
+   * never about the panel. `busy` below is this set's answer for the visible chat.
+   */
+  const [runningChats, setRunningChats] = useState<ReadonlySet<string>>(() => new Set());
   const [refs, setRefs] = useState<ElementRef[]>([]);
   const [picking, setPicking] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const portRef = useRef<chrome.runtime.Port | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-  /** The chat the open port is running, so a switch does not misfile incoming events. */
-  const portChatRef = useRef<string | null>(null);
-  /** Set when the restored transcript looks like it was cut off mid-run, so the next port event says so. */
-  const reconnectRef = useRef(false);
+  /** The chat the panel is showing, readable from the port listener, which outlives renders. */
+  const chatIdRef = useRef<string | null>(null);
+  /**
+   * Chats whose restored transcript looked cut off mid-run, so the next event for each says so
+   * once. Per chat, because two chats can both have been interrupted.
+   */
+  const reconnectRef = useRef<Set<string>>(new Set());
+  /**
+   * The debounced save for the visible chat: the id it was scheduled for, and its timer. Held in a
+   * ref rather than an effect cleanup so a chat or host switch can FLUSH it — writing A's items
+   * under B's id is precisely the bug this whole change is about.
+   */
+  const pendingSaveRef = useRef<{ chatId: string; items: ChatItem[]; timer: ReturnType<typeof setTimeout> } | null>(null);
+  /**
+   * One write chain per chat id for background chats' transcripts, so a burst of events for a chat
+   * the user is not looking at cannot interleave its read-modify-write cycles and lose rows.
+   */
+  const offscreenWritesRef = useRef<Map<string, Promise<ChatItem[]>>>(new Map());
   /**
    * Bumped by every host change and every deliberate chat switch. Async work captures the value it
    * started under and drops its result if the number has moved on, so a slow lookup for one host
@@ -35,6 +55,13 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
   /** The current host, readable from the port listener, which is registered once and outlives renders. */
   const hostRef = useRef(host);
   hostRef.current = host;
+  // The port listener is registered once and closes over the first render's state, so what it has
+  // to read at event time lives in refs — and those refs are advanced eagerly by showChat() and
+  // updateItems(), not a render later. An event arriving in the same tick as a chat switch must
+  // already see the new chat, or it is filed against the wrong one, which is this whole bug.
+  const itemsRef = useRef<ChatItem[]>(items);
+  /** Is the chat currently on screen the one that is running? Never "is the panel busy". */
+  const busy = chatId != null && runningChats.has(chatId);
 
   // Pick up this site's chats and show the most recently updated live one, transcript and all. A
   // chat is only created on first send, so opening the panel on a new site does not litter storage
@@ -44,9 +71,12 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
   useEffect(() => {
     const gen = ++genRef.current;
     const live = () => genRef.current === gen;
+    // Whatever was scheduled belongs to the chat we are leaving, so write it under THAT id now,
+    // and hand that chat over to the background path in case it is still running.
+    flushSave();
+    handOff(chatIdRef.current, itemsRef.current);
     setLoaded(false);
-    setItems([]);
-    setChatId(null);
+    showChat(null, []);
     setChats([]);
     if (!host) {
       setLoaded(true);
@@ -63,12 +93,11 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
           setLoaded(true);
           return;
         }
-        const stored = await loadItems(show.id);
+        const stored = await readItems(show.id);
         if (!live()) return;
         setChats(list);
-        setChatId(show.id);
-        setItems(stored);
-        reconnectRef.current = looksUnfinished(stored);
+        showChat(show.id, stored);
+        markReconnect(show.id, stored);
         setLoaded(true);
         requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ block: 'end' }));
       } catch {
@@ -77,12 +106,13 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
     })();
   }, [host]);
 
-  // Persist the transcript, debounced so a streaming turn does not write on every delta.
+  // Persist the visible chat's transcript, debounced so a streaming turn does not write on every
+  // delta. The id is captured HERE, at schedule time, and the pending write is flushed before the
+  // view moves — a timer that fired after a switch used to write the old chat's items under the
+  // new chat's id, which is how transcripts from different chats ended up merged.
   useEffect(() => {
     if (!chatId || !loaded) return;
-    const id = chatId;
-    const t = setTimeout(() => void saveItems(id, items).catch(() => {}), SAVE_DEBOUNCE_MS);
-    return () => clearTimeout(t);
+    scheduleSave(chatId, items);
   }, [items, chatId, loaded]);
 
   useEffect(() => {
@@ -104,69 +134,130 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
     bottomRef.current?.scrollIntoView({ block: 'end' });
   }, [items]);
 
+  /**
+   * Queue the visible chat's transcript for a debounced write under the id it belongs to.
+   * Rescheduling replaces the pending write for that same id; a different id flushes first.
+   */
+  function scheduleSave(id: string, next: ChatItem[]) {
+    const pending = pendingSaveRef.current;
+    if (pending) {
+      clearTimeout(pending.timer);
+      if (pending.chatId !== id) void saveItems(pending.chatId, pending.items).catch(() => {});
+    }
+    const timer = setTimeout(() => {
+      pendingSaveRef.current = null;
+      void saveItems(id, next).catch(() => {});
+    }, SAVE_DEBOUNCE_MS);
+    pendingSaveRef.current = { chatId: id, items: next, timer };
+  }
+
+  /** Write any pending transcript now, under the id it was scheduled for. Called before a switch. */
+  function flushSave() {
+    const pending = pendingSaveRef.current;
+    if (!pending) return;
+    clearTimeout(pending.timer);
+    pendingSaveRef.current = null;
+    void saveItems(pending.chatId, pending.items).catch(() => {});
+  }
+
+  /**
+   * Apply an event to a chat the user is NOT looking at: read its stored transcript, reduce, write
+   * it back. Chained per chat id so a stream of deltas cannot interleave read-modify-write cycles.
+   * This is what keeps a run complete while the user reads another chat, rather than either losing
+   * its output or spilling it into whatever is on screen.
+   */
+  function applyOffscreen(id: string, e: AgentEvent) {
+    const chain = offscreenChain(id);
+    const next = chain.then(async (prev) => {
+      let base = prev;
+      if (reconnectRef.current.has(id)) {
+        reconnectRef.current.delete(id);
+        base = [...base, { kind: 'note', text: RECONNECT_NOTE }];
+      }
+      // An 'unqueued' for an invisible chat cannot put text back in the composer — that composer
+      // belongs to the chat on screen — so the bubble simply goes away.
+      const reduced = reduceItems(base, e);
+      if (reduced !== prev) await saveItems(id, reduced).catch(() => {});
+      return reduced;
+    });
+    offscreenWritesRef.current.set(id, next);
+    void next.catch(() => {});
+  }
+
+  /** The tail of a background chat's write chain, started from storage the first time. */
+  function offscreenChain(id: string): Promise<ChatItem[]> {
+    const existing = offscreenWritesRef.current.get(id);
+    if (existing) return existing;
+    const started = loadItems(id).catch(() => [] as ChatItem[]);
+    offscreenWritesRef.current.set(id, started);
+    return started;
+  }
+
+  /**
+   * A chat's transcript for putting on screen. It has to go through the same per-chat chain that
+   * background events write on, or opening a chat that is mid-run would read storage from before
+   * the write in flight and then overwrite it with that stale copy.
+   */
+  function readItems(id: string): Promise<ChatItem[]> {
+    const next = offscreenChain(id).then((items) => items);
+    offscreenWritesRef.current.set(id, next);
+    return next;
+  }
+
+  /**
+   * Hand a chat we are leaving over to the background path: its chain starts from exactly what was
+   * on screen, so no event is applied to a stale copy in the gap between the flush and the first
+   * offscreen write.
+   */
+  function handOff(id: string | null, current: ChatItem[]) {
+    if (id) offscreenWritesRef.current.set(id, Promise.resolve(current));
+  }
+
   function connect(): chrome.runtime.Port {
     if (portRef.current) return portRef.current;
     const port = chrome.runtime.connect({ name: 'agent' });
-    // A run that outlived the panel keeps streaming into a port we no longer hold. On the first
-    // event after a reconnect we cannot recover the text we missed, so we just say so once.
-    let first = true;
     port.onMessage.addListener((e: AgentEvent) => {
-      setItems((prev) => {
-        const next = [...prev];
-        if (first) {
-          first = false;
-          if (reconnectRef.current) {
-            reconnectRef.current = false;
-            next.push({ kind: 'note', text: 'reconnected — earlier output from this run was not captured' });
-          }
+      // Route by the event's own chat, never by "the chat this port last started". One port serves
+      // the whole panel, and the panel may well be showing a different chat than the one running.
+      if (e.type === 'done') setRunningChats((prev) => withoutChat(prev, e.chatId));
+      else setRunningChats((prev) => (prev.has(e.chatId) ? prev : new Set(prev).add(e.chatId)));
+
+      if (e.chatId !== chatIdRef.current) {
+        applyOffscreen(e.chatId, e);
+        return;
+      }
+
+      if (e.type === 'accepted' && !titleFixRef.current) {
+        // The background has now run touchChat, so the stored title and updatedAt are real.
+        // Reading them back once per run keeps the switcher honest even if the optimistic title
+        // guessed differently (e.g. a chat that already had a title).
+        titleFixRef.current = true;
+        void refreshChats();
+      }
+      if (e.type === 'unqueued') {
+        // Only the chat on screen owns the composer, so only it gets its text back.
+        const dropped = unqueuedItem(itemsRef.current, e.id);
+        if (dropped) {
+          setText((t) => (t.trim() ? `${t.trim()}\n${dropped.text}` : dropped.text));
+          if (dropped.refs) setRefs((r) => [...r, ...dropped.refs!]);
         }
-        const last = next[next.length - 1];
-        switch (e.type) {
-          case 'text':
-            if (last?.kind === 'assistant') next[next.length - 1] = { ...last, text: last.text + e.delta };
-            else next.push({ kind: 'assistant', text: e.delta });
-            return next;
-          case 'tool_call':
-            next.push({ kind: 'tool', id: e.id, name: e.name, input: e.input });
-            return next;
-          case 'tool_result': {
-            const i = next.findIndex((x) => x.kind === 'tool' && x.id === e.id);
-            if (i >= 0) next[i] = { ...(next[i] as Extract<ChatItem, { kind: 'tool' }>), summary: e.summary, isError: e.isError };
-            return next;
-          }
-          case 'proposal':
-            next.push({ kind: 'proposal', proposal: e.proposal });
-            return next;
-          case 'accepted':
-            // The background has now run touchChat, so the stored title and updatedAt are real.
-            // Reading them back once per run keeps the switcher honest even if the optimistic
-            // title above guessed differently (e.g. a chat that already had a title).
-            if (!titleFixRef.current) {
-              titleFixRef.current = true;
-              void refreshChats();
-            }
-            return next.map((it) => (it.kind === 'user' && it.id === e.id ? { ...it, queued: false } : it));
-          case 'unqueued': {
-            const dropped = next.find((it) => it.kind === 'user' && it.id === e.id) as Extract<ChatItem, { kind: 'user' }> | undefined;
-            if (dropped) {
-              setText((t) => (t.trim() ? `${t.trim()}\n${dropped.text}` : dropped.text));
-              if (dropped.refs) setRefs((r) => [...r, ...dropped.refs!]);
-            }
-            return next.filter((it) => !(it.kind === 'user' && it.id === e.id));
-          }
-          case 'error':
-            next.push({ kind: 'error', text: e.message });
-            return next;
-          case 'done':
-            return next;
+      }
+      updateItems((prev) => {
+        // A run that outlived the panel keeps streaming into a port we no longer hold. We cannot
+        // recover the text we missed, so the first event back into that chat just says so.
+        let base = prev;
+        if (reconnectRef.current.has(e.chatId)) {
+          reconnectRef.current.delete(e.chatId);
+          base = [...base, { kind: 'note', text: RECONNECT_NOTE }];
         }
+        return reduceItems(base, e);
       });
-      if (e.type === 'done') setBusy(false);
     });
     port.onDisconnect.addListener(() => {
       portRef.current = null;
-      portChatRef.current = null;
-      setBusy(false);
+      // The worker went away (or was restarted): nothing is streaming to us any more. Runs
+      // themselves survive in the background and their transcripts are written there.
+      setRunningChats(new Set());
     });
     portRef.current = port;
     return port;
@@ -215,22 +306,23 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
         }
         id = chat.id;
         setChats((prev) => [chat, ...prev]);
-        setChatId(chat.id);
+        showChat(chat.id, itemsRef.current);
         setLoaded(true);
       } catch (e) {
-        setItems((prev) => [...prev, { kind: 'error', text: `Could not start a chat: ${e instanceof Error ? e.message : String(e)}` }]);
+        updateItems((prev) => [...prev, { kind: 'error', text: `Could not start a chat: ${e instanceof Error ? e.message : String(e)}` }]);
         return;
       }
     }
     // Only send references whose token still appears in the message.
     const used = refs.filter((r) => new RegExp(`@${escapeRe(r.token)}(?![\\w.#-])`).test(t));
     const msgId = crypto.randomUUID();
-    setItems((prev) => [...prev, { kind: 'user', id: msgId, text: t, refs: used.length ? used : undefined, queued: busy }]);
+    // Queued only if THIS chat is already running. A run on another tab does not queue anything.
+    const queued = runningChats.has(id);
+    updateItems((prev) => [...prev, { kind: 'user', id: msgId, text: t, refs: used.length ? used : undefined, queued }]);
     setText('');
     setRefs([]);
-    setBusy(true);
+    setRunningChats((prev) => (prev.has(id!) ? prev : new Set(prev).add(id!)));
     const req: AgentPortRequest = { type: 'send', tabId, chatId: id, id: msgId, text: t, refs: used.length ? used : undefined };
-    portChatRef.current = id;
     titleFixRef.current = false;
     connect().postMessage(req);
     // Reflect the new activity in the switcher right away. The background derives the title from
@@ -257,16 +349,54 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
     }
   }
 
+  /** Stop the chat on screen. Only that chat: another tab's run is none of this button's business. */
   function abort() {
-    portRef.current?.postMessage({ type: 'abort' } satisfies AgentPortRequest);
+    if (!chatId) return;
+    portRef.current?.postMessage({ type: 'abort', chatId } satisfies AgentPortRequest);
   }
 
-  /** Stop any run and forget the port's chat, before the view lands somewhere else. */
+  /**
+   * Leave the current chat. The run is deliberately NOT stopped: it belongs to its own chat and
+   * keeps streaming into that chat's stored transcript, which is the whole point of the fix. All
+   * that has to happen here is that the pending transcript write lands under the id it was made
+   * for, before the view moves.
+   */
   function detach() {
-    if (busy) abort();
-    portChatRef.current = null;
-    reconnectRef.current = false;
+    flushSave();
+    handOff(chatIdRef.current, itemsRef.current);
     titleFixRef.current = false;
+  }
+
+  /**
+   * Change the visible transcript. The ref advances with the state rather than a render later, so
+   * a burst of events in one tick all reduce from what the previous one produced, and a switch
+   * that happens in the same tick hands off exactly what was on screen.
+   */
+  function updateItems(fn: (prev: ChatItem[]) => ChatItem[]) {
+    const next = fn(itemsRef.current);
+    if (next === itemsRef.current) return;
+    itemsRef.current = next;
+    setItems(next);
+  }
+
+  /**
+   * Put a chat (or the empty composer) on screen. The ref moves first and in the same statement as
+   * the state, so the port listener never sees a moment where the id and the items disagree — that
+   * gap is how one chat's events landed in another chat's transcript.
+   */
+  function showChat(id: string | null, next: ChatItem[]) {
+    chatIdRef.current = id;
+    itemsRef.current = next;
+    // On screen, this chat is written by the visible path alone; its background chain is done.
+    if (id) offscreenWritesRef.current.delete(id);
+    setChatId(id);
+    setItems(next);
+  }
+
+  /** Remember that this chat's restored transcript stops mid-run, so its next event says so once. */
+  function markReconnect(id: string, stored: ChatItem[]) {
+    if (looksUnfinished(stored)) reconnectRef.current.add(id);
+    else reconnectRef.current.delete(id);
   }
 
   /**
@@ -277,13 +407,12 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
     const gen = ++genRef.current;
     detach();
     setLoaded(false);
-    setItems([]);
-    setChatId(id);
-    void loadItems(id)
+    showChat(id, []);
+    void readItems(id)
       .then((stored) => {
         if (genRef.current !== gen) return;
-        setItems(stored);
-        reconnectRef.current = looksUnfinished(stored);
+        showChat(id, stored);
+        markReconnect(id, stored);
         setLoaded(true);
         requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ block: 'end' }));
       })
@@ -293,8 +422,8 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
   }
 
   /**
-   * Switching away from a chat that is mid-run would misfile the run's remaining events into the
-   * chat we land on, so the run is stopped first. The model history is already saved either way.
+   * Switching away from a chat that is mid-run is fine now: its events carry its own chat id, so
+   * they go on filling in its stored transcript while the user reads something else.
    */
   function switchTo(id: string | null) {
     if (id === chatId) return;
@@ -311,8 +440,7 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
     if (!host) return;
     ++genRef.current;
     detach();
-    setChatId(null);
-    setItems([]);
+    showChat(null, []);
     setLoaded(true);
   }
 
@@ -362,14 +490,14 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
       await rpc({ type: 'page.pick', tabId });
     } catch (e) {
       setPicking(false);
-      setItems((prev) => [...prev, { kind: 'error', text: `Could not start the picker: ${e instanceof Error ? e.message : String(e)}` }]);
+      updateItems((prev) => [...prev, { kind: 'error', text: `Could not start the picker: ${e instanceof Error ? e.message : String(e)}` }]);
     }
   }
 
   async function tryProposal(p: ModProposal) {
     if (tabId == null) return;
     const r = await rpc({ type: 'mods.try', tabId, code: p.code });
-    setItems((prev) => [...prev, { kind: 'tool', id: crypto.randomUUID(), name: 'try', input: { description: 'Ran the proposed mod once' }, summary: r.ok ? `OK${r.logs.length ? ': ' + r.logs.join(' | ') : ''}` : r.error, isError: !r.ok }]);
+    updateItems((prev) => [...prev, { kind: 'tool', id: crypto.randomUUID(), name: 'try', input: { description: 'Ran the proposed mod once' }, summary: r.ok ? `OK${r.logs.length ? ': ' + r.logs.join(' | ') : ''}` : r.error, isError: !r.ok }]);
   }
 
   /**
@@ -380,7 +508,7 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
   async function saveProposal(p: ModProposal, idx: number) {
     const existing = await findModByName(p.name);
     await rpc({ type: 'mods.save', mod: modFromProposal(p, existing) });
-    setItems((prev) => prev.map((it, i) => (i === idx && it.kind === 'proposal' ? { ...it, saved: true } : it)));
+    updateItems((prev) => prev.map((it, i) => (i === idx && it.kind === 'proposal' ? { ...it, saved: true } : it)));
   }
 
   const unsupported = !pageUrl || /^(chrome|edge|about|chrome-extension|devtools):/.test(pageUrl);
@@ -541,12 +669,12 @@ async function findModByName(name: string): Promise<Mod | undefined> {
   }
 }
 
-/**
- * Did this transcript stop mid-turn? A tool row without a result, or a message still marked queued,
- * means the panel went away while the background was working.
- */
-export function looksUnfinished(items: ChatItem[]): boolean {
-  return items.some((it) => (it.kind === 'tool' && it.summary === undefined) || (it.kind === 'user' && it.queued === true));
+/** The running set without one chat, or the same set when it was not in it (so React can skip). */
+function withoutChat(set: ReadonlySet<string>, id: string): ReadonlySet<string> {
+  if (!set.has(id)) return set;
+  const next = new Set(set);
+  next.delete(id);
+  return next;
 }
 
 /** A short, readable token from a selector's last segment, e.g. `#main-nav > a.logo` → `a.logo`. */
