@@ -1532,27 +1532,51 @@ async function dashboardFlow({ capture = false } = {}) {
       // Rewrite the chats key faster than a transcript read can resolve, for long enough that the
       // old effect could not have got one through. updatedAt is untouched: nothing here is a real
       // change, only a new array identity, which is exactly what an unrelated write produces.
-      const churn = page.evaluate(async () => {
-        const until = Date.now() + 5000;
-        while (Date.now() < until) {
-          const { chats } = await chrome.storage.local.get('chats');
-          await chrome.storage.local.set({ chats: chats.map((c) => ({ ...c })) });
-          await new Promise((r) => setTimeout(r, 15));
-        }
-      });
+      // The rejection is swallowed at creation, not at the await. Any assertion between here and
+      // `await churn` throws, the finally closes the browser, and this in-page loop rejects with
+      // "target closed" — as an UNHANDLED rejection, which takes the process down and prints its
+      // own message instead of the assertion that actually failed. Catching it here keeps the real
+      // failure visible; the await below still waits for the loop to finish on the happy path.
+      const churn = page
+        .evaluate(async () => {
+          const until = Date.now() + 5000;
+          while (Date.now() < until) {
+            const { chats } = await chrome.storage.local.get('chats');
+            await chrome.storage.local.set({ chats: chats.map((c) => ({ ...c })) });
+            await new Promise((r) => setTimeout(r, 15));
+          }
+        })
+        .catch(() => {});
       await page.waitForTimeout(300);
       // "indentation" appears only inside the HN transcript, in neither a title nor a host, so the
       // only way this chat can match is a transcript read that landed and stuck.
       await page.locator('[data-testid="chat-search"]').fill('indentation');
+      // Wait for the list to have NARROWED to exactly the one chat, not merely for that chat's row
+      // to exist. All three rows are on screen when the query is typed, and the box is debounced by
+      // 200ms, so "chat-hn-1 is present" is true before the filter has run at all — the assertion
+      // that followed it was reading the unfiltered list and could only pass by luck. Waiting on
+      // the end state makes this step about what the search did rather than about how fast it did
+      // it, which is the whole point when the page is being churned underneath.
       await page
-        .locator('[data-testid="chat-row"][data-chat-id="chat-hn-1"]')
-        .waitFor({ timeout: 8_000 })
+        .waitForFunction(
+          () => document.querySelectorAll('[data-testid="chat-row"]').length === 1,
+          undefined,
+          { timeout: 8_000 },
+        )
         .catch(async () => {
-          const shown = await page.locator('[data-testid="chat-title"]').allTextContents();
-          fail(`a chat under sustained writes never became searchable by its message text (list held ${JSON.stringify(shown)})`);
+          const ids = await page.locator('[data-testid="chat-row"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-chat-id')));
+          const stored = await page.evaluate(async () => {
+            const { chats } = await chrome.storage.local.get('chats');
+            return chats.map((c) => `${c.id}|${c.title}`);
+          });
+          fail(
+            `the message-text search did not settle on the one chat whose transcript holds the word ` +
+              `(rows ${JSON.stringify(ids)}, storage ${JSON.stringify(stored)})`,
+          );
         });
-      if ((await page.locator('[data-testid="chat-row"]').count()) !== 1) {
-        fail('the message-text search matched more than the one chat whose transcript holds the word');
+      if (!(await page.locator('[data-testid="chat-row"][data-chat-id="chat-hn-1"]').count())) {
+        const shown = await page.locator('[data-testid="chat-title"]').allTextContents();
+        fail(`a chat under sustained writes never became searchable by its message text (list held ${JSON.stringify(shown)})`);
       }
       await churn;
       await page.waitForTimeout(500);
