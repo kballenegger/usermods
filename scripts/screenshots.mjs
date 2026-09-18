@@ -1511,6 +1511,16 @@ async function dashboardFlow({ capture = false } = {}) {
     {
       await page.locator('[data-testid="chat-search"]').fill('');
       await page.waitForTimeout(400);
+      // Close the preview pane first. It reads chats.transcript too — legitimately, once per chat
+      // it opens — and the assertion below is "no id was read twice", so a pane left open on the
+      // chat step 5b restored would put a second, innocent read of it in the tally and fail a
+      // correct implementation. Clicking the open row's title toggles it shut.
+      const stillOpen = page.locator('[data-testid="chat-preview"]');
+      if (await stillOpen.count()) {
+        await page.locator('[data-testid="chat-row"][data-chat-id="chat-wiki-2"] [data-testid="chat-title"]').click();
+        await stillOpen.waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
+      }
+      await page.waitForTimeout(300);
       await page.evaluate(() => {
         window.__transcriptReads = [];
         const send = chrome.runtime.sendMessage.bind(chrome.runtime);
