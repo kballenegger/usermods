@@ -393,7 +393,7 @@ async function shotMods(b, composer) {
   const panel = await openPanel(b.ctx, b.extId, { storage: { mods: seedMods() } });
   const site = await openSite(b.ctx, WIKI);
   await panel.waitForTimeout(1000);
-  await panel.locator('.tabs button', { hasText: 'Mods' }).click();
+  await panel.locator('.tab-group [data-view="mods"]').click();
   await panel.waitForTimeout(700);
 
   const l = tmp('mods-site');
@@ -453,7 +453,7 @@ async function shotMigrate(b, composer) {
   const panel = await openPanel(b.ctx, b.extId, { storage: { mods: seedMods() } });
   const site = await openSite(b.ctx, WIKI);
   await panel.waitForTimeout(900);
-  await panel.locator('.tabs button', { hasText: 'Mods' }).click();
+  await panel.locator('.tab-group [data-view="mods"]').click();
   await panel
     .locator('.card', { hasText: 'Migrate from Tampermonkey' })
     .locator('button.btn', { hasText: 'Show' })

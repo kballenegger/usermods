@@ -3,6 +3,7 @@ import { hostFromUrl } from '@/lib/chats';
 import { hasConsented } from '@/lib/consent';
 import { rpc } from '@/lib/rpc';
 import { Chat } from './Chat';
+import { DashboardIcon, SettingsIcon } from './components/icons';
 import { ThemeToggle } from './components/ThemeToggle';
 import { Consent } from './Consent';
 import { ModsView } from './ModsView';
@@ -82,18 +83,59 @@ export function App() {
 
   return (
     <div className="app">
+      {/*
+        The bar is two groups with the host between them.
+
+        Left: the two screens you move between while working — Chat and Mods — as tabs, because
+        that is what they are. Right: the controls you reach for occasionally. Settings is still a
+        view of this panel — it carries `aria-current="page"` and the same volt active treatment the
+        tabs do — it has simply stopped competing with Chat and Mods for the left edge; Dashboard
+        leaves the panel, so it is a plain button; the theme toggle is a preference. All three are
+        one family: same box, same spacing, same hover.
+
+        Below the container breakpoint (see .tabs in styles.css) Settings and Dashboard drop their
+        labels and become their icons alone. The labels stay in the DOM as the accessible name —
+        visually hidden, not display:none — and both carry an explicit aria-label and title so the
+        icon-only state is never a mystery.
+      */}
       <nav className="tabs">
-        <button className={tab === 'chat' ? 'active' : ''} onClick={() => setTab('chat')}>Chat</button>
-        <button className={tab === 'mods' ? 'active' : ''} onClick={() => setTab('mods')}>Mods</button>
-        <button className={tab === 'settings' ? 'active' : ''} onClick={() => setTab('settings')}>Settings</button>
-        <span className="spacer" />
-        {/* The page in view. A volt dot means a real page the panel can act on. */}
-        {host && <span className="dot" aria-hidden="true" />}
-        <span className="status" title={pageUrl}>{host}</span>
-        <button className="tab-action" onClick={() => void openDashboard()} title="Open the dashboard: every chat and every mod, in a full tab">
-          Dashboard
-        </button>
-        <ThemeToggle />
+        <div className="tab-group">
+          <button type="button" data-view="chat" aria-current={tab === 'chat' ? 'page' : undefined} className={tab === 'chat' ? 'active' : ''} onClick={() => setTab('chat')}>Chat</button>
+          <button type="button" data-view="mods" aria-current={tab === 'mods' ? 'page' : undefined} className={tab === 'mods' ? 'active' : ''} onClick={() => setTab('mods')}>Mods</button>
+        </div>
+        {/* The page in view. A volt dot means a real page the panel can act on. It takes the slack
+            between the groups and only truncates when the panel is genuinely too narrow. */}
+        <span className="status" title={pageUrl || host}>
+          {host && <span className="dot" aria-hidden="true" />}
+          <span className="status-host">{host}</span>
+        </span>
+        <div className="tab-group actions">
+          <button
+            type="button"
+            className={`tab-action${tab === 'settings' ? ' active' : ''}`}
+            data-view="settings"
+            data-action="settings"
+            aria-current={tab === 'settings' ? 'page' : undefined}
+            aria-label="Settings"
+            title="Settings"
+            onClick={() => setTab('settings')}
+          >
+            <SettingsIcon />
+            <span className="tab-action-label">Settings</span>
+          </button>
+          <button
+            type="button"
+            className="tab-action"
+            data-action="dashboard"
+            aria-label="Dashboard"
+            title="Open the dashboard: every chat and every mod, in a full tab"
+            onClick={() => void openDashboard()}
+          >
+            <DashboardIcon />
+            <span className="tab-action-label">Dashboard</span>
+          </button>
+          <ThemeToggle />
+        </div>
       </nav>
       {usStatus && !usStatus.available && <div className="notice">{usStatus.message}</div>}
       {tab === 'chat' &&
