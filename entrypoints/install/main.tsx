@@ -8,7 +8,7 @@ import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import { isInstallableUrl, scriptUrlFromLocation } from '@/lib/installurl';
 import { rpc } from '@/lib/rpc';
-import { applyMirroredTheme, applyStoredTheme } from '@/lib/theme';
+import { applyStoredTheme } from '@/lib/theme';
 import type { ScriptPreview } from '@/lib/types';
 import { InstallPreview } from '../sidepanel/components/InstallPreview';
 import { ThemeToggle } from '../sidepanel/components/ThemeToggle';
@@ -93,10 +93,8 @@ function InstallPage() {
   );
 }
 
-// Same theme the side panel is wearing, settled before the first paint: the synchronous mirror is
-// what the first frame uses, and the authoritative read follows without blocking this module's
-// evaluation (and so DOMContentLoaded). See the note in sidepanel/main.tsx.
-applyMirroredTheme();
+// The authoritative read, correcting the mirror the import above already applied. Not awaited: see
+// the note in sidepanel/main.tsx.
 void applyStoredTheme();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

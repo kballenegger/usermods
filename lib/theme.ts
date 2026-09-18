@@ -23,16 +23,10 @@ export { THEME_CYCLE, THEME_LABEL, nextTheme } from './types';
  * chrome.storage stays the source of truth: it is what Settings writes, what syncs across pages,
  * and what survives this mirror being cleared. This is a cache, and it is allowed to be missing.
  */
+// Duplicated from lib/theme-boot.ts rather than imported: importing that module would run its side
+// effect (and drag it into every bundle that touches the theme), which is exactly what it is built
+// to avoid. test/theme.test.ts asserts the two strings stay equal.
 const MIRROR_KEY = 'usermods.theme';
-
-function readMirror(): ThemeChoice | null {
-  try {
-    const v = localStorage.getItem(MIRROR_KEY);
-    return v === 'system' || v === 'dark' || v === 'light' ? v : null;
-  } catch {
-    return null; // storage partitioned or disabled: fall back to the async read
-  }
-}
 
 function writeMirror(choice: ThemeChoice): void {
   try {
@@ -52,16 +46,15 @@ export function applyTheme(choice: ThemeChoice, doc: Document = document): void 
 }
 
 /**
- * Put the last known theme on the document immediately, with no await.
+ * What this document is wearing right now, read off the element itself.
  *
- * Called at the top of every extension page's entry module, which still runs before the first
- * paint. If the mirror is empty (a fresh profile, or cleared storage) nothing is written and the
- * document stays on the CSS default — which is System, the right guess for a profile with no
- * choice saved.
+ * No attribute means System, which is exactly what the CSS falls back to. Lets a control render the
+ * correct state on its very first render, with no async read and so no extra render of whatever
+ * surrounds it.
  */
-export function applyMirroredTheme(doc: Document = document): void {
-  const choice = readMirror();
-  if (choice) applyTheme(choice, doc);
+export function currentTheme(doc: Document = document): ThemeChoice {
+  const v = doc.documentElement.getAttribute('data-theme');
+  return v === 'dark' || v === 'light' ? v : 'system';
 }
 
 /** Read the saved choice, applying the same old-profile rule loadSettings uses. */
