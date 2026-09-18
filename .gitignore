@@ -7,3 +7,4 @@ stats-*.json
 *.log
 .env
 .env.*
+.claude/worktrees/
