@@ -19,9 +19,7 @@
 @import '@fontsource/ibm-plex-mono/latin-400.css';
 @import '@fontsource/ibm-plex-mono/latin-500.css';
 @import '@fontsource/ibm-plex-mono/latin-600.css';
-@import '@fontsource/pixelify-sans/latin-400.css';
-@import '@fontsource/pixelify-sans/latin-600.css';
-@import '@fontsource/pixelify-sans/latin-700.css';
+@import '@fontsource/jersey-10/latin-400.css';
 
 * {
   box-sizing: border-box;
@@ -158,7 +156,7 @@ button.pill,
   border-radius: var(--r-pill);
   color: var(--text-2);
   font-size: var(--fs-label);
-  font-weight: 700;
+  font-weight: 400;
   line-height: 1;
   letter-spacing: var(--lbl-tracking);
   text-transform: uppercase;
@@ -292,8 +290,16 @@ button.pill,
   flex-direction: column;
 }
 
-/* The chat switcher: a strip on the panel surface above the transcript. */
+/*
+ * The chat switcher: a strip on the panel surface above the transcript.
+ *
+ * It is its own query container, on the same 520px breakpoint the top bar uses, so the bar decides
+ * its own layout from its own width. The measure is the same one and the reason is the same: the
+ * side panel is a width the user drags, and the screenshot harness renders it at arbitrary sizes.
+ */
 .chatbar {
+  container-type: inline-size;
+  container-name: chatbar;
   flex: none;
   display: flex;
   gap: var(--sp-2);
@@ -303,8 +309,15 @@ button.pill,
   border-bottom: 1px solid var(--border-hair);
 }
 
+/*
+ * The select gets the slack, and the buttons never take any.
+ *
+ * `flex: 1 1 auto` alone was not enough: the buttons' own content width still won, so a long chat
+ * title ellipsised while RENAME and ARCHIVE sat at their full intrinsic size. `flex: none` on the
+ * actions states the priority outright — the title is the content, the actions are chrome.
+ */
 .chatbar select {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
   font: 400 var(--fs-meta) / 1.4 var(--font-ui);
   color: var(--text-1);
@@ -316,8 +329,42 @@ button.pill,
 }
 
 .chatbar .btn {
-  padding: 6px 11px;
-  font-size: var(--fs-meta);
+  flex: none;
+  padding: 6px 9px;
+  font-size: var(--fs-btn);
+}
+
+/*
+ * Narrow is the default: the tail is clipped to a 1px box, the way the top bar hides its action
+ * labels, so the word survives in the accessibility tree and in every text-matching locator while
+ * giving its pixels back to the title. `display: none` would take the text out along with the
+ * pixels, which is exactly what must not happen here.
+ */
+.chatbar .btn .action-tail {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+@container chatbar (min-width: 520px) {
+  .chatbar .btn {
+    padding: 6px 11px;
+  }
+
+  .chatbar .btn .action-tail {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip-path: none;
+  }
 }
 
 /*
@@ -476,7 +523,7 @@ button.pill,
   align-items: center;
   font-family: var(--font-display);
   font-size: var(--fs-label);
-  font-weight: 700;
+  font-weight: 400;
   text-transform: uppercase;
   letter-spacing: var(--lbl-tracking);
   color: var(--text-2);
@@ -553,10 +600,10 @@ button.pill,
  */
 button.btn {
   font-family: var(--font-display);
-  font-size: var(--fs-meta);
-  font-weight: 700;
+  font-size: var(--fs-btn);
+  font-weight: 400;
   line-height: 1;
-  letter-spacing: 0.04em;
+  letter-spacing: var(--lbl-tracking);
   text-transform: uppercase;
   border: var(--border-width) solid var(--border-control);
   background: var(--surface-2);
@@ -719,7 +766,7 @@ button.linklike:hover {
 .card h4 {
   margin: 0;
   font-size: var(--fs-ui);
-  font-weight: 700;
+  font-weight: 400;
   letter-spacing: 0.02em;
 }
 
@@ -809,12 +856,12 @@ details > summary::-webkit-details-marker {
   margin-bottom: var(--sp-2);
 }
 
-/* Section labels: 11px pixel type, uppercase, tracked out. */
+/* Section labels: 12px pixel type, uppercase, tracked out. */
 .label,
 .muted.label {
   font-family: var(--font-display);
   font-size: var(--fs-label);
-  font-weight: 700;
+  font-weight: 400;
   text-transform: uppercase;
   letter-spacing: var(--lbl-tracking);
   color: var(--text-2);
@@ -862,7 +909,7 @@ label.field {
   margin-bottom: var(--sp-3);
   font-family: var(--font-display);
   font-size: var(--fs-label);
-  font-weight: 700;
+  font-weight: 400;
   text-transform: uppercase;
   letter-spacing: var(--lbl-tracking);
   color: var(--text-2);
@@ -1037,7 +1084,7 @@ input[type='checkbox']:checked::after {
 /* 26px display type has room here, unlike the 420px panel. */
 .page h2 {
   font-size: var(--fs-title);
-  font-weight: 700;
+  font-weight: 400;
   letter-spacing: 0.01em;
   margin: 0;
   color: var(--text-1);
@@ -1053,7 +1100,7 @@ input[type='checkbox']:checked::after {
   gap: 8px;
   font-family: var(--font-display);
   font-size: var(--fs-ui);
-  font-weight: 700;
+  font-weight: 400;
   letter-spacing: 0.04em;
   text-transform: lowercase;
   color: var(--live-text);
@@ -1117,7 +1164,7 @@ input[type='checkbox']:checked::after {
   background: none;
   font-family: var(--font-display);
   font-size: var(--fs-label);
-  font-weight: 700;
+  font-weight: 400;
   line-height: 1;
   letter-spacing: var(--lbl-tracking);
   text-transform: uppercase;

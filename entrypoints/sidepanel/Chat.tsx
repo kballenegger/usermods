@@ -11,6 +11,28 @@ import type { AgentEvent, ChatItem, ContentEvent, ElementRef, Mod, ModProposal }
 
 const SAVE_DEBOUNCE_MS = 400;
 
+/**
+ * A chatbar action label that can give up its tail when the bar is narrow.
+ *
+ * The switcher's <select> has to carry a chat title, and the two actions beside it were eating the
+ * width it needed — "Full-width Wikipedia articles · n" truncated mid-word at the default side
+ * panel size. The actions are the part that can afford to lose characters: RENAME and ARCHIVE are
+ * still unmistakable as REN and ARCH next to a chat you are already looking at.
+ *
+ * The tail is CLIPPED rather than removed, exactly as the top bar's `.tab-action-label` is, so the
+ * full word stays in the DOM: `title` and the accessibility tree keep it, and the smoke suite's
+ * `hasText: 'Archive'` locators keep matching, because `display: none` would take the text out of
+ * both. Above the chatbar's container breakpoint the tail comes back and the labels are whole.
+ */
+function ActionLabel({ head, tail }: { head: string; tail: string }) {
+  return (
+    <>
+      {head}
+      <span className="action-tail">{tail}</span>
+    </>
+  );
+}
+
 export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: string; host: string }) {
   const [chats, setChats] = useState<ChatRecord[]>([]);
   const [chatId, setChatId] = useState<string | null>(null);
@@ -685,17 +707,21 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
             // Mousedown, not click: the input's blur would close rename mode before a click landed.
             <button className="btn primary" onMouseDown={(e) => e.preventDefault()} onClick={() => void commitRename()} title="Save this name">Save</button>
           ) : (
-            <button className="btn" onClick={startRename} disabled={!chatId} title="Give this chat your own name. It will not be renamed automatically afterwards.">Rename</button>
+            <button className="btn" onClick={startRename} disabled={!chatId} title="Give this chat your own name. It will not be renamed automatically afterwards.">
+              <ActionLabel head="Ren" tail="ame" />
+            </button>
           )}
           {renaming !== null ? null : viewingArchived ? (
             <>
-              <button className="btn" onClick={() => void setArchived(chatId!, false)} title="Move this chat back to the main list">Unarchive</button>
+              <button className="btn" onClick={() => void setArchived(chatId!, false)} title="Move this chat back to the main list">
+                <ActionLabel head="Unarch" tail="ive" />
+              </button>
               <button className="btn danger" onClick={() => void removeChat()} title="Delete this chat for good">Delete</button>
             </>
           ) : (
             // Archive is reversible, so it stays a secondary button; coral is kept for Delete.
             <button className="btn" onClick={() => void setArchived(chatId!, true)} disabled={!chatId} title="Archive this chat: it moves to the Archived group and stops opening by default">
-              Archive
+              <ActionLabel head="Arch" tail="ive" />
             </button>
           )}
         </div>

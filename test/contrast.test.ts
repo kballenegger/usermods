@@ -482,18 +482,43 @@ test('the error role stays distinct from the accent under colour-vision deficien
 
 test('the pixel display face is only ever declared for short labels', () => {
   // The display face is the brand's voice, and it is also the fastest way to make the product
-  // unreadable. The floor exists because Pixelify's C and O are near-identical below 11px.
+  // unreadable.
+  //
+  // The floor is 12px because Jersey 10 sets a smaller cap-height per em than the Pixelify Sans it
+  // replaced, so 12px of Jersey is the optical size 11px of Pixelify was. It is NOT a floor for
+  // the reason the old one was: the old 11px floor was an attempt to outrun Pixelify's capital C,
+  // whose aperture is one pixel-unit tall and therefore closes into an O at any size — a size
+  // floor could never have fixed that, which is why the face changed instead.
   const micro = dark['--fs-micro'];
   assert.ok(micro !== undefined, '--fs-micro should be defined');
   assert.ok(
-    parseInt(micro, 10) >= 11,
-    `the display face's smallest size must be at least 11px, got ${micro}`,
+    parseInt(micro, 10) >= 12,
+    `the display face's smallest size must be at least 12px, got ${micro}`,
   );
   assert.match(
     dark['--font-display'] ?? '',
-    /Pixelify Sans/,
-    'the display face should be the bundled Pixelify Sans',
+    /Jersey 10/,
+    'the display face should be the bundled Jersey 10',
   );
+
+  // Jersey 10 ships a single 400 weight. Asking for 700 makes the engine synthesise a bold by
+  // smearing the outline, which thickens the strokes into the counters and undoes the very thing
+  // the face was chosen for — an open C. The face is heavy enough at 400; nothing may ask for more.
+  const displaySelectors = [
+    'entrypoints/sidepanel/styles.css',
+    'entrypoints/sidepanel/activity.css',
+    'entrypoints/dashboard/dashboard.css',
+    'entrypoints/styleguide/styleguide.css',
+  ];
+  const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+  for (const rel of displaySelectors) {
+    const sheet = fs.readFileSync(path.join(root, rel), 'utf8');
+    assert.ok(
+      !/font-weight:\s*(700|bold)\b/.test(sheet),
+      `${rel} asks for a bold weight, but the display face has only a 400 — the engine would ` +
+        'synthesise it and close the C that this face was chosen for.',
+    );
+  }
 });
 
 test('the brand identity colours are the banner’s own, unaltered', () => {
