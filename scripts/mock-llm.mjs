@@ -24,6 +24,12 @@
 // unavailable in an automated profile (the "Allow User Scripts" toggle cannot be flipped
 // programmatically), so those tools would fail and put an error row in the transcript. get_page,
 // find_elements and get_styles all go through the content script and work fine.
+//
+// A consequence, since propose_mod started refusing untested scripts: every script here proposes
+// with `untested_reason`, because in this profile a mod genuinely cannot be run first. That is the
+// honest state and the proposal card says so. It is also the only reason the captured screenshots
+// carry a "not tested on this page" line; a real session with the user-scripts toggle on runs the
+// script and shows no such line.
 
 import http from 'node:http';
 
@@ -40,6 +46,11 @@ export const FAST_MARKER = 'FASTMARKER-b21c';
 
 /** How long the slow conversation holds its first byte, so a run is demonstrably still in flight. */
 const FIRST_BYTE_MS = Number(process.env.MOCK_LLM_SLOW_MS ?? 4000);
+
+/** The script the guardrails conversation proposes twice: once refused, once with an override. */
+const REFERENCES_CODE = `const style = document.createElement('style');
+style.textContent = '.reflist { font-size: 0.8em; columns: 2; }';
+document.head.appendChild(style);`;
 
 /**
  * Each step is one assistant turn: `text` streams out as content deltas, `calls` become tool_calls.
@@ -70,6 +81,7 @@ const SCRIPTS = [
               name: 'Wikipedia: full-width article',
               description: 'Hides the pinned table of contents and lets the article body use the whole window.',
               matches: ['*://*.wikipedia.org/wiki/*'],
+              untested_reason: 'chrome.userScripts is unavailable in this automated profile',
               code: `const css = \`
   /* Pinned table of contents and the empty column it sits in */
   #vector-toc-pinned-container,
@@ -118,6 +130,7 @@ document.head.appendChild(style);`,
               name: 'Hacker News dark',
               description: 'A dark theme for Hacker News: dark surfaces, dimmed orange header, readable link colors.',
               matches: ['*://news.ycombinator.com/*'],
+              untested_reason: 'chrome.userScripts is unavailable in this automated profile',
               code: `const css = \`
   body, #hnmain { background: #16181c !important; color: #c9ccd1 !important; }
 
@@ -167,6 +180,7 @@ document.documentElement.appendChild(style);`,
               name: 'Wikipedia: no site notices',
               description: 'Removes the dismissable banner at the top of articles, including ones inserted after load.',
               matches: ['*://*.wikipedia.org/*'],
+              untested_reason: 'chrome.userScripts is unavailable in this automated profile',
               code: `const SELECTOR = '#siteNotice, .mw-dismissable-notice';
 
 const drop = () => document.querySelectorAll(SELECTOR).forEach((el) => el.remove());
@@ -245,6 +259,56 @@ setTimeout(() => observer.disconnect(), 10000);`,
       {
         text: `${FAST_MARKER} answered immediately, in a different chat on a different site.`,
         calls: [],
+      },
+    ],
+  },
+
+  {
+    // The agent-guardrails conversation, for the smoke run. It deliberately misbehaves twice, so
+    // the smoke can assert that the loop pushes back rather than going along with it:
+    //
+    //   steps 0-3  four page reads in a row and nothing acted on  -> lib/agent/budget.ts nudges
+    //   step 4     propose_mod with no run_script behind it       -> lib/agent/propose.ts refuses
+    //   step 5     propose_mod again with untested_reason         -> accepted, card says untested
+    //
+    // The second propose is the recovery path an override is for: chrome.userScripts is
+    // unavailable under automation (see note 4 in scripts/screenshots.mjs), so a script here
+    // genuinely cannot be run, which is exactly the situation untested_reason exists to describe.
+    name: 'guardrails',
+    match: /tidy up the references section/i,
+    steps: [
+      { text: 'Looking at the page.', calls: [{ name: 'get_page', args: { max_chars: 6000 } }] },
+      { text: 'Checking the reference list.', calls: [{ name: 'find_elements', args: { selector: '.reflist', limit: 3 } }] },
+      { text: 'And the citations inside it.', calls: [{ name: 'find_elements', args: { selector: '.reference', limit: 3 } }] },
+      { text: 'One more look at the styling.', calls: [{ name: 'get_styles', args: { selector: '.reflist', properties: ['font-size'] } }] },
+      {
+        text: 'That should be enough to write it.',
+        calls: [
+          {
+            name: 'propose_mod',
+            args: {
+              name: 'Wikipedia: compact references',
+              description: 'Shrinks the reference list so it takes less room at the bottom of an article.',
+              matches: ['*://*.wikipedia.org/wiki/*'],
+              code: REFERENCES_CODE,
+            },
+          },
+        ],
+      },
+      {
+        text: 'I cannot run scripts on this page, so I am proposing it untested.',
+        calls: [
+          {
+            name: 'propose_mod',
+            args: {
+              name: 'Wikipedia: compact references',
+              description: 'Shrinks the reference list so it takes less room at the bottom of an article.',
+              matches: ['*://*.wikipedia.org/wiki/*'],
+              code: REFERENCES_CODE,
+              untested_reason: 'scripts cannot be run in this browser profile',
+            },
+          },
+        ],
       },
     ],
   },

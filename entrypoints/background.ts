@@ -5,6 +5,7 @@ import { fetchText, previewFromUrl, resolveDependencies, toBase64 } from '@/lib/
 import { UPDATED_MARK } from '@/lib/importreport';
 import { scriptIdentity } from '@/lib/installurl';
 import { resyncPlan } from '@/lib/resync';
+import { mapStack, prepareRunScript, renderRunResult, type RunResult } from '@/lib/runscript';
 import { shouldUpdate } from '@/lib/version';
 import { loadMods, modFromSource, parseHeader, previewFromSource, upsertMod, deleteMod, saveMods } from '@/lib/mods';
 import { appendTurn, archiveChat, createChat, deleteChat, getChat, listChats, loadMessages, markTitleRefreshed, renameChat, saveMessages, setModelTitle, touchChat } from '@/lib/chats';
@@ -329,9 +330,9 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
         const mod = (await loadMods()).find((m) => m.id === req.modId);
         if (!mod) throw new Error('That mod no longer exists.');
         const code = buildRegisteredCode(mod, await loadGmValues(mod.id));
-        return executeInTab(req.tabId, code, { world: mod.world });
+        return legacyRunShape(await executeInTab(req.tabId, code, { world: mod.world, raw: true }));
       }
-      return executeInTab(req.tabId, req.code);
+      return legacyRunShape(await executeInTab(req.tabId, req.code, { raw: true }));
     }
     case 'userScripts.status':
       return userScriptsStatus();
@@ -757,47 +758,144 @@ async function syncRegistrations(): Promise<void> {
 }
 
 /**
- * Run code once in a tab, in the USER_SCRIPT world. The wrapper captures console output and the
- * final value (awaiting promises), then reports back over runtime messaging so async code works.
+ * Everything the injected wrapper puts around the model's code, split so the line offset of the
+ * user's first line is a computable constant rather than a guess. mapStack() needs that offset to
+ * report a thrown error at the line the model wrote, not the line the wrapper landed on.
+ *
+ * The observer is the answer to "the script reported nothing, did it do anything?": a script whose
+ * only effect is `forEach((e) => e.remove())` has no return value, and without a count of what it
+ * moved the model has no evidence it worked and goes back to inspecting the page.
  */
-async function executeInTab(tabId: number, code: string, opts: { world?: Mod['world']; timeoutMs?: number } = {}) {
-  const { world = 'USER_SCRIPT', timeoutMs = 20_000 } = opts;
-  const status = userScriptsStatus();
-  if (!status.available) throw new Error(status.message);
-  const runId = crypto.randomUUID();
-  const wrapped = `(async () => {
+function wrapForExecution(code: string, runId: string): { wrapped: string; lineOffset: number } {
+  const preamble = `(async () => {
     const __logs = [];
     const __fmt = (a) => a.map((x) => { try { return typeof x === 'string' ? x : JSON.stringify(x); } catch { return String(x); } }).join(' ');
     const __console = globalThis.console;
     const console = { ...__console, log: (...a) => { __logs.push(__fmt(a)); __console.log(...a); }, info: (...a) => { __logs.push(__fmt(a)); __console.info(...a); }, warn: (...a) => { __logs.push('warn: ' + __fmt(a)); __console.warn(...a); }, error: (...a) => { __logs.push('error: ' + __fmt(a)); __console.error(...a); } };
+    const __dom = { added: 0, removed: 0, attributes: 0 };
+    let __obs = null;
+    try {
+      __obs = new MutationObserver((records) => {
+        for (const r of records) {
+          if (r.type === 'attributes') __dom.attributes++;
+          else { __dom.added += r.addedNodes.length; __dom.removed += r.removedNodes.length; }
+        }
+      });
+      __obs.observe(document.documentElement, { childList: true, subtree: true, attributes: true });
+    } catch {}
     let __out;
     try {
-      const __r = await (async () => { ${code}\n })();
+      const __r = await (async () => {`;
+  const epilogue = `
+      })();
+      // One microtask turn and one frame, so a removal the page does in a rAF callback is counted.
+      await new Promise((r) => { try { requestAnimationFrame(() => r()); setTimeout(r, 50); } catch { r(); } });
+      try { __obs && __obs.takeRecords().forEach((r) => { if (r.type === 'attributes') __dom.attributes++; else { __dom.added += r.addedNodes.length; __dom.removed += r.removedNodes.length; } }); } catch {}
       let __s; try { __s = typeof __r === 'string' ? __r : JSON.stringify(__r); } catch { __s = String(__r); }
-      __out = { ok: true, result: __s === undefined ? 'undefined' : String(__s).slice(0, 4000), logs: __logs };
+      __out = { ok: true, returnedValue: __r !== undefined, result: __s === undefined ? 'undefined' : String(__s).slice(0, 4000), dom: __dom, logs: __logs };
     } catch (e) {
-      __out = { ok: false, error: (e && e.stack) ? String(e.stack).slice(0, 2000) : String(e), logs: __logs };
+      __out = { ok: false, error: (e && e.stack) ? String(e.stack).slice(0, 4000) : String(e), dom: __dom, logs: __logs };
     }
+    try { __obs && __obs.disconnect(); } catch {}
     try { chrome.runtime.sendMessage({ type: 'usermods:run-result', runId: ${JSON.stringify(runId)}, ...__out }); } catch {}
     return __out;
   })()`;
+  // The user's first line begins on the line after the preamble's last newline.
+  return { wrapped: `${preamble} ${code}${epilogue}`, lineOffset: preamble.split('\n').length - 1 };
+}
 
-  const result = new Promise<{ ok: boolean; result?: string; logs: string[]; error?: string }>((resolve) => {
-    const timer = setTimeout(() => {
-      chrome.runtime.onUserScriptMessage.removeListener(listener);
-      resolve({ ok: false, error: `Timed out after ${timeoutMs / 1000}s (the script may still be running).`, logs: [] });
-    }, timeoutMs);
-    const listener = (msg: { type?: string; runId?: string } & Record<string, unknown>) => {
-      if (msg?.type !== 'usermods:run-result' || msg.runId !== runId) return;
+/**
+ * Run code once in a tab, in the USER_SCRIPT world. The wrapper captures console output, the
+ * returned value (awaiting promises) and a count of what the DOM did, then reports back over
+ * runtime messaging so async code works.
+ *
+ * `raw: true` injects the code exactly as given — that is the path `mods.try` uses, where the code
+ * is a whole registered userscript and a last-expression rewrite would be wrong.
+ */
+async function executeInTab(
+  tabId: number,
+  code: string,
+  opts: { world?: Mod['world']; timeoutMs?: number; raw?: boolean } = {},
+): Promise<RunResult> {
+  const { world = 'USER_SCRIPT', timeoutMs = 20_000, raw = false } = opts;
+  const status = userScriptsStatus();
+  if (!status.available) throw new Error(status.message);
+
+  let source = code;
+  if (!raw) {
+    const prepared = prepareRunScript(code);
+    // Injecting code we know does not parse wastes a round trip and reports the failure as a
+    // runtime error from inside the wrapper; saying so here is both faster and more precise.
+    if (!prepared.ok) return { outcome: { kind: 'threw', error: prepared.message }, logs: [] };
+    source = prepared.code;
+  }
+
+  const runId = crypto.randomUUID();
+  const { wrapped, lineOffset } = wrapForExecution(source, runId);
+  const codeLines = source.split('\n').length;
+
+  // Watching the tab is how a lost result stops looking like a timeout. The wrapper reports over
+  // chrome.runtime.sendMessage; a navigation or unload between the script finishing and that
+  // message flushing drops it silently, and the model used to be told only that 20s had passed.
+  const result = new Promise<RunResult>((resolve) => {
+    let settled = false;
+    const finish = (r: RunResult) => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timer);
       chrome.runtime.onUserScriptMessage.removeListener(listener);
-      resolve({ ok: !!msg.ok, result: msg.result as string | undefined, logs: (msg.logs as string[]) ?? [], error: msg.error as string | undefined });
+      chrome.tabs.onUpdated.removeListener(onUpdated);
+      chrome.tabs.onRemoved.removeListener(onRemoved);
+      resolve(r);
+    };
+
+    const timer = setTimeout(() => finish({ outcome: { kind: 'timeout', seconds: timeoutMs / 1000 }, logs: [] }), timeoutMs);
+
+    const listener = (msg: { type?: string; runId?: string } & Record<string, unknown>) => {
+      if (msg?.type !== 'usermods:run-result' || msg.runId !== runId) return;
+      const logs = (msg.logs as string[]) ?? [];
+      if (msg.ok) {
+        finish({
+          outcome: {
+            kind: 'ok',
+            returnedValue: !!msg.returnedValue,
+            result: msg.result as string | undefined,
+            dom: msg.dom as { added: number; removed: number; attributes: number } | undefined,
+          },
+          logs,
+        });
+      } else {
+        const stack = String(msg.error ?? '');
+        finish({ outcome: { kind: 'threw', error: mapStack(stack, lineOffset, codeLines) }, logs });
+      }
     };
     chrome.runtime.onUserScriptMessage.addListener(listener);
+
+    const onUpdated = (id: number, change: chrome.tabs.OnUpdatedInfo, tab: chrome.tabs.Tab) => {
+      if (id !== tabId || change.status !== 'loading') return;
+      finish({ outcome: { kind: 'navigated', url: change.url ?? tab.url ?? 'a new page' }, logs: [] });
+    };
+    chrome.tabs.onUpdated.addListener(onUpdated);
+
+    const onRemoved = (id: number) => {
+      if (id === tabId) finish({ outcome: { kind: 'navigated', url: 'a closed tab' }, logs: [] });
+    };
+    chrome.tabs.onRemoved.addListener(onRemoved);
+
+    // An injection that never starts is its own failure, and saying "timed out" for it is a lie.
+    chrome.userScripts
+      .execute({ target: { tabId }, js: [{ code: wrapped }], world })
+      .catch((e: unknown) => finish({ outcome: { kind: 'injection-failed', reason: e instanceof Error ? e.message : String(e) }, logs: [] }));
   });
 
-  await chrome.userScripts.execute({ target: { tabId }, js: [{ code: wrapped }], world });
   return result;
+}
+
+/** The `{ok, result, logs, error}` shape `mods.try` and the panel have always spoken. */
+function legacyRunShape(r: RunResult): { ok: boolean; result?: string; logs: string[]; error?: string } {
+  const rendered = renderRunResult(r);
+  if (r.outcome.kind === 'ok') return { ok: true, result: r.outcome.result ?? 'undefined', logs: r.logs };
+  return { ok: false, error: rendered.text, logs: r.logs };
 }
 
 // ---------- content script plumbing ----------

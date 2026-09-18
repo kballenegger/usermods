@@ -108,6 +108,11 @@ export interface ModProposal {
   matches: string[];
   /** Script body without the userscript header. */
   code: string;
+  /**
+   * Set when the model proposed without a successful run_script and said why. Shown on the
+   * proposal card so the user knows this one was never run on a real page.
+   */
+  untestedReason?: string;
 }
 
 // Events streamed from the background agent loop to the side panel over a Port.
@@ -138,6 +143,12 @@ export type AgentEventBody =
   | { type: 'accepted'; id: string }
   /** A queued message was dropped because the run was stopped; the panel gets its text back. */
   | { type: 'unqueued'; id: string }
+  /**
+   * The turn ended on its own terms rather than by finishing: the step cap was reached. Not an
+   * error — the conversation is intact and a reply continues it — so the panel shows it as a
+   * muted note rather than a red row.
+   */
+  | { type: 'stopped'; reason: 'max_steps'; steps: number }
   | { type: 'done' }
   /**
    * A chat was renamed by the model after a turn finished, so the switcher can follow along. Like

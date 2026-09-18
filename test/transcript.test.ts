@@ -90,6 +90,13 @@ test('error appends an error row, done changes nothing', () => {
   assert.equal(reduceItems(withError, { type: 'done' }), withError);
 });
 
+test("running out of steps is a note, not an error — it must not read as something that went wrong", () => {
+  const items = reduceItems([{ kind: 'assistant', text: 'still looking' }], { type: 'stopped', reason: 'max_steps', steps: 30 });
+  assert.deepEqual(items[items.length - 1], { kind: 'note', text: 'stopped after 30 steps \u00b7 send a message to continue' });
+  // The panel renders 'error' rows red and 'note' rows muted, so the kind is the whole point here.
+  assert.equal(items.some((it) => it.kind === 'error'), false);
+});
+
 test('reduceItems never mutates the array it is given', () => {
   const items: ChatItem[] = [{ kind: 'assistant', text: 'a' }];
   const snapshot = structuredClone(items);
