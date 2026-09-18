@@ -138,6 +138,23 @@ export function SettingsView({ onReviewNotice }: { onReviewNotice?: () => void }
         {models.length > 0 && <span>{models.length} models available. Start typing to filter.</span>}
       </label>
 
+      <label className="field">
+        <span className="row" style={{ gap: 6 }}>
+          <input
+            type="checkbox"
+            checked={s.autoNameChats !== false}
+            onChange={(e) => update({ autoNameChats: e.target.checked })}
+            style={{ width: 'auto', flex: 'none' }}
+          />
+          Name chats automatically
+        </span>
+        <span>
+          After the first reply, usermods asks the model above for a short name for the chat — one
+          extra, small request per chat. Off, a chat keeps the first thing you typed as its name.
+          Renaming a chat yourself always sticks either way.
+        </span>
+      </label>
+
       <div className="muted" style={{ fontSize: 12 }}>{saved ? 'All changes saved.' : 'Saving…'}</div>
       <p className="muted" style={{ marginTop: 20 }}>
         {subscription

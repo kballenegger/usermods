@@ -7,7 +7,9 @@ import { scriptIdentity } from '@/lib/installurl';
 import { resyncPlan } from '@/lib/resync';
 import { shouldUpdate } from '@/lib/version';
 import { loadMods, modFromSource, parseHeader, previewFromSource, upsertMod, deleteMod, saveMods } from '@/lib/mods';
-import { appendTurn, archiveChat, createChat, deleteChat, listChats, loadMessages, renameChat, saveMessages, touchChat } from '@/lib/chats';
+import { appendTurn, archiveChat, createChat, deleteChat, getChat, listChats, loadMessages, markTitleRefreshed, renameChat, saveMessages, setModelTitle, touchChat } from '@/lib/chats';
+import { buildTitleInput, completedTurns, sanitizeTitle, titleDecision, TITLE_SYSTEM_PROMPT } from '@/lib/title';
+import { createProvider } from '@/lib/providers';
 import {
   CHATGPT_CODEX_BASE,
   STORE_BUILD,
@@ -18,7 +20,7 @@ import type { OAuthKind } from '@/lib/oauth';
 import type { AgentPortRequest, OAuthLoginState, RpcRequest } from '@/lib/rpc';
 import { loadSettings } from '@/lib/settings';
 import { looksLikeZip, parseTampermonkeyJson, parseTampermonkeyZipEntries, type TmScript } from '@/lib/tampermonkey';
-import type { ContentRequest, Mod, Msg, UserTurn } from '@/lib/types';
+import type { AgentEvent, ContentRequest, Mod, Msg, Part, Settings, UserTurn } from '@/lib/types';
 
 export default defineBackground(() => {
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
@@ -66,12 +68,16 @@ export default defineBackground(() => {
       running = true;
       controller = new AbortController();
       const signal = controller.signal;
+      // Only a turn that finished cleanly is worth naming: an aborted or failed one has nothing
+      // the model could summarise, and the user's own message is already the placeholder title.
+      let succeeded = false;
+      let settings: Settings | null = null;
       // Held outside the try so the catch can still write the conversation back. runAgent only
       // returns messages on success, so a provider error (429, a bad key) would otherwise leave
       // the whole chat unsaved and the user's turn lost.
       let history: Msg[] = [];
       try {
-        const settings = await loadSettings();
+        settings = await loadSettings();
         const usesKey = settings.provider === 'anthropic' || settings.provider === 'openai-compatible';
         if (usesKey && !settings.apiKey && !settings.baseUrl) throw new Error('Add an API key in Settings first (or a base URL for a local server or proxy).');
         if (!settings.model) throw new Error('Choose a model in Settings first.');
@@ -89,6 +95,7 @@ export default defineBackground(() => {
         });
         await saveMessages(chatId, messages);
         await touchChat(chatId);
+        succeeded = !signal.aborted;
       } catch (e) {
         // Keep everything that was already in the chat, plus the turn that failed, so retrying
         // does not start from nothing. Partial assistant output inside the failed run is lost;
@@ -104,8 +111,12 @@ export default defineBackground(() => {
       running = false;
       // Stop clears the queue; otherwise anything still waiting starts the next turn.
       const next = queue.shift();
-      if (next && !signal.aborted) void run(tabId, chatId, next);
-      else post({ type: 'done' });
+      if (next && !signal.aborted) return void run(tabId, chatId, next);
+      post({ type: 'done' });
+      // Naming the chat is a second, tool-free model call. It runs only after 'done' has been
+      // posted and its result is never awaited by the turn, so a slow or failing title call cannot
+      // delay, break or fail what the user actually asked for. Errors are swallowed and logged.
+      if (succeeded && settings) void nameChat(chatId, settings, post);
     }
 
     port.onMessage.addListener((req: AgentPortRequest) => {
@@ -166,6 +177,77 @@ async function installUserJsRedirect(): Promise<void> {
       },
     ],
   });
+}
+
+// ---------- chat titles ----------
+
+/**
+ * One tool-free model call: ask the provider for a short answer to a system prompt.
+ *
+ * This deliberately reuses Provider.chat with an empty tool list rather than adding a method to the
+ * Provider interface — every adapter already omits the tools field when there are none, so all four
+ * backends get this for free and none of them grew an API.
+ */
+async function complete(settings: Settings, system: string, user: string, signal?: AbortSignal): Promise<string> {
+  const res = await createProvider(settings).chat({
+    system,
+    messages: [{ role: 'user', content: [{ type: 'text', text: user }] }],
+    tools: [],
+    signal,
+    callbacks: { onText: () => {} },
+  });
+  return res.content
+    .filter((p): p is Extract<Part, { type: 'text' }> => p.type === 'text')
+    .map((p) => p.text)
+    .join('')
+    .trim();
+}
+
+/** A title call that hangs must not keep the worker alive, so it gets its own deadline. */
+const TITLE_TIMEOUT_MS = 20_000;
+
+/**
+ * Give the chat a model-written name, if it is due one.
+ *
+ * Called after 'done' has already been posted, so nothing here is on the user's critical path.
+ * Every failure — no provider, a 429, a nonsense reply, the chat being deleted meanwhile — leaves
+ * the existing title in place and is logged, never surfaced as a chat error.
+ */
+async function nameChat(chatId: string, settings: Settings, post: (e: AgentEvent) => void): Promise<void> {
+  try {
+    if (settings.autoNameChats === false) return;
+    const chat = await getChat(chatId);
+    const messages = await loadMessages(chatId);
+    const decision = titleDecision(chat, completedTurns(messages), true);
+    if (decision.kind === 'none') return;
+    const refresh = decision.kind === 'refresh';
+    // The first title reads the whole first exchange; the refresh reads what the chat has become,
+    // which is the last three things the user asked for.
+    const input = buildTitleInput(messages, refresh ? { userMessages: 3, includeAssistant: false } : { userMessages: 1, includeAssistant: true });
+    if (!input) return;
+
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), TITLE_TIMEOUT_MS);
+    let raw: string;
+    try {
+      raw = await complete(settings, TITLE_SYSTEM_PROMPT, input, ac.signal);
+    } finally {
+      clearTimeout(timer);
+    }
+
+    const title = sanitizeTitle(raw);
+    // An empty or refusal-shaped reply means keep what we have. The refresh is still spent, so a
+    // model that will not name this chat is not asked again on every later turn.
+    if (!title) {
+      if (refresh) await markTitleRefreshed(chatId);
+      return;
+    }
+    const stored = await setModelTitle(chatId, title, { refresh });
+    // The panel may be closed, in which case the title is simply stored and read back next open.
+    if (stored) post({ type: 'chat_title', chatId, title: stored });
+  } catch (e) {
+    console.warn('[usermods] chat title', e);
+  }
 }
 
 // ---------- RPC ----------

@@ -17,6 +17,9 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
   const [busy, setBusy] = useState(false);
   const [refs, setRefs] = useState<ElementRef[]>([]);
   const [picking, setPicking] = useState(false);
+  /** The draft title while the switcher is in rename mode, or null when it is a select again. */
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const renameRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const portRef = useRef<chrome.runtime.Port | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -48,6 +51,7 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
     setItems([]);
     setChatId(null);
     setChats([]);
+    setRenaming(null);
     if (!host) {
       setLoaded(true);
       return;
@@ -154,6 +158,9 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
             }
             return next.filter((it) => !(it.kind === 'user' && it.id === e.id));
           }
+          case 'chat_title':
+            // Handled outside the transcript: it renames a row in the switcher, not a message.
+            return next;
           case 'error':
             next.push({ kind: 'error', text: e.message });
             return next;
@@ -161,6 +168,9 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
             return next;
         }
       });
+      // The background named the chat after the turn finished. Patch the switcher in place rather
+      // than refetching, so the new name appears the moment it is written.
+      if (e.type === 'chat_title') setChats((prev) => prev.map((c) => (c.id === e.chatId ? { ...c, title: e.title, titleSource: 'auto-model' } : c)));
       if (e.type === 'done') setBusy(false);
     });
     port.onDisconnect.addListener(() => {
@@ -267,6 +277,8 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
     portChatRef.current = null;
     reconnectRef.current = false;
     titleFixRef.current = false;
+    // A half-typed name belongs to the chat being left, so it is dropped rather than carried over.
+    setRenaming(null);
   }
 
   /**
@@ -355,6 +367,34 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
     }
   }
 
+  /** Turn the switcher into a text input holding the current title, selected for replacement. */
+  function startRename() {
+    if (!chatId) return;
+    setRenaming(chats.find((c) => c.id === chatId)?.title ?? '');
+    requestAnimationFrame(() => {
+      renameRef.current?.focus();
+      renameRef.current?.select();
+    });
+  }
+
+  /**
+   * Commit the typed title. It becomes titleSource 'user' in storage, which is what stops the model
+   * from renaming this chat at its 4th turn, so the optimistic update below records that too.
+   */
+  async function commitRename() {
+    const id = chatId;
+    const title = (renaming ?? '').trim();
+    setRenaming(null);
+    if (!id || !title) return;
+    const before = chats;
+    setChats((prev) => prev.map((c) => (c.id === id ? { ...c, title, titleSource: 'user' } : c)));
+    try {
+      await rpc({ type: 'chats.rename', id, title });
+    } catch {
+      setChats(before); // the rename did not land; show what is actually stored
+    }
+  }
+
   async function pick() {
     if (tabId == null) return;
     setPicking(true);
@@ -393,24 +433,51 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
     <div className="chat">
       {!unsupported && host && chats.length > 0 && (
         <div className="chatbar">
-          <select value={chatId ?? ''} onChange={(e) => switchTo(e.target.value || null)} title={`Chats on ${host}`}>
-            <option value="">New chat…</option>
-            {live.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.title} · {relativeTime(c.updatedAt)}
-              </option>
-            ))}
-            {archived.length > 0 && (
-              <optgroup label="Archived">
-                {archived.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.title} · {relativeTime(c.updatedAt)}
-                  </option>
-                ))}
-              </optgroup>
-            )}
-          </select>
-          {viewingArchived ? (
+          {renaming !== null ? (
+            <input
+              ref={renameRef}
+              className="rename"
+              value={renaming}
+              onChange={(e) => setRenaming(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  void commitRename();
+                } else if (e.key === 'Escape') {
+                  e.preventDefault();
+                  setRenaming(null);
+                }
+              }}
+              onBlur={() => setRenaming(null)}
+              placeholder="Name this chat"
+              aria-label="Chat name"
+            />
+          ) : (
+            <select value={chatId ?? ''} onChange={(e) => switchTo(e.target.value || null)} title={`Chats on ${host}`}>
+              <option value="">New chat…</option>
+              {live.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.title} · {relativeTime(c.updatedAt)}
+                </option>
+              ))}
+              {archived.length > 0 && (
+                <optgroup label="Archived">
+                  {archived.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.title} · {relativeTime(c.updatedAt)}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+          )}
+          {renaming !== null ? (
+            // Mousedown, not click: the input's blur would close rename mode before a click landed.
+            <button className="btn primary" onMouseDown={(e) => e.preventDefault()} onClick={() => void commitRename()} title="Save this name">Save</button>
+          ) : (
+            <button className="btn" onClick={startRename} disabled={!chatId} title="Give this chat your own name. It will not be renamed automatically afterwards.">Rename</button>
+          )}
+          {renaming !== null ? null : viewingArchived ? (
             <>
               <button className="btn" onClick={() => void setArchived(chatId!, false)} title="Move this chat back to the main list">Unarchive</button>
               <button className="btn danger" onClick={() => void removeChat()} title="Delete this chat for good">Delete</button>

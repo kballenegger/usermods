@@ -177,6 +177,29 @@ const FALLBACK = {
 };
 
 // ---------------------------------------------------------------------------
+// Chat titles
+// ---------------------------------------------------------------------------
+//
+// After a turn completes, the background makes one extra call with no tools and the title system
+// prompt from lib/title.ts, asking for a short name for the chat. It is answered here with a fixed
+// string, deliberately dressed in the quotes and trailing period a real model tends to add, so the
+// screenshots flow exercises the panel's sanitiser rather than a pre-cleaned answer.
+
+/** Matches the title system prompt without pinning its exact wording. */
+const TITLE_SYSTEM = /you name chat conversations/i;
+const TITLE_REPLY = '"Full-width Wikipedia articles."';
+
+// The title the switcher should end up showing once lib/title.ts has stripped the quotes and the
+// period: "Full-width Wikipedia articles". screenshots.mjs keeps its own copy of that string rather
+// than importing it, because importing this file starts a second server on the same port.
+
+/** A title request: no tools offered, and a system message that reads like the title prompt. */
+function isTitleRequest(body) {
+  if ((body.tools ?? []).length) return false;
+  return (body.messages ?? []).some((m) => m.role === 'system' && TITLE_SYSTEM.test(messageText(m)));
+}
+
+// ---------------------------------------------------------------------------
 // Protocol
 // ---------------------------------------------------------------------------
 
@@ -277,16 +300,22 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     const messages = body.messages ?? [];
-    const script = pickScript(messages);
-    const step = stepFor(script, messages);
-    if (process.env.MOCK_LLM_VERBOSE) {
-      console.log(`[mock-llm] ${script.name ?? 'fallback'} step ${script.steps.indexOf(step)}: ${(step.calls ?? []).map((c) => c.name).join(', ') || 'text only'}`);
-    }
     res.writeHead(200, {
       'content-type': 'text/event-stream',
       'cache-control': 'no-cache',
       connection: 'keep-alive',
     });
+    // The title call is a one-shot, tool-free request; it never takes a step out of a script.
+    if (isTitleRequest(body)) {
+      if (process.env.MOCK_LLM_VERBOSE) console.log(`[mock-llm] title -> ${TITLE_REPLY}`);
+      await streamStep(res, { text: TITLE_REPLY, calls: [] }, body.model ?? 'demo');
+      return;
+    }
+    const script = pickScript(messages);
+    const step = stepFor(script, messages);
+    if (process.env.MOCK_LLM_VERBOSE) {
+      console.log(`[mock-llm] ${script.name ?? 'fallback'} step ${script.steps.indexOf(step)}: ${(step.calls ?? []).map((c) => c.name).join(', ') || 'text only'}`);
+    }
     await streamStep(res, step, body.model ?? 'demo');
     return;
   }

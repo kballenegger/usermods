@@ -81,3 +81,5 @@ label.field input, label.field select { font: inherit; padding: 6px 8px; border:
 .chatbar { flex: none; display: flex; gap: 6px; align-items: center; padding: 6px 8px; border-bottom: 1px solid var(--border); }
 .chatbar select { flex: 1; min-width: 0; font: inherit; font-size: 12px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); color: var(--fg); }
 .chatbar .btn { padding: 4px 8px; font-size: 12px; }
+/* Rename mode: the input stands exactly where the select was, so the bar does not jump. */
+.chatbar input.rename { flex: 1; min-width: 0; font: inherit; font-size: 12px; padding: 4px 6px; border: 1px solid var(--accent); border-radius: 6px; background: var(--card); color: var(--fg); }
