@@ -710,6 +710,16 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // A library for the dashboard flow's @require assertion: it needs a real, fetchable dependency to
+  // prove that editing a mod's header to add an @require actually fetches and stores the body.
+  // The query string decides what the library defines, so one route serves two different versions.
+  if (url.pathname === '/__require.js') {
+    const name = url.searchParams.get('name') ?? 'usermodsTestLib';
+    res.writeHead(200, { 'content-type': 'application/javascript' });
+    res.end(`window.${name} = () => ${JSON.stringify(name)};\n`);
+    return;
+  }
+
   if (url.pathname.endsWith('/models')) {
     res.writeHead(200, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ object: 'list', data: [{ id: 'demo' }, { id: 'demo-mini' }] }));

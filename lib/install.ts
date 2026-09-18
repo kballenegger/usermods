@@ -1,6 +1,9 @@
 // Fetching userscripts from the network: preview before install, and the @require / @resource
 // dependencies a script needs baked in at install time (registered code has no network of its own).
-import { parseHeader, previewFromSource } from './mods';
+// The .ts extension is load-bearing: the node test runner (--experimental-strip-types) resolves
+// these imports literally, and the pure decisions in this file are tested there. Vite resolves it
+// either way. lib/dashboard.ts imports lib/chats.ts the same way for the same reason.
+import { modFromSource, parseHeader, previewFromSource } from './mods.ts';
 import type { Mod, ScriptPreview } from './types';
 
 const FETCH_TIMEOUT_MS = 15_000;
@@ -91,4 +94,56 @@ export async function resolveDependencies(mod: Mod): Promise<Mod> {
   mod.requires = requires;
   mod.resources = resources;
   return mod;
+}
+
+/**
+ * An edited source as a Mod, keeping everything about the existing mod that is its identity rather
+ * than its text: the id, the enabled flag, when it was created, where it came from, and the
+ * dependency bodies already fetched for it. Everything the header decides comes from the new text.
+ *
+ * modFromSource(source, existing) already does most of this: passing the existing mod carries its
+ * id, enabled flag, createdAt, downloadUrl (when the edited header names none) and its already
+ * fetched @require/@resource bodies forward, which is exactly what an edit should keep.
+ *
+ * The one field it gets wrong for an edit is `matches`: it falls back to the existing mod's
+ * patterns when the new header has none, which is right for an install (a missing @match is an
+ * error the caller rejects) and wrong here, where deleting the last @match line has to actually
+ * delete it — otherwise the mod goes on running on a site the user just told it to stop running on,
+ * and the caller never gets the chance to reject the save. So the shared parse is reused and that
+ * one field is overridden with what the header really said.
+ */
+export function reparseEditedSource(existing: Mod, source: string): Mod {
+  return { ...modFromSource(source, existing), matches: parseHeader(source).matches };
+}
+
+/**
+ * Does this source's @require / @resource set differ from the bodies a mod already carries?
+ *
+ * The dashboard's source editor asks this before saving: refetching every dependency on every
+ * keystroke-sized edit would put a network round trip in front of a one-character CSS change, and
+ * NOT refetching when the header's dependency lines moved is the bug that makes the saved mod throw
+ * ReferenceError on the next page load, because it is re-registered with the old bodies (or with
+ * none at all) under a header that says it needs new ones.
+ *
+ * Order matters: a script that loads jQuery then a plugin is not the same as one that loads them
+ * the other way round, and the registered code concatenates the bodies in header order. A resource
+ * is identified by name AND url, since renaming a resource changes what GM_getResourceText returns
+ * for a given name even when the bytes are identical.
+ *
+ * `have.requires` is compared on url alone: the body is whatever that url served at fetch time, and
+ * a mod whose header still names the same urls keeps the bodies it has rather than refetching them.
+ */
+export function dependenciesChanged(
+  source: string,
+  have: Pick<Mod, 'requires' | 'resources'>,
+): boolean {
+  const h = parseHeader(source);
+  const wantRequires = h.requires;
+  const haveRequires = (have.requires ?? []).map((r) => r.url);
+  if (wantRequires.length !== haveRequires.length || wantRequires.some((u, i) => u !== haveRequires[i])) return true;
+  // A NUL separator, written as an escape rather than an invisible byte in the source, so that no
+  // name/url pair can be spelled two ways and compare equal.
+  const wantResources = h.resources.map((r) => `${r.name}\u0000${r.url}`);
+  const haveResources = (have.resources ?? []).map((r) => `${r.name}\u0000${r.url}`);
+  return wantResources.length !== haveResources.length || wantResources.some((k, i) => k !== haveResources[i]);
 }

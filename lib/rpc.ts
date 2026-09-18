@@ -22,6 +22,13 @@ export type RpcRequest =
   | { type: 'mods.preview'; source: string }
   /** Install an outside userscript: parse, fetch @require/@resource, save, register. */
   | { type: 'mods.install'; source: string; downloadUrl?: string; enabled?: boolean; values?: Record<string, unknown> }
+  /**
+   * Save an edited source over an existing mod: re-parse the header, refetch @require/@resource if
+   * and only if the header's dependency lines changed, keep the mod's id, enabled flag, GM values
+   * and provenance, and re-register. This is what a source editor saves through — mods.save takes a
+   * caller-built Mod and does no dependency resolution at all.
+   */
+  | { type: 'mods.saveSource'; id: string; source: string }
   /** Refetch from downloadUrl and replace the source if @version moved. */
   | { type: 'mods.update'; id: string }
   /** Import a Tampermonkey backup (JSON text, or a base64 ZIP). */
@@ -58,6 +65,7 @@ interface RpcResults {
   'mods.delete': Mod[];
   'mods.toggle': Mod[];
   'mods.install': Mod[];
+  'mods.saveSource': Mod[];
   'mods.preview': ScriptPreview;
   'mods.update': { updated: boolean; version: string };
   'mods.importBackup': { imported: number; skipped: string[]; mods: Mod[] };

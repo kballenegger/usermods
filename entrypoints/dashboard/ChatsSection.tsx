@@ -5,9 +5,12 @@ import {
   chatOpenUrl,
   groupChatsByHost,
   HANDOFF_KEY,
+  openChatOf,
   searchChats,
+  staleTranscripts,
   timeLabel,
   toggleSelectAll,
+  transcriptSearchKey,
   transcriptsToSearch,
   type ChatHandoff,
 } from '@/lib/dashboard';
@@ -27,7 +30,13 @@ export function ChatsSection({ chats, loaded, onChanged }: { chats: Chat[]; load
   /** Transcript text by chat id, loaded lazily for search. Never evicted: a profile caps at 200 chats. */
   const [transcripts, setTranscripts] = useState<Map<string, string>>(new Map());
   const [preview, setPreview] = useState<{ id: string; items: ChatItem[] } | null>(null);
-  const haveRef = useRef<Set<string>>(new Set());
+  /**
+   * The updatedAt each cached transcript was read at, and by its keys the set of chats already
+   * fetched (or attempted). A ref rather than state: the sweep writes it as it goes and nothing
+   * renders from it, so a write here must not itself schedule a render — that is what made the
+   * effect restart on its own output.
+   */
+  const stampsRef = useRef<Map<string, number>>(new Map());
 
   // Debounce the search box: every keystroke otherwise re-filters and, worse, queues transcript
   // reads for chats whose metadata did not match.
@@ -39,61 +48,102 @@ export function ChatsSection({ chats, loaded, onChanged }: { chats: Chat[]; load
   // Load the transcripts a search needs, capped and newest-first (transcriptsToSearch decides
   // which). Results render from metadata immediately and gain the message-text matches as these
   // land, so typing is never blocked on storage.
+  //
+  // Two things here are load-bearing, and both were wrong before.
+  //
+  // The dependency is a stable key, not `chats`. The array's identity changes on every storage
+  // write — the dashboard refreshes on any chats or mods write, and a chat running in the side
+  // panel writes several times a second — so an effect keyed on it restarted that often, and each
+  // restart aborted the sweep partway. The key changes only when a chat appeared, disappeared or
+  // was updated, which is the only news this effect has any use for.
+  //
+  // And an id is recorded BEFORE the cancellation check, not after. Recording it after meant the
+  // one read that was in flight when a restart hit was never marked as fetched, so the next run
+  // queued it again, and under sustained writes it was refetched forever: the transcripts that
+  // needed the sweep most (the chat currently running) were the ones it could never finish.
   useEffect(() => {
     if (!query.trim()) return;
     let cancelled = false;
-    const ids = transcriptsToSearch(chats, query, haveRef.current);
+    const ids = transcriptsToSearch(chats, query, new Set(stampsRef.current.keys()));
     if (!ids.length) return;
+    // The updatedAt each read is answering, captured before the await: if the chat is written
+    // again while its transcript is in flight, the stamp stays behind and the next sweep — which
+    // the write itself triggers, because it moves the key — refetches it rather than caching text
+    // that is already out of date.
+    const at = new Map(chats.map((c) => [c.id, c.updatedAt]));
     void (async () => {
       for (const id of ids) {
         if (cancelled) return;
+        stampsRef.current.set(id, at.get(id) ?? 0);
         try {
           const items = await rpc({ type: 'chats.transcript', id });
           if (cancelled) return;
-          haveRef.current.add(id);
           setTranscripts((prev) => new Map(prev).set(id, transcriptText(items)));
         } catch {
           // A transcript that will not load is simply not searchable; its metadata still matches.
-          haveRef.current.add(id);
+          // The stamp stays, so the sweep does not retry it on a loop.
         }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [query, chats]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, transcriptSearchKey(chats)]);
+
+  // Drop the cached transcripts of chats that have been written since they were read (and of chats
+  // that are gone). Without this the cache is permanent: a chat that gains messages while the
+  // dashboard is open goes on being searched by the text it had when it was first read. Dropping
+  // the stamp is what re-queues it — transcriptsToSearch skips whatever stampsRef already holds.
+  useEffect(() => {
+    const stale = staleTranscripts(chats, stampsRef.current);
+    if (!stale.length) return;
+    for (const id of stale) stampsRef.current.delete(id);
+    setTranscripts((prev) => {
+      const next = new Map(prev);
+      for (const id of stale) next.delete(id);
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transcriptSearchKey(chats)]);
 
   const matching = useMemo(() => searchChats(chats, query, transcripts), [chats, query, transcripts]);
   const groups = useMemo(() => groupChatsByHost(matching), [matching]);
   const selection = bulkTargets(selected, matching);
 
-  // A chat that has left the list (deleted elsewhere, or filtered out) must not keep the preview
-  // pane open on content the user can no longer see in the list.
-  useEffect(() => {
-    if (openId && !chats.some((c) => c.id === openId)) {
-      setOpenId(null);
-      setPreview(null);
-    }
-  }, [chats, openId]);
+  /**
+   * The chat the preview pane is showing, derived from the data rather than remembered alongside
+   * it. This is the ONE mechanism that closes a preview whose chat is gone: openId is a wish, and
+   * a wish for a chat that no longer exists simply does not resolve, so the pane falls back to its
+   * empty state on the same render the chat disappeared on.
+   *
+   * There used to be two more, both weaker and both now gone: an effect watching `chats` that
+   * cleared openId one render late, and a guard in bulk() that checked the *filtered* selection, so
+   * deleting the open chat while it was scrolled out of the search results missed it entirely.
+   * Deriving cannot miss a case, because there is no case to remember.
+   */
+  const openChatRecord = openChatOf(chats, openId);
 
-  // The preview pane: read the stored transcript when a row is clicked.
+  // The preview pane: read the stored transcript for whichever chat is actually open. Keyed on the
+  // derived record's id, so a deleted chat stops the read as well as hiding the pane.
+  const openRecordId = openChatRecord?.id ?? null;
   useEffect(() => {
-    if (!openId) {
+    if (!openRecordId) {
       setPreview(null);
       return;
     }
     let cancelled = false;
-    void rpc({ type: 'chats.transcript', id: openId })
+    void rpc({ type: 'chats.transcript', id: openRecordId })
       .then((items) => {
-        if (!cancelled) setPreview({ id: openId, items });
+        if (!cancelled) setPreview({ id: openRecordId, items });
       })
       .catch(() => {
-        if (!cancelled) setPreview({ id: openId, items: [] });
+        if (!cancelled) setPreview({ id: openRecordId, items: [] });
       });
     return () => {
       cancelled = true;
     };
-  }, [openId]);
+  }, [openRecordId]);
 
   const fail = (e: unknown) => setError(e instanceof Error ? e.message : String(e));
 
@@ -163,7 +213,8 @@ export function ChatsSection({ chats, loaded, onChanged }: { chats: Chat[]; load
     if (!confirm(`Delete "${chat.title}"? This cannot be undone.`)) return;
     try {
       await rpc({ type: 'chats.delete', id: chat.id });
-      if (openId === chat.id) setOpenId(null);
+      // Same as bulk(): the pane closes because openChatRecord stops finding the chat, not because
+      // a caller remembered to close it.
       onChanged();
     } catch (e) {
       fail(e);
@@ -177,7 +228,10 @@ export function ChatsSection({ chats, loaded, onChanged }: { chats: Chat[]; load
     try {
       await rpc({ type: 'chats.bulk', ids, action });
       setSelected(new Set());
-      if (action === 'delete' && openId && ids.includes(openId)) setOpenId(null);
+      // No "close the preview if I deleted the open chat" guard here: openChatRecord derives the
+      // open chat from the current data, so a deleted one closes the pane by not being found. The
+      // guard that used to live here tested the *filtered* selection and missed the open chat
+      // whenever the search had scrolled it off screen.
       onChanged();
     } catch (e) {
       fail(e);
@@ -192,8 +246,6 @@ export function ChatsSection({ chats, loaded, onChanged }: { chats: Chat[]; load
       return next;
     });
   }
-
-  const openChatRecord = openId ? chats.find((c) => c.id === openId) : undefined;
 
   return (
     <>

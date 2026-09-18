@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   bulkTargets,
+  editorSync,
   exportFilename,
   exportFilenames,
   filterMods,
@@ -12,7 +13,7 @@ import {
   toggleSelectAll,
   type ModFilter,
 } from '@/lib/dashboard';
-import { modFromSource, parseHeader, previewFromSource } from '@/lib/mods';
+import { previewFromSource } from '@/lib/mods';
 import { rpc } from '@/lib/rpc';
 import type { Mod } from '@/lib/types';
 import { InstallPanel } from './InstallPanel';
@@ -27,12 +28,16 @@ export function ModsSection({ mods, loaded, onChanged }: { mods: Mod[]; loaded: 
   const visible = useMemo(() => filterMods(mods, filter), [mods, filter]);
   const sites = useMemo(() => modSiteOptions(mods), [mods]);
   const selection = bulkTargets(selected, visible);
+  /**
+   * The mod whose editor is open, derived from the current list rather than mirrored in state. Same
+   * rule as the chats pane: a mod deleted elsewhere closes its editor by not being found, on the
+   * render the deletion arrives in. The effect that used to do this as well ran a render later and
+   * could only ever agree with the derivation, so it is gone.
+   *
+   * `mods`, not `visible`: a mod the filter is hiding is still open and still editable, which is a
+   * different thing from a mod that no longer exists.
+   */
   const open = openId ? mods.find((m) => m.id === openId) : undefined;
-
-  // A mod deleted from elsewhere (the side panel, or a bulk action here) must close its editor.
-  useEffect(() => {
-    if (openId && !mods.some((m) => m.id === openId)) setOpenId(null);
-  }, [mods, openId]);
 
   const fail = (e: unknown) => {
     setStatus('');
@@ -302,10 +307,21 @@ function ModRow({
  * be a megabyte of bundle for that. Tab inserts two spaces rather than leaving the field, which is
  * the one thing a textarea gets wrong for code.
  *
- * Saving re-parses the header through the same modFromSource path the install flow uses, so the
- * name, matches, grants and world all follow the edited header, and the background re-registers the
- * script. Parse warnings (previewFromSource's, the same ones the install screen shows) are surfaced
- * before the save rather than after.
+ * Saving goes to the background's mods.saveSource, which re-parses the header, refetches @require
+ * and @resource when the edit changed them, and re-registers — not mods.save, which takes a Mod the
+ * page built and resolves no dependencies, so an edit that added an @require line would re-register
+ * the script with that dependency missing and it would throw at page load. Parse warnings
+ * (previewFromSource's, the same ones the install screen shows) are surfaced before the save, and a
+ * dependency fetch failure comes back as an error here rather than as a saved-but-broken mod.
+ *
+ * Dirtiness is tracked explicitly rather than derived from `source !== mod.source`. A derived flag
+ * is wrong the moment mod.source changes underneath — an Update, a save from the side panel — while
+ * the editor holds the same text: the comparison flips to "dirty" on its own, the editor keeps
+ * showing the old text, and Save would write the pre-update source back over the update. Instead an
+ * edit sets the flag, a save or a revert clears it, and a ref holds the mod.source last seen: when
+ * the mod changes externally and the editor is clean, the new text is adopted silently; when it
+ * changes with unsaved edits in the box, neither side is thrown away — a notice offers the choice
+ * and Save is blocked until one is made.
  */
 function ModEditor({
   mod,
@@ -319,31 +335,78 @@ function ModEditor({
   onError: (e: unknown) => void;
 }) {
   const [source, setSource] = useState(mod.source);
+  const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
+  /** The mod.source this editor last reconciled with, so a change to it is detectable. */
+  const seenRef = useRef(mod.source);
+  /** Set when the mod changed elsewhere while there were unsaved edits here; cleared by a choice. */
+  const [conflict, setConflict] = useState<string | null>(null);
 
-  // A mod changed elsewhere (an Update, a side-panel save) should show its new source, but not at
-  // the cost of throwing away an edit in progress.
-  const dirty = source !== mod.source;
+  // A mod changed elsewhere (an Update, a save from the side panel) should show its new source, but
+  // not at the cost of throwing away an edit in progress — and not at the cost of writing the old
+  // text back over the new one either.
   useEffect(() => {
-    if (!dirty) setSource(mod.source);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mod.source]);
+    const what = editorSync({ modSource: mod.source, seen: seenRef.current, dirty });
+    if (what === 'none') return;
+    if (what === 'adopt') {
+      seenRef.current = mod.source;
+      setSource(mod.source);
+      setConflict(null);
+      return;
+    }
+    // Unsaved edits here and a different source there: keep both and make the user choose.
+    setConflict(mod.source);
+  }, [mod.source, dirty]);
+
+  /** Take the version saved elsewhere, dropping the edits in the box. */
+  function loadIncoming() {
+    const incoming = conflict ?? mod.source;
+    seenRef.current = incoming;
+    setSource(incoming);
+    setDirty(false);
+    setConflict(null);
+  }
+
+  /** Keep editing this text; the next Save writes it over whatever landed in between. */
+  function keepMine() {
+    seenRef.current = mod.source;
+    setConflict(null);
+  }
 
   const preview = useMemo(() => previewFromSource(source), [source]);
 
   async function save() {
+    // A save while the mod is contested would silently pick a winner; the choice is explicit.
+    if (conflict !== null) return;
     setBusy(true);
     try {
-      // mods.install with the mod's own id kept: it re-parses the header, refetches @require and
-      // @resource if the edit changed them, and re-registers. Going through mods.save with a
-      // hand-built Mod would skip the dependency resolution.
-      await rpc({ type: 'mods.save', mod: reparse(mod, source) });
+      // mods.saveSource, not mods.save: the background re-parses the header, refetches @require and
+      // @resource when the edit changed them, and re-registers. mods.save takes a Mod built here and
+      // resolves nothing, so an added @require would re-register with the dependency missing.
+      await rpc({ type: 'mods.saveSource', id: mod.id, source });
+      seenRef.current = source;
+      setDirty(false);
       onStatus(`Saved “${preview.name}”.`);
       onSaved();
     } catch (e) {
+      // A dependency that would not fetch, or a header with nothing to match on: nothing was
+      // written, the edits stay in the box, and the reason is on screen.
       onError(e);
     }
     setBusy(false);
+  }
+
+  function edit(next: string) {
+    setSource(next);
+    setDirty(true);
+  }
+
+  function revert() {
+    const base = conflict ?? mod.source;
+    seenRef.current = base;
+    setSource(base);
+    setDirty(false);
+    setConflict(null);
   }
 
   const t = timeLabel(mod.updatedAt);
@@ -381,48 +444,54 @@ function ModEditor({
         </div>
       ))}
 
+      {conflict !== null && (
+        <div className="notice" data-testid="mod-editor-conflict">
+          This mod changed elsewhere while you were editing it. Saving now would overwrite that
+          change; loading it would drop your edits. Pick one.
+          <div className="row" style={{ marginTop: 8 }}>
+            <button className="pill" onClick={loadIncoming} data-testid="mod-editor-load-new">
+              Load new version
+            </button>
+            <button className="pill" onClick={keepMine} data-testid="mod-editor-keep-mine">
+              Keep my edits
+            </button>
+          </div>
+        </div>
+      )}
+
       <textarea
         className="editor"
         value={source}
         spellCheck={false}
         data-testid="mod-editor-source"
-        onChange={(e) => setSource(e.target.value)}
+        onChange={(e) => edit(e.target.value)}
         onKeyDown={(e) => {
           if (e.key !== 'Tab' || e.metaKey || e.ctrlKey || e.altKey) return;
           e.preventDefault();
           const ta = e.currentTarget;
           const { selectionStart: start, selectionEnd: end, value } = ta;
           const next = `${value.slice(0, start)}  ${value.slice(end)}`;
-          setSource(next);
+          edit(next);
           requestAnimationFrame(() => ta.setSelectionRange(start + 2, start + 2));
         }}
       />
 
       <div className="editor-bar">
-        <button className="pill primary" onClick={() => void save()} disabled={busy || !dirty} data-testid="mod-editor-save">
-          {busy ? 'Saving…' : dirty ? 'Save and re-register' : 'Saved'}
+        <button
+          className="pill primary"
+          onClick={() => void save()}
+          disabled={busy || !dirty || conflict !== null}
+          data-testid="mod-editor-save"
+        >
+          {busy ? 'Saving…' : conflict !== null ? 'Choose a version first' : dirty ? 'Save and re-register' : 'Saved'}
         </button>
-        <button className="pill" onClick={() => setSource(mod.source)} disabled={busy || !dirty}>
+        <button className="pill" onClick={revert} disabled={busy || (!dirty && conflict === null)}>
           Revert
         </button>
         <span className="muted">{formatSize(source.length)}</span>
       </div>
     </div>
   );
-}
-
-/**
- * The edited source as a Mod, keeping this mod's identity, enabled state and already-fetched
- * dependencies, and taking everything the header decides from the new text.
- *
- * modFromSource(source, mod) is the shared parse, but its `matches` line falls back to the existing
- * mod's patterns when the new header has none — right for an install (where a missing @match is an
- * error the caller rejects) and wrong here, where deleting a @match line must actually delete it.
- * So the parse is reused and that one field is overridden with what the header really said.
- */
-function reparse(mod: Mod, source: string): Mod {
-  const fresh = modFromSource(source, mod);
-  return { ...fresh, matches: parseHeader(source).matches, id: mod.id, enabled: mod.enabled, createdAt: mod.createdAt };
 }
 
 function download(blob: Blob, filename: string): void {

@@ -1,7 +1,7 @@
 import { runAgent, type AgentEnv } from '@/lib/agent/loop';
 import { buildRegisteredCode, gmValuesKey, loadGmValues, type GmMessage } from '@/lib/gm';
 import { checkConnect, connectOf } from '@/lib/connect';
-import { fetchText, previewFromUrl, resolveDependencies, toBase64 } from '@/lib/install';
+import { dependenciesChanged, fetchText, previewFromUrl, reparseEditedSource, resolveDependencies, toBase64 } from '@/lib/install';
 import { UPDATED_MARK } from '@/lib/importreport';
 import { scriptIdentity } from '@/lib/installurl';
 import { resyncPlan } from '@/lib/resync';
@@ -363,6 +363,11 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
       await syncRegistrations();
       return mods;
     }
+    case 'mods.saveSource': {
+      const mods = await upsertMod(await saveEditedSource(req.id, req.source));
+      await syncRegistrations();
+      return mods;
+    }
     case 'mods.update':
       return updateMod(req.id);
     case 'mods.importBackup':
@@ -475,6 +480,32 @@ async function installSource(
     const existing = opts.existing ? await loadGmValues(mod.id) : {};
     await chrome.storage.local.set({ [gmValuesKey(mod.id)]: { ...existing, ...opts.values } });
   }
+  return mod;
+}
+
+/**
+ * Save an edited source over an existing mod — what the dashboard's source editor saves through.
+ *
+ * The two things this does that mods.save cannot. First, the header is re-parsed from the edited
+ * text, so the name, patterns, grants, world and run-at all follow what the user actually wrote.
+ * Second, @require and @resource are refetched when (and only when) the header's dependency lines
+ * moved: re-registering with stale or empty bodies under a header that names new ones is exactly
+ * how an edited mod starts throwing ReferenceError at page load with nothing on screen to say why.
+ * A fetch failure throws before anything is written, so a broken mod is never saved — the editor
+ * shows the error and the installed mod is left as it was.
+ *
+ * The mod's identity survives untouched: same id, so its registration and its gm:<id> value store
+ * are the same ones; same enabled flag, same createdAt, same downloadUrl (so the Update button does
+ * not vanish because the edit dropped the @downloadURL comment).
+ */
+async function saveEditedSource(id: string, source: string): Promise<Mod> {
+  const existing = (await loadMods()).find((m) => m.id === id);
+  if (!existing) throw new Error('That mod no longer exists.');
+  const mod = reparseEditedSource(existing, source);
+  if (!mod.matches.length && !mod.includeGlobs.length) {
+    throw new Error(`"${mod.name}" has no @match or @include lines, so it would never run.`);
+  }
+  if (dependenciesChanged(source, existing)) await resolveDependencies(mod);
   return mod;
 }
 

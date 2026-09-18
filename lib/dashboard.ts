@@ -106,6 +106,88 @@ export function transcriptsToSearch(chats: Chat[], query: string, have: Set<stri
     .map((c) => c.id);
 }
 
+/**
+ * A stable identity for "the chats a transcript search would read", for a React effect to depend on
+ * instead of the chats array itself.
+ *
+ * The array is a new object on every storage change — the dashboard refreshes on any chats OR mods
+ * write, so a chat running in the side panel rebuilds it several times a second. An effect keyed on
+ * the array restarts that often, and a restart aborts the in-flight sweep: under sustained writes
+ * the transcript reads never finish and those chats never become searchable by message text. Keyed
+ * on this string, the effect restarts only when something it actually reads changed.
+ *
+ * What it reads: which chats exist (sorted ids, so a reordered array is the same key) and each
+ * one's updatedAt, because a chat whose transcript grew needs rereading and nothing else does.
+ * Titles and hosts are deliberately absent: a rename changes what chatMetaMatch says, but the worst
+ * that costs is one stale cached transcript for a chat that is on screen either way, and including
+ * them would restart the sweep on every title the model writes.
+ */
+export function transcriptSearchKey(chats: Chat[]): string {
+  return chats
+    .map((c) => `${c.id}:${c.updatedAt}`)
+    .sort()
+    .join(',');
+}
+
+/**
+ * Which cached transcripts are out of date: the ids whose chat has a newer updatedAt than when the
+ * transcript was read, plus the ids whose chat is gone.
+ *
+ * Without this the cache is never invalidated, so a chat that gains messages while the dashboard is
+ * open keeps matching (or not matching) on the text it had when it was first read. With it, the
+ * effect drops exactly those entries and the next sweep refetches them — which is only correct
+ * because the sweep records what it fetched: `stamps` holds the updatedAt each cached transcript
+ * was read at, so "newer than what I have" is a real question rather than a guess.
+ */
+export function staleTranscripts(chats: Chat[], stamps: Map<string, number>): string[] {
+  const live = new Map(chats.map((c) => [c.id, c.updatedAt]));
+  return [...stamps].filter(([id, at]) => live.get(id) !== at).map(([id]) => id);
+}
+
+/**
+ * The chat the preview pane is showing: the one `openId` names, if it still exists.
+ *
+ * Stated as a function because it is the ONE rule that closes a preview whose chat is gone, and a
+ * derivation cannot miss a case the way a remembered flag can. openId is a wish; a wish for a
+ * deleted chat simply does not resolve, and the pane shows its empty state on the same render the
+ * chat disappeared on.
+ *
+ * It replaces two weaker mechanisms that used to overlap here: an effect watching the chats array,
+ * which closed the pane a render late, and a guard in the bulk-delete handler that tested the
+ * FILTERED selection — so deleting the open chat while a search had scrolled it out of the visible
+ * rows left the preview up, showing a transcript whose chat no longer existed.
+ *
+ * The full list is searched, not the filtered one: a chat filtered off screen by the search box is
+ * still open and still readable, which is the difference between "you cannot see it in the list"
+ * and "it is not there any more".
+ */
+export function openChatOf(chats: Chat[], openId: string | null): Chat | undefined {
+  return openId ? chats.find((c) => c.id === openId) : undefined;
+}
+
+/**
+ * What a source editor should do when the mod underneath it changed — an Update, a save from the
+ * side panel, another dashboard tab.
+ *
+ *  - 'none': the mod's source is the one this editor already reconciled with. Nothing happened.
+ *  - 'adopt': it changed and there are no unsaved edits here, so show the new text silently.
+ *  - 'conflict': it changed and there ARE unsaved edits, so keep both and make the user choose.
+ *
+ * The decision hangs on `dirty` being tracked explicitly — set when the user types, cleared on a
+ * save or a revert — and on `seen`, the mod.source this editor last reconciled with. Deriving
+ * dirtiness instead, as `source !== mod.source`, is the bug this replaces: the comparison is
+ * recomputed against the NEW prop in the same render that the change arrives in, so an editor
+ * holding the old text looks dirty before the effect has had a chance to adopt anything. It then
+ * refuses to adopt (protecting an edit that was never made), keeps displaying the superseded text
+ * with Save lit up, and one click writes the pre-update source back over the update.
+ */
+export function editorSync(
+  { modSource, seen, dirty }: { modSource: string; seen: string; dirty: boolean },
+): 'none' | 'adopt' | 'conflict' {
+  if (modSource === seen) return 'none';
+  return dirty ? 'conflict' : 'adopt';
+}
+
 // ---------------------------------------------------------------------------
 // The side-panel handoff
 // ---------------------------------------------------------------------------
@@ -132,11 +214,23 @@ export const HANDOFF_KEY = 'openChat';
 export const HANDOFF_TTL_MS = 2 * 60 * 1000;
 
 /**
+ * How far ahead of the reader's clock a handoff may be dated and still be honoured. The writer and
+ * the reader are the same machine, so the only legitimate difference between the two readings is
+ * the few milliseconds between the write and the panel's mount; five seconds is generous for that
+ * and tight enough that a handoff dated a minute ahead — a clock jump, a restored profile, a stale
+ * key written before the clock was corrected — is stale rather than good for minutes.
+ */
+export const HANDOFF_SKEW_MS = 5 * 1000;
+
+/**
  * Which chat the side panel should show, given a possible handoff from the dashboard. This is the
  * whole rule in one place:
  *
  *  - a handoff for THIS host, recent enough, naming a chat that still exists → that chat, and the
- *    panel clears the handoff so a later mount does not reopen it;
+ *    panel clears the handoff so a later mount does not reopen it. "Recent enough" is a window that
+ *    ends HANDOFF_TTL_MS in the past and begins HANDOFF_SKEW_MS in the future: a handoff dated
+ *    ahead of the reader's clock by more than that skew allowance is stale, not valid, because a
+ *    future timestamp means the two clocks disagree and nothing about it can be trusted;
  *  - anything else → whatever the panel would have shown anyway (pickChatToShow's answer), leaving
  *    a handoff for another host alone, because that host's panel has not seen it yet.
  *
@@ -157,7 +251,8 @@ export function resolveHandoff(
   if (!handoff || !host || handoff.host !== host) return { chat: fallback, clearHandoff: false };
   // A stale handoff is consumed as well as ignored: it is for this host, so nothing else will ever
   // claim it, and leaving it behind would only make it stale for longer.
-  if (!(now - handoff.at < HANDOFF_TTL_MS) || now < handoff.at - HANDOFF_TTL_MS) {
+  const age = now - handoff.at;
+  if (age >= HANDOFF_TTL_MS || age < -HANDOFF_SKEW_MS) {
     return { chat: fallback, clearHandoff: true };
   }
   const wanted = chats.find((c) => c.id === handoff.chatId);

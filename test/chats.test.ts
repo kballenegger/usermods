@@ -3,7 +3,22 @@
 //   npm test
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { archivedChats, capChats, countTurns, isArchived, liveChats, pickChatToShow, sortChats, titleFromText, type Chat } from '../lib/chats.ts';
+import {
+  applyBulkArchive,
+  archivedChats,
+  bulkChats,
+  capChats,
+  countTurns,
+  isArchived,
+  itemsKey,
+  liveChats,
+  MAX_CHATS,
+  messagesKey,
+  pickChatToShow,
+  sortChats,
+  titleFromText,
+  type Chat,
+} from '../lib/chats.ts';
 import type { Msg } from '../lib/types.ts';
 
 /** A chat record with only the fields these functions read. */
@@ -129,4 +144,112 @@ test('a chat\'s turn count is its user messages, not every message in the histor
   // so counting user-role messages would say 3. Only the two the person actually typed are turns.
   assert.equal(countTurns(history), 2);
   assert.equal(countTurns([]), 0);
+});
+
+// ---------------------------------------------------------------------------
+// Finding 10: every index writer goes through the cap
+// ---------------------------------------------------------------------------
+//
+// createChat caps the index and deletes the evicted chats' transcript keys. bulkChats wrote the
+// index raw, so it was the one writer that could leave the index over MAX_CHATS and leave orphaned
+// chat:<id>:messages / chat:<id>:items keys behind it. These run the real function against an
+// in-memory chrome.storage.local — the cap has to be exercised through the writer, because a test
+// of capChats alone is exactly what passed while bulkChats was not calling it.
+
+/** The smallest chrome.storage.local that lib/chats needs: get/set/remove over a plain object. */
+function fakeStorage(initial: Record<string, unknown> = {}) {
+  const data: Record<string, unknown> = { ...initial };
+  const removed: string[] = [];
+  const local = {
+    async get(key: string | string[]) {
+      const keys = Array.isArray(key) ? key : [key];
+      const out: Record<string, unknown> = {};
+      for (const k of keys) if (k in data) out[k] = data[k];
+      return out;
+    },
+    async set(items: Record<string, unknown>) {
+      Object.assign(data, items);
+    },
+    async remove(key: string | string[]) {
+      for (const k of Array.isArray(key) ? key : [key]) {
+        removed.push(k);
+        delete data[k];
+      }
+    },
+  };
+  return { data, removed, local };
+}
+
+/** Install the fake for one test and take it back down, so tests do not leak into each other. */
+async function withStorage<T>(initial: Record<string, unknown>, fn: (s: ReturnType<typeof fakeStorage>) => Promise<T>): Promise<T> {
+  const s = fakeStorage(initial);
+  const g = globalThis as { chrome?: unknown };
+  const had = 'chrome' in g;
+  const before = g.chrome;
+  g.chrome = { storage: { local: s.local } };
+  try {
+    return await fn(s);
+  } finally {
+    if (had) g.chrome = before;
+    else delete g.chrome;
+  }
+}
+
+/** MAX_CHATS chats plus `extra` more, all live, newest last. */
+function overCap(extra: number): Chat[] {
+  return Array.from({ length: MAX_CHATS + extra }, (_, i) => chat(`c${i}`, 1000 + i));
+}
+
+test('finding 10: a bulk unarchive writes the index through the cap, like every other writer', async () => {
+  // An index that is over MAX_CHATS by two — it can get here through an older build, a synced
+  // profile, or simply a cap that ran when fewer chats were archived. Whatever put it there, the
+  // writer that touches it next has to bring it back, and bulkChats was the one that did not.
+  const chats = overCap(2).map((c, i) => (i < 5 ? { ...c, archivedAt: 500 + i } : c));
+  await withStorage({ chats }, async (s) => {
+    await bulkChats(['c0', 'c1'], 'unarchive');
+    const stored = (s.data.chats as Chat[]) ?? [];
+    assert.equal(stored.length, MAX_CHATS, `the index was left at ${stored.length}, over the ${MAX_CHATS} cap`);
+    assert.equal(stored.some((c) => c.id === 'c0'), true, 'the chats the user just unarchived survive');
+    assert.equal(stored.some((c) => c.id === 'c1'), true);
+  });
+});
+
+test('finding 10: the chats a bulk write evicts lose their transcript keys too', async () => {
+  // An orphaned chat:<id>:items is invisible and permanent: nothing lists it, nothing reads it, and
+  // it counts against the storage quota forever.
+  const chats = overCap(3);
+  await withStorage({ chats }, async (s) => {
+    await bulkChats(['c50'], 'archive');
+    const stored = (s.data.chats as Chat[]) ?? [];
+    assert.equal(stored.length, MAX_CHATS);
+    const kept = new Set(stored.map((c) => c.id));
+    const gone = chats.filter((c) => !kept.has(c.id)).map((c) => c.id);
+    assert.equal(gone.length, 3, 'three chats over the cap, three evicted');
+    for (const id of gone) {
+      assert.ok(s.removed.includes(messagesKey(id)), `${id} kept an orphaned messages key`);
+      assert.ok(s.removed.includes(itemsKey(id)), `${id} kept an orphaned items key`);
+    }
+  });
+});
+
+test('finding 10: a bulk action on an index inside the cap drops nothing', async () => {
+  const chats = [chat('a', 100), chat('b', 200, 250), chat('c', 300)];
+  await withStorage({ chats }, async (s) => {
+    await bulkChats(['b'], 'unarchive');
+    const stored = (s.data.chats as Chat[]) ?? [];
+    assert.deepEqual(stored.map((c) => c.id).sort(), ['a', 'b', 'c']);
+    assert.equal(stored.find((c) => c.id === 'b')?.archivedAt, undefined, 'unarchived');
+    assert.deepEqual(s.removed, [], 'nothing was evicted, so no transcript key was removed');
+  });
+});
+
+test('finding 10: bulk archive and unarchive touch only the named chats', () => {
+  const chats = [chat('a', 100), chat('b', 200, 900), chat('c', 300)];
+  const archived = applyBulkArchive(chats, new Set(['a']), 'archive', 4242);
+  assert.equal(archived.find((c) => c.id === 'a')?.archivedAt, 4242);
+  assert.equal(archived.find((c) => c.id === 'b')?.archivedAt, 900, 'an untouched chat keeps its own timestamp');
+  assert.equal(archived.find((c) => c.id === 'c')?.archivedAt, undefined);
+  const unarchived = applyBulkArchive(chats, new Set(['b']), 'unarchive', 4242);
+  assert.equal(unarchived.find((c) => c.id === 'b')?.archivedAt, undefined);
+  assert.equal('archivedAt' in unarchived.find((c) => c.id === 'b')!, false, 'the field is deleted, not set to undefined');
 });

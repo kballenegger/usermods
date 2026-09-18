@@ -1457,6 +1457,109 @@ async function dashboardFlow({ capture = false } = {}) {
       .textContent();
     if (!hnGroupCount?.includes('1 archived')) fail(`the host group did not report the archived chat (said ${JSON.stringify(hnGroupCount)})`);
 
+    // --- 5b. Finding 9: a bulk delete closes the preview of a chat it deleted.
+    //
+    // There used to be two mechanisms racing here: an explicit "if the ids I just sent include the
+    // open one, clear it" in the bulk handler, and an effect watching `chats`. The explicit one
+    // reasoned about the filtered selection rather than about what the data now says, so a chat
+    // that left the index by any other route (deleted from the side panel, evicted by the cap) kept
+    // its pane open on content that no longer exists. One rule now: the open chat is looked up in
+    // the current data, and when it is not there the pane closes.
+    {
+      const victim = page.locator('[data-testid="chat-row"][data-chat-id="chat-wiki-2"]');
+      await victim.locator('[data-testid="chat-title"]').click();
+      await page.locator('[data-testid="chat-preview"]').waitFor({ timeout: 10_000 });
+      // Delete it out from under the open preview, the way the side panel would — no click on this
+      // page at all, so nothing but the derived rule can close the pane. The record is handed back
+      // so the steps after this one still see three chats.
+      const removed = await page.evaluate(async () => {
+        const { chats } = await chrome.storage.local.get('chats');
+        await chrome.storage.local.set({ chats: chats.filter((c) => c.id !== 'chat-wiki-2') });
+        return chats.find((c) => c.id === 'chat-wiki-2');
+      });
+      if (!removed) fail('the chat this step deletes was not in storage to begin with');
+      await page
+        .locator('[data-testid="chat-preview"]')
+        .waitFor({ state: 'detached', timeout: 10_000 })
+        .catch(async () => {
+          const held = await page.locator('[data-testid="chat-preview"] h3').textContent();
+          fail(`the preview stayed open on a chat that no longer exists (showing ${JSON.stringify(held)})`);
+        });
+      if ((await page.locator('[data-testid="chat-row"]').count()) !== 2) fail('the deleted chat is still in the list');
+      // Put it back for the steps that follow, which expect three chats.
+      await page.evaluate(async (restored) => {
+        const { chats } = await chrome.storage.local.get('chats');
+        await chrome.storage.local.set({ chats: [...chats, restored] });
+      }, removed);
+      await page.waitForTimeout(600);
+      if ((await page.locator('[data-testid="chat-row"]').count()) !== 3) fail('restoring the deleted chat did not bring the list back');
+    }
+
+    // --- 5c. Finding 7: a chat being written to still becomes searchable, and is read once.
+    //
+    // The transcript-search effect used to depend on the `chats` ARRAY, which Dashboard replaces on
+    // every storage change (it refreshes on any write to chats or mods), and it only claimed an id
+    // in haveRef AFTER the read resolved. So under sustained writes — a chat running in the side
+    // panel touches the index several times a turn — the effect was torn down and restarted before
+    // its read landed, the id was never claimed, and the same transcript was fetched again and
+    // again without the chat ever entering the searchable set.
+    //
+    // The observable that separates the two implementations regardless of how the timing falls is
+    // the number of reads: keyed on a stable string and claiming the id before the read, a
+    // transcript is fetched ONCE per search however many unrelated writes go past. So this counts
+    // chats.transcript requests from inside the page while it churns the chats key.
+    {
+      await page.locator('[data-testid="chat-search"]').fill('');
+      await page.waitForTimeout(400);
+      await page.evaluate(() => {
+        window.__transcriptReads = [];
+        const send = chrome.runtime.sendMessage.bind(chrome.runtime);
+        chrome.runtime.sendMessage = (msg, ...rest) => {
+          if (msg && msg.type === 'chats.transcript') window.__transcriptReads.push(msg.id);
+          return send(msg, ...rest);
+        };
+      });
+      // Rewrite the chats key faster than a transcript read can resolve, for long enough that the
+      // old effect could not have got one through. updatedAt is untouched: nothing here is a real
+      // change, only a new array identity, which is exactly what an unrelated write produces.
+      const churn = page.evaluate(async () => {
+        const until = Date.now() + 5000;
+        while (Date.now() < until) {
+          const { chats } = await chrome.storage.local.get('chats');
+          await chrome.storage.local.set({ chats: chats.map((c) => ({ ...c })) });
+          await new Promise((r) => setTimeout(r, 15));
+        }
+      });
+      await page.waitForTimeout(300);
+      // "indentation" appears only inside the HN transcript, in neither a title nor a host, so the
+      // only way this chat can match is a transcript read that landed and stuck.
+      await page.locator('[data-testid="chat-search"]').fill('indentation');
+      await page
+        .locator('[data-testid="chat-row"][data-chat-id="chat-hn-1"]')
+        .waitFor({ timeout: 8_000 })
+        .catch(async () => {
+          const shown = await page.locator('[data-testid="chat-title"]').allTextContents();
+          fail(`a chat under sustained writes never became searchable by its message text (list held ${JSON.stringify(shown)})`);
+        });
+      if ((await page.locator('[data-testid="chat-row"]').count()) !== 1) {
+        fail('the message-text search matched more than the one chat whose transcript holds the word');
+      }
+      await churn;
+      await page.waitForTimeout(500);
+      const reads = await page.evaluate(() => window.__transcriptReads);
+      const perChat = new Map();
+      for (const id of reads) perChat.set(id, (perChat.get(id) ?? 0) + 1);
+      const repeated = [...perChat].filter(([, n]) => n > 1);
+      if (repeated.length) {
+        fail(
+          `the same transcript was read ${repeated.map(([id, n]) => `${n}x for ${id}`).join(', ')} during ~5s of unrelated writes — ` +
+            'the search effect is restarting on every write instead of on a real change',
+        );
+      }
+      await page.locator('[data-testid="chat-search"]').fill('');
+      await page.waitForTimeout(500);
+    }
+
     // --- 6. Open: the handoff, then the tab.
     //
     // Note what actually happens here. chrome.sidePanel.open({windowId}) SUCCEEDS from this
@@ -1535,6 +1638,170 @@ async function dashboardFlow({ capture = false } = {}) {
     const shownName = await page.locator(`[data-testid="mod-row"][data-mod-id="${modId}"] [data-testid="mod-name"]`).textContent();
     if (!shownName?.includes('Renamed by the editor')) fail(`the mod list still showed ${JSON.stringify(shownName)}`);
 
+    // --- 8a. Finding 5: an edit that adds an @require line fetches and stores the dependency.
+    //
+    // This is the whole of the bug. The editor used to save through rpc 'mods.save', which is an
+    // upsert plus a re-register and resolves nothing, so the mod was written with requires: [] under
+    // a header naming a library — and the re-registered script threw ReferenceError at page load
+    // with the save having reported success. The save now goes through mods.saveSource, which
+    // re-parses the header AND refetches the dependencies when (and only when) they moved.
+    {
+      const editor = page.locator('[data-testid="mod-editor-source"]');
+      const requireUrl = `${BASE_URL.replace(/\/v1$/, '')}/__require.js?name=firstLib`;
+      const withRequire = (await editor.inputValue()).replace('// ==/UserScript==', `// @require      ${requireUrl}\n// ==/UserScript==`);
+      await editor.fill(withRequire);
+      await page.waitForTimeout(200);
+      await page.locator('[data-testid="mod-editor-save"]').click();
+      await page.waitForTimeout(2000);
+      const stored = await page.evaluate(async (id) => {
+        const { mods } = await chrome.storage.local.get('mods');
+        const m = mods.find((x) => x.id === id);
+        return { requires: m?.requires ?? [], enabled: m?.enabled, source: m?.source };
+      }, modId);
+      if (stored.requires.length !== 1) {
+        fail(`adding an @require line saved ${stored.requires.length} dependency bodies — the mod would throw ReferenceError on its next page load`);
+      }
+      if (!stored.requires[0].code.includes('firstLib')) {
+        fail(`the stored @require body is not what the URL serves (got ${JSON.stringify(stored.requires[0].code.slice(0, 80))})`);
+      }
+      if (stored.requires[0].url !== requireUrl) fail('the stored dependency does not carry the URL it came from');
+
+      // Changing the URL refetches: the stale body must not survive an edit that repointed it.
+      const secondUrl = `${BASE_URL.replace(/\/v1$/, '')}/__require.js?name=secondLib`;
+      await editor.fill(withRequire.replace(requireUrl, secondUrl));
+      await page.waitForTimeout(200);
+      await page.locator('[data-testid="mod-editor-save"]').click();
+      await page.waitForTimeout(2000);
+      const after = await page.evaluate(async (id) => {
+        const { mods } = await chrome.storage.local.get('mods');
+        return mods.find((x) => x.id === id)?.requires ?? [];
+      }, modId);
+      if (after.length !== 1 || !after[0].code.includes('secondLib')) {
+        fail(`repointing the @require left the old body in place (stored ${JSON.stringify(after.map((r) => r.url))})`);
+      }
+
+      // A dependency that will not fetch fails the save and says so, rather than writing a mod that
+      // is broken from the moment it is registered.
+      const badUrl = `${BASE_URL.replace(/\/v1$/, '')}/__nothing-here.js`;
+      await editor.fill(withRequire.replace(requireUrl, badUrl));
+      await page.waitForTimeout(200);
+      await page.locator('[data-testid="mod-editor-save"]').click();
+      await page.waitForTimeout(2500);
+      const unchanged = await page.evaluate(async (id) => {
+        const { mods } = await chrome.storage.local.get('mods');
+        return mods.find((x) => x.id === id)?.requires ?? [];
+      }, modId);
+      if (unchanged.length !== 1 || !unchanged[0].code.includes('secondLib')) {
+        fail('a failed dependency fetch still wrote over the installed mod');
+      }
+      const shownError = await page.locator('.error').first().textContent().catch(() => '');
+      if (!/require|fetch|404|HTTP/i.test(shownError ?? '')) {
+        fail(`a dependency fetch failure was not surfaced to the editor (the page said ${JSON.stringify(shownError)})`);
+      }
+
+      // Back to a clean, saved, dependency-free mod for the steps that follow.
+      const plain = withRequire.replace(new RegExp(`// @require.*\\n`), '');
+      await editor.fill(plain);
+      await page.waitForTimeout(200);
+      await page.locator('[data-testid="mod-editor-save"]').click();
+      await page.waitForTimeout(2000);
+    }
+
+    // --- 8b. Finding 6: the editor follows an external change when it is clean, and refuses to
+    // pick a winner when it is not.
+    //
+    // The old editor derived dirtiness from `source !== mod.source` and adopted a new mod.source
+    // only while that comparison said clean. But the moment mod.source moved underneath, the
+    // comparison said DIRTY on its own — the box still held the old text — so the editor froze on
+    // the pre-update source, Save lit up, and saving wrote that stale text back over the update.
+    {
+      const editor = page.locator('[data-testid="mod-editor-source"]');
+      const save = page.locator('[data-testid="mod-editor-save"]');
+
+      // (a) Clean editor, source changes elsewhere: the new text is adopted, with no prompt.
+      const externalA = `${await editor.inputValue()}\n// changed elsewhere while the editor was clean\n`;
+      await page.evaluate(
+        async ([id, source]) => {
+          const { mods } = await chrome.storage.local.get('mods');
+          await chrome.storage.local.set({
+            mods: mods.map((m) => (m.id === id ? { ...m, source, updatedAt: Date.now() } : m)),
+          });
+        },
+        [modId, externalA],
+      );
+      await page
+        .waitForFunction(
+          (want) => document.querySelector('[data-testid="mod-editor-source"]')?.value === want,
+          externalA,
+          { timeout: 10_000 },
+        )
+        .catch(async () => {
+          fail(`a clean editor did not pick up the source saved elsewhere (it still held ${JSON.stringify(await editor.inputValue())})`);
+        });
+      if (await page.locator('[data-testid="mod-editor-conflict"]').count()) {
+        fail('a clean editor should adopt the new version silently, not ask about it');
+      }
+
+      // (b) Unsaved edits here, source changes elsewhere: neither side is thrown away, Save is
+      // blocked, and the user is given the choice.
+      const mine = `${externalA}// my unsaved edit\n`;
+      await editor.fill(mine);
+      await page.waitForTimeout(200);
+      const externalB = `${externalA}// a second change from elsewhere\n`;
+      await page.evaluate(
+        async ([id, source]) => {
+          const { mods } = await chrome.storage.local.get('mods');
+          await chrome.storage.local.set({
+            mods: mods.map((m) => (m.id === id ? { ...m, source, updatedAt: Date.now() } : m)),
+          });
+        },
+        [modId, externalB],
+      );
+      await page
+        .locator('[data-testid="mod-editor-conflict"]')
+        .waitFor({ timeout: 10_000 })
+        .catch(() => fail('a change from elsewhere during an unsaved edit raised no notice'));
+      if ((await editor.inputValue()) !== mine) fail('the conflict notice came with the edits already discarded');
+      if (!(await save.isDisabled())) fail('Save was live during a conflict, so it would silently pick a winner');
+
+      // "Keep my edits" is an explicit choice: Save comes back, and it writes the user's text.
+      await page.locator('[data-testid="mod-editor-keep-mine"]').click();
+      await page.waitForTimeout(200);
+      if (await page.locator('[data-testid="mod-editor-conflict"]').count()) fail('choosing a version left the notice up');
+      if (await save.isDisabled()) fail('Save stayed disabled after the user chose a version');
+      await save.click();
+      await page.waitForTimeout(1200);
+      const storedSource = await page.evaluate(async (id) => {
+        const { mods } = await chrome.storage.local.get('mods');
+        return mods.find((m) => m.id === id)?.source;
+      }, modId);
+      if (storedSource !== mine) fail('the save after "Keep my edits" did not write the text that was in the box');
+
+      // (c) And the far more damaging half of the old bug: an update landing while the editor is
+      // clean must not be undone by a later save of the pre-update text. The editor is clean again
+      // now (it just saved), so a change from elsewhere is adopted rather than held on to.
+      const externalC = `${mine}// the update this editor must not overwrite\n`;
+      await page.evaluate(
+        async ([id, source]) => {
+          const { mods } = await chrome.storage.local.get('mods');
+          await chrome.storage.local.set({
+            mods: mods.map((m) => (m.id === id ? { ...m, source, updatedAt: Date.now() } : m)),
+          });
+        },
+        [modId, externalC],
+      );
+      await page
+        .waitForFunction(
+          (want) => document.querySelector('[data-testid="mod-editor-source"]')?.value === want,
+          externalC,
+          { timeout: 10_000 },
+        )
+        .catch(async () => {
+          fail(`the editor did not follow the update (it held ${JSON.stringify(await editor.inputValue())})`);
+        });
+      if (!(await save.isDisabled())) fail('the editor reported unsaved changes it does not have, which is how the stale text got saved');
+    }
+
     // --- 9. Bulk: selecting every visible mod and disabling them writes through in one pass.
     await page.locator('.dash-toolbar button.pill', { hasText: 'Select all' }).click();
     await page.locator('[data-testid="mod-bulkbar"]').waitFor({ timeout: 5_000 });
@@ -1580,7 +1847,9 @@ async function dashboardFlow({ capture = false } = {}) {
     // re-register scripts, so this asserts the same contract every other flow does.
     await assertNoViolations('dashboard');
 
-    console.log('dashboard: OK — grouping, search over titles/hosts/message text, preview, rename, archive, handoff + tab, mod toggle, source edit, bulk disable, zero invalid requests');
+    console.log(
+      'dashboard: OK — grouping, search over titles/hosts/message text (incl. under sustained writes), preview (closed by the one derived rule), rename, archive, handoff + tab, mod toggle, source edit with @require resolution and a failed fetch refused, external-change adoption and conflict, bulk disable, zero invalid requests',
+    );
   } finally {
     await b.close();
   }

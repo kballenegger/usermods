@@ -150,6 +150,18 @@ async function writeIndex(chats: Chat[]): Promise<void> {
   await chrome.storage.local.set({ [INDEX_KEY]: sortChats(chats) });
 }
 
+/**
+ * Write the index through the MAX_CHATS cap, deleting the transcript keys of anything it evicted.
+ * Every writer that can grow the index, or that can change which chats the cap would evict first
+ * (archiving does exactly that — archived chats go before live ones), goes through here, so the
+ * 200-chat ceiling is one rule in one place rather than a thing each caller remembers.
+ */
+async function writeIndexCapped(chats: Chat[]): Promise<void> {
+  const { kept, dropped } = capChats(chats);
+  await writeIndex(kept);
+  if (dropped.length) await chrome.storage.local.remove(dropped.flatMap((id) => [messagesKey(id), itemsKey(id)]));
+}
+
 export async function listChats(host?: string): Promise<Chat[]> {
   const all = await readIndex();
   return host ? all.filter((c) => c.host === host) : all;
@@ -162,9 +174,7 @@ export async function getChat(id: string): Promise<Chat | null> {
 export async function createChat(host: string): Promise<Chat> {
   const now = Date.now();
   const chat: Chat = { id: crypto.randomUUID(), host, title: 'New chat', titleSource: 'auto-first', createdAt: now, updatedAt: now };
-  const { kept, dropped } = capChats([chat, ...(await readIndex())]);
-  await writeIndex(kept);
-  if (dropped.length) await chrome.storage.local.remove(dropped.flatMap((id) => [messagesKey(id), itemsKey(id)]));
+  await writeIndexCapped([chat, ...(await readIndex())]);
   return chat;
 }
 
@@ -279,13 +289,26 @@ export async function bulkChats(ids: string[], action: 'archive' | 'unarchive' |
     await chrome.storage.local.remove([...wanted].flatMap((id) => [messagesKey(id), itemsKey(id)]));
     return;
   }
-  const at = Date.now();
-  for (const chat of chats) {
-    if (!wanted.has(chat.id)) continue;
-    if (action === 'archive') chat.archivedAt = at;
-    else delete chat.archivedAt;
-  }
-  await writeIndex(chats);
+  // Capped like every other index write. A bulk unarchive is the case that needs it: an index of
+  // 200 where most are archived is within the cap only because archived chats are cheap to evict,
+  // and unarchiving them does not grow the index but does change which chats the next cap pass
+  // would drop. Going through the cap here keeps the ceiling and the transcript cleanup in one
+  // rule rather than leaving this one writer to grow the index past MAX_CHATS by another route.
+  await writeIndexCapped(applyBulkArchive(chats, wanted, action, Date.now()));
+}
+
+/**
+ * The archive/unarchive half of a bulk action as a pure decision: the index with archivedAt set or
+ * cleared on the named chats and nothing else touched. Separate from bulkChats so the rule is
+ * testable without chrome.storage.
+ */
+export function applyBulkArchive(chats: Chat[], wanted: Set<string>, action: 'archive' | 'unarchive', at: number): Chat[] {
+  return chats.map((chat) => {
+    if (!wanted.has(chat.id)) return chat;
+    if (action === 'archive') return { ...chat, archivedAt: at };
+    const { archivedAt: _dropped, ...rest } = chat;
+    return rest;
+  });
 }
 
 export async function loadMessages(id: string): Promise<Msg[]> {
