@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/banner.png" alt="usermods. Your web. Your rules. Vibe-code userscripts in place." width="100%"></p>
+
 # usermods
 
 **Vibe-code userscripts in place.** An open-source browser extension that lets you customize any website by chatting with the LLM of your choice.
