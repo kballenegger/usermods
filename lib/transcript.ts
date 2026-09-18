@@ -57,6 +57,11 @@ export function reduceItems(items: ChatItem[], event: AgentEventBody): ChatItem[
       // A model-written name renames a row in the switcher, not a message: the transcript is
       // untouched, and returning the same array means an offscreen chat schedules no write for it.
       return items;
+    case 'stopped':
+      // The step cap, not a failure: the conversation is intact and the next message continues it,
+      // so it reads as a muted status line rather than a red error row. Saying nothing here is what
+      // made a capped turn look like the agent had silently given up.
+      return [...items, { kind: 'note', text: `stopped after ${event.steps} steps · send a message to continue` }];
     case 'error':
       return [...items, { kind: 'error', text: event.message }];
     case 'done':

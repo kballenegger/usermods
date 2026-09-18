@@ -43,7 +43,7 @@ export const TOOLS: ToolDef[] = [
   {
     name: 'run_script',
     description:
-      'Run JavaScript once on the current page, right now, in the same isolated world a saved mod would use. Returns the value of the last expression (or the resolved value if you return a promise), console output, and any thrown error. Use it to test a draft mod or to perform a one-off task. Code may use await at top level.',
+      'Run JavaScript once on the current page, right now, in the same isolated world a saved mod would use. Returns the value of the last expression (or of an explicit return, or the resolved value of a promise), a count of what the DOM did while it ran, console output, and any thrown error. Code whose last statement is a bare expression returns that expression; code that only mutates the page reports "Completed. No return value." with the DOM counts, which is a successful run, not a failure. Use it to test a draft mod or to perform a one-off task. Code may use await at top level.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -62,7 +62,7 @@ export const TOOLS: ToolDef[] = [
   {
     name: 'propose_mod',
     description:
-      'Present a finished userscript to the user, who can try it, save it, and enable it. Call this once the script has been tested with run_script. Do not include a ==UserScript== header; it is generated from the other fields.',
+      'Present a finished userscript to the user, who can try it, save it, and enable it. Call this once the script has been tested with run_script. It is refused if nothing has been run since your last proposal, if the code does not parse, if it uses eval, new Function, document.write or an inline handler attribute, or if a match pattern covers every site the user visits without them having asked for that. Do not include a ==UserScript== header; it is generated from the other fields.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -70,6 +70,11 @@ export const TOOLS: ToolDef[] = [
         description: { type: 'string', description: 'One sentence.' },
         matches: { type: 'array', items: { type: 'string' }, description: 'Chrome match patterns, e.g. ["*://*.youtube.com/*"].' },
         code: { type: 'string', description: 'The script body.' },
+        untested_reason: {
+          type: 'string',
+          description:
+            'Only when you genuinely could not run the script here. One sentence saying why; it is shown to the user on the proposal card. This bypasses the "test it first" check and nothing else.',
+        },
       },
       required: ['name', 'description', 'matches', 'code'],
       additionalProperties: false,

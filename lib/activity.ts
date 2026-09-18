@@ -225,6 +225,9 @@ export function activityFromEvent(a: ChatActivity, e: ActivityEvent, now: number
       return { ...a, lastEventAt: now, queued: Math.max(0, a.queued - 1) };
     case 'done':
     case 'error':
+    // Running out of steps ends the run as surely as finishing it does. The transcript's note is
+    // what explains it from here on, so the live line must not stay up as if work were continuing.
+    case 'stopped':
       return IDLE_ACTIVITY;
     case 'chat_title':
       // A rename arrives AFTER 'done', from the tool-free naming call. It is not the run, so it

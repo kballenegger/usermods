@@ -3,7 +3,8 @@
 // scripted mock backend in scripts/mock-llm.mjs. No API key and no network model call.
 //
 //   npm run screenshots     capture everything into docs/screenshots/
-//   npm run smoke           headless: the chat, activity, chats and isolation flows, all asserted
+//   npm run smoke           headless: the chat, guardrails, activity, chats and isolation flows,
+//                           all asserted
 //   npm run smoke:chats     headless: the chats flow alone (restore, New chat, archive/unarchive)
 //   npm run smoke:isolation headless: the isolation flow alone (two chats running at once, no bleed)
 //
@@ -426,13 +427,85 @@ async function smoke() {
 }
 
 // ---------------------------------------------------------------------------
+// Guardrails test: the loop pushes back on over-investigation and on an untested proposal.
+// ---------------------------------------------------------------------------
+//
+// Both fixes work by putting text into the conversation, so the panel is only half the evidence:
+// the assertions that matter read what the extension actually SENT, which mock-llm.mjs records at
+// GET /__requests. The scripted conversation is `guardrails` in scripts/mock-llm.mjs.
+
+/**
+ * Every message body the extension has sent to the mock so far, flattened to one string. The
+ * nudges and the propose_mod refusal are text the loop appends to a tool-results message, so this
+ * is the only place they become observable — the panel shows the tool row, not what was sent.
+ */
+async function sentToModel() {
+  const res = await fetch(`http://127.0.0.1:${PORT}/__requests`);
+  if (!res.ok) throw new Error(`mock /__requests returned ${res.status}`);
+  const { requests } = await res.json();
+  return requests
+    .flatMap((r) => r.messages ?? [])
+    .map((m) => (typeof m.content === 'string' ? m.content : Array.isArray(m.content) ? m.content.map((p) => p.text ?? '').join('\n') : ''))
+    .join('\n---\n');
+}
+
+async function guardrails() {
+  // Start from an empty log so nothing asserted here can be satisfied by a previous flow's traffic.
+  await fetch(`http://127.0.0.1:${PORT}/__requests`, { method: 'DELETE' });
+  const b = await launch('light');
+  try {
+    const panel = await openPanel(b.ctx, b.extId);
+    await openSite(b.ctx, 'https://en.wikipedia.org/wiki/Common_kingfisher');
+    await panel.waitForTimeout(1200);
+    await runConversation(panel, 'tidy up the references section');
+
+    const fail = (m) => {
+      throw new Error(`guardrails: ${m}`);
+    };
+
+    const sent = await sentToModel();
+
+    // FIX 4: four reads with nothing acted on, and the nudge reached the model in a later request.
+    if (!/You have made 4 page reads without running or proposing anything/.test(sent)) {
+      fail('the read-budget nudge never reached the mock');
+    }
+    if (!/Act now: test with run_script or ask the user one question/.test(sent)) {
+      fail('the read-budget nudge reached the mock without its instruction');
+    }
+
+    // FIX 6: the first propose_mod had no run_script behind it, so the loop refused it and said so.
+    if (!/Test the script with run_script before proposing it/.test(sent)) {
+      fail('propose_mod without a test was not refused, or the refusal never reached the mock');
+    }
+
+    // The refusal was a recoverable tool error, not the end of the turn: the second propose_mod,
+    // carrying untested_reason, was accepted and the card names the reason for the user.
+    const cards = await panel.locator('.messages .card h4').count();
+    if (cards !== 1) fail(`expected exactly one proposal card, got ${cards}`);
+    const cardText = (await panel.locator('.messages .card').first().textContent()) ?? '';
+    if (!cardText.includes('scripts cannot be run in this browser profile')) {
+      fail('the proposal card does not show the untested reason');
+    }
+
+    // The refused call is visible in the transcript as a failed tool row, which is how the user
+    // sees that the agent corrected itself rather than silently doing the wrong thing.
+    const refused = await panel.locator('.messages details.tool.error summary', { hasText: 'propose_mod' }).count();
+    if (refused !== 1) fail(`expected 1 refused propose_mod row, got ${refused}`);
+
+    console.log('guardrails: OK — read-budget nudge and propose-time refusal both reached the model, override accepted');
+  } finally {
+    await b.close();
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Activity test: the panel says what it is doing while it is doing it.
+// ---------------------------------------------------------------------------
 //
 // The owner's complaint was that a run gave no sign of life, so this asserts the sign of life is
 // there: it appears at once, it names the phase, its timer moves, it follows the run into a tool
 // call, and it is gone the moment the run ends. The 'take your time' script in mock-llm.mjs holds
 // its first byte for ~3s so there is a real waiting window to observe.
-// ---------------------------------------------------------------------------
 
 const THINKING_PROMPT = 'take your time and tell me what this page is';
 
@@ -495,6 +568,7 @@ async function activityFlow() {
 
     if (process.env.ACTIVITY_VERBOSE) console.log('[activity] the line showed:', await recorded(panel));
     console.log('activity: OK — appears <500ms, waiting label with a ticking timer, tool label, gone after done');
+
   } finally {
     await b.close();
   }
@@ -928,6 +1002,7 @@ async function main() {
     }
     if (SMOKE) {
       await smoke();
+      await guardrails();
       await activityFlow();
       await chatsFlow();
       await isolationFlow();

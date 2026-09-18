@@ -1,14 +1,15 @@
 import { createProvider } from '../providers';
+import { renderRunResult, type RunResult } from '../runscript';
 import type { AgentEventBody, ElementRef, ModProposal, Msg, Part, Settings, UserTurn } from '../types';
+import { MAX_ITERATIONS, countReads, readBudgetNudge, wrapUpNudge } from './budget';
 import { SYSTEM_PROMPT } from './prompt';
+import { checkProposal, type ProposalContext } from './propose';
 import { TOOLS } from './tools';
-
-const MAX_ITERATIONS = 30;
 
 /** Everything a tool needs from the browser. Implemented in the background worker. */
 export interface AgentEnv {
   sendToContent<T = unknown>(req: unknown): Promise<T>;
-  runScript(code: string): Promise<{ ok: boolean; result?: string; logs: string[]; error?: string }>;
+  runScript(code: string): Promise<RunResult>;
   screenshot(): Promise<{ mediaType: 'image/jpeg' | 'image/png'; data: string }>;
   pageInfo(): Promise<{ url: string; title: string }>;
 }
@@ -59,53 +60,94 @@ export async function runAgent(input: AgentInput): Promise<Msg[]> {
   return signal.aborted ? trimUnanswered(messages) : messages;
 
   async function loop() {
-  for (let i = 0; i < MAX_ITERATIONS; i++) {
-    if (signal.aborted) break;
-    // The panel's activity line is driven entirely by these: it has no other way to tell a model
-    // that is thinking from one that has hung.
-    emit({ type: 'status', phase: 'model', detail: i === 0 ? 'waiting for model' : 'continuing', iteration: i + 1 });
-    const res = await provider.chat({
-      system: SYSTEM_PROMPT,
-      messages,
-      tools: TOOLS,
-      signal,
-      callbacks: { onText: (delta) => emit({ type: 'text', delta }) },
-    });
-    messages.push({ role: 'assistant', content: res.content });
+    // Page reads since the model last ran or proposed anything. The prompt's read budget is only a
+    // rule until something in the conversation contradicts the model when it breaks it; this is
+    // that something. Per turn, reset by run_script or propose_mod.
+    let reads = 0;
+    // Whether a run_script has completed since the last proposal, which is what propose_mod's
+    // "test it first" check reads. Held here rather than derived from the message history, because
+    // by the time the history is stored a tool result is provider-neutral text.
+    const ctx: ProposalContext = { testedSinceProposal: false, userText: input.turn.text };
+    // Every other exit from the for loop is deliberate and says something; falling off the end is
+    // the one that used to say nothing at all.
+    let ranOut = true;
 
-    const calls = res.content.filter((p): p is Extract<Part, { type: 'tool_call' }> => p.type === 'tool_call');
-    if (res.stopReason === 'max_tokens' && calls.length) {
-      messages.pop();
-      emit({ type: 'error', message: 'The model hit its output limit mid tool call. Try again with a smaller request.' });
-      break;
-    }
-    if (res.stopReason === 'refusal') {
-      emit({ type: 'error', message: 'The model declined this request.' });
-      break;
-    }
-    if (!calls.length) break;
+    for (let i = 0; i < MAX_ITERATIONS; i++) {
+      if (signal.aborted) {
+        ranOut = false;
+        break;
+      }
+      // The panel's activity line is driven entirely by these: it has no other way to tell a model
+      // that is thinking from one that has hung.
+      emit({ type: 'status', phase: 'model', detail: i === 0 ? 'waiting for model' : 'continuing', iteration: i + 1 });
+      const res = await provider.chat({
+        system: SYSTEM_PROMPT,
+        messages,
+        tools: TOOLS,
+        signal,
+        callbacks: { onText: (delta) => emit({ type: 'text', delta }) },
+      });
+      messages.push({ role: 'assistant', content: res.content });
 
-    const results: Part[] = [];
-    let proposed = false;
-    for (const call of calls) {
-      emit({ type: 'tool_call', id: call.id, name: call.name, input: call.input });
-      emit({ type: 'status', phase: 'tool', tool: call.name, detail: describeCall(call.name, call.input), iteration: i + 1 });
-      const r = await executeTool(call.name, call.input, env, emit);
-      emit({ type: 'tool_result', id: call.id, summary: summarize(r.content), isError: !!r.isError });
-      results.push({ type: 'tool_result', toolCallId: call.id, content: r.content, isError: r.isError });
-      if (call.name === 'propose_mod' && !r.isError) proposed = true;
+      const calls = res.content.filter((p): p is Extract<Part, { type: 'tool_call' }> => p.type === 'tool_call');
+      if (res.stopReason === 'max_tokens' && calls.length) {
+        messages.pop();
+        emit({ type: 'error', message: 'The model hit its output limit mid tool call. Try again with a smaller request.' });
+        ranOut = false;
+        break;
+      }
+      if (res.stopReason === 'refusal') {
+        emit({ type: 'error', message: 'The model declined this request.' });
+        ranOut = false;
+        break;
+      }
+      if (!calls.length) {
+        ranOut = false;
+        break;
+      }
+
+      const results: Part[] = [];
+      let proposed = false;
+      for (const call of calls) {
+        emit({ type: 'tool_call', id: call.id, name: call.name, input: call.input });
+        emit({ type: 'status', phase: 'tool', tool: call.name, detail: describeCall(call.name, call.input), iteration: i + 1 });
+        const r = await executeTool(call.name, call.input, env, emit, ctx);
+        emit({ type: 'tool_result', id: call.id, summary: summarize(r.content), isError: !!r.isError });
+        results.push({ type: 'tool_result', toolCallId: call.id, content: r.content, isError: r.isError });
+        if (call.name === 'propose_mod' && !r.isError) proposed = true;
+      }
+
+      // Both nudges ride along with the tool results rather than as a separate user message, so the
+      // history keeps its assistant/tool-result pairing and no orphan turn appears in the panel.
+      const before = reads;
+      reads = countReads(reads, calls.map((c) => c.name));
+      const budget = readBudgetNudge(reads, before);
+      if (budget) results.push({ type: 'text', text: budget });
+      const wrapUp = wrapUpNudge(i);
+      if (wrapUp) results.push({ type: 'text', text: wrapUp });
+
+      // Anything the user typed meanwhile joins this message, after the tool results.
+      const queued = signal.aborted ? [] : input.pullQueued();
+      for (const q of queued) {
+        results.push({ type: 'text', text: renderTurn(q, null, true) });
+        emit({ type: 'accepted', id: q.id });
+      }
+      messages.push({ role: 'user', content: results });
+      if (signal.aborted) {
+        ranOut = false;
+        break;
+      }
+      // A proposal ends the turn: the user decides what happens next.
+      if (proposed && !queued.length) {
+        ranOut = false;
+        break;
+      }
     }
-    // Anything the user typed meanwhile joins this message, after the tool results.
-    const queued = signal.aborted ? [] : input.pullQueued();
-    for (const q of queued) {
-      results.push({ type: 'text', text: renderTurn(q, null, true) });
-      emit({ type: 'accepted', id: q.id });
-    }
-    messages.push({ role: 'user', content: results });
-    if (signal.aborted) break;
-    // A proposal ends the turn: the user decides what happens next.
-    if (proposed && !queued.length) break;
-  }
+
+    // Falling out of the for loop used to be silent: the panel simply stopped, with no proposal and
+    // no explanation, which is the "i can't tell if it's stuck" complaint exactly. This is a soft
+    // stop, not an error - the history is valid and a reply picks the turn back up.
+    if (ranOut && !signal.aborted) emit({ type: 'stopped', reason: 'max_steps', steps: MAX_ITERATIONS });
   }
 }
 
@@ -141,6 +183,7 @@ async function executeTool(
   input: Record<string, unknown>,
   env: AgentEnv,
   emit: (e: AgentEventBody) => void,
+  ctx: ProposalContext,
 ): Promise<{ content: Part[]; isError?: boolean }> {
   try {
     switch (name) {
@@ -170,20 +213,32 @@ async function executeTool(
       case 'run_script': {
         if (typeof input.code !== 'string') return err('code is required');
         const r = await env.runScript(input.code);
-        const lines: string[] = [];
-        if (r.ok) lines.push(`Result: ${r.result ?? 'undefined'}`);
-        else lines.push(`Error: ${r.error}`);
-        if (r.logs.length) lines.push('Console:', ...r.logs.slice(-50));
-        return r.ok ? text(lines.join('\n')) : err(lines.join('\n'));
+        const rendered = renderRunResult(r);
+        // Only a run that actually completed counts as having tested the script. A navigation, a
+        // timeout or a throw proves nothing, so propose_mod will still ask for a real test.
+        if (r.outcome.kind === 'ok') ctx.testedSinceProposal = true;
+        return rendered.isError ? err(rendered.text) : text(rendered.text);
       }
       case 'screenshot': {
         const img = await env.screenshot();
         return { content: [{ type: 'image', mediaType: img.mediaType, data: img.data }] };
       }
       case 'propose_mod': {
-        const p = input as Partial<ModProposal>;
+        const p = input as Partial<ModProposal> & { untested_reason?: unknown };
         if (!p.name || !p.code || !Array.isArray(p.matches) || !p.matches.length) return err('name, code and at least one match pattern are required');
-        const proposal: ModProposal = { name: p.name, description: p.description ?? '', matches: p.matches, code: p.code };
+        const untestedReason = typeof p.untested_reason === 'string' && p.untested_reason.trim() ? p.untested_reason.trim() : undefined;
+        const problem = checkProposal({ code: p.code, matches: p.matches, untestedReason }, ctx);
+        if (problem) return err(problem);
+        const proposal: ModProposal = {
+          name: p.name,
+          description: p.description ?? '',
+          matches: p.matches,
+          code: p.code,
+          ...(untestedReason ? { untestedReason } : {}),
+        };
+        // A fresh proposal starts a fresh testing obligation: a revision written after this one has
+        // to be run before it can be proposed in turn.
+        ctx.testedSinceProposal = false;
         emit({ type: 'proposal', proposal });
         return text('The mod has been shown to the user with Try and Save buttons. Wait for their feedback.');
       }
