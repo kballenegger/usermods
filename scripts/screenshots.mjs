@@ -102,6 +102,7 @@ const ARTIFACT = process.argv.includes('--artifact');
 const ARTIFACT_SHOT = process.argv.includes('--artifact-capture');
 const PANELSCOPE = process.argv.includes('--panelscope');
 const RESUME = process.argv.includes('--resume');
+const COMPOSER = process.argv.includes('--composer');
 
 /**
  * Where the tab bar's captures go when --tabbar is asked to write them (`--tabbar-capture`). These
@@ -3670,6 +3671,207 @@ async function visionFlow() {
 }
 
 // ---------------------------------------------------------------------------
+// The composer grows with its text
+// ---------------------------------------------------------------------------
+//
+// The owner's words: "the text box grows instead of overflowing for long messages". The box is
+// sized by CSS alone (`field-sizing: content`, see .composer textarea in styles.css), so this flow
+// is the only thing that would notice a browser, or a stylesheet change, quietly turning it back
+// into a fixed 64px well. It measures the real element in a real panel:
+//
+//   * empty: the minimum height;
+//   * a few lines: taller, and NOT scrolling inside — that is "grows instead of overflowing";
+//   * a very long paste: stops at the cap (about ten lines, or 40% of the panel), scrolls inside,
+//     and the tab bar is still on screen and the page itself has not started scrolling;
+//   * the same with an @element chip and an image chip above the box, and on a short panel, where
+//     the 40% half of the cap is the one that binds;
+//   * a draft left in one chat is as tall as it was when you come back to it;
+//   * Shift+Enter adds a line and Enter sends, and a send puts the box back to the minimum.
+
+const COMPOSER_MIN = 64;
+/** The line half of the cap. The stylesheet computes 10 × line-height + padding + borders. */
+const COMPOSER_LINES_CAP = 10;
+
+async function composerBox(panel) {
+  return panel.evaluate(() => {
+    const ta = document.querySelector('.composer textarea');
+    const cs = getComputedStyle(ta);
+    const bar = document.querySelector('.tabs').getBoundingClientRect();
+    const comp = document.querySelector('.composer').getBoundingClientRect();
+    const msgs = document.querySelector('.messages').getBoundingClientRect();
+    return {
+      height: Math.round(ta.getBoundingClientRect().height),
+      scrolls: ta.scrollHeight > ta.clientHeight + 1,
+      lineHeight: parseFloat(cs.lineHeight),
+      padding: parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth),
+      fieldSizing: cs.fieldSizing,
+      barTop: Math.round(bar.top),
+      composerBottom: Math.round(comp.bottom),
+      messagesHeight: Math.round(msgs.height),
+      viewport: window.innerHeight,
+      pageScrolls: document.documentElement.scrollHeight > window.innerHeight + 1,
+    };
+  });
+}
+
+async function composerFlow() {
+  const fail = (m) => {
+    throw new Error(`composer: ${m}`);
+  };
+  let queuedChecked = false;
+  const b = await launch('dark');
+  try {
+    await clearViolations();
+    const panel = await openPanel(b.ctx, b.extId, { settings: { theme: 'dark' } });
+    const site = await openSite(b.ctx, FIXTURE_URL);
+    await waitForComposer(panel);
+    const ta = panel.locator('.composer textarea');
+
+    /** The shell holds: the tab bar is on screen, the composer ends inside the panel, nothing scrolls the page. */
+    const assertShell = (box, at) => {
+      if (box.barTop !== 0) fail(`${at}: the tab bar's top edge is at ${box.barTop}px, so it has been pushed out of view`);
+      if (box.composerBottom > box.viewport) fail(`${at}: the composer ends at ${box.composerBottom}px in a ${box.viewport}px panel`);
+      if (box.pageScrolls) fail(`${at}: the panel document itself scrolls; the shell is meant to be height:100% / overflow:hidden`);
+    };
+
+    // --- empty ---------------------------------------------------------------
+    const empty = await composerBox(panel);
+    if (empty.fieldSizing !== 'content') fail(`field-sizing computed to ${JSON.stringify(empty.fieldSizing)}; this Chromium does not size the box from its content`);
+    if (empty.height !== COMPOSER_MIN) fail(`the empty composer is ${empty.height}px, expected the ${COMPOSER_MIN}px minimum`);
+    const cap = Math.round(Math.min(0.4 * empty.viewport, COMPOSER_LINES_CAP * empty.lineHeight + empty.padding));
+
+    // --- a few lines: grows, does not scroll ----------------------------------
+    await ta.fill(['first line', 'second line', 'third line', 'fourth line', 'fifth line'].join('\n'));
+    const five = await composerBox(panel);
+    if (five.height <= COMPOSER_MIN) fail(`five lines left the box at ${five.height}px; it did not grow`);
+    if (five.scrolls) fail(`five lines scroll inside a ${five.height}px box; it should have grown to fit them`);
+    if (five.height >= cap) fail(`five lines already reached the ${cap}px cap (${five.height}px)`);
+    assertShell(five, 'five lines');
+
+    // --- one long paragraph: grows by wrapping too ------------------------------
+    await ta.fill('a sentence that goes on for a while and wraps at the edge of the box, '.repeat(4));
+    const wrapped = await composerBox(panel);
+    if (wrapped.height <= COMPOSER_MIN || wrapped.scrolls) fail(`a wrapping paragraph gave a ${wrapped.height}px box (scrolls: ${wrapped.scrolls})`);
+
+    // --- a very long message, pasted: capped, scrolls inside ---------------------
+    const long = Array.from({ length: 80 }, (_, i) => `line ${i + 1} of a very long pasted message`).join('\n');
+    await ta.fill('');
+    await ta.focus();
+    // A real paste: the clipboard path the browser takes, not a value assignment.
+    await b.ctx.grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => {});
+    const pasted = await panel
+      .evaluate(async (text) => {
+        try {
+          await navigator.clipboard.writeText(text);
+          return true;
+        } catch {
+          return false;
+        }
+      }, long)
+      .catch(() => false);
+    if (pasted) await panel.keyboard.press('ControlOrMeta+V');
+    // A background tab is not always allowed the clipboard; the measurement is the same either way.
+    if ((await ta.inputValue()).length < long.length) await ta.fill(long);
+    const capped = await composerBox(panel);
+    if (Math.abs(capped.height - cap) > 1) fail(`80 lines gave a ${capped.height}px box; the cap is ${cap}px`);
+    if (!capped.scrolls) fail('80 lines do not scroll inside the capped box, so some of the message cannot be reached');
+    if (capped.messagesHeight < 120) fail(`the transcript was squeezed to ${capped.messagesHeight}px by the composer`);
+    assertShell(capped, '80 lines');
+
+    // --- with chips above the box ----------------------------------------------
+    await pasteImage(panel, { w: 640, h: 360, bg: '#224', fg: '#446', label: 'mock', name: 'mock.png' });
+    await waitForThumbs(panel, 1);
+    await panel.locator('.composer button.btn', { hasText: 'Point at element' }).click();
+    await panel.waitForTimeout(400);
+    const target = site.locator('h1, p, div').first();
+    const tb = await target.boundingBox();
+    if (!tb) fail('the fixture page has nothing to point at');
+    await site.mouse.move(tb.x + 4, tb.y + 4);
+    await site.waitForTimeout(250);
+    await site.mouse.click(tb.x + 4, tb.y + 4);
+    await panel.locator('.composer .chip.ref').first().waitFor({ timeout: 10_000 });
+    const chips = await composerBox(panel);
+    if (Math.abs(chips.height - cap) > 1) fail(`with chips above it the capped box is ${chips.height}px, expected ${cap}px`);
+    if (!/@[\w.#-]+/.test(await ta.inputValue())) fail('pointing at an element did not put its @token in the message');
+    assertShell(chips, 'chips + 80 lines');
+
+    // --- a short panel: 40% is the binding half of the cap ---------------------
+    await panel.setViewportSize({ width: PANEL.width, height: 420 });
+    await panel.waitForTimeout(200);
+    const short = await composerBox(panel);
+    const shortCap = Math.round(0.4 * 420);
+    if (Math.abs(short.height - shortCap) > 1) fail(`on a 420px panel the box is ${short.height}px; 40% of the panel is ${shortCap}px`);
+    if (short.barTop !== 0) fail(`on a 420px panel the tab bar's top edge is at ${short.barTop}px`);
+    if (short.pageScrolls) fail('on a 420px panel the panel document scrolls');
+
+    // --- and the narrowest panel the tab bar supports --------------------------
+    await panel.setViewportSize({ width: 320, height: PANEL.height });
+    await panel.waitForTimeout(200);
+    const narrow = await composerBox(panel);
+    if (Math.abs(narrow.height - cap) > 1) fail(`at 320px wide the capped box is ${narrow.height}px, expected ${cap}px`);
+    assertShell(narrow, '320px wide');
+    const overflowX = await panel.evaluate(() => {
+      const c = document.querySelector('.composer');
+      return c.scrollWidth > c.clientWidth + 1;
+    });
+    if (overflowX) fail('at 320px wide the composer overflows sideways');
+    await panel.setViewportSize(PANEL);
+    await panel.waitForTimeout(200);
+
+    // --- keyboard: Shift+Enter is a newline, Enter sends ------------------------
+    await panel.locator('.composer .chip.ref .chip-x').click();
+    await panel.locator('.composer .attach button').first().click().catch(() => {});
+    await ta.fill('hide the promo banner on this page');
+    await ta.press('Shift+Enter');
+    await ta.pressSequentially('and keep the footer');
+    const value = await ta.inputValue();
+    if (!/page\nand keep/.test(value)) fail(`Shift+Enter did not add a line: ${JSON.stringify(value)}`);
+    if ((await panel.locator('.messages .msg.user').count()) !== 0) fail('Shift+Enter sent the message');
+    await ta.press('Enter');
+    await panel.locator('.messages .msg.user').first().waitFor({ timeout: 10_000 });
+
+    // --- shrinks back after the send --------------------------------------------
+    const after = await composerBox(panel);
+    if ((await ta.inputValue()) !== '') fail('the composer still holds text after Enter');
+    if (after.height !== COMPOSER_MIN) fail(`after sending, the box is ${after.height}px rather than back at ${COMPOSER_MIN}px`);
+
+    // --- the queued state: a long message queued behind a run shrinks the box too ---
+    // Only while the first turn is still running, which depends on how fast the host is; the OK
+    // line says whether it was.
+    const busy = await panel.locator('.composer button.btn.primary', { hasText: 'Queue' }).count();
+    if (busy) {
+      await ta.fill(['also, while you are there', 'make the heading smaller', 'and the links grey'].join('\n'));
+      await ta.press('Enter');
+      const queuedBox = await composerBox(panel);
+      queuedChecked = true;
+      if (queuedBox.height !== COMPOSER_MIN) fail(`after queueing, the box is ${queuedBox.height}px rather than ${COMPOSER_MIN}px`);
+    }
+    await panel.locator('.composer button.btn.primary', { hasText: 'Send' }).waitFor({ timeout: 90_000 });
+
+    // --- a draft that comes back at the height it was left -----------------------
+    await ta.fill(long);
+    const draftTall = (await composerBox(panel)).height;
+    await startNewChat(panel);
+    const fresh = await composerBox(panel);
+    if (fresh.height !== COMPOSER_MIN) fail(`a new chat's empty composer is ${fresh.height}px; the previous chat's draft leaked into its size`);
+    // Back to the chat the draft was left in: the first live chat in the switcher.
+    const firstChat = await panel.locator('.chatbar select option').nth(1).getAttribute('value');
+    await panel.locator('.chatbar select').selectOption(firstChat);
+    await panel.waitForFunction((want) => document.querySelector('.composer textarea')?.value.length === want, long.length, { timeout: 10_000 });
+    const restored = await composerBox(panel);
+    if (restored.height !== draftTall) fail(`the restored draft is in a ${restored.height}px box; it was ${draftTall}px when it was left`);
+    assertShell(restored, 'restored draft');
+
+    await assertNoViolations('composer');
+  } finally {
+    await b.close();
+  }
+  console.log(
+    `composer: OK — the box is 64px empty, grows with typed, wrapped and pasted text without scrolling inside, stops at min(10 lines, 40% of the panel) and scrolls from there, holds that cap under reference and image chips, on a 420px-tall and a 320px-wide panel, never moves the tab bar or scrolls the page, takes Shift+Enter as a newline and Enter as send, returns to 64px after a send${queuedChecked ? ' and after a queue' : ''}, and restores a draft at the height it was left`,
+  );
+}
+
+// ---------------------------------------------------------------------------
 
 /**
  * The living specimen, captured in both themes for docs/design.md.
@@ -4049,6 +4251,10 @@ async function main() {
       await resumeFlow();
       return;
     }
+    if (COMPOSER) {
+      await composerFlow();
+      return;
+    }
     if (SETTINGS_SHOT) {
       await settings('dark', '04-settings.png');
       await settings('light', '04-settings-light.png');
@@ -4090,6 +4296,7 @@ async function main() {
       await visionFlow();
       await artifactFlow();
       await resumeFlow();
+      await composerFlow();
       return;
     }
     // The dark set: the design system's own palette, and what the README leads with.
