@@ -77,11 +77,28 @@ export interface AgentInput {
    */
   draft?: () => string;
   /**
+   * The mods already installed on the page this turn is being sent from, rendered as the block the
+   * model reads to decide whether a request belongs with one of them (lib/modmatch.ts modsBlock).
+   *
+   * It rides on the user turn rather than in the system prompt for the same reason the draft does,
+   * and one more: the system prompt is sent as a single cached block (the Anthropic adapter marks
+   * it ephemeral), so a list that changes with every navigation would invalidate that cache on
+   * every turn. A function, like `draft`, because open_mod can change what it says mid-turn.
+   */
+  installed?: () => string;
+  /**
    * Whether the chat has a draft. Passed through to compaction, which asks for a different summary
    * when the draft's code is being re-sent every turn anyway. A function, like `draft`, because a
    * turn that starts with no draft can end with one.
    */
   hasDraft?: () => boolean;
+  /**
+   * Adopt an installed mod as this chat's draft — the open_mod tool. Returns what to tell the
+   * model: the mod's full script on success, or the reason it was refused. The background owns
+   * artifact storage and the mod list, so it owns this; a loop without one (the unit tests) simply
+   * reports that the tool is unavailable.
+   */
+  onOpenMod?: (modId: string, replace: boolean) => Promise<{ ok: true; text: string; version: number | null } | { ok: false; reason: string }>;
   /**
    * Record an accepted proposal as a new version of the draft. Returns the version number, which
    * the loop emits so the panel can select it. The background implements it; a loop running without
@@ -136,10 +153,14 @@ export const RESUME_NUDGE = '[The previous run was interrupted before it finishe
  * every turn rather than relied upon from the history, so a compaction that summarised away the
  * proposal it came from cannot leave the model editing a script it can no longer see.
  */
-function renderTurn(turn: UserTurn, page: { url: string; title: string } | null, injected: boolean, draft = ''): string {
+function renderTurn(turn: UserTurn, page: { url: string; title: string } | null, injected: boolean, draft = '', installed = ''): string {
   const lines: string[] = [];
   if (page) lines.push(`[Current page: ${page.title} — ${page.url}]`);
   if (draft) lines.push(draft);
+  // After the draft, because the draft is what most turns are about once one exists; before the
+  // refs and the user's own words, because "which of these should this change go into" is a
+  // question the model answers before it reads the request in detail.
+  if (installed) lines.push(installed);
   for (const ref of turn.refs ?? []) {
     const html = ref.html.length > 2500 ? ref.html.slice(0, 2500) + '…' : ref.html;
     lines.push(`[@${ref.token} = ${ref.label} — selector: ${ref.selector}]`, html);
@@ -166,9 +187,9 @@ function renderTurn(turn: UserTurn, page: { url: string; title: string } | null,
  * the text of the message they are about — while the model still reads the draft first within that
  * text, which is the only place the ordering matters to it.
  */
-function turnParts(turn: UserTurn, page: { url: string; title: string } | null, injected: boolean, draft = ''): Part[] {
+function turnParts(turn: UserTurn, page: { url: string; title: string } | null, injected: boolean, draft = '', installed = ''): Part[] {
   const parts: Part[] = (turn.images ?? []).map((img) => ({ type: 'image', mediaType: img.mediaType, data: img.data }));
-  parts.push({ type: 'text', text: renderTurn(turn, page, injected, draft) });
+  parts.push({ type: 'text', text: renderTurn(turn, page, injected, draft, installed) });
   return parts;
 }
 
@@ -220,11 +241,12 @@ export async function runAgent(input: AgentInput): Promise<RunOutcome> {
   const provider = input.provider ?? createProvider(settings);
   const messages: Msg[] = [...input.history];
   const draft = () => input.draft?.() ?? '';
+  const installed = () => input.installed?.() ?? '';
   const checkpoint = () => Promise.resolve(input.onCheckpoint?.(trimUnanswered(messages))).catch(() => {});
 
   if (input.turn) {
     const page = await env.pageInfo().catch(() => null);
-    messages.push({ role: 'user', content: turnParts(input.turn, page, false, draft()) });
+    messages.push({ role: 'user', content: turnParts(input.turn, page, false, draft(), installed()) });
     emit({ type: 'accepted', id: input.turn.id });
   } else {
     // Resuming. The conversation is sent as it stands; see RESUME_NUDGE for the one exception.
@@ -378,7 +400,7 @@ export async function runAgent(input: AgentInput): Promise<RunOutcome> {
       for (const call of calls) {
         emit({ type: 'tool_call', id: call.id, name: call.name, input: call.input });
         emit({ type: 'status', phase: 'tool', tool: call.name, detail: describeCall(call.name, call.input), iteration: i + 1 });
-        const r = await executeTool(call.name, call.input, env, emit, ctx, signal, input.onProposal);
+        const r = await executeTool(call.name, call.input, env, emit, ctx, signal, input.onProposal, input.onOpenMod);
         emit({ type: 'tool_result', id: call.id, summary: summarize(r.content), isError: !!r.isError });
         results.push({ type: 'tool_result', toolCallId: call.id, content: r.content, isError: r.isError });
         if (call.name === 'propose_mod' && !r.isError) proposed = true;
@@ -412,7 +434,7 @@ export async function runAgent(input: AgentInput): Promise<RunOutcome> {
         // The draft is read again here, not captured at the top of the turn: a proposal made two
         // steps ago has already become the current version, and a queued "make it bigger" is about
         // that version.
-        results.push(...turnParts(q, null, true, draft()));
+        results.push(...turnParts(q, null, true, draft(), installed()));
         emit({ type: 'accepted', id: q.id });
       }
       messages.push({ role: 'user', content: results });
@@ -448,6 +470,9 @@ function describeCall(name: string, input: Record<string, unknown>): string | un
     const parsed = parseWaitInput(input);
     return parsed.ok ? waitActivityDetail(parsed.spec.condition) : 'waiting';
   }
+  // "opening a mod" rather than the raw id: the user is watching this line to see what the agent is
+  // doing, and a uuid tells them nothing they can act on.
+  if (name === 'open_mod') return 'opening an installed mod';
   if (name === 'run_script' && typeof input.description === 'string' && input.description.trim()) return input.description.trim();
   if ((name === 'find_elements' || name === 'get_styles' || name === 'get_page') && typeof input.selector === 'string' && input.selector.trim()) {
     return input.selector.trim();
@@ -485,6 +510,7 @@ async function executeTool(
   ctx: ProposalContext,
   signal: AbortSignal,
   onProposal?: (p: ModProposal) => Promise<number | null>,
+  onOpenMod?: (modId: string, replace: boolean) => Promise<{ ok: true; text: string; version: number | null } | { ok: false; reason: string }>,
 ): Promise<ToolOutcome> {
   try {
     switch (name) {
@@ -562,6 +588,19 @@ async function executeTool(
       case 'screenshot': {
         const img = await env.screenshot();
         return { content: [{ type: 'image', mediaType: img.mediaType, data: img.data }] };
+      }
+      case 'open_mod': {
+        if (typeof input.mod_id !== 'string' || !input.mod_id.trim()) return err('mod_id is required: take it from the "[Mods already installed on this page]" list.');
+        if (!onOpenMod) return err('Opening an installed mod is not available in this session.');
+        const r = await onOpenMod(input.mod_id.trim(), input.replace === true);
+        // A refusal is a tool error, not a thrown one: the model is meant to recover inside this
+        // same turn — by asking the user, or by calling again with replace: true — and an error it
+        // can read is what makes that possible.
+        if (!r.ok) return err(r.reason);
+        // The draft moved, so the panel must be told before anything else happens: the user has to
+        // see what their Save is now about to write over.
+        if (r.version != null) emit({ type: 'artifact', version: r.version });
+        return text(r.text);
       }
       case 'propose_mod': {
         const p = input as Partial<ModProposal> & { untested_reason?: unknown };

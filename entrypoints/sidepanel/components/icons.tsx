@@ -186,6 +186,46 @@ export function UnarchiveIcon() {
   );
 }
 
+/**
+ * Edit a mod: a script page with a pencil tip at its corner.
+ *
+ * It has to read as "a mod, being edited" beside a pencil that already means "rename this chat", so
+ * the two cannot both be a bare pencil. The document is the loud part — a page with three ragged
+ * lines of code on it, which is what a mod looks like — and the pencil is a small mark at its
+ * corner, the way a badge sits on an app icon. Same rules as every other icon here: 16x16, integer
+ * rects, crispEdges, currentColor, aria-hidden, with the pencil's diagonal stepped with a 1px
+ * overlap per row so it reads as a solid bar rather than a staircase (see RenameIcon).
+ */
+export function EditModIcon() {
+  return (
+    <svg
+      className="ico"
+      viewBox="0 0 16 16"
+      width="16"
+      height="16"
+      shapeRendering="crispEdges"
+      aria-hidden="true"
+      focusable="false"
+    >
+      {/* The page: 1px walls, stopping short on the right so the pencil has a corner of its own. */}
+      <rect x="2" y="2" width="9" height="1" fill="currentColor" />
+      <rect x="2" y="2" width="1" height="12" fill="currentColor" />
+      <rect x="10" y="2" width="1" height="5" fill="currentColor" />
+      <rect x="2" y="13" width="9" height="1" fill="currentColor" />
+      <rect x="10" y="11" width="1" height="3" fill="currentColor" />
+      {/* Three lines of script, ragged like code rather than justified like prose. */}
+      <rect x="4" y="5" width="5" height="1" fill="currentColor" opacity="0.55" />
+      <rect x="4" y="7" width="3" height="1" fill="currentColor" opacity="0.55" />
+      <rect x="4" y="9" width="4" height="1" fill="currentColor" opacity="0.55" />
+      {/* The pencil, running down-left into the page's corner, with its graphite tip at full strength. */}
+      <rect x="13" y="6" width="2" height="1" fill="currentColor" />
+      <rect x="12" y="7" width="2" height="1" fill="currentColor" />
+      <rect x="11" y="8" width="2" height="1" fill="currentColor" />
+      <rect x="10" y="9" width="2" height="1" fill="currentColor" />
+    </svg>
+  );
+}
+
 /** Delete: a bin. */
 export function DeleteIcon() {
   return (

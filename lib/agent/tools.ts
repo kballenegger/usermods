@@ -113,6 +113,24 @@ export const TOOLS: ToolDef[] = [
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
   },
   {
+    name: 'open_mod',
+    description:
+      'Adopt an installed mod as this chat\'s draft, so the next propose_mod revises that mod instead of creating a second one. Take the id from the "[Mods already installed on this page]" list in the user\'s turn. Use it whenever the user asks for a change that belongs with a mod already on this page — the same site and the same purpose, or wording like "also", "too" or "as well". It returns the mod\'s current script, which you should read before changing anything. If the chat already has a draft with unsaved changes it is refused, and you decide with the user whether to save that first or pass replace: true.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        mod_id: { type: 'string', description: 'The id of an installed mod, exactly as the list gives it.' },
+        replace: {
+          type: 'boolean',
+          description:
+            'Only after a refusal: take over a draft that has unsaved changes. Nothing is lost — the earlier versions stay in the user\'s version strip — but the draft they were working on stops being what a Save writes, so ask them first.',
+        },
+      },
+      required: ['mod_id'],
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'propose_mod',
     description:
       'Present a finished userscript to the user, who can try it, save it, and enable it. Call this once the script has been tested with run_script. It is refused if nothing has been run since your last proposal, if the code does not parse, if it uses eval, new Function, document.write or an inline handler attribute, or if a match pattern covers every site the user visits without them having asked for that. Do not include a ==UserScript== header; it is generated from the other fields.',

@@ -30,8 +30,15 @@ export const ACT_TOOLS = new Set(['run_script', 'propose_mod']);
  * It still costs a step, because it is a model round trip like any other. Its own overuse is
  * caught by the separate guard in lib/agent/wait.ts, which measures the thing that actually goes
  * wrong: waiting over and over for something that is not coming.
+ *
+ * open_mod is here for the same shape of reason. It reads no page — its answer is the user's own
+ * installed script — so charging it as a read would make "pick up the existing mod before changing
+ * it", the behaviour this product wants most, cost the model a step of its investigation budget.
+ * Nor is it an act: adopting a draft proves nothing about the page, so it must not clear a streak
+ * of get_page calls that had earned a nudge. It is idempotent and bounded by the mods on the page,
+ * so there is nothing here to overuse.
  */
-export const NEUTRAL_TOOLS = new Set(['wait_for']);
+export const NEUTRAL_TOOLS = new Set(['wait_for', 'open_mod']);
 
 /** More than this many reads with nothing acted on earns a nudge. */
 export const READ_BUDGET = 3;

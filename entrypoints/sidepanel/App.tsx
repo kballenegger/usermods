@@ -152,7 +152,11 @@ export function App() {
         ) : (
           <Chat tabId={tabId} pageUrl={pageUrl} host={host} />
         ))}
-      {tab === 'mods' && <ModsView tabId={tabId} pageUrl={pageUrl} />}
+      {/* "Edit in chat" on a mod row is a move between the two tabs, so the Mods view asks to be
+          taken there rather than reaching into the Chat view: the chat it should land on is named
+          by a session-storage handoff (the same one the dashboard writes), which Chat reads when it
+          mounts on that host. */}
+      {tab === 'mods' && <ModsView tabId={tabId} pageUrl={pageUrl} host={host} onEditInChat={() => setTab('chat')} />}
       {tab === 'settings' && (
         <SettingsView
           onReviewNotice={() => {
