@@ -9,24 +9,22 @@ dashboard. Companion files: [permissions.md](permissions.md) for the reviewer ju
 ## Title
 
 ```
-usermods — userscripts by chat
+usermods
 ```
 
-30 characters. The item name is **not a dashboard field**: the store takes it from the manifest's
-`name`, so changing it means changing `wxt.config.ts` and rebuilding, not editing the listing.
+The item name is **not a dashboard field**: the store takes it from the manifest's `name`, which
+already ships as `usermods` in `wxt.config.ts`. There is nothing to paste and nothing to change.
 
-The manifest `name` limit is **75 characters**, universal across locales since February 2024 (it
-was 45 for English before that). This file previously said the cap was 30 — that was wrong, and
-nothing was being cut off; 30 is simply the length this title happens to be.
+This is the product's own name — the one on the icon, in the README, in the toolbar tooltip and
+throughout the UI — so the listing agrees with the extension a user installs. The tagline lives in
+the **summary** field directly beneath the title in the store, which is where the store expects a
+descriptive phrase; putting one in the name as well would only duplicate it.
 
-That matters only if a longer name is ever wanted: there is room. What there is *not* room for is
-the store's display truncation, which is a separate thing from the limit and kicks in well before
-75 characters in listing tiles and search results. Keeping the name short is still the right call,
-so this stays as it is. A plain `usermods` also works if a shorter name is preferred.
-
-**The manifest currently ships `name: "usermods"`, not this title.** Decide before submitting which
-one the store should show, and if it is this one, change `manifest.name` in `wxt.config.ts` and
-rebuild — see the note in [submission.md](submission.md#title).
+For reference, the manifest `name` limit is **75 characters**, universal across locales since
+February 2024 (45 for English before that). An earlier draft of this file claimed a 30-character
+cap, which was wrong. The limit is not a constraint here either way: the store also truncates long
+names in listing tiles and search results well before 75 characters, so a short name is the right
+call independently of the limit.
 
 ## Summary (132 characters max — confirmed against the current docs)
 

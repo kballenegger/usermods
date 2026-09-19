@@ -28,25 +28,16 @@ fields from the uploaded manifest, so the Privacy tab is incomplete until it has
 
 ### Title
 
-**Not an editable dashboard field.** The store reads it from the uploaded manifest's `name`.
-
-The manifest currently ships:
-
 ```
 usermods
 ```
 
-listing.md proposes a longer one, `usermods — userscripts by chat` (30 characters):
+**Nothing to do.** This is not an editable dashboard field — the store reads it from the uploaded
+manifest's `name`, which already ships as `usermods`. No change to `wxt.config.ts`, no rebuild.
 
-> **Decide this before uploading.** To use the longer title, change `manifest.name` in
-> `wxt.config.ts` and re-run `npm run zip:store`. To keep `usermods`, change nothing — but then
-> ignore listing.md's Title section, which describes the other choice.
->
-> The limit is **75 characters**, universal across locales since February 2024. Both candidates are
-> well inside it. Recommendation: **keep `usermods`.** It is the name used in the icon, the README,
-> the toolbar tooltip and everywhere in the UI, and a title that disagrees with the product's own
-> name is a small, permanent friction. The tagline's work is done by the summary field directly
-> beneath it.
+It is the name on the icon, in the README, in the toolbar tooltip and throughout the UI, so the
+listing matches the extension a user installs. The descriptive tagline goes in the **summary**
+field below, not into the name. (The limit, for reference, is 75 characters.)
 
 ### Summary
 
@@ -246,7 +237,7 @@ There is no "show in search results" toggle — that behaviour is what Public vs
       build omits subscription sign-in; the plain build does not, and shipping it would put
       undocumented vendor endpoints in a listing that declares what it talks to.
 - [ ] `manifest.version` is `0.1.0` and matches `package.json`.
-- [ ] The manifest `name` is whichever title was decided in §1.
+- [ ] `manifest.name` is `usermods` — the store title, unchanged.
 - [ ] The reviewer-notes field has a **real key** in place of the placeholder.
 - [ ] `PRIVACY.md` is pushed and its GitHub URL renders.
 - [ ] Permission fields in the dashboard match the built manifest exactly — no extra, none missing.
