@@ -9,9 +9,13 @@
 //        -> text/event-stream of `data: {choices:[{delta:{...}, finish_reason}]}` lines,
 //           terminated by `data: [DONE]`.
 //   GET  /v1/models            -> {data: [{id}, ...]}  (Settings' "Fetch models" button)
-//   GET  /__requests           -> {requests: [{at, script, messages}, ...]}  every body received,
-//        DELETE /__requests    in order; the isolation flow reads this back to prove that one
-//                              chat's user text never entered another chat's model conversation.
+//   GET  /__requests           -> {requests: [{at, script, messages, images}, ...]}  every body
+//        DELETE /__requests    received, in order; the isolation flow reads this back to prove that
+//                              one chat's user text never entered another chat's model
+//                              conversation, and the images flow reads `images` — one entry per
+//                              image_url part, with its media type, byte size, dimensions when the
+//                              PNG header gives them, and where it sat relative to the text — to
+//                              prove what an attachment actually looked like on the wire.
 //                              DELETE empties the log.
 //   GET  /__violations        -> {violations: [{at, kind, detail, script}, ...]}  every request
 //        DELETE /__violations  that was structurally invalid. See "Validation" below.
@@ -52,6 +56,9 @@ export const FAST_MARKER = 'FASTMARKER-b21c';
 
 /** The compaction flow's marker, so its transcript is identifiable the same way. */
 export const COMPACT_MARKER = 'COMPACTMARKER-9d4e';
+
+/** The images flow's marker, so its reply is identifiable in the transcript. */
+export const IMAGES_MARKER = 'IMAGESMARKER-4c7b';
 
 /** How long the slow conversation holds its first byte, so a run is demonstrably still in flight. */
 const FIRST_BYTE_MS = Number(process.env.MOCK_LLM_SLOW_MS ?? 4000);
@@ -203,6 +210,21 @@ setTimeout(() => observer.disconnect(), 10000);`,
             },
           },
         ],
+      },
+    ],
+  },
+
+  {
+    // The attached-images flow (screenshots.mjs --images). The user pastes a mockup and drops a
+    // second one, so this script is picked by words a person would actually type beside a picture.
+    // One step, no tool calls: the flow is about what reached the wire and what the panel shows,
+    // and a proposal card would only add rows for it to scroll past.
+    name: 'attached-images',
+    match: /make the header look like this/i,
+    steps: [
+      {
+        text: `${IMAGES_MARKER} I can see the mockup: a dark bar with the title centred. Nothing to change on the live page yet — tell me which part to start with.`,
+        calls: [],
       },
     ],
   },
@@ -722,7 +744,165 @@ export function validateChatRequest(body) {
     out.push({ kind: 'no-tools-array', detail: 'the history contains tool calls but the request offered no tools' });
   }
 
+  out.push(...collectImages(messages).problems);
+
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// Attached images
+// ---------------------------------------------------------------------------
+//
+// A vision backend takes an `image_url` content part whose url is a data URL. Nothing about that
+// is enforced by the transport, so an extension that sent a truncated base64 string, a media type
+// no model accepts, or a 40 MB original would look fine here and fail against a real provider —
+// which is the whole class of bug this mock exists to catch. Every image part is checked and
+// recorded.
+
+/** Media types a vision endpoint will take. Anything else is a violation, not a preference. */
+const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
+
+/** Refuse anything an endpoint would: this is comfortably above a 1568px JPEG at q0.85. */
+const MAX_IMAGE_BYTES = 4_000_000;
+
+/**
+ * Describe and check one image_url part.
+ *
+ * Returns {info, problems}: `info` is what /__requests records, `problems` are violations. A part
+ * that is not a data URL at all, whose base64 does not decode, or whose decoded bytes do not start
+ * with the magic number its media type promises, is a violation — those are precisely the failures
+ * that a permissive mock would swallow.
+ */
+export function inspectImagePart(part, where) {
+  const problems = [];
+  const url = part?.image_url?.url;
+  if (typeof url !== 'string' || !url) {
+    problems.push({ kind: 'image-no-url', detail: `${where} is an image_url part with no url` });
+    return { info: null, problems };
+  }
+  const m = /^data:([^;,]+);base64,([\s\S]*)$/i.exec(url);
+  if (!m) {
+    problems.push({ kind: 'image-not-data-url', detail: `${where} image url is not a base64 data URL (starts ${JSON.stringify(url.slice(0, 32))})` });
+    return { info: null, problems };
+  }
+  const mediaType = m[1].toLowerCase();
+  const b64 = m[2];
+  if (!IMAGE_TYPES.has(mediaType)) {
+    problems.push({ kind: 'image-bad-media-type', detail: `${where} image media type is ${mediaType}` });
+  }
+  let bytes = null;
+  let dimensions = null;
+  if (!b64) {
+    problems.push({ kind: 'image-empty', detail: `${where} image data URL carries no base64 payload` });
+  } else if (!/^[A-Za-z0-9+/]+={0,2}$/.test(b64)) {
+    problems.push({ kind: 'image-bad-base64', detail: `${where} image payload is not valid base64` });
+  } else {
+    let buf = null;
+    try {
+      buf = Buffer.from(b64, 'base64');
+    } catch {
+      buf = null;
+    }
+    if (!buf || !buf.length) {
+      problems.push({ kind: 'image-bad-base64', detail: `${where} image payload did not decode` });
+    } else {
+      bytes = buf.length;
+      if (bytes > MAX_IMAGE_BYTES) {
+        problems.push({ kind: 'image-too-large', detail: `${where} image is ${bytes} bytes, over ${MAX_IMAGE_BYTES}` });
+      }
+      if (!magicMatches(buf, mediaType)) {
+        problems.push({ kind: 'image-corrupt', detail: `${where} image bytes do not look like ${mediaType}` });
+      }
+      dimensions = readDimensions(buf, mediaType);
+    }
+  }
+  return { info: { mediaType, bytes, ...(dimensions ?? {}) }, problems };
+}
+
+/** Does the decoded payload begin the way its declared type must? Catches truncation and mislabels. */
+function magicMatches(buf, mediaType) {
+  if (mediaType === 'image/png') return buf.length > 8 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
+  if (mediaType === 'image/jpeg') return buf.length > 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[buf.length - 2] === 0xff && buf[buf.length - 1] === 0xd9;
+  if (mediaType === 'image/gif') return buf.length > 6 && buf.toString('latin1', 0, 3) === 'GIF';
+  if (mediaType === 'image/webp') return buf.length > 12 && buf.toString('latin1', 0, 4) === 'RIFF' && buf.toString('latin1', 8, 12) === 'WEBP';
+  return true; // an unknown type is already a violation above; do not report it twice
+}
+
+/**
+ * Width and height where the header makes them cheap to read.
+ *
+ * PNG and JPEG are enough for what the flows assert — the extension re-encodes every attachment to
+ * one of those two — and a format we cannot measure simply records no dimensions rather than
+ * pulling in an image library.
+ */
+function readDimensions(buf, mediaType) {
+  try {
+    if (mediaType === 'image/png' && buf.length >= 24) {
+      return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+    }
+    if (mediaType === 'image/jpeg') {
+      // Walk the segment chain to the first SOF marker, which is where the size lives.
+      let i = 2;
+      while (i + 9 < buf.length) {
+        if (buf[i] !== 0xff) {
+          i += 1;
+          continue;
+        }
+        const marker = buf[i + 1];
+        // SOF0-SOF15, minus the four that are not frame headers (DHT, JPG, DAC, RST).
+        if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
+          return { height: buf.readUInt16BE(i + 5), width: buf.readUInt16BE(i + 7) };
+        }
+        i += 2 + buf.readUInt16BE(i + 2);
+      }
+    }
+  } catch {
+    /* a header we cannot read is not a violation; it just records no dimensions */
+  }
+  return null;
+}
+
+/**
+ * Every image in one request, in order, with the index of the message it came from and whether it
+ * sat before the text part of that message. The images flow asserts on both: the extension must
+ * put the picture first, because that is the order the providers document.
+ */
+/**
+ * The messages as /__requests stores them: identical, except that an image_url part keeps only a
+ * short marker in place of its base64.
+ *
+ * Without this a single flow's log is tens of megabytes of duplicated base64 — every request
+ * resends every earlier image — and the GET that reads it back stalls. Everything the flows assert
+ * about an image is in the `images` summary beside it, so nothing is lost.
+ */
+export function stripImageData(messages) {
+  return messages.map((m) => {
+    if (!Array.isArray(m?.content) || !m.content.some((p) => p?.type === 'image_url')) return m;
+    return {
+      ...m,
+      content: m.content.map((p) =>
+        p?.type === 'image_url' && typeof p.image_url?.url === 'string'
+          ? { ...p, image_url: { ...p.image_url, url: `${p.image_url.url.slice(0, p.image_url.url.indexOf(',') + 1)}<${p.image_url.url.length} chars>` } }
+          : p,
+      ),
+    };
+  });
+}
+
+export function collectImages(messages) {
+  const out = [];
+  const problems = [];
+  messages.forEach((m, i) => {
+    if (!Array.isArray(m?.content)) return;
+    const firstText = m.content.findIndex((p) => p?.type === 'text');
+    m.content.forEach((p, j) => {
+      if (p?.type !== 'image_url') return;
+      const { info, problems: bad } = inspectImagePart(p, `messages[${i}].content[${j}]`);
+      problems.push(...bad);
+      if (info) out.push({ message: i, part: j, role: m.role, beforeText: firstText === -1 || j < firstText, ...info });
+    });
+  });
+  return { images: out, problems };
 }
 
 /** Content the API will accept: a non-empty string, or a non-empty array of parts. */
@@ -938,21 +1118,23 @@ const server = http.createServer(async (req, res) => {
     // is still recorded, because the isolation flow's "no chat's text entered another chat's model
     // conversation" assertion has to hold for the title call too.
     if (isSummaryRequest(body)) {
-      requests.push({ at: Date.now(), script: 'summary', messages });
+      requests.push({ at: Date.now(), script: 'summary', messages: stripImageData(messages) });
       if (process.env.MOCK_LLM_VERBOSE) console.error('[mock-llm] compaction summary');
       await streamStep(res, { text: SUMMARY_REPLY, calls: [] }, body.model ?? 'demo');
       return;
     }
     if (isTitleRequest(body)) {
-      requests.push({ at: Date.now(), script: 'title', messages });
+      requests.push({ at: Date.now(), script: 'title', messages: stripImageData(messages) });
       if (process.env.MOCK_LLM_VERBOSE) console.error(`[mock-llm] title -> ${TITLE_REPLY}`);
       await streamStep(res, { text: TITLE_REPLY, calls: [] }, body.model ?? 'demo');
       return;
     }
     const { script, from } = pickScript(messages);
     const step = stepFor(script, messages, from);
-    // Recorded before anything is streamed, so a hung run still leaves its evidence behind.
-    requests.push({ at: Date.now(), script: script.name ?? 'fallback', messages });
+    // Recorded before anything is streamed, so a hung run still leaves its evidence behind. The
+    // images are summarised rather than copied: the flow needs their count, type, size, dimensions
+    // and position, and a megabyte of base64 per request would make /__requests unusable.
+    requests.push({ at: Date.now(), script: script.name ?? 'fallback', messages: stripImageData(messages), images: collectImages(messages).images });
     if (process.env.MOCK_LLM_VERBOSE) {
       console.error(`[mock-llm] ${script.name ?? 'fallback'} step ${script.steps.indexOf(step)}: ${(step.calls ?? []).map((c) => c.name).join(', ') || 'text only'}`);
     }

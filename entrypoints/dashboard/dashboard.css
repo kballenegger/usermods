@@ -490,6 +490,30 @@ button.pill.primary:disabled {
   word-break: break-word;
 }
 
+/* Attached images in the preview. Read-only twins of the panel's .attach-strip / .attach, sized
+   for a page rather than a 420px column; the class names are shared because the component is. */
+.preview .attach-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.preview .attach {
+  display: inline-flex;
+  padding: 0;
+  border: var(--border-width) solid var(--border-control);
+  border-radius: 2px;
+  background: var(--surface-well);
+  max-width: 120px;
+}
+.preview .attach img {
+  display: block;
+  width: 100%;
+  height: 64px;
+  object-fit: contain;
+}
+.preview .attach .attach-size { display: none; }
+
 /* The read-only transcript preview: same shapes as the panel's transcript, at page scale. */
 .preview {
   display: flex;

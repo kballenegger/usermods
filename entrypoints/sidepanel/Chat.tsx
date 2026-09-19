@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Activity } from './Activity';
+import { Lightbox, PendingStrip, SentImages, type PendingImage } from './Attachments';
+import { carriesFiles, fileFromDataUrlText, filesFromTransfer, processImageFile } from './images';
 import { IDLE_ACTIVITY, activityFromEvent, allDisconnected, withActivity, withoutActivity, type ChatActivity } from '@/lib/activity';
+import { putBlobs } from '@/lib/blobs';
 import { archivedChats, isArchived, liveChats, loadItems, pickChatToShow, relativeTime, saveItems, titleFromText, type Chat as ChatRecord } from '@/lib/chats';
 import { HANDOFF_KEY, resolveHandoff, type ChatHandoff } from '@/lib/dashboard';
+import { ACCEPT_ATTR, MAX_IMAGES_PER_MESSAGE, capNote, emptyTextFor, type AttachedImage, type ImageThumb } from '@/lib/images';
 import { findByName } from '@/lib/modmatch';
 import { modFromProposal } from '@/lib/mods';
 import { rpc, type AgentPortRequest } from '@/lib/rpc';
@@ -10,6 +14,31 @@ import { RECONNECT_NOTE, looksUnfinished, reduceItems, toolDotClass, toolDotStat
 import type { AgentEvent, ChatItem, ContentEvent, ElementRef, Mod, ModProposal } from '@/lib/types';
 
 const SAVE_DEBOUNCE_MS = 400;
+
+/**
+ * What the composer holds for one chat while you are not looking at it.
+ *
+ * Attachments made this necessary and text came along with them. Dropping a mockup into chat A,
+ * switching to B to check something and coming back had to leave the mockup where it was — it
+ * belongs to the thing you were asking A, not to the panel — and the half-typed sentence beside it
+ * is exactly the same kind of thing. So both are per chat, keyed by chat id, with the unsent chat
+ * (no id yet) under a sentinel of its own.
+ */
+interface Draft {
+  text: string;
+  refs: ElementRef[];
+  images: ComposerImage[];
+}
+
+/** A pending attachment: what the strip renders, plus the full-size copy that will be sent. */
+interface ComposerImage extends PendingImage {
+  full: AttachedImage;
+}
+
+const EMPTY_DRAFT: Draft = { text: '', refs: [], images: [] };
+
+/** Where the draft of a chat that does not exist yet lives. A chat id is a UUID, so this is safe. */
+const NEW_CHAT_DRAFT = 'new';
 
 /**
  * A chatbar action label that can give up its tail when the bar is narrow.
@@ -39,7 +68,19 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
   const [items, setItems] = useState<ChatItem[]>([]);
   /** False while the panel is still working out which chat to show, so nothing flashes. */
   const [loaded, setLoaded] = useState(false);
-  const [text, setText] = useState('');
+  /**
+   * Every chat's unsent composer, by chat id (and NEW_CHAT_DRAFT for the one not created yet).
+   * `text`, `refs` and `images` below are this map's answer for the chat on screen, so every
+   * existing reader keeps working and nothing has to remember which chat it is writing into.
+   */
+  const [drafts, setDrafts] = useState<ReadonlyMap<string, Draft>>(() => new Map());
+  /** An inline complaint about the last paste or drop — a refused SVG, a file over the cap. */
+  const [attachNote, setAttachNote] = useState<string | null>(null);
+  /** The image the lightbox is showing, or null when it is closed. */
+  const [viewing, setViewing] = useState<ImageThumb | null>(null);
+  /** True while a file is being dragged over the panel, so the drop target is visible. */
+  const [dragging, setDragging] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
   /**
    * Which chats are running right now, by chat id. Runs are per chat, not per panel: chat A can be
    * streaming on one tab while the user reads chat B, so "busy" is a question you ask about a chat,
@@ -58,8 +99,7 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
    * The last message sent in each chat, so Retry on a dead port resends into the chat the failed
    * message belonged to and not into whatever happens to be on screen.
    */
-  const lastSentRef = useRef<Map<string, { text: string; refs?: ElementRef[] }>>(new Map());
-  const [refs, setRefs] = useState<ElementRef[]>([]);
+  const lastSentRef = useRef<Map<string, { text: string; refs?: ElementRef[]; images?: AttachedImage[] }>>(new Map());
   const [picking, setPicking] = useState(false);
   /** The draft title while the switcher is in rename mode, or null when it is a select again. */
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -108,6 +148,57 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
    * to say, which is how switching from a running chat to an idle one clears the line instantly.
    */
   const activity = (chatId != null ? activities.get(chatId) : undefined) ?? IDLE_ACTIVITY;
+
+  /** The draft key for the chat on screen: its id, or the sentinel for a chat not created yet. */
+  const draftKey = chatId ?? NEW_CHAT_DRAFT;
+  const draft = drafts.get(draftKey) ?? EMPTY_DRAFT;
+  const { text, refs, images } = draft;
+
+  /** Edit the visible chat's draft. Every composer write goes through here, so none can stray. */
+  function editDraft(fn: (d: Draft) => Draft) {
+    const key = chatIdRef.current ?? NEW_CHAT_DRAFT;
+    setDrafts((prev) => {
+      const next = new Map(prev);
+      const updated = fn(prev.get(key) ?? EMPTY_DRAFT);
+      if (!updated.text && !updated.refs.length && !updated.images.length) next.delete(key);
+      else next.set(key, updated);
+      return next;
+    });
+  }
+
+  /** The composer's text, as a plain setter, so the existing call sites read unchanged. */
+  function setText(value: string | ((prev: string) => string)) {
+    editDraft((d) => ({ ...d, text: typeof value === 'function' ? value(d.text) : value }));
+  }
+
+  function setRefs(value: ElementRef[] | ((prev: ElementRef[]) => ElementRef[])) {
+    editDraft((d) => ({ ...d, refs: typeof value === 'function' ? value(d.refs) : value }));
+  }
+
+  /**
+   * A message that was created in the not-yet-a-chat slot has to follow its chat once the chat is
+   * created, or the first send would leave its own attachments behind under the sentinel.
+   */
+  function adoptDraft(id: string) {
+    setDrafts((prev) => {
+      const pending = prev.get(NEW_CHAT_DRAFT);
+      if (!pending) return prev;
+      const next = new Map(prev);
+      next.delete(NEW_CHAT_DRAFT);
+      next.set(id, pending);
+      return next;
+    });
+  }
+
+  /** Empty the visible chat's composer once its message is on its way. */
+  function clearDraft(id: string) {
+    setDrafts((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Map(prev);
+      next.delete(id);
+      return next;
+    });
+  }
 
   // Pick up this site's chats and show the most recently updated live one, transcript and all. A
   // chat is only created on first send, so opening the panel on a new site does not litter storage
@@ -306,9 +397,16 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
       }
       if (e.type === 'unqueued') {
         // Only the chat on screen owns the composer, so only it gets its text back.
+        //
+        // Its images do NOT come back with it. They are already in this chat's blob store, but the
+        // composer holds the full-size copy and the transcript held only a thumbnail, so putting
+        // them back as attachments would mean re-reading and re-decoding them to send a message the
+        // user may not resend at all. The text returns; the pictures are mentioned in it.
         const dropped = unqueuedItem(itemsRef.current, e.id);
         if (dropped) {
-          setText((t) => (t.trim() ? `${t.trim()}\n${dropped.text}` : dropped.text));
+          const n = dropped.images?.length ?? 0;
+          const back = n ? `${dropped.text}\n[${n} attached image${n === 1 ? '' : 's'} were not resent — attach them again if you still want them]` : dropped.text;
+          setText((t) => (t.trim() ? `${t.trim()}\n${back}` : back));
           if (dropped.refs) setRefs((r) => [...r, ...dropped.refs!]);
         }
       }
@@ -356,6 +454,103 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
     });
   }
 
+  // ---------------------------------------------------------------------------
+  // Attachments
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Take some files: decode, downscale and re-encode each one, then add it to THIS chat's draft.
+   *
+   * Every rejection is an inline note rather than a thrown error or a silent drop — a refused SVG
+   * and a 20 MB photo are both things the user did on purpose and deserve a sentence about.
+   *
+   * The chat id is captured before the first `await`. Processing a 6000px screenshot takes long
+   * enough for a chat switch, and an attachment landing in whatever chat happens to be on screen
+   * when the encoder finishes is exactly the isolation bug this panel spent a release removing.
+   */
+  async function attach(files: File[]) {
+    if (!files.length) return;
+    const key = chatIdRef.current ?? NEW_CHAT_DRAFT;
+    const held = (drafts.get(key) ?? EMPTY_DRAFT).images.length;
+    const room = Math.max(0, MAX_IMAGES_PER_MESSAGE - held);
+    const note = capNote(held, files.length);
+    setAttachNote(note);
+    const taking = files.slice(0, room);
+    if (!taking.length) return;
+
+    const results = await Promise.all(taking.map((f) => processImageFile(f)));
+    const added: ComposerImage[] = [];
+    const errors: string[] = [];
+    for (const r of results) {
+      if (r.ok) {
+        added.push({
+          id: crypto.randomUUID(),
+          thumb: r.image.thumb,
+          width: r.image.full.width,
+          height: r.image.full.height,
+          bytes: r.image.full.bytes,
+          full: r.image.full,
+          ...(r.image.full.name ? { name: r.image.full.name } : {}),
+        });
+      } else errors.push(r.error);
+    }
+    if (errors.length) setAttachNote(errors[0]!);
+    else if (!note) setAttachNote(null);
+    if (!added.length) return;
+
+    // Written against the key we started with, not against "the current chat", and re-capped in
+    // case another paste landed while these were encoding.
+    setDrafts((prev) => {
+      const next = new Map(prev);
+      const current = prev.get(key) ?? EMPTY_DRAFT;
+      next.set(key, { ...current, images: [...current.images, ...added].slice(0, MAX_IMAGES_PER_MESSAGE) });
+      return next;
+    });
+  }
+
+  function removeImage(id: string) {
+    setAttachNote(null);
+    editDraft((d) => ({ ...d, images: d.images.filter((img) => img.id !== id) }));
+  }
+
+  /**
+   * A paste into the composer. Files win; a clipboard that carries only a data URL as text is
+   * still an image someone meant to attach, so that is taken too.
+   *
+   * preventDefault runs only when something was actually taken, so pasting ordinary text still
+   * pastes ordinary text.
+   */
+  function onPaste(e: React.ClipboardEvent) {
+    if (unsupported) return;
+    const files = filesFromTransfer(e.clipboardData);
+    if (files.length) {
+      e.preventDefault();
+      void attach(files);
+      return;
+    }
+    const asText = e.clipboardData?.getData('text/plain') ?? '';
+    const fromUrl = fileFromDataUrlText(asText);
+    if (fromUrl) {
+      e.preventDefault();
+      void attach([fromUrl]);
+    }
+  }
+
+  /** A drop on the composer or the transcript. Both land in the same place: this chat's draft. */
+  function onDrop(e: React.DragEvent) {
+    if (!carriesFiles(e.dataTransfer)) return;
+    e.preventDefault();
+    setDragging(false);
+    if (unsupported) return;
+    void attach(filesFromTransfer(e.dataTransfer));
+  }
+
+  function onDragOver(e: React.DragEvent) {
+    if (!carriesFiles(e.dataTransfer)) return;
+    e.preventDefault();
+    if (!unsupported) setDragging(true);
+  }
+
   function removeRef(token: string) {
     setRefs((prev) => prev.filter((r) => r.token !== token));
     setText((prev) => prev.replace(new RegExp(`@${escapeRe(token)}(?![\\w.#-])\\s?`, 'g'), ''));
@@ -368,8 +563,14 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
    * which Retry needs: it runs from an event handler that closed over the previous render's state,
    * so putting the text back with setText and calling send() would send the stale (empty) value.
    */
-  async function send(resend?: { text: string; refs?: ElementRef[] }) {
-    const t = (resend?.text ?? text).trim();
+  async function send(resend?: { text: string; refs?: ElementRef[]; images?: AttachedImage[] }) {
+    const attached: AttachedImage[] = resend?.images ?? images.map((img) => img.full);
+    const thumbs = resend?.images ? [] : images.map((img) => img.thumb);
+    // An empty box with pictures in it is a complete message; an empty box with nothing is not.
+    // The text the model gets says plainly what was sent, so a bare "Attached 2 images" turn still
+    // reads as a sentence in the history rather than as an empty one.
+    const typed = (resend?.text ?? text).trim();
+    const t = typed || (attached.length ? emptyTextFor(attached.length) : '');
     if (!t || tabId == null) return;
     // The chat is created lazily, on the first message that actually goes out.
     let id = chatId;
@@ -381,11 +582,14 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
       try {
         const chat = await rpc({ type: 'chats.create', host });
         if (genRef.current !== gen) {
-          setText((cur) => (cur.trim() ? cur : t));
+          setText((cur) => (cur.trim() ? cur : typed));
           return;
         }
         id = chat.id;
         setChats((prev) => [chat, ...prev]);
+        // The draft moves with the chat it was composed in, attachments and all, before showChat
+        // repoints the composer at the new id.
+        adoptDraft(chat.id);
         showChat(chat.id, itemsRef.current);
         setLoaded(true);
       } catch (e) {
@@ -398,11 +602,18 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
     const msgId = crypto.randomUUID();
     // Queued only if THIS chat is already running. A run on another tab does not queue anything.
     const queued = runningChats.has(id);
-    updateItems((prev) => [...prev, { kind: 'user', id: msgId, text: t, refs: used.length ? used : undefined, queued }]);
-    setText('');
-    setRefs([]);
+    // The full-size images go to the chat's blob store once; what the transcript keeps is the
+    // thumbnail and the hash that finds them again. A resend has no thumbnails to store (its
+    // bubble is already on screen from the first attempt), so it skips this.
+    const stored: ImageThumb[] = thumbs.length ? await putBlobs(id, attached, thumbs) : [];
+    updateItems((prev) => [
+      ...prev,
+      { kind: 'user', id: msgId, text: t, refs: used.length ? used : undefined, images: stored.length ? stored : undefined, queued },
+    ]);
+    clearDraft(id);
+    setAttachNote(null);
     setRunningChats((prev) => (prev.has(id!) ? prev : new Set(prev).add(id!)));
-    lastSentRef.current.set(id, { text: t, refs: used.length ? used : undefined });
+    lastSentRef.current.set(id, { text: t, refs: used.length ? used : undefined, images: attached.length ? attached : undefined });
     // Start THIS chat's line immediately, before any event comes back, so "is it stuck?" is
     // answered from the very first frame rather than once the background gets round to us. It is
     // filed under the chat the message went to, so sending and then switching away leaves the
@@ -417,7 +628,15 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
         queued: a.phase === 'idle' ? 0 : a.queued + 1,
       })),
     );
-    const req: AgentPortRequest = { type: 'send', tabId, chatId: id, id: msgId, text: t, refs: used.length ? used : undefined };
+    const req: AgentPortRequest = {
+      type: 'send',
+      tabId,
+      chatId: id,
+      id: msgId,
+      text: t,
+      refs: used.length ? used : undefined,
+      images: attached.length ? attached : undefined,
+    };
     titleFixRef.current = false;
     connect().postMessage(req);
     // Reflect the new activity in the switcher right away. The background derives the title from
@@ -726,7 +945,7 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
           )}
         </div>
       )}
-      <div className="messages">
+      <div className="messages" onDrop={onDrop} onDragOver={onDragOver} onDragLeave={() => setDragging(false)}>
         {/* Until the lookup resolves we do not know whether this host has a chat to restore, so
             neither the empty state nor a transcript is shown — the panel must not flash "describe
             how you want this page to change" over a conversation that is about to appear. */}
@@ -750,6 +969,7 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
               return (
                 <div key={i} className={`msg user${it.queued ? ' queued' : ''}`}>
                   {it.queued && <div className="label" style={{ marginBottom: 6 }}>queued · sends between steps</div>}
+                  {it.images && it.images.length > 0 && <SentImages images={it.images} onOpen={setViewing} />}
                   {it.text}
                   {it.refs && (
                     <div className="row" style={{ marginTop: 8 }}>
@@ -822,8 +1042,8 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
         onStop={abort}
         onRetry={retry}
       />
-      <div className="composer">
-        {refs.length > 0 && (
+      <div className={`composer${dragging ? ' dragging' : ''}`} onPaste={onPaste} onDrop={onDrop} onDragOver={onDragOver} onDragLeave={() => setDragging(false)}>
+        {(refs.length > 0 || images.length > 0) && (
           <div className="row">
             {refs.map((r) => (
               <span key={r.token} className="chip ref" title={r.selector}>
@@ -831,8 +1051,10 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
                 <button className="chip-x" onClick={() => removeRef(r.token)} title="Remove reference">×</button>
               </span>
             ))}
+            <PendingStrip images={images} onRemove={removeImage} />
           </div>
         )}
+        {attachNote && <div className="attach-note">{attachNote}</div>}
         <textarea
           ref={textareaRef}
           value={text}
@@ -843,19 +1065,40 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
               void send();
             }
           }}
-          placeholder={unsupported ? 'open a web page first' : 'what should this page do differently? point at elements to reference them'}
+          placeholder={unsupported ? 'open a web page first' : 'what should this page do differently? paste or drop an image, or point at elements'}
           disabled={unsupported}
         />
         <div className="row">
           <button className="btn" onClick={() => void pick()} disabled={picking || unsupported || tabId == null} title="Click an element on the page to reference it in your message">
             {picking ? 'click an element…' : 'Point at element'}
           </button>
+          <button
+            className="btn"
+            onClick={() => fileRef.current?.click()}
+            disabled={unsupported || images.length >= MAX_IMAGES_PER_MESSAGE}
+            title={`Attach a screenshot or mockup (PNG, JPEG, WebP or GIF; up to ${MAX_IMAGES_PER_MESSAGE})`}
+          >
+            Attach image
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept={ACCEPT_ATTR}
+            multiple
+            hidden
+            onChange={(e) => {
+              void attach(Array.from(e.target.files ?? []));
+              // Cleared so picking the same file twice in a row fires onChange the second time.
+              e.target.value = '';
+            }}
+          />
           <button className="btn" onClick={newChat} disabled={unsupported || !host || (!chatId && items.length === 0)}>New chat</button>
           <span className="grow" />
           {busy && <button className="btn danger" onClick={abort}>Stop</button>}
-          <button className="btn primary" onClick={() => void send()} disabled={!text.trim() || unsupported}>{busy ? 'Queue' : 'Send'}</button>
+          <button className="btn primary" onClick={() => void send()} disabled={(!text.trim() && !images.length) || unsupported}>{busy ? 'Queue' : 'Send'}</button>
         </div>
       </div>
+      {viewing && <Lightbox chatId={chatId} image={viewing} onClose={() => setViewing(null)} />}
     </div>
   );
 }
