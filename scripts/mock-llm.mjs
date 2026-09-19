@@ -19,6 +19,9 @@
 //                              DELETE empties the log.
 //   GET  /__violations        -> {violations: [{at, kind, detail, script}, ...]}  every request
 //        DELETE /__violations  that was structurally invalid. See "Validation" below.
+//   POST /__faults            <- {plan: [fault, ...]}  make the NEXT chat-completions requests fail
+//        GET  /__faults        the way a real network does. See "Fault injection" below. GET shows
+//        DELETE /__faults      what is left of the plan; DELETE clears it (the outage is over).
 //
 // Scripting. A conversation is picked by matching the FIRST user message in the request against
 // a script's `match` regex; the agent prefixes each turn with "[Current page: <title> — <url>]",
@@ -62,6 +65,47 @@ export const IMAGES_MARKER = 'IMAGESMARKER-4c7b';
 
 /** The artifact (draft mod) flow's marker. */
 export const ARTIFACT_MARKER = 'ARTIFACTMARKER-7e21';
+
+/**
+ * The resume flow's markers and prompts. Four conversations, one per thing that can go wrong: a
+ * stream that drops once, an outage that outlasts the retries, a service worker killed mid-run and
+ * a panel closed mid-run. Each `done` marker appears only in that conversation's LAST step, so
+ * seeing it means the run got all the way there; each `first` sentence appears only in its first
+ * step, so counting it in the transcript is how a duplicated reply is caught.
+ */
+export const RESUME = {
+  drop: {
+    prompt: 'survive a dropped connection RESUMEPROMPT-a1',
+    first: 'RESUMEFIRST-a1 I will read the page first and then report back on what it contains.',
+    done: 'RESUMEDONE-a1',
+  },
+  outage: { prompt: 'survive a long outage RESUMEPROMPT-b2', first: 'RESUMEFIRST-b2 Reading the page.', done: 'RESUMEDONE-b2' },
+  kill: { prompt: 'survive a dead worker RESUMEPROMPT-c3', first: 'RESUMEFIRST-c3 Reading the page.', done: 'RESUMEDONE-c3' },
+  close: { prompt: 'survive a closed panel RESUMEPROMPT-d4', first: 'RESUMEFIRST-d4 Reading the page.', done: 'RESUMEDONE-d4' },
+};
+
+/**
+ * How long the kill and close conversations hold a step's first byte, so the flow has time to act
+ * while a request is demonstrably in flight. The kill conversation holds its second step (the
+ * worker is killed under it). The close conversation holds its second step briefly (the panel is
+ * closed under it, so that step's text, tool call and result all happen with no panel attached) and
+ * its third step for longer (the panel is reopened under it, and must show a run in progress).
+ */
+export const RESUME_HOLDS = { kill: [0, 4000, 0], close: [0, 2000, 7000] };
+
+/** Three steps: read the page, look at the heading, report. `holds[i]` delays step i's first byte. */
+function resumeScript(name, r, holds = [0, 0, 0]) {
+  const hold = (i) => (holds[i] ? { firstByteDelay: holds[i] } : {});
+  return {
+    name,
+    match: new RegExp(r.prompt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'),
+    steps: [
+      { text: r.first, calls: [{ name: 'get_page', args: { max_chars: 4000 } }], ...hold(0) },
+      { text: 'Now the heading.', calls: [{ name: 'find_elements', args: { selector: 'h1', limit: 3 } }], ...hold(1) },
+      { text: `${r.done} The page has one heading and nothing else of note.`, ...hold(2) },
+    ],
+  };
+}
 
 /**
  * The three versions the artifact flow's draft passes through, as the mock streams them.
@@ -122,6 +166,10 @@ document.head.appendChild(style);`;
  * A step with calls ends with finish_reason "tool_calls"; one without ends with "stop".
  */
 const SCRIPTS = [
+  resumeScript('resume-drop', RESUME.drop),
+  resumeScript('resume-outage', RESUME.outage),
+  resumeScript('resume-kill', RESUME.kill, RESUME_HOLDS.kill),
+  resumeScript('resume-close', RESUME.close, RESUME_HOLDS.close),
   {
     name: 'wikipedia-reader',
     match: /hide the sidebar and make the article full width/i,
@@ -1064,11 +1112,82 @@ function sse(res, obj) {
   res.write(`data: ${JSON.stringify(obj)}\n\n`);
 }
 
+// ---------------------------------------------------------------------------
+// Fault injection
+// ---------------------------------------------------------------------------
+//
+// A mock that always answers cannot test what happens when the network does not. A test posts a
+// PLAN: an ordered list of faults. Each chat-completions request (title and summary calls included;
+// an outage does not care what the request was for) consults the first fault in the plan that still
+// has something left:
+//
+//   {kind: 'drop', afterChunks: 4, times: 1}     answer 200, stream that many chunks, then kill the
+//                                                socket: a connection lost mid-reply.
+//   {kind: 'status', status: 503, retryAfter: 1, times: 2}
+//                                                answer with that status (and Retry-After, seconds).
+//   {kind: 'refuse'}                             kill the socket before answering: what a refused
+//                                                connection or no route looks like to fetch().
+//
+// `times` defaults to 1 for drop and status and to "until cleared" for refuse. `skip: N` lets the
+// first N requests through untouched before the fault starts, which is how a flow lets a run make
+// real progress and THEN takes the network away. `script` limits a fault to one scripted
+// conversation by name. DELETE /__faults is the network coming back.
+//
+// A faulted request is still validated and still recorded in /__requests (with `fault` set), so a
+// flow can count the attempts the extension made.
+
+/** The plan, mutated in place as it is used up. */
+let faults = [];
+
+function parseFaults(plan) {
+  if (!Array.isArray(plan)) return [];
+  return plan
+    .filter((f) => f && ['drop', 'status', 'refuse'].includes(f.kind))
+    .map((f) => ({
+      kind: f.kind,
+      times: Number.isFinite(f.times) ? f.times : f.kind === 'refuse' ? Infinity : 1,
+      skip: Number.isFinite(f.skip) ? f.skip : 0,
+      afterChunks: Number.isFinite(f.afterChunks) ? f.afterChunks : 3,
+      status: Number.isFinite(f.status) ? f.status : 503,
+      ...(f.retryAfter !== undefined ? { retryAfter: f.retryAfter } : {}),
+      ...(typeof f.script === 'string' ? { script: f.script } : {}),
+    }));
+}
+
+/** The fault this request should suffer, if any, consuming it from the plan. */
+function takeFault(scriptName) {
+  for (const f of faults) {
+    if (f.times <= 0) continue;
+    if (f.script && f.script !== scriptName) continue;
+    if (f.skip > 0) {
+      f.skip -= 1;
+      return null;
+    }
+    f.times -= 1;
+    return f;
+  }
+  return null;
+}
+
+/** Thrown inside streamStep to stop writing once the socket has been killed on purpose. */
+const DROPPED = Symbol('dropped');
+
 /** Stream one scripted step as chat-completion chunks, the way a real backend would. */
-async function streamStep(res, step, model, { slowFirstByte = false } = {}) {
+async function streamStep(res, step, model, { slowFirstByte = false, dropAfterChunks = null } = {}) {
   const id = `chatcmpl-mock-${Date.now()}`;
   const base = { id, object: 'chat.completion.chunk', created: Math.floor(Date.now() / 1000), model };
-  const chunk = (delta, finish_reason = null) => sse(res, { ...base, choices: [{ index: 0, delta, finish_reason }] });
+  let sent = 0;
+  const chunk = (delta, finish_reason = null) => {
+    // The injected mid-stream drop: the reply is cut off with no finish_reason and no [DONE], by
+    // destroying the socket rather than ending the response, so the client sees a broken
+    // connection and not a short but well-formed reply.
+    if (dropAfterChunks !== null && sent >= dropAfterChunks) {
+      res.destroy();
+      throw DROPPED;
+    }
+    sent += 1;
+    sse(res, { ...base, choices: [{ index: 0, delta, finish_reason }] });
+  };
 
   // A slow conversation holds its first byte, so the run is demonstrably still in flight while the
   // test switches tabs and starts the other chat.
@@ -1135,7 +1254,7 @@ const server = http.createServer(async (req, res) => {
   // The extension calls this from a page origin, so CORS has to be permissive.
   res.setHeader('access-control-allow-origin', '*');
   res.setHeader('access-control-allow-headers', '*');
-  res.setHeader('access-control-allow-methods', 'GET,POST,OPTIONS');
+  res.setHeader('access-control-allow-methods', 'GET,POST,DELETE,OPTIONS');
   if (req.method === 'OPTIONS') {
     res.writeHead(204).end();
     return;
@@ -1152,6 +1271,28 @@ const server = http.createServer(async (req, res) => {
     }
     res.writeHead(200, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ violations }));
+    return;
+  }
+
+  // The fault plan: see "Fault injection".
+  if (url.pathname === '/__faults') {
+    if (req.method === 'DELETE') {
+      faults = [];
+      res.writeHead(204).end();
+      return;
+    }
+    if (req.method === 'POST') {
+      try {
+        faults = parseFaults(JSON.parse(await readBody(req)).plan);
+      } catch {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: { message: 'bad fault plan' } }));
+        return;
+      }
+    }
+    res.writeHead(200, { 'content-type': 'application/json' });
+    // Infinity does not survive JSON, so an open-ended fault reports times: null.
+    res.end(JSON.stringify({ plan: faults.map((f) => ({ ...f, times: Number.isFinite(f.times) ? f.times : null })) }));
     return;
   }
 
@@ -1207,6 +1348,26 @@ const server = http.createServer(async (req, res) => {
     // stall the flow at the first breakage and hide every later one. The flows read /__violations
     // at the end and fail there, with the whole list.
     recordViolations(body, messages);
+
+    // Fault injection, decided before anything is written. The request is recorded either way.
+    const kind = isSummaryRequest(body) ? 'summary' : isTitleRequest(body) ? 'title' : (pickScript(messages).script.name ?? 'fallback');
+    const fault = takeFault(kind);
+    if (fault && fault.kind !== 'drop') {
+      requests.push({ at: Date.now(), script: kind, fault: fault.kind, messages: stripImageData(messages) });
+      if (process.env.MOCK_LLM_VERBOSE) console.error(`[mock-llm] FAULT ${fault.kind} on ${kind}`);
+      if (fault.kind === 'refuse') {
+        req.socket.destroy();
+        return;
+      }
+      res.writeHead(fault.status, {
+        'content-type': 'application/json',
+        ...(fault.retryAfter !== undefined ? { 'retry-after': String(fault.retryAfter), 'access-control-expose-headers': 'retry-after' } : {}),
+      });
+      res.end(JSON.stringify({ error: { message: `injected ${fault.status}`, type: 'server_error' } }));
+      return;
+    }
+    const dropAfterChunks = fault ? fault.afterChunks : null;
+
     res.writeHead(200, {
       'content-type': 'text/event-stream',
       'cache-control': 'no-cache',
@@ -1232,11 +1393,22 @@ const server = http.createServer(async (req, res) => {
     // Recorded before anything is streamed, so a hung run still leaves its evidence behind. The
     // images are summarised rather than copied: the flow needs their count, type, size, dimensions
     // and position, and a megabyte of base64 per request would make /__requests unusable.
-    requests.push({ at: Date.now(), script: script.name ?? 'fallback', messages: stripImageData(messages), images: collectImages(messages).images });
+    requests.push({
+      at: Date.now(),
+      script: script.name ?? 'fallback',
+      ...(fault ? { fault: fault.kind } : {}),
+      messages: stripImageData(messages),
+      images: collectImages(messages).images,
+    });
     if (process.env.MOCK_LLM_VERBOSE) {
       console.error(`[mock-llm] ${script.name ?? 'fallback'} step ${script.steps.indexOf(step)}: ${(step.calls ?? []).map((c) => c.name).join(', ') || 'text only'}`);
     }
-    await streamStep(res, step, body.model ?? 'demo', { slowFirstByte: !!script.slowFirstByte });
+    try {
+      await streamStep(res, step, body.model ?? 'demo', { slowFirstByte: !!script.slowFirstByte, dropAfterChunks });
+    } catch (e) {
+      if (e !== DROPPED) throw e;
+      if (process.env.MOCK_LLM_VERBOSE) console.error(`[mock-llm] FAULT drop on ${script.name ?? 'fallback'}`);
+    }
     return;
   }
 
