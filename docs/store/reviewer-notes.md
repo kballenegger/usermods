@@ -3,13 +3,24 @@
 The text to paste into the developer dashboard's **Notes for reviewers** field (Privacy practices
 tab, below the permission justifications).
 
-**Before pasting:** replace `[reviewer key: PASTE HERE]` in the short version with a real API key,
-scoped and spend-capped, created for this submission and revoked after the review. Do not commit
-the key back into this file.
+**Before pasting:** the placeholder `[reviewer key: PASTE HERE]` must be replaced with the real
+reviewer key. Do not do it by hand and do not commit the key back into this file — run:
+
+```sh
+USERMODS_REVIEWER_KEY='…' node scripts/reviewer-notes.mjs | pbcopy
+```
+
+which prints the short version with the key substituted, ready to paste.
+
+**The reviewer key is time-limited.** The current one is an OpenAI-compatible endpoint
+(`[reviewer base URL: PASTE HERE]`, model `ornith`) and **expires 2026-10-03**. If a review runs
+past that date the reviewer will hit an auth error, which is why the pasted text tells them to ask
+via the support URL rather than conclude the extension is broken. Re-issue the key and update the
+listing's note if the review is still open near that date.
 
 A note on the field itself: Google does not document this field or its character limit anywhere on
 developer.chrome.com — it exists in the dashboard UI but not in the published docs. The short
-version below is **2,174 characters**, which is under every limit the field has been reported to
+version below is **2,489 characters**, which is under every limit the field has been reported to
 have. Paste the short version. If the field turns out to accept more, the long version underneath
 adds the detail; it is otherwise reference material for answering a reviewer's follow-up email.
 
@@ -24,43 +35,49 @@ a language model writes a userscript for it, and usermods saves and runs that sc
 pages — the same job Tampermonkey does, with the script written by chat instead of by hand.
 
 REQUIRED SETUP: ALLOW USER SCRIPTS
-Chrome requires this of every user script manager, and nothing in the extension works without it:
+Chrome requires this of every user script manager; nothing works without it:
   1. Open chrome://extensions
   2. Click Details on usermods
   3. Turn on "Allow User Scripts"
 The extension shows a banner with these steps until the toggle is on.
 
 MODEL API KEY
-The chat needs a model API key that the user supplies. None is bundled, and there is no account
-and no server of ours. For your review, in the side panel: Settings (the slider icon, top right) →
-click the "Anthropic" preset → paste this key into the API key field. It saves itself.
+The chat needs a model API key the user supplies. None is bundled; there is no account and no
+server of ours. We provide one for your review. In the side panel open Settings (slider icon, top
+right), click the "Custom OpenAI API" preset, then fill in all three fields — the preset selects
+the OpenAI-compatible provider but does not fill these in:
 
-[reviewer key: PASTE HERE]
+  Base URL   [reviewer base URL: PASTE HERE]
+  Model      ornith
+  API key    [reviewer key: PASTE HERE]
+
+Settings saves itself; there is no Save button. This key expires 2026-10-03 — if it has, please
+request a new one at the support URL on our listing rather than reporting the chat broken.
 
 5-MINUTE TEST
   1. Open https://en.wikipedia.org/wiki/Common_kingfisher
   2. Click the usermods toolbar icon to open the side panel; accept the first-run data notice.
   3. Type "hide the table of contents" and press Enter. It inspects the page and proposes a script.
-  4. Click "Try now" to see it applied, then "Save & enable".
+  4. On the proposal card click "Run once" to see it applied, then "Open in draft". In the Draft
+     panel at the bottom, click "Save".
   5. Reload the page — the table of contents stays hidden. Then Mods tab → Delete on that mod.
 
 NO KEY NEEDED FOR THE IMPORT PATHS
-Installing and running scripts needs no model and no key at all. Open this URL to see the install
-preview, then Install:
+Installing and running scripts needs no model or key. Open this URL for the install preview, then
+Install (it exercises @require and GM.* grants):
 https://update.greasyfork.org/scripts/478687/GitHub%20Custom%20Global%20Navigation.user.js
-It exercises @require and GM.* grants. Mods tab also has import from a file and "Migrate from
-Tampermonkey" for a Tampermonkey backup file.
+The Mods tab also imports from a file and from a Tampermonkey backup.
 
 PRIVACY
-No data goes to the developer. There is no account, no server and no telemetry — requests go only
-to the model endpoint the user configured. Policy:
-https://github.com/kballenegger/usermods/blob/main/PRIVACY.md
+No data goes to the developer. No account, no server, no telemetry — requests go only to the model
+endpoint the user configured.
+Policy: https://github.com/kballenegger/usermods/blob/main/PRIVACY.md
 
 SINGLE PURPOSE
 To create, install and run userscripts that customize the websites the user visits.
 
-Each permission is justified individually in the fields above. Source (MIT):
-https://github.com/kballenegger/usermods
+Each permission is justified individually above.
+Source (MIT): https://github.com/kballenegger/usermods
 ```
 
 ---
@@ -94,10 +111,28 @@ which is stored in `chrome.storage.local` on their device and sent only to that 
 endpoint as an `Authorization` header on their own requests. It is never sent to the developer, who
 operates no server.
 
-The **Anthropic** preset is the one to pick for review: it needs only a key, with no base URL to
-fill in, and the model field is pre-filled. The OpenAI, xAI Grok and OpenRouter presets work the
-same way. The Ollama and LM Studio presets point at `localhost` and need no key but need a model
-running locally.
+The key supplied to the reviewer is for an **OpenAI-compatible** endpoint, not a named vendor, so
+the preset to pick is **"Custom OpenAI API"** — the second of the two buttons on the bottom row of
+the Presets block.
+
+That preset is a starting point, not a complete configuration. It sets the provider to
+*OpenAI-compatible (chat/completions)* and seeds **Base URL** with the stub `http://localhost:`,
+leaving **Model** empty; both have to be typed in by hand, over the stub in the case of Base URL.
+That is the one place a reviewer could get stuck, which is why the short version spells out all
+three values and says explicitly that the preset does not fill them in. The three fields are
+labelled exactly **Base URL**, **API key** and **Model**, in that order, and Settings autosaves
+about 300 ms after the last keystroke — there is no Save button to look for.
+
+The named presets behave differently and are worth knowing about if a reviewer explores: the
+**Anthropic**, **OpenAI**, **xAI Grok** and **OpenRouter** presets each fill in a real base URL and
+a default model, so they need only a key. **Ollama** and **LM Studio** point at `localhost` and
+need no key, but need a model server running on the reviewer's own machine, so they are not usable
+for review.
+
+The reviewer key is **time-limited and expires 2026-10-03**. After that the endpoint returns an
+auth error, which would look exactly like a broken extension — hence the line in the pasted notes
+telling the reviewer to request a fresh key through the listing's support URL instead. If a review
+is still open near that date, re-issue the key and update the notes field in the dashboard.
 
 The two **subscription** presets visible in the screenshots (ChatGPT, SuperGrok) are **not in this
 package**. They ship only in the GitHub build. The Chrome Web Store build is compiled with a flag
