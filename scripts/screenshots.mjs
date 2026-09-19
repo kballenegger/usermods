@@ -18,6 +18,9 @@
 //                            mid-run), against the mock's fault injection and its fixture page
 //   npm run smoke:wait       headless: the wait flow alone (every wait_for condition, a deliberate
 //                            timeout, Stop mid-wait), against a fixture page the mock server serves
+//   npm run smoke:editmod    headless: editing an installed mod alone (import a userscript with a
+//                            metadata block, @require and GM grants; edit it from the mod row and
+//                            from a fresh chat via open_mod; detach; prove the round trip)
 //   node scripts/screenshots.mjs --dashboard-capture   that flow, also writing 07-dashboard.png
 //   node scripts/screenshots.mjs --tabbar-capture      the bar flow, also writing the bar at 360
 //                                                      and 640 into $TABBAR_SHOT_DIR
@@ -68,7 +71,7 @@
 
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
-import { ARTIFACT_V1, ARTIFACT_V2, ARTIFACT_V3, COMPACT_MARKER, FAST_MARKER, IMAGES_MARKER, RESUME as RESUME_CONV, SLOW_MARKER, SUMMARY_MARKER, WAIT_MARKER } from './mock-llm.mjs';
+import { ARTIFACT_V1, ARTIFACT_V2, ARTIFACT_V3, COMPACT_MARKER, EDITMOD_PROMPTS, editModSource, FAST_MARKER, IMAGES_MARKER, RESUME as RESUME_CONV, SLOW_MARKER, SUMMARY_MARKER, WAIT_MARKER } from './mock-llm.mjs';
 import { extDir } from './build-dir.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -97,6 +100,7 @@ const TABBAR = process.argv.includes('--tabbar');
 const WAIT = process.argv.includes('--wait');
 const IMAGES = process.argv.includes('--images');
 const ARTIFACT = process.argv.includes('--artifact');
+const EDITMOD = process.argv.includes('--editmod');
 /** The artifact flow, asserted AND capturing the two draft-panel states for the PR. */
 const ARTIFACT_SHOT = process.argv.includes('--artifact-capture');
 const PANELSCOPE = process.argv.includes('--panelscope');
@@ -124,7 +128,7 @@ const SETTINGS_SHOT = process.argv.includes('--settings-capture');
 const CAPTURING =
   !SMOKE && !CHATS && !ISOLATION && !COMPACTION && !DASHBOARD && !DASHBOARD_SHOT && !THEME &&
   !TABBAR && !TABBAR_SHOT && !WAIT && !IMAGES && !STYLEGUIDE && !ARTIFACT && !ARTIFACT_SHOT &&
-  !PANELSCOPE && !RESUME;
+  !PANELSCOPE && !RESUME && !EDITMOD;
 
 /** See note 4: a first-run setup instruction, not the steady state the README should show. */
 const HIDE_SETUP_NOTICE = '.app > .notice, .dash-inner > .notice { display: none !important; }';
@@ -1171,6 +1175,257 @@ async function artifactFlow({ capture = false } = {}) {
     await assertNoViolations('artifact');
     console.log(
       'artifact: OK — draft panel at v1, the edit turn carried v1’s code, v2’s diff showed one line, rollback appended v3 and changed what the next turn was told, Save made one mod and Update rewrote it in place, survived a reload, dashboard badge and origin link',
+    );
+  } finally {
+    await b.close();
+  }
+}
+
+
+// ---------------------------------------------------------------------------
+// Editing an installed mod: the three ways in, and what must survive them.
+// ---------------------------------------------------------------------------
+//
+// The owner's report was "how are you supposed to edit mods. i don't see a easy way to tell it you
+// want to keep adding to a mod". This flow drives the answer end to end, against an IMPORTED
+// userscript rather than a chat-written one — because a chat-written mod's header can be
+// regenerated from four fields and an imported one's cannot, so it is the imported case that
+// actually tests the machinery.
+//
+//   (a) install by import, press "Edit in chat" on the Mods tab, and the draft panel opens at v1,
+//       linked, reading as saved. Ask for a change; the model proposes v2; Save rewrites the SAME
+//       mod id in place, keeping its enabled state, its GM values and its whole metadata block.
+//   (b) a brand-new chat on the same page: the request's system-side context lists the installed
+//       mod, the scripted model calls open_mod and then propose_mod, and Save updates in place.
+//   (c) detach, then Save: a SECOND mod is created and the first is left exactly as it was.
+//   (d) a panel reload mid-way: the "Editing <name>" state is storage, not component state.
+
+/** The mod the flow installs and then edits, and the GM value that must survive an edit. */
+const EDITMOD_GM_VALUE = { installed: true, note: 'set-before-any-edit' };
+
+async function editModFlow() {
+  const b = await launch('light');
+  const fail = (m) => {
+    throw new Error(`editmod: ${m}`);
+  };
+  try {
+    await clearViolations();
+    await fetch(`${CONTROL_BASE}/__requests`, { method: 'DELETE' }).catch(() => {});
+
+    const panel = await openPanel(b.ctx, b.extId);
+    await openSite(b.ctx, 'https://en.wikipedia.org/wiki/Common_kingfisher');
+    await waitForComposer(panel);
+
+    // --- 0. Install the imported userscript, the way a user would: paste it, preview, confirm.
+    //
+    // Through the real install path (rpc mods.install), not by writing chrome.storage directly, so
+    // the mod under test is a genuinely installed one: parsed header, resolved dependencies, GM
+    // store and all. Its @require points at a dead port, so resolveDependencies must not be asked
+    // to fetch it — which it is not, because nothing in this flow changes the dependency lines.
+    const installed = await panel.evaluate(async (source) => {
+      const res = await chrome.runtime.sendMessage({ type: 'mods.install', source, enabled: true });
+      return res?.ok ? res.data : { error: res?.error };
+    }, editModSource(CONTROL_BASE));
+    if (installed.error) fail(`the fixture userscript would not install: ${installed.error}`);
+    let mods = await storedMods(panel);
+    if (mods.length !== 1) fail(`expected one installed mod, storage holds ${mods.length}`);
+    const modId = mods[0].id;
+    if (!mods[0].grants.includes('GM_setValue')) fail('the installed mod lost its grants at install time');
+    // A GM value, set before any edit. If an edit recreates the mod instead of rewriting it, the
+    // id changes and this store is orphaned — which is the failure this fixture exists to catch.
+    await panel.evaluate(async ([id, values]) => chrome.storage.local.set({ [`gm:${id}`]: values }), [modId, EDITMOD_GM_VALUE]);
+    // The mock's scripted open_mod call needs the live id; see /__editmod in scripts/mock-llm.mjs.
+    await fetch(`${CONTROL_BASE}/__editmod`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ modId }),
+    });
+
+    // --- (a) "Edit in chat" from the Mods tab.
+    await panel.locator('.tabs button[data-view="mods"]').click();
+    const editButton = panel.locator(`[data-testid="mod-edit-in-chat"][data-mod-id="${modId}"]`);
+    // The Mods tab reads the list when it mounts, so the row lands a moment after the tab does.
+    await editButton.waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {});
+    if (!(await editButton.count())) fail('the Mods tab offered no "Edit in chat" on the mod row');
+    if (!(await editButton.isVisible())) fail('"Edit in chat" is in the DOM but not on screen');
+    await editButton.click();
+
+    // It lands in the Chat tab, on a chat whose draft IS the installed mod.
+    await panel.locator('[data-testid="artifact"]').waitFor({ timeout: 20_000 });
+    const bar = (await panel.locator('[data-testid="artifact"]').innerText()) ?? '';
+    if (!/\bv1\b/.test(bar)) fail(`the seeded draft did not open at v1: ${JSON.stringify(bar)}`);
+    // Reads as saved, not as something waiting to be saved: the bar's button says Update, because
+    // v1 IS what is installed. A seeded chat that offered "Save" would be offering to save the mod
+    // over itself, which is the confusion fromMod's savedVersion exists to prevent.
+    if (!/update mod/i.test(bar)) fail(`a seeded draft must read as already saved: ${JSON.stringify(bar)}`);
+
+    // And it says what it is editing, in the collapsed state, before anything is expanded.
+    const editing = panel.locator('[data-testid="artifact-editing"]');
+    if (!(await editing.count())) fail('the chat did not say which mod it is editing');
+    const editingText = (await editing.innerText()) ?? '';
+    if (!/Editing/i.test(editingText) || !editingText.includes('Kingfisher Notes')) {
+      fail(`the editing line read ${JSON.stringify(editingText)}`);
+    }
+    if (!(await panel.locator('[data-testid="artifact-detach"]').count())) fail('the editing line offered no way to detach');
+
+    // The seeded draft holds the SCRIPT BODY, with the header stripped out of the code view — the
+    // header is kept separately and put back on save, which the round trip below proves.
+    await panel.locator('[data-testid="artifact-toggle"]').click();
+    await panel.locator('[data-testid="artifact-body"]').waitFor({ timeout: 10_000 });
+    const code = (await panel.locator('[data-testid="artifact-code"]').innerText()) ?? '';
+    if (code.includes('==UserScript==')) fail('the seeded draft put the metadata block in the editable body');
+    if (!code.includes("dataset.kingfisherNotes = 'v1'")) fail('the seeded draft is not the installed script');
+    await panel.locator('[data-testid="artifact-toggle"]').click();
+
+    // Ask for a change. The model proposes v2 carrying only a body and four fields.
+    await sendForVersion(panel, EDITMOD_PROMPTS.revise, 2);
+
+    // The turn carried the draft AND told the model it is editing an installed mod, with the block.
+    const reviseTurn = await requestForScript('editmod-revise');
+    if (!reviseTurn) fail('the mock never received the revise turn');
+    if (!/installed mod \(id /.test(reviseTurn)) fail('the turn did not tell the model it is editing an installed mod');
+    if (!/@require/.test(reviseTurn)) fail('the turn did not carry the metadata block the model must not drop');
+    if (!/\[Mods already installed on this page: 1\]/.test(reviseTurn)) fail('the turn did not list the mods running on this page');
+    if (!/THIS CHAT IS EDITING THIS ONE/.test(reviseTurn)) fail('the page list did not mark the mod this chat is editing');
+
+    // Save. The SAME mod, rewritten in place, with everything that was not asked about intact.
+    await panel.locator('[data-testid="artifact-save"]').click();
+    await panel.locator('[data-testid="artifact-status"]', { hasText: 'Updated' }).waitFor({ timeout: 20_000 });
+    mods = await storedMods(panel);
+    if (mods.length !== 1) fail(`saving an edit created a duplicate: storage holds ${mods.length} mods`);
+    const after = mods[0];
+    if (after.id !== modId) fail('the save wrote a different mod id, so the edit was a new mod rather than an edit');
+    if (!after.source.includes('added-by-chat')) fail('the save did not write the revision');
+
+    // The round trip: every header line the model never saw is still there.
+    for (const line of ['@namespace', '@version     2.4.1', '@require', '@grant       GM_setValue', '@grant       GM_getValue', '@connect', '@run-at']) {
+      if (!after.source.includes(line)) fail(`the edit round trip dropped ${line} from the metadata block`);
+    }
+    if ((after.source.match(/==UserScript==/g) ?? []).length !== 1) fail('the saved source carries two metadata blocks');
+    if (!after.grants.includes('GM_setValue') || !after.grants.includes('GM_getValue')) fail('the re-parsed mod lost its grants');
+    if (!after.connect.includes('api.example.org')) fail('the re-parsed mod lost its @connect');
+    if (after.runAt !== 'document_end') fail(`the re-parsed mod lost its @run-at (now ${after.runAt})`);
+    if (after.requires.length !== 1) fail('the @require body was dropped, so the script would throw at page load');
+    if (!after.requires[0].code.includes('__kingfisherLib')) fail('the @require\u2019s fetched body was lost, so the dependency is a URL with nothing behind it');
+    if (after.enabled !== true) fail('the save changed the mod’s enabled state');
+    // The GM store is keyed by mod id, so an id that survived means the values did.
+    const gm = await panel.evaluate(async (id) => (await chrome.storage.local.get(`gm:${id}`))[`gm:${id}`], modId);
+    if (!gm || gm.note !== 'set-before-any-edit') fail('the mod’s stored GM values did not survive the edit');
+
+    // --- (d) The editing state is storage, not component state.
+    await reloadPanel(panel);
+    await panel.locator('[data-testid="artifact-editing"]').waitFor({ timeout: 25_000 });
+    const afterReload = (await panel.locator('[data-testid="artifact-editing"]').innerText()) ?? '';
+    if (!afterReload.includes('Kingfisher Notes')) fail(`after a reload the panel forgot what it is editing: ${JSON.stringify(afterReload)}`);
+    const barAfterReload = (await panel.locator('[data-testid="artifact"]').innerText()) ?? '';
+    if (!/update mod/i.test(barAfterReload)) fail('after a reload the draft forgot it is linked to a mod');
+
+    // --- (b) A brand-new chat: the model is told what runs here and picks it up itself.
+    await panel.locator('.chatbar button[data-action="new"], .chatbar select').first().waitFor({ timeout: 10_000 });
+    await panel.locator('.chatbar select').selectOption('');
+    await waitForComposer(panel);
+
+    // The empty state offers the mod that runs here as one tap, before anything is typed. This is
+    // the report's answer on screen rather than something you have to know to ask for.
+    const shortcut = panel.locator(`[data-testid="empty-mod"][data-mod-id="${modId}"]`);
+    // The mod list is read asynchronously when the chat mounts, so the shortcut appears a moment
+    // after the composer does. Waiting for it is also the assertion that it is on SCREEN rather
+    // than merely in the DOM.
+    await shortcut.waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {});
+    if (!(await shortcut.count())) fail('a new chat’s empty state did not offer the mod that runs on this page');
+    const shortcutText = ((await shortcut.textContent()) ?? '').trim();
+    if (!shortcutText.includes('Kingfisher Notes')) fail(`the empty-state shortcut did not name the mod: ${JSON.stringify(shortcutText)}`);
+    if (!/^Edit /.test(shortcutText)) fail(`the shortcut should read "Edit <name>": ${JSON.stringify(shortcutText)}`);
+
+    // …but this half of the test is about the MODEL finding it, so the shortcut is left alone and
+    // the request is typed as a user would type it.
+    // open_mod seeds v1 and propose_mod appends v2, so the draft lands on v2 exactly as a chat that
+    // had one from the start would. If this times out, the transcript below says which half failed.
+    await sendForVersion(panel, EDITMOD_PROMPTS.fromScratch, 2).catch(async (e) => {
+      const rows = await panel.locator('.messages').innerText().catch(() => '');
+      fail(`the fresh chat never reached v2 (${e.message}). Transcript:\n${rows.slice(0, 1500)}`);
+    });
+
+    const openTurn = await requestForScript('editmod-open');
+    if (!openTurn) fail('the mock never received the new chat’s turn');
+    if (!/\[Mods already installed on this page: 1\]/.test(openTurn)) fail('a fresh chat’s turn did not list the installed mod');
+    if (!openTurn.includes(modId)) fail('the page list did not carry the mod’s id, so open_mod had nothing to name');
+    if (/THIS CHAT IS EDITING THIS ONE/.test(openTurn)) fail('a fresh chat was wrongly marked as already editing the mod');
+
+    // open_mod ran, and the draft it produced is the installed mod at v1 with v2 proposed on top.
+    const openRow = panel.locator('.messages details', { hasText: 'open_mod' });
+    if (!(await openRow.count())) fail('the transcript has no open_mod row, so the model never adopted the mod');
+    const editing2 = (await panel.locator('[data-testid="artifact-editing"]').innerText()) ?? '';
+    if (!editing2.includes('Kingfisher Notes')) fail('after open_mod the chat did not say what it is editing');
+
+    await panel.locator('[data-testid="artifact-save"]').click();
+    await panel.locator('[data-testid="artifact-status"]', { hasText: 'Updated' }).waitFor({ timeout: 20_000 });
+    mods = await storedMods(panel);
+    if (mods.length !== 1) fail(`open_mod + Save created a second mod: storage holds ${mods.length}`);
+    if (mods[0].id !== modId) fail('open_mod + Save wrote a different mod id');
+    if (!mods[0].source.includes('@require')) fail('the second chat’s save dropped the metadata block');
+    if (!mods[0].source.includes('kingfisherMarked')) fail('the second chat’s save did not write its revision');
+    // And what the FIRST chat added is still there: the second chat opened the mod as it stands
+    // now rather than the version it was originally installed with.
+    if (!mods[0].source.includes('added-by-chat')) fail('open_mod adopted a stale copy of the mod, losing the first chat’s edit');
+
+    // --- (c) Detach, then Save: a separate mod, and the first one untouched.
+    const before = mods[0];
+    await panel.locator('[data-testid="artifact-detach"]').click();
+    await panel.locator('[data-testid="artifact-detach-confirm"]').waitFor({ timeout: 10_000 });
+    // The confirmation says what detaching does and, more importantly, what it does NOT do.
+    const explain = (await panel.locator('[data-testid="artifact-detach-explain"]').innerText()) ?? '';
+    if (!/stays installed/i.test(explain)) fail(`the detach explanation did not promise the mod survives: ${JSON.stringify(explain)}`);
+    await panel.locator('[data-testid="artifact-detach-confirm"]').click();
+    await panel.locator('[data-testid="artifact-status"]', { hasText: 'Detached' }).waitFor({ timeout: 10_000 });
+
+    // Detaching alone must not have touched the mod.
+    mods = await storedMods(panel);
+    if (mods.length !== 1) fail(`detaching changed the mod count to ${mods.length}; it must touch no mod at all`);
+    if (mods[0].source !== before.source) fail('detaching rewrote the mod it detached from');
+    // And the panel stops claiming to be editing anything.
+    if (await panel.locator('[data-testid="artifact-editing"]').count()) fail('the panel still claims to be editing a mod after detaching');
+    const detachedBar = (await panel.locator('[data-testid="artifact"]').innerText()) ?? '';
+    if (/update mod/i.test(detachedBar)) fail('after detaching, Save must create rather than update');
+
+    // v1 was the mod as open_mod adopted it and v2 the revision this chat proposed, so the change
+    // asked for after detaching is v3. Detaching appends nothing: it only breaks the link.
+    await sendForVersion(panel, EDITMOD_PROMPTS.afterDetach, 3);
+    await panel.locator('[data-testid="artifact-save"]').click();
+
+    // The name and the patterns are unchanged, so this is exactly the duplicate the guard is for:
+    // it must ask rather than silently leaving two scripts fighting over one page.
+    const dupe = panel.locator('[data-testid="artifact-duplicate"]');
+    await dupe.waitFor({ timeout: 20_000 });
+    const dupeText = (await dupe.innerText()) ?? '';
+    if (!dupeText.includes('Kingfisher Notes')) fail(`the duplicate question did not name the mod: ${JSON.stringify(dupeText)}`);
+    mods = await storedMods(panel);
+    if (mods.length !== 1) fail('the duplicate question must be asked BEFORE anything is written');
+
+    // "Keep both" is the deliberate answer, and it is the one this scenario is testing.
+    await panel.locator('[data-testid="artifact-duplicate-keep"]').click();
+    await panel.locator('[data-testid="artifact-status"]', { hasText: 'Saved' }).waitFor({ timeout: 20_000 });
+    mods = await storedMods(panel);
+    if (mods.length !== 2) fail(`"Keep both" should have left two mods; storage holds ${mods.length}`);
+    const original = mods.find((m) => m.id === modId);
+    const fresh = mods.find((m) => m.id !== modId);
+    if (!original) fail('the original mod was destroyed by saving a detached draft');
+    if (original.source !== before.source) fail('the original mod was rewritten by a detached save');
+    if (!fresh?.source.includes('v3-detached')) fail('the new mod does not hold the detached draft');
+    if (fresh.id === modId) fail('the new mod reused the original’s id');
+
+    // --- The dashboard says which chat edits which mod, from the index alone.
+    const dash = await openDashboard(b.ctx, b.extId);
+    await dash.locator('[data-testid="chat-row"]').first().waitFor({ timeout: 15_000 });
+    const badges = await dash.locator('[data-testid="chat-editing"]').allTextContents();
+    if (!badges.some((t) => t.includes('Kingfisher Notes'))) fail(`no dashboard chat row says which mod it edits: ${JSON.stringify(badges)}`);
+    await dash.locator('.dash-tabs button', { hasText: 'Mods' }).click();
+    await dash.locator('[data-testid="mod-row"]').first().waitFor({ timeout: 15_000 });
+    if (!(await dash.locator('[data-testid="mod-edit-in-chat"]').count())) fail('the dashboard mod row offered no "Edit in chat"');
+
+    await assertNoViolations('editmod');
+    console.log(
+      'editmod: OK — imported mod edited from the Mods tab (draft at v1, linked, reading as saved), its metadata block, grants, @require, GM values and enabled state survived the round trip, a fresh chat was told what runs here and used open_mod to update the same mod in place, the editing state survived a reload, and detach + "Keep both" made a second mod while leaving the first untouched',
     );
   } finally {
     await b.close();
@@ -3875,6 +4130,10 @@ async function main() {
       await artifactFlow({ capture: ARTIFACT_SHOT });
       return;
     }
+    if (EDITMOD) {
+      await editModFlow();
+      return;
+    }
     if (PANELSCOPE) {
       await panelScopeFlow();
       return;
@@ -3922,6 +4181,7 @@ async function main() {
       await waitFlow();
       await imagesFlow();
       await artifactFlow();
+      await editModFlow();
       await resumeFlow();
       return;
     }

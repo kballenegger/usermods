@@ -894,6 +894,11 @@ async function editModInChat(
   const mod = (await loadMods()).find((m) => m.id === modId);
   if (!mod) throw new Error('That mod no longer exists.');
   const chats = await listChats();
+  // The page in front of the user, read once: it decides which host a new chat is filed under and
+  // whether the panel has to say "this mod does not run here".
+  const url = await activeUrl();
+  const runsHere = runsOnPage(mod, url);
+  const likelyUrl = likelyUrlFor([...mod.matches, ...mod.includeGlobs]);
   // Whether a chat counts as "empty" needs its draft and its transcript, and asking that of 200
   // chats would be 400 storage reads. It is only ever asked of the ONE chat on screen.
   const current = currentChatId ? (chats.find((c) => c.id === currentChatId) ?? null) : null;
@@ -925,10 +930,18 @@ async function editModInChat(
   } else if (plan.action === 'seed') {
     chatId = plan.chatId;
   } else {
-    // A new chat belongs on the host the mod is for when we can name one, so it appears in that
-    // site's switcher rather than under whatever page happened to be open.
-    const derived = likelyUrlFor([...mod.matches, ...mod.includeGlobs]);
-    chatId = (await createChat(hostFromUrl(derived) || host)).id;
+    // Which host a new chat belongs to.
+    //
+    // The page in front of the user wins whenever the mod actually runs there. A mod matching
+    // `*://*.wikipedia.org/wiki/*` read on en.wikipedia.org belongs in en.wikipedia.org's switcher,
+    // not under a bare "wikipedia.org" the user has never been on — and a chat filed under a host
+    // the panel is not showing is a chat the panel cannot open, because the switcher is per host.
+    //
+    // Only when the mod does NOT run here is a host derived from its patterns, which is the case
+    // where the current page is genuinely the wrong answer: editing a Reddit mod from a Wikipedia
+    // tab should not leave its chat filed under Wikipedia forever.
+    const derived = runsHere ? hostFromUrl(url) : hostFromUrl(likelyUrl);
+    chatId = (await createChat(derived || host)).id;
     created = true;
   }
 
@@ -942,7 +955,6 @@ async function editModInChat(
     await saveArtifact(artifact);
   }
   await setChatArtifact(chatId, artifact.id, artifact.versions.length, { id: mod.id, name: mod.name });
-  const url = await activeUrl();
   return {
     chatId,
     // Read back rather than remembered: a reuse landed on a chat whose host this function never
@@ -953,8 +965,8 @@ async function editModInChat(
     unarchived,
     mod,
     artifact,
-    runsHere: runsOnPage(mod, url),
-    likelyUrl: likelyUrlFor([...mod.matches, ...mod.includeGlobs]),
+    runsHere,
+    likelyUrl,
   };
 }
 
