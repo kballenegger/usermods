@@ -522,7 +522,7 @@ button.pill.primary:disabled {
   display: inline-flex;
   padding: 0;
   border: var(--border-width) solid var(--border-control);
-  border-radius: 2px;
+  border-radius: var(--r-field);
   background: var(--surface-well);
   max-width: 120px;
 }

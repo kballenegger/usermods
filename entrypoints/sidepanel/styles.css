@@ -1390,9 +1390,14 @@ input[type='checkbox']:checked::after {
  * Attached images
  *
  * The composer strip, the thumbnails inside a sent bubble, and the full-size overlay. Every colour
- * is a token, so this lands unchanged in whichever of the two open design directions wins; the
- * only thing it asserts is shape — a 2px block edge and a hard offset shadow, like everything else
- * on this screen.
+ * is a token, so re-tinting the brand stays a change to tokens.css alone.
+ *
+ * These were written before the muted palette landed and asked for a 2px block edge and a hard
+ * offset shadow, which is option A's card treatment. In this system a thumbnail is a chip, not a
+ * card: it takes the same 1px --border-control edge, the same 4px --r-field radius and the same
+ * inset --surface-well as .chip does, and it takes NO shadow. The hard offset shadow is reserved
+ * for the primary button and the hero card — two uses are what make it a signature rather than a
+ * texture — and a strip of four thumbnails carrying it would spend that signature on scenery.
  * ------------------------------------------------------------------------ */
 
 .attach-strip {
@@ -1417,7 +1422,6 @@ input[type='checkbox']:checked::after {
   border: var(--border-width) solid var(--border-control);
   border-radius: var(--r-field);
   background: var(--surface-well);
-  box-shadow: var(--shadow-press);
   /* Wide enough that "1568×1568 · 168 KB" fits on one line at the default panel width: the size
      is the only thing on the chip that carries information, and a truncated one carries none. */
   max-width: 152px;
@@ -1512,16 +1516,23 @@ button.attach:focus-visible {
   gap: var(--sp-3);
   padding: var(--sp-4);
   /* The page behind stays faintly visible, so it reads as something on top of the panel rather
-     than as a new screen the user has to find their way back from. */
-  background: color-mix(in srgb, var(--brand-ink) 88%, transparent);
+     than as a new screen the user has to find their way back from.
+     The scrim is the PAGE tone, not the identity ink: --brand-ink is a fixed near-black, so a
+     scrim built on it stayed near-black in the day theme and turned a white interface into a
+     darkroom for as long as the overlay was open. --bg-app follows the theme, which is what a
+     surface is for, and it is already the colour the panel sits on in both. */
+  background: color-mix(in srgb, var(--bg-app) 88%, transparent);
 }
 
 .lightbox img {
   max-width: 100%;
   max-height: calc(100% - 64px);
   object-fit: contain;
-  border: var(--border-width) solid var(--border-control);
-  background: var(--surface-well);
+  /* The image is the subject and the scrim behind it is only 88% opaque, so this takes the panel
+     edge rather than the control edge — the one place in the strip that asserts a boundary. */
+  border: var(--border-width) solid var(--border-card);
+  border-radius: var(--r-field);
+  background: var(--surface-1);
 }
 
 .lightbox-bar {
