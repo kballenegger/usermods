@@ -105,9 +105,9 @@ function Guide() {
 
       <Section
         title="Typography"
-        note="Three families, and which one is used is a rule. The pixel display face is for short labels only, at its single 400 weight; anything you read a sentence of is set in the UI or mono text face. The glyph-pair row below is the test a display face has to pass: it replaced Pixelify Sans, whose C was a closed O, so CHAT read as OHAT."
+        note="Two faces do the work and a third signs the name. Every label, tab, button and heading is the system UI face at 600 — that weight is the interface's whole boldness budget. The pixel display face has exactly two jobs, the wordmark and the big stat numbers, and the glyph-pair row below is the test it had to pass: it replaced Pixelify Sans, whose C was a closed O, so CHAT read as OHAT."
       >
-        <Row title="Display — Jersey 10. Labels, headings, the wordmark. Never a sentence, never below 12px.">
+        <Row title="Display — Jersey 10. The wordmark and the stat numbers, and nothing else.">
           <div className="sg-demo col">
             <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-title)' }}>
               usermods
@@ -147,7 +147,7 @@ function Guide() {
 
       <Section
         title="Buttons"
-        note="Boldness is a hierarchy, not a volume setting. One primary per screen carries the fill, the bright outline and the hard offset shadow; everything beside it is a quiet outline."
+        note="Boldness is a hierarchy, not a volume setting. One primary per screen carries the fill and the system's one offset shadow; everything beside it is a quiet outline."
       >
         <Row title="States">
           <div className="sg-demo">
@@ -239,7 +239,7 @@ function Guide() {
 
       <Section
         title="Cards"
-        note="A solid surface, a 2px outline and a hard offset shadow with no blur. One hero per screen takes the accent edge."
+        note="A solid surface and a 1px outline, separated from the page by a luminance step rather than by a lift. Only the hero card takes an offset — a 2px hard edge in the accent, one of the two places pink appears at all."
       >
         <Row title="Card, hero card, disabled card">
           <div className="sg-demo col">
@@ -280,7 +280,7 @@ function Guide() {
 
       <Section
         title="Forms and toggles"
-        note="Field labels are pixel type; the help text under them is prose, so it is the UI face at 12px. The toggle's 2px border carries its boundary — full lime on white is 1.23:1, so the fill alone could not."
+        note="Field labels are the UI face at 600, uppercase and tracked; the help text under them is prose, so it is the same face at a regular weight. The toggle's border carries its boundary — full lime on white is 1.23:1, so the fill alone could not — and the knob's travel is a second signal that does not use colour."
       >
         <div className="sg-panelframe" style={{ padding: 16, background: 'var(--surface-1)' }}>
           <label className="field">
@@ -385,7 +385,7 @@ function Guide() {
         </div>
       </Section>
 
-      <Section title="Tabs" note="The active tab is a solid lime block with an ink label: the loudest thing in the bar, because which screen you are on is the bar's only real question.">
+      <Section title="Tabs" note="The active tab is a solid primary block with a white label. It is the most definite thing in the bar, because which screen you are on is the bar's only real question — but it is the brand's blue, not lime, because lime here means alive and a tab is not.">
         <div className="sg-panelframe">
           <div className="tabs">
             <button className="active">Chat</button>

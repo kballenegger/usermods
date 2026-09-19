@@ -10,15 +10,21 @@
 //   4.5:1  normal body text
 //   3.0:1  large text (>=18.66px bold or >=24px), and non-text UI components and their boundaries
 //
-// The design's first principle is "be bold, and be legible". This file is the half of that promise
-// which can be checked by a machine: it is what stops the palette getting louder at the cost of
-// being readable. Where a bold value could not be made to pass, the fix was to change the SURFACE
-// or the tonal step — never to desaturate the brand — and the reason is recorded at the pairing.
+// AA is the HARD FLOOR and nothing in the palette is exempt from it. The design (option B, the
+// muted banner palette) additionally targets 7:1 for long-form body copy, and the READING pairings
+// below are asserted at that higher figure rather than at 4.5 — because the whole premise of this
+// option is that a calmer palette should read BETTER than the bold one, not merely as well. If a
+// muting decision ever costs body legibility, that is the thing this file is here to catch.
+//
+// Where a pairing could not be made to pass, the fix was to change the SURFACE or the tonal step —
+// never to abandon the banner's hue, which is what carries the brand once the chroma is down. The
+// reason is recorded at the pairing.
 //
 // It also holds the structural invariants that are easy to break by hand: the day theme must be
 // glow-free, the two blocks day can be reached through must be identical, every colour token must
-// be restated for day, and — the one that is pure design, not arithmetic — the error role must stay
-// distinguishable from the accent by something other than hue.
+// be restated for day, the shadows must stay hard-edged, the display face must stay confined to
+// the wordmark and the stat numbers, and — the one that is pure design, not arithmetic — the error
+// role must stay distinguishable from the accent by something other than hue.
 
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -154,9 +160,8 @@ type Pair = {
 };
 
 /**
- * The reading surfaces. In night these are the ink panels laid on the blue page; in day they are
- * the white cards. Long-form text only ever lands on one of these three, which is why the blue
- * page is NOT in this list — see `page` below.
+ * The reading surfaces. In night these are the navy panels laid on the deeper navy page; in day
+ * they are the white cards. Long-form text lands on one of these three.
  */
 const panels = (t: Record<string, string>) => [
   { label: 'surface-1', rgb: surface(t, '--surface-1') },
@@ -165,9 +170,13 @@ const panels = (t: Record<string, string>) => [
 ];
 
 /**
- * The page itself. In night this is the banner's electric blue, which is a CHROME colour: the
- * shell, the gaps between panels, the area behind the cards. Only a small, deliberate set of
- * foregrounds is ever drawn directly on it.
+ * The page itself: the shell, the gaps between panels, the area behind the cards.
+ *
+ * Unlike option A — where the page was the banner's electric blue and several foregrounds had to
+ * be RESTRICTED off it — this option's page is the deepest step of the same navy ramp the panels
+ * sit on. That makes it a legitimate surface for anything: every foreground below that is checked
+ * on a panel is checked on the page too, and none of them needs an exemption. That is one of the
+ * concrete things the muting bought, so it is asserted rather than described.
  */
 const page = (t: Record<string, string>) => [{ label: 'bg-app', rgb: appBg(t) }];
 
@@ -189,16 +198,19 @@ const fill =
 const PAIRS: Pair[] = [
   // --- Body text ----------------------------------------------------------
   //
-  // text-1 and text-2 are checked on the blue page too, because the shell does put them there:
-  // the top bar's host label, the page-head title on the install page.
-  { what: 'text-1 (primary copy, assistant prose)', fg: '--text-1', on: everywhere, min: 4.5 },
-  { what: 'text-2 (descriptions, help, notice bodies)', fg: '--text-2', on: everywhere, min: 4.5 },
+  // These three are the reading pairings, so they answer to the design's 7:1 target rather than to
+  // AA's 4.5:1 — except the faintest step, which is metadata rather than prose and is held at AA.
+  // A muted palette that made body copy harder to read than the bold one would have failed at its
+  // only real job, and this is where that would show up.
+  { what: 'text-1 (primary copy, assistant prose)', fg: '--text-1', on: everywhere, min: 7 },
+  { what: 'text-2 (descriptions, help, notice bodies)', fg: '--text-2', on: everywhere, min: 7 },
   {
-    // The faintest step: placeholders, list markers, meta. Panels only — it is 3.66:1 on the blue
-    // page, and tokens.css says in as many words that it must not be used there. Nothing does.
-    what: 'text-3 (placeholders, markers, meta) — panels only, never the blue page',
+    // The faintest step: placeholders, list markers, meta. Never long-form prose, so AA is the
+    // right bar for it. It is checked on the page as well as the panels, which option A could not
+    // do: there it was 3.66:1 on the electric blue and had to be restricted off it by hand.
+    what: 'text-3 (placeholders, markers, meta)',
     fg: '--text-3',
-    on: panels,
+    on: everywhere,
     min: 4.5,
   },
 
@@ -209,11 +221,10 @@ const PAIRS: Pair[] = [
   { what: 'info text', fg: '--info-text', on: panels, min: 4.5 },
   { what: 'warn text', fg: '--warn-text', on: panels, min: 4.5 },
   {
-    // Panels only, for the same reason as text-3: error on the blue page is 3.48:1. Every error in
-    // the product is rendered inside a panel, a notice or a card.
-    what: 'error text — panels only, never the blue page',
+    // Checked on the page too, for the same reason as text-3 above.
+    what: 'error text',
     fg: '--error-text',
-    on: panels,
+    on: everywhere,
     min: 4.5,
   },
 
@@ -279,8 +290,18 @@ const PAIRS: Pair[] = [
     min: 4.5,
   },
   {
-    // The active tab: a solid lime block with an ink label. The loudest pair in the panel.
-    what: 'active tab label on the live fill',
+    // The active tab. In option A this was a solid LIME block with an ink label — the loudest
+    // thing on the screen. Here lime is reserved for "alive", so the active tab is a primary-fill
+    // block with a white label, which is the same 6.80:1 pair the primary button uses.
+    what: 'active tab label on the primary fill',
+    fg: '--primary-on-fill',
+    on: fill('--primary-fill'),
+    min: 4.5,
+  },
+  {
+    // The enabled toggle and the running-turn rule are the two places a lime FILL survives, and
+    // both carry an ink label or knob against it.
+    what: 'label/knob on the live fill',
     fg: '--live-on-fill',
     on: fill('--live-fill'),
     min: 4.5,
@@ -305,45 +326,45 @@ const PAIRS: Pair[] = [
     min: 3,
   },
   {
-    // A panel's edge is the ONLY thing separating it from the page: in night the ink panel and the
-    // blue page are just 1.68:1 apart, so this border is load-bearing, not decoration.
-    what: 'panel border against the page and the panel it outlines',
+    // A panel's edge. It is no longer the ONLY thing separating a panel from the page — the
+    // luminance step between --bg-app and --surface-1 does most of that work in this option, which
+    // is why the border could drop from 2px bright to 1px quiet. It still has to be findable, so
+    // it still answers to 3:1 against every surface it can be drawn over.
+    what: 'panel border against the page and every panel it outlines',
     fg: '--border-strong',
-    on: (t) => [...page(t), { label: 'surface-1', rgb: surface(t, '--surface-1') }],
+    on: everywhere,
     min: 3,
   },
   {
     // The resting edge of a secondary button, an input, the toggle track and the top bar's icon
-    // buttons. It is what says "this is a control", so it is a UI boundary and not decoration —
-    // which is exactly why it is a token of its own and not --border-hair, whose 1.46:1 left the
-    // top bar's two icon buttons reading as two bare icons.
+    // buttons. It is what says "this is a control", so it is a UI boundary and not decoration.
     what: 'control border (buttons, inputs, the toggle track, top-bar icon buttons)',
     fg: '--border-control',
-    on: panels,
+    on: everywhere,
     min: 3,
   },
   { what: 'status dot: ok', fg: '--dot-ok', on: everywhere, min: 3 },
   { what: 'status dot: warn', fg: '--dot-warn', on: everywhere, min: 3 },
-  { what: 'status dot: error', fg: '--dot-error', on: panels, min: 3 },
+  { what: 'status dot: error', fg: '--dot-error', on: everywhere, min: 3 },
   {
     // The toggle's "on" state.
     //
     // It is NOT checked as "the lime fill against the surface": full lime on white is 1.23:1, and
-    // no lime that reads as lime would clear 3:1 there. The control is legible in day because it
-    // is drawn the way every block in this system is drawn — a solid fill inside a 2px ink border —
-    // so the thing that carries the boundary is that border, which is what is checked here. In
-    // night the same border is the bright one. Either way the edge, not the fill, is load-bearing,
-    // and the knob inside it moves as a second, non-colour signal of state.
+    // no lime that reads as lime would clear 3:1 there. What carries the control's boundary is its
+    // 1px border, which is what is checked here, and the knob's travel is a second signal that
+    // does not depend on colour at all.
     what: 'enabled toggle: the border that carries its boundary',
-    fg: '--border-strong',
-    on: panels,
+    fg: '--border-control',
+    on: everywhere,
     min: 3,
   },
   {
-    // The hero card's signature edge, which is what marks it out as the hero.
+    // The hero card's signature edge. It is one of only two places pink appears in the whole
+    // interface (the other is an element-reference chip), so it has to be unmistakable where it
+    // does appear — hence a real 3:1 against both the card and the page behind it.
     what: 'hero card accent edge',
     fg: '--accent-edge',
-    on: (t) => [...page(t), { label: 'surface-1', rgb: surface(t, '--surface-1') }],
+    on: everywhere,
     min: 3,
   },
 
@@ -446,12 +467,24 @@ test('every glow the night theme does have is lime, because only alive things gl
   }
 });
 
-test('both themes give panels a hard offset shadow rather than a blur', () => {
-  // The banner's depth is a solid offset block, not a soft drop shadow. A blur radius here would be
-  // a different design system.
+test('the offset shadows are hard-edged, and there are only two of them', () => {
+  // What depth this option has is the banner's kind: a solid offset block, zero blur. A blur
+  // radius here would be a different design system.
+  //
+  // The muting shows up as a COUNT, not just as a colour. --shadow-card is `none`, because in this
+  // option an ordinary panel is separated from the page by a luminance step and a 1px line rather
+  // than by a lift; only the primary button and the hero card are allowed an offset, and they take
+  // --shadow-raise / --shadow-press. That is the structural difference from option A, where every
+  // card carried a 4px ink block, so it is asserted rather than left to a comment.
   for (const [name, theme] of THEMES) {
-    for (const token of ['--shadow-card', '--shadow-raise', '--shadow-press']) {
+    assert.equal(
+      resolve(theme, '--shadow-card'),
+      'none',
+      `${name}: --shadow-card must be none — an ordinary panel in this option does not lift`,
+    );
+    for (const token of ['--shadow-raise', '--shadow-press']) {
       const v = resolve(theme, token);
+      // "2px 2px 0 rgba(...)" — the blur is the third whitespace-separated part.
       const parts = v.split(/\s+/);
       assert.ok(parts.length >= 4, `${name} ${token} should be "x y 0 <colour>", got ${v}`);
       assert.equal(parts[2], '0', `${name} ${token} must have a zero blur radius, got ${v}`);
@@ -480,21 +513,56 @@ test('the error role stays distinct from the accent under colour-vision deficien
   }
 });
 
-test('the pixel display face is only ever declared for short labels', () => {
-  // The display face is the brand's voice, and it is also the fastest way to make the product
-  // unreadable.
+const SHEETS = [
+  'entrypoints/sidepanel/styles.css',
+  'entrypoints/sidepanel/activity.css',
+  'entrypoints/dashboard/dashboard.css',
+  'entrypoints/styleguide/styleguide.css',
+];
+const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+test('the pixel display face is confined to the wordmark and the stat numbers', () => {
+  // This is the typographic decision that separates option B from option A, and it is the one that
+  // would rot first, because reaching for --font-display is how you make a label look "branded".
   //
-  // The floor is 12px because Jersey 10 sets a smaller cap-height per em than the Pixelify Sans it
-  // replaced, so 12px of Jersey is the optical size 11px of Pixelify was. It is NOT a floor for
-  // the reason the old one was: the old 11px floor was an attempt to outrun Pixelify's capital C,
-  // whose aperture is one pixel-unit tall and therefore closes into an O at any size — a size
-  // floor could never have fixed that, which is why the face changed instead.
-  const micro = dark['--fs-micro'];
-  assert.ok(micro !== undefined, '--fs-micro should be defined');
-  assert.ok(
-    parseInt(micro, 10) >= 12,
-    `the display face's smallest size must be at least 12px, got ${micro}`,
-  );
+  // In option A the face set every tab, button, section label and heading. Here it sets the
+  // `usermods` wordmark and the four large stat numbers on the dashboard, and nothing else —
+  // everything that is read rather than recognised is the text face at --fw-label. So the rule is
+  // asserted by COUNT: each stylesheet may declare the display face only on the selectors listed
+  // here, and a new one has to be argued for by editing this list.
+  const allowed: Record<string, string[]> = {
+    // The wordmark in the side panel's top bar.
+    'entrypoints/sidepanel/styles.css': ['.wordmark'],
+    'entrypoints/sidepanel/activity.css': [],
+    // The dashboard header's wordmark, and the stat tile numbers.
+    'entrypoints/dashboard/dashboard.css': ['.dash-head h1', '.stat .n'],
+    // The style guide's own page title, which is the wordmark by another name.
+    'entrypoints/styleguide/styleguide.css': ['.sg-head h1'],
+  };
+
+  for (const rel of SHEETS) {
+    const sheet = fs.readFileSync(path.join(REPO_ROOT, rel), 'utf8');
+    // Every rule block that declares the display face, with the selector text in front of it.
+    const uses = [...sheet.matchAll(/([^{}]*)\{[^{}]*font-family:\s*var\(--font-display\)/g)].map(
+      (m) => (m[1] ?? '').split(/\n\s*\n/).pop()?.replace(/\/\*[\s\S]*?\*\//g, '').trim() ?? '',
+    );
+    const expected = allowed[rel] ?? [];
+    assert.equal(
+      uses.length,
+      expected.length,
+      `${rel} declares the display face ${uses.length} time(s); this option allows ${expected.length} ` +
+        `(${expected.join(', ') || 'none'}). Found: ${uses.join(' | ')}`,
+    );
+    for (const sel of expected) {
+      assert.ok(
+        uses.some((u) => u.includes(sel)),
+        `${rel} should set the display face on ${sel}, but its display-face rules are: ${uses.join(' | ')}`,
+      );
+    }
+  }
+});
+
+test('the display face is the bundled Jersey 10, and nothing asks it for a bold', () => {
   assert.match(
     dark['--font-display'] ?? '',
     /Jersey 10/,
@@ -502,23 +570,41 @@ test('the pixel display face is only ever declared for short labels', () => {
   );
 
   // Jersey 10 ships a single 400 weight. Asking for 700 makes the engine synthesise a bold by
-  // smearing the outline, which thickens the strokes into the counters and undoes the very thing
-  // the face was chosen for — an open C. The face is heavy enough at 400; nothing may ask for more.
-  const displaySelectors = [
-    'entrypoints/sidepanel/styles.css',
-    'entrypoints/sidepanel/activity.css',
-    'entrypoints/dashboard/dashboard.css',
-    'entrypoints/styleguide/styleguide.css',
-  ];
-  const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-  for (const rel of displaySelectors) {
-    const sheet = fs.readFileSync(path.join(root, rel), 'utf8');
-    assert.ok(
-      !/font-weight:\s*(700|bold)\b/.test(sheet),
-      `${rel} asks for a bold weight, but the display face has only a 400 — the engine would ` +
-        'synthesise it and close the C that this face was chosen for.',
-    );
+  // smearing the outline, which thickens the strokes into the counters and closes the capital C —
+  // the exact defect that got Pixelify Sans replaced. The face is heavy enough at 400.
+  //
+  // The check is scoped to the rules that actually use the face, because in THIS option the text
+  // face legitimately does carry weight: --fw-label is 600, and that is what replaced the pixel
+  // labels. A blanket "no font-weight: 700 anywhere" would have been the wrong rule here.
+  for (const rel of SHEETS) {
+    const sheet = fs.readFileSync(path.join(REPO_ROOT, rel), 'utf8');
+    for (const m of sheet.matchAll(/\{([^{}]*font-family:\s*var\(--font-display\)[^{}]*)\}/g)) {
+      assert.ok(
+        !/font-weight:\s*(700|800|900|bold)\b/.test(m[1] ?? ''),
+        `${rel} asks the display face for a bold weight, but it has only a 400 — the engine would ` +
+          'synthesise it and close the C that this face was chosen for.',
+      );
+    }
   }
+});
+
+test('emphasis is carried by the text face at a real weight, not by the pixel face', () => {
+  // The other half of the same decision. Option A got its boldness from pixel type; this option
+  // gets it from the system stack at 600, so that weight is a token rather than a local choice —
+  // it is the interface's entire boldness budget and it should be changed in one place.
+  const w = dark['--fw-label'];
+  assert.ok(w !== undefined, '--fw-label should be defined: it is what replaced the pixel labels');
+  const n = parseInt(w, 10);
+  assert.ok(
+    n >= 600 && n <= 700,
+    `--fw-label is ${w}; emphasis needs to be a real semibold (600-700) to replace pixel type`,
+  );
+
+  // Body copy and code have floors, and they are floors because a muted palette leans harder on
+  // size and weight than a saturated one does.
+  assert.ok(parseInt(dark['--fs-body'] ?? '0', 10) >= 13, 'body copy must stay at least 13px');
+  assert.ok(parseInt(dark['--fs-meta'] ?? '0', 10) >= 12, 'code and metadata must stay at least 12px');
+  assert.ok(parseInt(dark['--fs-micro'] ?? '0', 10) >= 12, 'the smallest label must stay at least 12px');
 });
 
 test('the brand identity colours are the banner’s own, unaltered', () => {

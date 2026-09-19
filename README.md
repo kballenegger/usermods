@@ -60,11 +60,18 @@ Early. The core loop works end to end: chat, page inspection, live testing, prop
 
 ### Design
 
-The interface is built on the banner: electric blue as a real surface colour, lime for anything
-alive, pink, cyan and yellow as confident accents, ink outlines and hard offset pixel shadows, and a
-pixel display face for short labels. Anything you actually read — the transcript, code, the editor,
-settings help — sits on a solid panel in a text face at a comfortable size, because the system's
-first principle is **be bold, and be legible**.
+The interface is built on the banner, at the banner's hues rather than its saturation: a deep navy
+page and panels on the electric blue's own hue, the blue itself for buttons, links and the active
+tab, lime reserved for anything **alive**, pink for the hero card's edge and element chips, cyan for
+focus. Anything you actually read — the transcript, code, the editor, settings help — sits on a solid
+panel in a text face at a comfortable size, because the system's first principle is **calm, branded,
+legible**.
+
+> **Note.** This branch is **option B**, one of two design options open for comparison; neither is
+> merged. Option A applies the same identity boldly — the electric blue as the page itself, bright
+> 2px borders, hard offset shadows and pixel type throughout. The two are behaviour-identical.
+> [§2 of the design doc](docs/design.md#2-what-is-different-from-option-a-concretely) is a
+> side-by-side.
 
 **[docs/design.md](docs/design.md)** is the full style guide: the palette with hexes and OKLCH values
 for both themes, the contrast table, typography, every component with its states and do/don'ts,
@@ -75,18 +82,18 @@ stylesheets, so it shows the system rather than describing it.
 
 The panel follows your OS by default, and the ◐ in the tab bar cycles Dark → Light → System from
 anywhere. Day is its own design pass, not night inverted: the identity colours drop to the tones that
-can carry text on white, panels take ink outlines in place of the bright borders they use on the blue
-page, and every glow turns off — there is no neon in daylight. Both themes meet WCAG AA, which
-`test/contrast.test.ts` enforces against the token file.
+can carry text on white, the page is a cool white tinted on the same hue as night's navy, and every
+glow turns off — there is no neon in daylight. Both themes meet WCAG AA and hold long-form reading
+pairings to 7:1, which `test/contrast.test.ts` enforces against the token file.
 
 <table>
   <tr>
     <td width="50%" valign="top">
-      <img src="docs/screenshots/01-chat-proposal-light.png" alt="The proposal conversation in the day theme: white ink-outlined panels on a cool blue-white page, the hero card edged in magenta.">
+      <img src="docs/screenshots/01-chat-proposal-light.png" alt="The proposal conversation in the day theme: white panels on a cool blue-white page, a blue active tab and the hero card edged in magenta.">
       <sub><b>Chat, day.</b></sub>
     </td>
     <td width="50%" valign="top">
-      <img src="docs/screenshots/01-chat-proposal.png" alt="The same proposal conversation in the night theme: ink panels on electric blue, a lime active tab and the hero card edged in magenta.">
+      <img src="docs/screenshots/01-chat-proposal.png" alt="The same proposal conversation in the night theme: navy panels on a deeper navy page, a blue active tab and the hero card edged in magenta.">
       <sub><b>Chat, night.</b></sub>
     </td>
   </tr>

@@ -1,14 +1,16 @@
 /*
- * usermods, in the banner's own language.
+ * usermods — option B, the muted banner palette.
  *
- * The page is electric blue. Everything you read sits on a solid ink panel laid on that blue,
- * outlined in a bright 2px border and dropped on a hard ink shadow with no blur — the banner's
- * construction, at interface scale. Labels, tabs, buttons and the wordmark are set in the pixel
- * display face; every sentence, every code block and every editor is set in the UI or mono text
- * face at a comfortable size on a flat surface.
+ * The page is a deep navy on the banner blue's own hue. Everything you read sits on a slightly
+ * lighter navy panel, separated from the page by a real luminance step and confirmed by a 1px
+ * line — no bright outline, no shadow under every card. Depth is spent in two places only: the
+ * primary button and the hero proposal card, each of which takes a 2px hard offset.
  *
- * The rule the old system got right and this one keeps: ONLY ALIVE THINGS GLOW OR PULSE, and alive
- * is always lime. Everything else gets its weight from colour blocks, outlines and offset shadows.
+ * Labels, tabs, buttons and headings are the system text face at --fw-label (600). The pixel
+ * display face sets the `usermods` wordmark and nothing else in this file.
+ *
+ * The rule carried over unchanged: ONLY ALIVE THINGS GLOW OR PULSE, and alive is always lime.
+ * Lime appears nowhere else — not as a tab block, not as a rule under the bar.
  *
  * Identifiers (tool names, selectors, match patterns, model ids, @tokens, versions) are mono.
  */
@@ -65,8 +67,17 @@ pre,
 }
 
 /*
- * The pixel display face, as a utility. It is applied by the rules below rather than by hand, and
- * it is never put on a sentence — see the typography note in tokens.css.
+ * Emphasis, in the text face.
+ *
+ * This is where option B differs most visibly from option A. There, this rule put the pixel
+ * display face on every tab, button, section label, card title and heading. Here those are all set
+ * in the system stack at --fw-label (600), because a semibold label at 12px is read instantly and
+ * a pixel label at 12px is decoded. The boldness is still there — it is carried by weight, case
+ * and tracking rather than by the shape of the glyphs.
+ *
+ * The display face keeps two jobs, and only two: the `usermods` wordmark (below) and the large
+ * stat numbers on the dashboard. test/contrast.test.ts counts the declarations and fails if a
+ * third appears, because "just this one label" is exactly how the rule would rot.
  */
 .display,
 .label,
@@ -74,21 +85,19 @@ pre,
 .tabs button,
 button.btn,
 button.pill,
-.wordmark,
 .card h4,
 .page h2,
-.stat .n,
 .stat .k,
 .dash-label,
-.dash-head h1,
 .dash-tabs button {
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
+  font-weight: var(--fw-label);
 }
 
 /*
- * Focus: a 2px cyan ring with an ink halo behind it, so it is obvious on the blue page, on an ink
- * panel and on a white card alike. Cyan is reserved for focus and info precisely so that a focused
- * control can never be mistaken for a state.
+ * Focus: a 2px cyan ring, offset, so it is obvious on the navy page, on a navy panel and on a
+ * white card alike. Cyan is reserved for focus and info precisely so that a focused control can
+ * never be mistaken for a state.
  */
 :focus-visible {
   outline: 2px solid var(--focus-ring);
@@ -117,8 +126,8 @@ button.pill,
  * the panel is a side panel whose width the user drags, and in the screenshot harness it is a tab
  * at an arbitrary size. No JavaScript is involved — nothing measures, nothing re-renders.
  *
- * Visually it is a solid ink block across the blue page with a lime rule under it. It is chrome, so
- * it is the one place a bright band is allowed to run edge to edge.
+ * Visually it is a panel-coloured block across the page, closed by a hairline. In option A this
+ * bar carried a full-width lime rule; here lime means "alive", and a navigation bar is not alive.
  */
 .tabs {
   container-type: inline-size;
@@ -130,7 +139,7 @@ button.pill,
   gap: var(--sp-2);
   padding: var(--sp-3) var(--sp-4);
   background: var(--surface-1);
-  border-bottom: var(--border-width) solid var(--live);
+  border-bottom: var(--border-width) solid var(--border-hair);
 }
 
 /* The two ends of the bar. Neither may shrink: the host gives way first, then truncates. */
@@ -156,11 +165,20 @@ button.pill,
   border-radius: var(--r-pill);
   color: var(--text-2);
   font-size: var(--fs-label);
-  font-weight: 400;
   line-height: 1;
-  letter-spacing: var(--lbl-tracking);
+  /*
+   * Tighter than --lbl-tracking, and less padding than option A's 11px, because this bar has a
+   * width budget that a capture test enforces: at 360px the host label must still show 10
+   * characters of "en.wikipedia.org".
+   *
+   * Uppercase semibold system type is WIDER than the pixel face it replaced at the same nominal
+   * size, so switching the face spent width the bar did not have and the tabbar flow caught it —
+   * the host came back one character short. The tracking and padding here are what pay it back.
+   * Do not raise either without re-running `npm run smoke:tabbar`.
+   */
+  letter-spacing: 0.03em;
   text-transform: uppercase;
-  padding: 0 11px;
+  padding: 0 9px;
   cursor: pointer;
   transition: color 120ms ease, background 120ms ease;
 }
@@ -170,22 +188,22 @@ button.pill,
 }
 
 /*
- * The active tab is a solid lime block with an ink label — the loudest thing in the bar, because
- * "which screen am I on" is the bar's only real question. 16.11:1. It needs no glow: it IS the
- * colour, at full strength.
+ * The active tab is a solid PRIMARY block with a white label (6.80:1) — still the most definite
+ * thing in the bar, because "which screen am I on" is the bar's only real question, but in the
+ * brand's blue rather than in lime. Lime is reserved for things that are alive; a tab is not.
+ * No shadow: the fill alone is the state.
  */
 .tabs button.active,
 .tabs button.active:hover {
-  color: var(--live-on-fill);
-  background: var(--live-fill);
-  box-shadow: var(--shadow-press);
+  color: var(--primary-on-fill);
+  background: var(--primary-fill);
 }
 
 
 /*
  * The theme toggle: a ◐ that cycles Dark → Light → System. It is a preference rather than
- * navigation, so it stays an icon button — but on this palette "quiet" is a bordered ink square,
- * not a faded glyph.
+ * navigation, so it stays an icon button — a bordered square rather than a faded glyph, so it
+ * still reads as something you can press.
  */
 .theme-toggle {
   flex: none;
@@ -521,9 +539,9 @@ button.pill,
   display: flex;
   gap: 6px;
   align-items: center;
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: var(--fs-label);
-  font-weight: 400;
+  font-weight: var(--fw-label);
   text-transform: uppercase;
   letter-spacing: var(--lbl-tracking);
   color: var(--text-2);
@@ -599,9 +617,9 @@ button.pill,
  * shadow and the bright edge; everything beside it is an outline.
  */
 button.btn {
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: var(--fs-btn);
-  font-weight: 400;
+  font-weight: var(--fw-label);
   line-height: 1;
   letter-spacing: var(--lbl-tracking);
   text-transform: uppercase;
@@ -755,12 +773,18 @@ button.linklike:hover {
 }
 
 /*
- * One hero per screen. In Chat that is the proposal card. Its signature is the accent: a pink
- * outline over a pink-shadowed block. No glow — the edge and the offset do the work.
+ * One hero per screen. In Chat that is the proposal card, and this is one of only two places pink
+ * appears in the whole interface — the other is an element-reference chip.
+ *
+ * Its signature is a 2px accent edge and a 2px hard offset in the same accent. In option A the
+ * offset was 4px, which at panel width is a bar of pink down two sides of the card; at 2px it
+ * reads as an edge that has been deliberately doubled, which is the intent. This and the primary
+ * button are the only two offsets in the system.
  */
 .card.hero {
+  border-width: 2px;
   border-color: var(--accent-edge);
-  box-shadow: 4px 4px 0 var(--accent-edge);
+  box-shadow: 2px 2px 0 var(--accent-edge);
 }
 
 .card h4 {
@@ -849,19 +873,19 @@ details > summary::-webkit-details-marker {
 .empty::before {
   content: '▚▚▚';
   display: block;
-  font-family: var(--font-display);
-  font-size: 20px;
+  font-family: var(--font-mono);
+  font-size: 16px;
   letter-spacing: 0.2em;
-  color: var(--accent);
+  color: var(--text-3);
   margin-bottom: var(--sp-2);
 }
 
-/* Section labels: 12px pixel type, uppercase, tracked out. */
+/* Section labels: 12px semibold, uppercase, tracked out. */
 .label,
 .muted.label {
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: var(--fs-label);
-  font-weight: 400;
+  font-weight: var(--fw-label);
   text-transform: uppercase;
   letter-spacing: var(--lbl-tracking);
   color: var(--text-2);
@@ -907,15 +931,15 @@ label.field {
   flex-direction: column;
   gap: var(--sp-1);
   margin-bottom: var(--sp-3);
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: var(--fs-label);
-  font-weight: 400;
+  font-weight: var(--fw-label);
   text-transform: uppercase;
   letter-spacing: var(--lbl-tracking);
   color: var(--text-2);
 }
 
-/* The helper text under a field is prose, not a label: UI face, sentence case, 12px. */
+/* The helper text under a field is prose, not a label: UI face, regular weight, sentence case. */
 label.field > span {
   font-family: var(--font-ui);
   font-size: var(--fs-meta);
@@ -1099,13 +1123,13 @@ input[type='checkbox']:checked::after {
   align-items: center;
   gap: 8px;
   font-family: var(--font-display);
-  font-size: var(--fs-ui);
+  font-size: 18px;
   font-weight: 400;
   letter-spacing: 0.04em;
   text-transform: lowercase;
-  color: var(--live-text);
-  /* 1px, not 2px — see the note on .dash-head h1: a 2px offset muddies Jersey's finer strokes. */
-  text-shadow: 1px 1px 0 var(--accent-edge);
+  color: var(--primary-text);
+  /* No offset behind it — see the note on .dash-head h1: at this size a 1px colour edge on a pixel
+     face reads as chromatic fringing rather than as the banner's hard shadow. */
 }
 
 /*
@@ -1163,9 +1187,9 @@ input[type='checkbox']:checked::after {
   border: var(--border-width) solid var(--border-control);
   border-radius: var(--r-field);
   background: none;
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: var(--fs-label);
-  font-weight: 400;
+  font-weight: var(--fw-label);
   line-height: 1;
   letter-spacing: var(--lbl-tracking);
   text-transform: uppercase;
@@ -1202,16 +1226,38 @@ input[type='checkbox']:checked::after {
 
 /*
  * Settings selected. It is a view of this panel, so it wears exactly the treatment the Chat and
- * Mods tabs wear — a solid lime block with an ink label — rather than inventing a second, quieter
- * idea of "active" for the same question. It is distinguishable without colour too: the resting
- * state is an outline with no fill, and the selected state is a filled block with a hard shadow.
+ * Mods tabs wear — a solid PRIMARY block with a white label — rather than inventing a second,
+ * quieter idea of "active" for the same question. It is distinguishable without colour too: the
+ * resting state is an outline with no fill, and the selected state is a filled block.
+ *
+ * It was a lime block in option A. Lime means "alive" here, and a settings screen is not alive.
  */
 .tabs button.tab-action.active,
 .tabs button.tab-action.active:hover {
-  color: var(--live-on-fill);
-  background: var(--live-fill);
-  border-color: var(--live-fill);
-  box-shadow: var(--shadow-press);
+  color: var(--primary-on-fill);
+  background: var(--primary-fill);
+  /*
+   * A white ring on the blue fill: the selected control reads as a filled block wearing a bright
+   * edge, which is a difference a greyscale display still shows. It has to differ from BOTH the
+   * unselected resting border and the unselected HOVER border, since a click leaves the control
+   * hovered.
+   */
+  border-color: var(--text-on-primary);
+  /*
+   * An inset ring, and the reason it exists is worth recording because it is not decorative.
+   *
+   * `border-color` and `background` are both TRANSITIONED on this control (120ms, from the base
+   * rule). A test that clicks the control and immediately measures it therefore samples a colour
+   * part-way between the two states — which is exactly what the tabbar flow does, and it read the
+   * selected and unselected borders as equal because the selected one had not arrived yet. Option
+   * A never hit this: its active state also set `box-shadow`, which is not in the transition list,
+   * so the state was legible on the first frame.
+   *
+   * `box-shadow` is not transitioned here either, so this ring is the property that makes the
+   * state true immediately rather than 120ms later. It is the same colour as the border, so it
+   * reads as one 2px edge rather than as a second device.
+   */
+  box-shadow: inset 0 0 0 1px var(--text-on-primary);
 }
 
 /*

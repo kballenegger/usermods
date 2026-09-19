@@ -3,6 +3,50 @@
 Kept so that a future pass does not spend its budget rediscovering the same dead ends. Each entry
 says what was tried and why it was not chosen.
 
+## The three interface options — two still open
+
+The identity ([`branding.md`](../../branding.md) — the palette, the icon, the banner) has been
+settled since 2026-09-19.
+How much of the screen it should cover has been answered three different ways, and **two of those
+are open for comparison right now**; neither is merged.
+
+**Volt OS — superseded.** The original system: a charcoal page with a single neon yellow-green
+accent, and no relationship to the banner at all beyond the accent's hue. It was replaced when the
+BBS banner became canonical, because a brand whose whole character is a saturated electric blue
+cannot be represented by one accent colour on grey. Its token names survive as a deprecated alias
+block at the end of `tokens.css` so that branches in flight do not render unstyled on merge.
+
+**Option A — the bold application** (`design/volt-bold`; this is the state of `main`). The banner
+taken literally. The electric blue `#1008C8` *is* the page; reading panels are ink laid on top of it,
+each with a 2px bright border and a 4px hard ink offset; every label, tab and button is pixel type;
+the active tab is a solid lime block. Its first principle is "be bold, and be legible", and it holds
+both — every pairing clears AA and the type is large — but the boldness is continuous rather than
+reserved: the saturation is on screen the entire time you are reading.
+
+**Option B — the muted application** (`design/muted-banner`). The same six identity hexes and the
+same hues, with the **chroma pulled down for anything larger than a dot or a border**. A deep navy
+page on the banner blue's own hue (266) with slightly lighter navy panels on it, 1px edges, 4–6px
+radii, and exactly two offset shadows in the whole product. Lime is reserved for "alive"; pink for
+the hero card's edge and element chips. Labels are the system face at 600, and the pixel face is kept
+for the wordmark and the dashboard's stat numbers.
+
+The structural difference, which is what everything else follows from: **option A's panel is *darker*
+than its page and only 1.68:1 from it**, so a bright border is the only thing that can carry the
+edge. **Option B's panel is *lighter* than its page**, so a luminance step carries the edge and the
+border only confirms it. That inversion is what pays for the quieter borders, the absent shadows and
+the smaller radii — they are consequences of one decision, not four separate ones.
+
+Two measurable consequences worth recording either way:
+
+- Option A has to **restrict two tokens off its own page** — `--text-3` is 3.66:1 and `--error-text`
+  3.48:1 on the electric blue — and enforces that by which surfaces the test checks them against.
+  Option B's page is part of the same ramp as its panels, so every foreground is checked on it and
+  every one passes.
+- Option B holds long-form reading pairings to **7:1** rather than AA's 4.5:1, which option A's
+  palette could not do on the blue page.
+
+The comparison is the owner's to make; both branches carry full capture sets for it.
+
 ## `glyph-pairs.png` — why the display face changed, and to what
 
 Regenerate with `node scripts/glyph-specimen.mjs`. The specimen reads the shipped `tokens.css`, so
@@ -40,17 +84,24 @@ the outline does not have, so raising the floor was never going to work and the 
 The other three evaluated, all OFL and all in the specimen:
 
 - **VT323 — rejected.** Its `C` is properly open, but the face is a thin terminal font: at 12px on
-  the ink panel it is too light to hold a tab label, and "be bold" is the first half of the rule.
+  the ink panel it is too light to hold a tab label. (That test was option A's, where the face had to
+  carry every label; under option B it would only ever have set the wordmark, but the face was chosen
+  before the two options split.)
 - **Silkscreen — rejected again**, for the reason it was rejected the first time: uppercase only,
   so it cannot set `usermods`. Its tracking is also still very wide — see it wrapping in the
   specimen at 13px, the button size.
 - **DotGothic16 — rejected.** Legible and open, but light-stroked and wide, so it reads as a
   document face rather than a display face and pushes labels toward wrapping.
 
-The size scale moved with the face: `--fs-micro` / `--fs-label` are **12px** (Jersey sets a smaller
-cap-height per em, so 12px of Jersey is the optical size 11px of Pixelify was), stat and title rose
-to 22/28px, and button labels got their own `--fs-btn` at 13px so the display face and the prose
-face can be sized independently.
+The size scale moved with the face, in option A: `--fs-micro` / `--fs-label` went to **12px**
+(Jersey sets a smaller cap-height per em, so 12px of Jersey is the optical size 11px of Pixelify
+was), stat and title rose to 22/28px, and button labels got their own `--fs-btn` at 13px so the
+display face and the prose face could be sized independently.
+
+**Option B keeps the face and almost none of that scale**, because it sets only the wordmark and the
+stat numbers in it — everything that was pixel type there is the system face at 600. The 12px floor
+still applies to the labels, but for the ordinary reason that 12px is small, not to outrun a defect
+in a glyph.
 
 ## `typeface-trial.png` — the pixel display face (superseded)
 
@@ -81,20 +132,43 @@ The one caveat carried forward from this trial was that Pixelify's `C` and `O` a
 floor bought nothing and the shipped captures showed `OHAT` at 11px and above. See
 `glyph-pairs.png`.
 
-## Directions considered for the two themes
+## Directions considered for the two themes — and reconsidered
 
-Recorded here in words rather than as captures, because both were rejected at the token stage before
-a full UI was built on them.
+Recorded in words rather than as captures, because both were rejected at the token stage, **during
+option A's pass**, before a full UI was built on either. Option B reopened both of them deliberately,
+so the original reasoning and what changed are kept side by side.
 
 **Night, alternative: ink page with blue accents.** A near-black page with the electric blue used
-only for buttons and active marks — essentially the old charcoal layout re-hued. Rejected because it
-is not the banner: the banner's most striking quality is that the blue is the *field*, not an accent
-on it, and an ink page throws that away. It also makes the blue almost unusable, since `#1008C8` is
-too dark to read against near-black.
+only for buttons and active marks — essentially the old charcoal layout re-hued.
 
-**Day, alternative: white page, blue links.** The conventional light theme. Rejected for the reason
-the owner gave directly — "we don't need to be subtle with the colours" — and because it would have
-made the two themes siblings in name only. The chosen day theme keeps the banner's *construction*
-(ink outlines, hard offset shadows, saturated fills with ink labels) and only inverts the surfaces.
+*Rejected for option A* because it is not the banner: the banner's most striking quality is that the
+blue is the *field*, not an accent on it, and an ink page throws that away. It also makes the blue
+almost unusable, since `#1008C8` is too dark to read against near-black.
 
-The chosen pair is documented, with hexes and ratios, in [`../../design.md`](../../design.md).
+*Reopened for option B*, and the second objection is the one that had to be answered rather than
+waved off. Option B's page is **not** near-black and its primary is **not** `#1008C8`: the page is
+`#0C1220`, a deep navy on the banner blue's own hue 266, and the primary is a lighter tint of that
+same hue (`#98B6FB` as text, `#3053BC` as a fill) which is perfectly readable on it. So the
+"unusable blue" problem was really a problem with using the identity hex *unmodified* on a dark
+surface, and a tonal scale solves it — which option A had already discovered for its own panels.
+
+The first objection stands as stated and is simply the trade being offered: the blue is no longer the
+field. What option B argues is that the *hue* being everywhere — in every surface, every neutral and
+every border — is a different and more durable way of being the banner than the *saturation* being
+everywhere, and that it is the one that survives a long reading session. That is a judgement about
+which the owner is the authority, which is why both branches exist.
+
+**Day, alternative: white page, blue links.** The conventional light theme.
+
+*Rejected for option A* for the reason the owner gave directly — "we don't need to be subtle with the
+colours" — and because it would have made the two themes siblings in name only. Option A's day theme
+keeps the banner's construction (ink outlines, hard offset shadows, saturated fills with ink labels)
+and only inverts the surfaces.
+
+*Option B's day theme is not this alternative either*, though it is closer to it than option A's. The
+page is a cool white tinted on hue 266 rather than plain white, the primary is a deep blue on the
+banner's hue rather than a generic link blue, and lime, cyan, yellow and pink all still appear as
+real fills with ink labels. What it drops is the ink outline and the hard offset on every card.
+
+Each option's chosen pair is documented, with hexes and ratios, in the `design.md` on its own branch;
+this branch's is [`../../design.md`](../../design.md).

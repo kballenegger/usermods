@@ -1,50 +1,63 @@
 /*
- * The usermods design tokens.
+ * The usermods design tokens — OPTION B: the muted banner palette.
  *
- * FIRST PRINCIPLE: BE BOLD, AND BE LEGIBLE.
+ * FIRST PRINCIPLE: CALM, BRANDED, LEGIBLE — IN THAT ORDER.
  *
- * These are not in tension. Legibility comes from contrast, type size, spacing and solid surfaces —
- * not from desaturation. White on the banner's electric blue is 11.1:1; ink on lime is 16.1:1. So
- * when a choice arises, take the bolder colour and then MAKE it legible (raise contrast, enlarge
- * the type, thicken the stroke, put the text on a solid panel) rather than toning the colour down.
+ * This is one of two designs built from the same identity. The other (option A, on `main`) takes
+ * the banner literally: the electric blue IS the page, every panel takes a 2px bright border and a
+ * hard ink shadow, and every label is pixel type. It is unmistakably the brand and it is loud.
  *
- * The visual source of truth is docs/banner.png. Its identity palette is used here literally:
+ * This option keeps the brand and turns the volume down. The reasoning is that the banner is a
+ * poster and the side panel is a place you read in for half an hour at a time, and those two want
+ * different things from the same six colours. A poster wants the colour to be the subject. A
+ * reading surface wants the colour to be the frame.
  *
- *   electric blue  #1008C8   the page itself, and the primary fill
- *   lime           #AEFF24   live / ok — the one thing allowed to glow or pulse
- *   cyan           #00E5F2   info, and the focus ring
- *   ink            #030B16   outlines and hard offset shadows
- *   magenta        #F343D3   accent: the hero edge, element chips, the wordmark's shadow
+ * So the rule here is the inverse of option A's:
+ *
+ *   > Take the banner's hue, then pull its CHROMA down for anything larger than a dot or a border.
+ *   > Saturation is a highlighter: it marks the few things that are alive, selected or wrong, and
+ *   > it stops being informative the moment it covers a whole page.
+ *
+ * The identity hexes are NOT edited — they are still the brand, they are still recorded below, and
+ * the icon, banner and store artwork still use them literally. What changes is how much of the
+ * interface each one is allowed to cover:
+ *
+ *   electric blue  #1008C8   the hue of the page, the panels and the primary — at low chroma for
+ *                            surfaces, at moderate chroma for the primary fill
+ *   lime           #AEFF24   ALIVE ONLY: the running turn, an ok dot, an enabled toggle, a
+ *                            progress fill. Never a large fill, never a tab block.
+ *   cyan           #00E5F2   focus and info
+ *   ink            #030B16   the darkest step of the surface ramp
+ *   magenta        #F343D3   SPARINGLY: the hero proposal card's edge, and element-reference
+ *                            chips. Nothing else.
  *   yellow         #FFF345   warning
  *
- * Two structural facts drive nearly every decision below, and both were measured, not guessed:
+ * Every interface tone below was derived in OKLCH from those hexes with the HUE HELD and the
+ * chroma reduced — the derivation is in the comments at each scale, and the ratios are asserted by
+ * test/contrast.test.ts rather than claimed here.
  *
- *  1. #1008C8 is a very dark, saturated blue (OKLCH L=38%). It is superb as a FILL under white
- *     (11.11:1) or lime (9.06:1) text, and as TEXT on the light theme's pale page (9.73:1). It is
- *     unusable as text or as a thin border on a dark navy panel. So the primary role carries a
- *     tonal scale: the fill tone is the banner blue itself, and a bright tint (--primary-300
- *     #A7C2FE) does the work of text, icons and borders wherever the surface is dark.
+ * SURFACES. Dark theme: a deep navy/ink page with slightly lighter navy panels. Blue-cast, not
+ * green-cast — every surface sits on hue 266, the banner blue's own hue, so the greys are never
+ * neutral and never teal. Light theme: a soft cool white page with white panels. The ambient wash
+ * is faint enough that you have to look for it, and nothing is ever drawn behind text.
  *
- *  2. The blue page and the ink panels that sit on it differ by only 1.68:1 in luminance. A panel
- *     edge therefore CANNOT be carried by a luminance step or by a dark hairline. Every panel in
- *     the night theme takes a bright 2px border (--primary-300 is 6.24:1 on the page) plus a hard
- *     ink offset shadow. This is exactly how the banner is built, so the constraint and the
- *     aesthetic give the same answer.
+ * STRUCTURE. Small radii (4-6px) and 1px borders. There is exactly one hard 2px offset shadow in
+ * the system and it appears on two things: the primary button and the hero card. Every other panel
+ * is separated from the page by a luminance step and a 1px line, which is enough here precisely
+ * because the page is no longer the same lightness as the panels.
  *
- * READING SURFACES. Long-form text — assistant prose, code, the mod source editor, settings help,
- * the consent notice, install preview source — is never set on the blue page and never on a
- * texture. It sits on a solid ink panel (night) or a white ink-outlined panel (day), in a
- * proportional or mono TEXT face, at >=13px body / >=12px code. The pixel display face is for
- * short labels only. See the typography block.
+ * TYPE. The pixel display face (Jersey 10) is reserved for the `usermods` wordmark and the large
+ * stat numbers on the dashboard. Every label, tab, button, section label and heading is the text
+ * face at 600 — semibold carries the boldness that the pixel face used to carry, and it is legible
+ * at 12px in a way pixel type is not. Section labels stay uppercase and tracked.
  *
  * ROLES, NOT HUES. Components read --primary-*, --live-*, --accent-*, --info-*, --warn-*,
  * --error-*, --surface-*, --text-*. A component never names a hue, so re-tinting the brand is a
- * change to this file alone. The old Volt OS names survive as deprecated aliases in one marked
- * block at the very end, because other branches in flight still use them.
+ * change to this file alone. The old Volt OS names survive as deprecated aliases at the very end.
  *
- * Contrast is a gate, not a preference: test/contrast.test.ts parses this file and asserts WCAG AA
- * for every pairing the UI actually renders, in both themes. Deviations are marked `AA:` with the
- * ratio they buy and the reason.
+ * Contrast is a gate, not a preference: test/contrast.test.ts parses this file and asserts every
+ * pairing the UI renders, in both themes. AA (4.5:1 text, 3:1 UI) is the hard floor; body copy
+ * targets 7:1 and clears it in both themes.
  */
 
 :root {
@@ -59,8 +72,10 @@
   /* =========================================================================
    * IDENTITY — the banner's own six colours, unaltered.
    *
-   * These are the brand. They are the same in both themes and must never be edited to fix a
-   * contrast problem: fix it with a tonal step below, or by changing the surface.
+   * These are the brand. They are the same in both themes and in both design options, and they
+   * must never be edited to fix a contrast problem: fix it with a tonal step below, or by changing
+   * the surface. In THIS option they are used directly only at dot scale (the lime ok dot, the
+   * pink hero edge); everything larger is a reduced-chroma derivative.
    * ====================================================================== */
   --brand-blue: #1008c8;
   --brand-lime: #aeff24;
@@ -70,183 +85,203 @@
   --brand-yellow: #fff345;
 
   /* =========================================================================
-   * TONAL SCALES — derived in OKLCH holding each identity hue steady.
+   * SURFACE RAMP — hue 266 (the banner blue's own hue) at chroma 0.025-0.031.
    *
-   * Steps are named the usual way: 300 is the bright tint that carries text on dark surfaces, 500
-   * is the identity colour itself, 700 is the deep tone that carries text on white. Only the steps
-   * the UI actually uses are defined.
+   * That chroma is roughly a TENTH of the banner blue's 0.256, which is what makes these read as
+   * navy rather than as blue. Holding the hue is what stops them reading as neutral grey: put this
+   * ramp beside a true grey and the cast is obvious, which is the whole point — the brand is in
+   * the surfaces even when no brand colour is on screen.
+   * ====================================================================== */
+  --navy-900: #0c1220; /* oklch(18.5% 0.030 266) — the page */
+  --navy-850: #121723; /* oklch(20.5% 0.026 266) — the well */
+  --navy-800: #181e2b; /* oklch(23.5% 0.028 266) — the reading panel */
+  --navy-700: #212737; /* oklch(27.5% 0.030 266) — raised */
+  --navy-600: #2c3341; /* oklch(32.0% 0.028 266) — hairline dividers inside a panel */
+  --navy-500: #6b748a; /* oklch(56.0% 0.035 266) — control and panel edges; 3.18:1 worst case */
+
+  /* =========================================================================
+   * TONAL SCALES — derived in OKLCH holding each identity hue steady, chroma reduced.
+   *
+   * 300 is the tint that carries text on dark surfaces, 500 the fill, 700/800 the deep tone that
+   * carries text on white. Only the steps the UI actually uses are defined.
    * ====================================================================== */
 
-  /* Blue — hue 266. 500 is the banner blue. */
-  --blue-200: #c1d4ff; /* oklch(87.0% 0.073 266) — hover tint of primary text on dark */
-  --blue-300: #a7c2fe; /* oklch(81.6% 0.090 266) — primary as TEXT/BORDER on dark surfaces */
-  --blue-400: #6792fe; /* oklch(68.0% 0.150 266) */
-  --blue-500: #1008c8; /* oklch(38.3% 0.256 266) — THE banner blue: page, and primary fill */
-  --blue-700: #060077; /* oklch(26.0% 0.243 266) — pressed state of a blue fill */
-
-  /* Lime — hue 130. 500 is the banner lime. */
-  --lime-300: #c0ff73; /* oklch(93.0% 0.180 130) — hover of live text on dark */
-  --lime-500: #aeff24; /* oklch(91.3% 0.237 130) — live/ok on dark; fills with an ink label */
-  --lime-700: #4a7104; /* oklch(50.0% 0.132 130) — live/ok as TEXT on white (lime is unreadable there) */
+  /* Blue — hue 266, the banner's own. Chroma 0.105-0.175 against the banner's 0.256. */
+  --blue-200: #bdd0fd; /* oklch(86.0% 0.075 266) — hover tint of primary text on dark */
+  --blue-300: #98b6fb; /* oklch(78.0% 0.105 266) — primary as TEXT/BORDER on dark; 8.27:1 */
+  --blue-500: #3053bc; /* oklch(48.0% 0.170 266) — the primary FILL on dark; white on it is 6.80:1 */
+  --blue-600: #2c4fbb; /* oklch(47.0% 0.175 266) — the primary fill and text in day; 6.72:1 on white */
+  --blue-700: #2241a1; /* oklch(41.5% 0.160 266) — pressed */
+  --blue-800: #17318d; /* oklch(36.0% 0.155 266) — pressed in day */
 
   /*
-   * Pink — hue 336. 500 is the banner magenta.
-   *
-   * 300 is deliberately a pale pink rather than the mid tint one would reach for first. The reason
-   * is the error role: at oklch(80%) the accent and the error sit only 1.59:1 apart in luminance,
-   * and luminance is the ONLY channel that survives a colour-vision deficiency simulation for this
-   * pair. Lifting the accent to 86% opens the gap to 2.00:1 without touching either hue, which is
-   * what test/contrast.test.ts holds. Do not darken this step back down.
+   * Lime — hue 130. This is the one role that keeps most of its chroma, because it is the one role
+   * that is only ever a dot, a 2px rule, a small knob or a thin progress fill. A colour that never
+   * covers more than a few hundred square pixels can be as saturated as it likes.
    */
-  --pink-300: #ffb6ec; /* oklch(86.0% 0.120 336) — accent TEXT on dark surfaces */
-  --pink-500: #f343d3; /* oklch(68.6% 0.254 336) — accent fills, edges, the wordmark shadow */
-  --pink-600: #c4139f; /* oklch(55.8% 0.219 336) — accent as TEXT on white; see --red-800 */
+  --lime-300: #c3ef88; /* oklch(89.0% 0.140 130) — hover of live text on dark */
+  --lime-400: #aae560; /* oklch(85.5% 0.175 130) — live/ok on dark; 11.18:1 on a panel */
+  --lime-500: #aeff24; /* the identity lime — the ok DOT, at dot scale only */
+  --lime-600: #b0ea69; /* oklch(87.0% 0.170 130) — the enabled toggle's fill in day, ink knob */
+  --lime-700: #4e6f23; /* oklch(50.0% 0.110 130) — live/ok as TEXT on white; 5.46:1 */
 
-  /* Cyan — hue 202. 500 is the banner cyan. */
-  --cyan-500: #00e5f2; /* oklch(83.9% 0.143 202) — info + focus ring on dark */
-  --cyan-700: #02777f; /* oklch(51.9% 0.088 203) — info as TEXT on white */
+  /*
+   * Pink — hue 336. Used SPARINGLY: the hero proposal card's edge, and element-reference chips.
+   * Nothing else in the product may take it, which is what makes the hero card findable.
+   *
+   * 300 sits at oklch(86%) rather than the mid tint one would reach for first, for the same reason
+   * option A did it: at 80% the accent and the error role sit under 1.6:1 apart in luminance, and
+   * luminance is the ONLY channel that survives a colour-vision deficiency simulation for this
+   * pair. 86% opens the gap to 2.11:1 without touching either hue. Do not darken this step.
+   */
+  --pink-300: #fabae8; /* oklch(86.0% 0.095 336) — accent TEXT on dark; 9.40:1 worst panel */
+  --pink-400: #d262ba; /* oklch(66.0% 0.175 336) — the hero card's edge on dark; 4.92:1 */
+  --pink-500: #f343d3; /* the identity magenta — chip edges at 1px, nothing larger */
+  --pink-600: #aa4e96; /* oklch(56.5% 0.150 336) — accent as TEXT and edge on white; 4.95:1 */
 
-  /* Yellow — hue 105. 500 is the banner yellow. */
-  --yellow-500: #fff345; /* oklch(94.5% 0.182 105) — warning on dark; fills with an ink label */
-  --yellow-700: #6c6601; /* oklch(50.0% 0.106 106) — warning as TEXT on white */
+  /* Cyan — hue 202. Focus and info. */
+  --cyan-300: #72d7de; /* oklch(82.0% 0.095 202) — info + focus ring on dark; 9.92:1 */
+  --cyan-500: #68e3ed; /* oklch(85.0% 0.110 202) — the info fill in day, ink label */
+  --cyan-700: #1d767d; /* oklch(52.0% 0.080 202) — info as TEXT on white; 5.02:1 */
+
+  /* Yellow — hue 105. Warning. */
+  --yellow-300: #e0d96e; /* oklch(87.0% 0.130 105) — warn on dark; 11.37:1 */
+  --yellow-500: #ece362; /* oklch(90.0% 0.150 105) — the warn fill in day, ink label */
+  --yellow-700: #6f6915; /* oklch(51.0% 0.100 105) — warn as TEXT on white; 5.33:1 */
 
   /*
    * Red — hue 27. NOT a banner colour: the banner has no red, and error needs one that cannot be
    * mistaken for the pink accent.
    *
-   * Hue alone does not achieve that. Simulating protanopia, deuteranopia and tritanopia (Brettel
-   * LMS) collapses pink #F343D3 and any red toward the same olive/grey: at best 2.4:1 between them,
-   * at worst 1.01:1 under tritanopia. So the separation is carried three ways at once, and colour
-   * is the weakest of them:
+   * Hue alone does not achieve that, and muting the palette does not change that fact — it makes
+   * it slightly worse, because two desaturated colours are closer together than two saturated ones.
+   * Simulating protanopia, deuteranopia and tritanopia (Brettel LMS) collapses pink and red toward
+   * the same olive; under tritanopia they are within 1.1:1. So the separation is carried three
+   * ways at once and colour is the weakest of them:
    *   - LIGHTNESS: the two roles are held at least 1.8:1 apart in relative luminance in BOTH
    *     themes, which is the one channel a simulation cannot collapse. Night pairs a pale accent
-   *     (#FFB6EC) with a mid red (#F35F55) for a 2.00:1 gap; day pairs a mid accent (#C4139F) with
-   *     a very dark red (#7D030E) for 2.08:1. Both gaps are asserted by test/contrast.test.ts;
-   *   - FORM: an error is the only thing that takes a filled rail / a solid outlined block, and the
-   *     accent is the only thing that takes the hero's doubled edge. Shape, not hue, is what the
-   *     component is recognised by;
+   *     (#FABAE8) with a mid red (#E66B61) for 2.00:1; day pairs a mid accent (#AA4E96) with a
+   *     deep red (#861213) for 2.01:1. Both are asserted by test/contrast.test.ts;
+   *   - FORM: an error is the only thing that takes a filled left rail / a solid outlined block,
+   *     and the accent is the only thing that takes the hero's offset edge;
    *   - WORDS: every error state carries a word ("failed", "error"), never colour alone.
    * This is recorded as a hard rule in docs/design.md; do not "fix" it by re-hueing.
    */
-  --red-500: #f35f55; /* oklch(67.5% 0.184 27) — error on dark */
-  --red-800: #7d030e; /* oklch(38.9% 0.161 27) — error as TEXT and as a fill on white */
+  --red-400: #e66b61; /* oklch(67.5% 0.155 27) — error on dark; 4.71:1 worst panel */
+  --red-800: #861213; /* oklch(40.0% 0.150 27) — error as TEXT and fill on white; 9.37:1 */
 
   /* =========================================================================
-   * THEME: NIGHT (the default, and the hero look)
+   * THEME: NIGHT (the default)
    *
-   * The banner's electric blue IS the page. Reading panels are blue-cast ink laid on top of it,
-   * bordered bright and shadowed hard.
+   * A deep navy page with slightly lighter navy panels on it. The panel is separated from the page
+   * by a real luminance step (1.30:1) plus a 1px edge — which is the structural reason this option
+   * can drop option A's 2px bright border and hard shadow on every card. Option A could not: its
+   * blue page and ink panel were 1.68:1 apart with the panel DARKER, so only a bright outline
+   * could carry the edge.
    * ====================================================================== */
 
-  /* The page. Not a near-black: the brand colour, at full strength. */
-  --bg-app: #1008c8;
+  /* The page. Deep navy, blue-cast, no texture. */
+  --bg-app: #0c1220;
 
   /*
-   * The page's decoration. The banner has stars and dither on its blue field; this is the same
-   * idea at a whisper — two soft corner glows and nothing behind text. It is a background-image, so
-   * anything that must carry prose paints its own solid --surface-* over it.
+   * The page's decoration: two corner washes at a whisper, and nothing behind text. It is a
+   * background-image, so anything that must carry prose paints its own solid --surface-* over it.
+   * The alphas are roughly a third of option A's — at this strength you notice it only when you
+   * look for it, which is the intent.
    */
   --bg-ambient:
-    radial-gradient(520px 380px at 108% -8%, rgba(174, 255, 36, 0.1), transparent 70%),
-    radial-gradient(440px 340px at -12% 106%, rgba(243, 67, 211, 0.12), transparent 70%), #1008c8;
+    radial-gradient(560px 400px at 108% -8%, rgba(174, 255, 36, 0.035), transparent 72%),
+    radial-gradient(480px 360px at -12% 106%, rgba(243, 67, 211, 0.04), transparent 72%), #0c1220;
 
   /* Surfaces: solid, never gradient — text has to sit on one flat colour. */
-  --surface-1: #041325; /* the reading panel: cards, the transcript, the composer */
-  --surface-2: #0b1f34; /* raised: a hovered row, a header strip inside a card */
-  --surface-well: #000613; /* inset: code blocks, the source editor, tool output */
+  --surface-1: #181e2b; /* the reading panel: cards, the transcript, the composer */
+  --surface-2: #212737; /* raised: a hovered row, your own message, a header strip */
+  --surface-well: #121723; /* inset: code blocks, the source editor, tool output */
   --surface-card: var(--surface-1);
-  --surface-hi: var(--surface-1);
+  --surface-hi: var(--surface-2);
   --surface-lo: var(--surface-well);
 
   /*
-   * Borders. On the night theme a border is a BRIGHT line, because the ink panel and the blue page
-   * are only 1.68:1 apart and a dark hairline would simply vanish. 2px, not 1px: the banner's
-   * outlines are chunky, and a 2px bright edge is also what makes the panel legible.
+   * Borders. 1px, and quiet. The panel edge and the control edge are the SAME value here, which
+   * they could not be in option A: there the panel edge had to be bright enough to separate two
+   * surfaces of nearly equal lightness, so it shouted. Here the luminance step does that job and
+   * the line only has to confirm it.
    */
-  --border-strong: var(--blue-300); /* 6.24:1 on the page, 10.48:1 on a panel */
-  --border-card: var(--blue-300);
+  --border-strong: var(--navy-500); /* 3.18:1 worst case — a UI boundary, and it clears 3:1 */
+  --border-card: var(--navy-500);
+  --border-control: var(--navy-500);
+
+  /* The one quieter line: separators INSIDE a panel, where no boundary is being asserted. */
+  --border-hair: var(--navy-600);
+  --border-width: 1px;
 
   /*
-   * The resting edge of an interactive control — a secondary button, an input, the toggle track,
-   * the top bar's icon buttons.
-   *
-   * It is NOT --border-hair. A control's outline is the thing that says "this is a control", so it
-   * answers to the 3:1 UI rule; the hairline below is 1.46:1 and at that value the top bar's two
-   * icon buttons read as two naked icons rather than as buttons. 3.88:1 on a panel, 4.22:1 on the
-   * well, and it stays quieter than --border-strong so the hierarchy still reads.
+   * The hard offset shadow. Zero blur, as in option A — depth in this system is never a blur — but
+   * it is now 2px and it appears in exactly TWO places: the primary button and the hero card. Two
+   * uses is what makes it a signature instead of a texture.
    */
-  --border-control: #55749c;
+  --shadow-card: none;
+  --shadow-raise: 2px 2px 0 rgba(3, 11, 22, 0.55);
+  --shadow-press: 1px 1px 0 rgba(3, 11, 22, 0.55);
 
-  /* The one quiet line: separators INSIDE a panel. Never a panel's edge, never a control's. */
-  --border-hair: #1c3350;
-  --border-width: 2px;
-
-  /*
-   * The hard offset pixel shadow — the banner's device, and the night theme's depth. No blur: a
-   * solid ink block, offset down-right. Ink on the blue page is 1.78:1, which is not contrast but
-   * is not meant to be: the bright border carries the edge, and the shadow gives it weight.
-   */
-  --shadow-card: 4px 4px 0 var(--brand-ink);
-  --shadow-raise: 3px 3px 0 var(--brand-ink);
-  --shadow-press: 1px 1px 0 var(--brand-ink);
-
-  /* Text. The blue-cast neutral family, derived from the banner's ink hue (251). */
-  --text-1: #f2f6ff; /* 17.25:1 on a panel, 10.26:1 on the blue page */
-  --text-2: #aebed1; /* 9.85:1 on a panel, 5.86:1 on the page — descriptions, help, notice bodies */
-  --text-3: #8d9fb2; /* 6.88:1 on a panel — placeholders, markers, meta. NOT for use on the page. */
-  --text-on-fill: var(--brand-ink); /* the label on a lime / cyan / yellow / pink fill */
-  --text-on-primary: #ffffff; /* the label on a blue fill: 11.11:1 */
+  /* Text. The blue-cast neutral family, on the same hue 266 as the surfaces. */
+  --text-1: #f1f3f9; /* 15.03:1 on a panel, 16.85:1 on the page — body copy clears the 7:1 target */
+  --text-2: #b8bece; /* 8.94:1 on a panel — descriptions, help, notice bodies */
+  --text-3: #999eab; /* 6.22:1 on a panel — placeholders, markers, meta */
+  --text-on-fill: var(--navy-900); /* the label on a lime / cyan / yellow fill */
+  --text-on-primary: #ffffff; /* the label on the blue fill: 6.80:1 */
 
   /* --- Roles -------------------------------------------------------------- */
 
-  /* PRIMARY — brand, and the main interactive colour. */
-  --primary: var(--blue-300); /* as text, icon, border, active-tab mark on dark */
-  --primary-fill: var(--blue-500); /* as a surface: primary buttons, header blocks */
-  --primary-fill-hover: #2e5bfc;
+  /* PRIMARY — brand, and the main interactive colour: buttons, links, active tab, selected rows. */
+  --primary: var(--blue-300);
+  --primary-fill: var(--blue-500);
+  --primary-fill-hover: #3a60cc;
   --primary-fill-press: var(--blue-700);
   --primary-text: var(--blue-300);
   --primary-on-fill: var(--text-on-primary);
 
-  /* LIVE / OK — the running turn, an enabled mod, a healthy status. The only role that may glow. */
-  --live: var(--brand-lime);
-  --live-text: var(--brand-lime);
-  --live-fill: var(--brand-lime);
-  --live-on-fill: var(--brand-ink);
-  --live-tint: rgba(174, 255, 36, 0.14);
-  --live-edge: rgba(174, 255, 36, 0.55);
+  /* LIVE / OK — the running turn, an enabled mod, a healthy status, a progress fill. */
+  --live: var(--lime-400);
+  --live-text: var(--lime-400);
+  --live-fill: var(--lime-400);
+  --live-on-fill: var(--navy-900);
+  --live-dot: var(--lime-500); /* at dot scale the identity lime itself */
+  --live-tint: rgba(174, 255, 36, 0.1);
+  --live-edge: rgba(170, 229, 96, 0.5);
 
-  /* ACCENT — the hero card's edge, element chips, selection, the wordmark's shadow. */
+  /* ACCENT — the hero card's edge and element-reference chips. Nothing else. */
   --accent: var(--pink-300);
   --accent-text: var(--pink-300);
-  --accent-fill: var(--pink-500);
-  --accent-on-fill: var(--brand-ink);
-  --accent-tint: rgba(243, 67, 211, 0.16);
-  --accent-edge: var(--pink-500);
+  --accent-fill: var(--pink-400);
+  --accent-on-fill: var(--navy-900);
+  --accent-tint: rgba(243, 67, 211, 0.1);
+  --accent-edge: var(--pink-400);
 
   /* INFO — and the focus ring, which is always cyan so it is never confused with a state. */
-  --info: var(--brand-cyan);
-  --info-text: var(--brand-cyan);
-  --info-fill: var(--brand-cyan);
-  --info-on-fill: var(--brand-ink);
-  --info-tint: rgba(0, 229, 242, 0.14);
-  --focus-ring: var(--brand-cyan); /* 7.13:1 on the page, 11.99:1 on a panel */
+  --info: var(--cyan-300);
+  --info-text: var(--cyan-300);
+  --info-fill: var(--cyan-300);
+  --info-on-fill: var(--navy-900);
+  --info-tint: rgba(114, 215, 222, 0.1);
+  --focus-ring: var(--cyan-300); /* 9.92:1 on a panel, 11.12:1 on the page */
 
   /* WARN — attention, not failure. Never glows. */
-  --warn: var(--yellow-500);
-  --warn-text: var(--yellow-500);
-  --warn-fill: var(--yellow-500);
-  --warn-on-fill: var(--brand-ink);
-  --warn-bg: rgba(255, 243, 69, 0.14);
+  --warn: var(--yellow-300);
+  --warn-text: var(--yellow-300);
+  --warn-fill: var(--yellow-300);
+  --warn-on-fill: var(--navy-900);
+  --warn-bg: rgba(224, 217, 110, 0.1);
 
   /* ERROR — failure. Never glows, always accompanied by a word. */
-  --error: var(--red-500);
-  --error-text: var(--red-500);
-  --error-fill: var(--red-500);
-  --error-on-fill: var(--brand-ink); /* 6.19:1 — ink, not white, which is only 3.99:1 */
-  --error-bg: rgba(243, 95, 85, 0.16);
+  --error: var(--red-400);
+  --error-text: var(--red-400);
+  --error-fill: var(--red-400);
+  --error-on-fill: var(--navy-900); /* 5.91:1 — ink, not white */
+  --error-bg: rgba(230, 107, 97, 0.06);
 
   /* Status dots are 7px UI components, so they answer to the 3:1 rule rather than the text rule. */
-  --dot-ok: var(--live);
+  --dot-ok: var(--live-dot);
   --dot-warn: var(--warn);
   --dot-error: var(--error);
 
@@ -255,88 +290,89 @@
   --btn-primary-fg: var(--primary-on-fill);
   --btn-disabled-fg: var(--text-3);
 
-  /* Data. */
-  --fill-grad: linear-gradient(90deg, var(--brand-lime), var(--brand-cyan));
-  --track: rgba(167, 194, 254, 0.22);
+  /* Data. Lime is 'alive', so a progress fill is lime — and it is thin. */
+  --fill-grad: linear-gradient(90deg, var(--lime-400), var(--cyan-300));
+  --track: rgba(152, 182, 251, 0.16);
 
-  /* Selection: the accent, because selecting is a small moment of delight, not a state. */
-  --selection-bg: rgba(243, 67, 211, 0.45);
+  /* Selection: the primary, quietly. */
+  --selection-bg: rgba(48, 83, 188, 0.55);
   --selection-fg: #ffffff;
 
   /* =========================================================================
    * TYPE
    *
-   * Three families, and which one is used is a rule, not a preference:
+   * Two faces do the work and a third signs the name:
    *
-   *   --font-display  Jersey 10. SHORT LABELS ONLY: the wordmark, tab labels, section labels,
-   *                   button labels, stat numbers, headings. Never a sentence, never below 12px.
-   *
-   *                   It replaced Pixelify Sans, which shipped briefly and had to go: Pixelify's
-   *                   capital C carries an aperture only ONE pixel-unit tall on a seven-unit
-   *                   glyph, so its C is a closed O with a nick in it. That is the face's own
-   *                   drawing, not a rendering artefact — it survives at 96px — so no size,
-   *                   weight, tracking or font-smoothing setting could rescue it, and at label
-   *                   sizes the nick vanished into the stroke entirely: CHAT read as OHAT and
-   *                   ARCHIVE as AROHIVE on the most-clicked controls in the product. Its G, 0/O
-   *                   and 8/B collapse the same way for the same reason.
-   *
-   *                   Jersey 10's C is open across a third of the glyph's height, so the pair is
-   *                   separated by structure rather than by a single pixel that antialiasing can
-   *                   swallow. It also has true lowercase (the brand's own "usermods" needs it),
-   *                   is heavy enough at its single 400 weight to keep the banner's boldness
-   *                   without a bold axis, and is narrower than Pixelify at the same size — which
-   *                   is what gives the chat switcher its width back. See
-   *                   docs/design/explorations/README.md for the specimen and the four faces that
-   *                   lost.
-   *   --font-ui       the system UI face. ALL prose and every long-form reading surface.
+   *   --font-ui       the system UI stack. EVERY label, tab, button, section label, heading and
+   *                   sentence in the product. Weight 600 is what carries emphasis — it is the
+   *                   thing that replaced option A's pixel labels, and it is legible at 12px in a
+   *                   way pixel type is not.
    *   --font-mono     IBM Plex Mono. Identifiers, code, and anything the user might copy.
+   *   --font-display  Jersey 10. TWO USES ONLY: the `usermods` wordmark, and the large stat
+   *                   numbers on the dashboard. It is the signature, not the voice.
+   *
+   *                   The face itself is the one option A landed on, and for the same reason:
+   *                   Jersey 10's capital C is open across about a third of the glyph's height,
+   *                   where Pixelify Sans's aperture is one pixel-unit on a seven-unit glyph and
+   *                   closes into an O at every size, so CHAT read as OHAT on the most-clicked
+   *                   controls in the product. That defect matters far less here — nothing but the
+   *                   wordmark and four numerals is set in it — but there was no reason to go back
+   *                   to a face that cannot hold its own letters apart.
    * ====================================================================== */
   --font-display: 'Jersey 10', ui-monospace, monospace;
-  --font-ui: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, sans-serif;
+  --font-ui:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Helvetica, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 
   /*
-   * 12px, not 11px. Jersey 10 carries a smaller x-height and cap-height per em than Pixelify, so
-   * the same nominal size renders visibly smaller; one step up holds the labels at the optical
-   * size the layout was drawn for. The floor is a floor for a different reason than before — the
-   * old 11px floor was an attempt to outrun Pixelify's closed C, which no size could do.
+   * The weight that carries emphasis. It is a token because it is a design decision, not a local
+   * choice: 600 on the system stack is the boldness budget for the whole interface.
+   */
+  --fw-label: 600;
+
+  /*
+   * Sizes. The floor rose against option A, because these are now set in a proportional face at a
+   * real weight rather than in pixel type — 12px of semibold system UI is comfortably readable
+   * where 12px of pixel type is a squint. Body is 13px and code is 12px, both of which are floors.
    */
   --fs-micro: 12px;
   --fs-label: 12px;
   --fs-meta: 12px;
   --fs-body: 13px;
   --fs-ui: 14px;
-  --fs-stat: 22px;
-  --fs-title: 28px;
+  --fs-btn: 12px;
+  --fs-stat: 26px; /* the display face, so it is sized for its smaller cap-height per em */
+  --fs-title: 15px;
+  --fs-wordmark: 26px; /* the display face again */
 
   /*
-   * The button label's own size. It used to share --fs-meta with field help and metadata, which
-   * meant the display face and the prose face could not be sized independently — and they have to
-   * be, because they render at different optical sizes for the same nominal one. 13px of Jersey 10
-   * is the optical match for the 12px of Pixelify it replaces.
+   * Tracking for uppercase section labels. Smaller than option A's 0.08em: that value was set for
+   * pixel glyphs, which need more air between them than a sans does. On the system face at 600 it
+   * would read as a logo rather than as a label.
    */
-  --fs-btn: 13px;
-
-  --lbl-tracking: 0.08em; /* pixel type needs more air between glyphs than a sans does */
+  --lbl-tracking: 0.06em;
 
   /*
-   * Radii. The banner is built from squares and stepped silhouettes, so the system is square with
-   * one small step for the things you touch. Nothing is round any more except a status dot.
+   * Radii. Small, not square and not round: 4-6px is enough to say "this is a soft interface"
+   * without reading as a bubble. Option A is square throughout because the banner is built from
+   * squares; this option keeps the banner's structure in the layout and its hardness only in the
+   * two offset shadows.
    */
-  --r-card: 0px;
-  --r-field: 2px;
-  --r-pill: 2px;
-  --r-bar: 0px;
+  --r-card: 6px;
+  --r-field: 4px;
+  --r-pill: 4px;
+  --r-bar: 4px;
 
   /*
-   * Glow. ONLY alive things glow or pulse, and alive is always lime. Everything else takes its
-   * weight from colour blocks, bright borders and hard offset shadows.
+   * Glow. ONLY alive things glow or pulse, and alive is always lime. There is no other glow in the
+   * system — the hero is marked by its edge and its offset, the active tab by a solid primary
+   * block, and a card by its luminance step.
    */
-  --glow-dot: 0 0 7px rgba(174, 255, 36, 0.75);
-  --glow-fill: 0 0 12px rgba(174, 255, 36, 0.45);
-  --glow-hero: none; /* the hero is marked by its pink edge and shadow, not by a blur */
-  --glow-text: 0 0 20px rgba(174, 255, 36, 0.4);
-  --glow-tab: none; /* the active tab is a solid lime block; it needs no halo */
+  --glow-dot: 0 0 6px rgba(174, 255, 36, 0.5);
+  --glow-fill: 0 0 8px rgba(174, 255, 36, 0.3);
+  --glow-hero: none;
+  --glow-text: none;
+  --glow-tab: none;
 
   /* Spacing rhythm. */
   --sp-1: 4px;
@@ -353,111 +389,110 @@
  * THEME: DAY
  * ---------------------------------------------------------------------------
  *
- * Not "a white app with blue links". A pale cool page, white panels OUTLINED IN INK with the same
- * hard offset shadow, big blue header blocks carrying white or lime, and lime / pink / yellow used
- * as real fills with ink labels. The day theme is the banner seen in daylight — the same
- * construction, inverted.
+ * A soft cool white page with white panels on it. The page is tinted on the same hue 266 as the
+ * night surfaces, so the two themes are recognisably the same product rather than a palette and
+ * its inverse.
  *
  * What changes from night, and why:
- *   - every identity colour that has to carry TEXT drops to its 700 step: lime, cyan, yellow and
+ *   - every identity colour that has to carry TEXT drops to its deep step: lime, cyan, yellow and
  *     pink are all unreadable as text on white (lime #AEFF24 on white is 1.4:1);
- *   - the primary becomes the banner blue ITSELF, which is 11.11:1 on white — day is where
- *     #1008C8 gets to be the text colour it is best at;
- *   - borders become ink rather than a bright tint, because on white the bright tints vanish;
- *   - glows go to none. There is no neon in daylight; "alive" is carried by a solid lime fill.
+ *   - the primary becomes a deep blue on the banner's hue, 6.72:1 on white, used as text and as
+ *     the fill alike;
+ *   - borders darken to clear 3:1 on white;
+ *   - glows go to none. There is no neon in daylight; "alive" is carried by a lime fill with an
+ *     ink label, and by the knob's travel.
  *
  * test/contrast.test.ts parses exactly this block. Keep one `--token: value;` per line.
  */
 :root[data-theme='light'] {
   color-scheme: light;
 
-  --bg-app: #eaf0fe;
+  --bg-app: #f0f3fa;
   --bg-ambient:
-    radial-gradient(520px 380px at 108% -8%, rgba(16, 8, 200, 0.07), transparent 70%),
-    radial-gradient(440px 340px at -12% 106%, rgba(243, 67, 211, 0.07), transparent 70%), #eaf0fe;
+    radial-gradient(560px 400px at 108% -8%, rgba(78, 111, 35, 0.035), transparent 72%),
+    radial-gradient(480px 360px at -12% 106%, rgba(170, 78, 150, 0.035), transparent 72%), #f0f3fa;
 
   --surface-1: #ffffff;
   --surface-2: #ffffff;
-  --surface-well: #f3f7ff;
+  --surface-well: #f6f8fd;
   --surface-card: var(--surface-1);
-  --surface-hi: var(--surface-1);
+  --surface-hi: var(--surface-2);
   --surface-lo: var(--surface-well);
 
-  /* Day outlines in INK. 17.35:1 on white — the boldest edge in the system, and the banner's own. */
-  --border-strong: #071b31;
-  --border-card: #071b31;
-  --border-control: #7089ac;
-  --border-hair: #c9d8f0;
-  --border-width: 2px;
+  /* 3.37:1 on white, 3.03:1 on the page — a UI boundary, and quiet enough to stay a boundary. */
+  --border-strong: #848c9f;
+  --border-card: #848c9f;
+  --border-control: #848c9f;
+  --border-hair: #dde2ec;
+  --border-width: 1px;
 
-  /* The same hard offset shadow, in the same ink. 17.30:1 on the page. */
-  --shadow-card: 4px 4px 0 #071b31;
-  --shadow-raise: 3px 3px 0 #071b31;
-  --shadow-press: 1px 1px 0 #071b31;
+  --shadow-card: none;
+  --shadow-raise: 2px 2px 0 rgba(28, 35, 49, 0.28);
+  --shadow-press: 1px 1px 0 rgba(28, 35, 49, 0.28);
 
-  --text-1: #081a2d;
-  --text-2: #44596f;
-  --text-3: #5a6c81;
-  --text-on-fill: #081a2d;
+  --text-1: #1c2331;
+  --text-2: #485061;
+  --text-3: #61697b;
+  --text-on-fill: #1c2331;
   --text-on-primary: #ffffff;
 
-  /* PRIMARY: in day the banner blue is the text colour, and the fill colour, and the header block. */
-  --primary: #1008c8;
-  --primary-fill: #1008c8;
-  --primary-fill-hover: #060077;
-  --primary-fill-press: #060077;
-  --primary-text: #1008c8;
+  --primary: #2c4fbb;
+  --primary-fill: #2c4fbb;
+  --primary-fill-hover: #1f3da5;
+  --primary-fill-press: #17318d;
+  --primary-text: #2c4fbb;
   --primary-on-fill: #ffffff;
 
-  /* LIVE: lime cannot carry text on white, so text drops to lime-700 while FILLS stay full lime. */
-  --live: #4a7104;
-  --live-text: #4a7104;
-  --live-fill: #aeff24;
-  --live-on-fill: #081a2d;
-  --live-tint: #e6ffc2;
-  --live-edge: #4a7104;
+  /* LIVE: lime cannot carry text on white, so text drops to lime-700 while the FILL stays lime. */
+  --live: #4e6f23;
+  --live-text: #4e6f23;
+  --live-fill: #b0ea69;
+  --live-on-fill: #1c2331;
+  --live-dot: #4e6f23;
+  --live-tint: #eaf5e0;
+  --live-edge: #4e6f23;
 
-  --accent: #c4139f;
-  --accent-text: #c4139f;
-  --accent-fill: #f343d3;
-  --accent-on-fill: #081a2d;
-  --accent-tint: #ffe8fa;
-  --accent-edge: #c4139f;
+  --accent: #aa4e96;
+  --accent-text: #aa4e96;
+  --accent-fill: #e58acf;
+  --accent-on-fill: #1c2331;
+  --accent-tint: #fdf3fa;
+  --accent-edge: #aa4e96;
 
-  --info: #02777f;
-  --info-text: #02777f;
-  --info-fill: #00e5f2;
-  --info-on-fill: #081a2d;
-  --info-tint: #dbfbfd;
-  --focus-ring: #1008c8;
+  --info: #1d767d;
+  --info-text: #1d767d;
+  --info-fill: #68e3ed;
+  --info-on-fill: #1c2331;
+  --info-tint: #daf7f9;
+  --focus-ring: #2c4fbb;
 
-  --warn: #6c6601;
-  --warn-text: #6c6601;
-  --warn-fill: #fff345;
-  --warn-on-fill: #081a2d;
-  --warn-bg: #fffbcf;
+  --warn: #6f6915;
+  --warn-text: #6f6915;
+  --warn-fill: #ece362;
+  --warn-on-fill: #1c2331;
+  --warn-bg: #f3f2db;
 
-  --error: #7d030e;
-  --error-text: #7d030e;
-  --error-fill: #7d030e;
+  --error: #861213;
+  --error-text: #861213;
+  --error-fill: #861213;
   --error-on-fill: #ffffff;
-  --error-bg: #ffe4e4;
+  --error-bg: #ffe9e5;
 
-  --dot-ok: #4a7104;
-  --dot-warn: #6c6601;
-  --dot-error: #7d030e;
+  --dot-ok: #4e6f23;
+  --dot-warn: #6f6915;
+  --dot-error: #861213;
 
-  --btn-primary-bg: #1008c8;
+  --btn-primary-bg: #2c4fbb;
   --btn-primary-fg: #ffffff;
-  --btn-disabled-fg: #5a6c81;
+  --btn-disabled-fg: #61697b;
 
-  --fill-grad: linear-gradient(90deg, #4a7104, #02777f);
-  --track: rgba(8, 26, 45, 0.12);
+  --fill-grad: linear-gradient(90deg, #4e6f23, #1d767d);
+  --track: rgba(28, 35, 49, 0.1);
 
-  --selection-bg: #ffc2f0;
-  --selection-fg: #081a2d;
+  --selection-bg: #ccd8f7;
+  --selection-fg: #1c2331;
 
-  /* No neon in daylight. Alive is a solid lime fill, not a halo. */
+  /* No neon in daylight. Alive is a lime fill with an ink label, not a halo. */
   --glow-dot: none;
   --glow-fill: none;
   --glow-hero: none;
@@ -478,87 +513,88 @@
   :root:not([data-theme]) {
     color-scheme: light;
 
-    --bg-app: #eaf0fe;
+    --bg-app: #f0f3fa;
     --bg-ambient:
-      radial-gradient(520px 380px at 108% -8%, rgba(16, 8, 200, 0.07), transparent 70%),
-      radial-gradient(440px 340px at -12% 106%, rgba(243, 67, 211, 0.07), transparent 70%), #eaf0fe;
+      radial-gradient(560px 400px at 108% -8%, rgba(78, 111, 35, 0.035), transparent 72%),
+      radial-gradient(480px 360px at -12% 106%, rgba(170, 78, 150, 0.035), transparent 72%), #f0f3fa;
 
     --surface-1: #ffffff;
     --surface-2: #ffffff;
-    --surface-well: #f3f7ff;
+    --surface-well: #f6f8fd;
     --surface-card: var(--surface-1);
-    --surface-hi: var(--surface-1);
+    --surface-hi: var(--surface-2);
     --surface-lo: var(--surface-well);
 
-    --border-strong: #071b31;
-    --border-card: #071b31;
-    --border-control: #7089ac;
-    --border-hair: #c9d8f0;
-    --border-width: 2px;
+    --border-strong: #848c9f;
+    --border-card: #848c9f;
+    --border-control: #848c9f;
+    --border-hair: #dde2ec;
+    --border-width: 1px;
 
-    --shadow-card: 4px 4px 0 #071b31;
-    --shadow-raise: 3px 3px 0 #071b31;
-    --shadow-press: 1px 1px 0 #071b31;
+    --shadow-card: none;
+    --shadow-raise: 2px 2px 0 rgba(28, 35, 49, 0.28);
+    --shadow-press: 1px 1px 0 rgba(28, 35, 49, 0.28);
 
-    --text-1: #081a2d;
-    --text-2: #44596f;
-    --text-3: #5a6c81;
-    --text-on-fill: #081a2d;
+    --text-1: #1c2331;
+    --text-2: #485061;
+    --text-3: #61697b;
+    --text-on-fill: #1c2331;
     --text-on-primary: #ffffff;
 
-    --primary: #1008c8;
-    --primary-fill: #1008c8;
-    --primary-fill-hover: #060077;
-    --primary-fill-press: #060077;
-    --primary-text: #1008c8;
+    --primary: #2c4fbb;
+    --primary-fill: #2c4fbb;
+    --primary-fill-hover: #1f3da5;
+    --primary-fill-press: #17318d;
+    --primary-text: #2c4fbb;
     --primary-on-fill: #ffffff;
 
-    --live: #4a7104;
-    --live-text: #4a7104;
-    --live-fill: #aeff24;
-    --live-on-fill: #081a2d;
-    --live-tint: #e6ffc2;
-    --live-edge: #4a7104;
+    --live: #4e6f23;
+    --live-text: #4e6f23;
+    --live-fill: #b0ea69;
+    --live-on-fill: #1c2331;
+    --live-dot: #4e6f23;
+    --live-tint: #eaf5e0;
+    --live-edge: #4e6f23;
 
-    --accent: #c4139f;
-    --accent-text: #c4139f;
-    --accent-fill: #f343d3;
-    --accent-on-fill: #081a2d;
-    --accent-tint: #ffe8fa;
-    --accent-edge: #c4139f;
+    --accent: #aa4e96;
+    --accent-text: #aa4e96;
+    --accent-fill: #e58acf;
+    --accent-on-fill: #1c2331;
+    --accent-tint: #fdf3fa;
+    --accent-edge: #aa4e96;
 
-    --info: #02777f;
-    --info-text: #02777f;
-    --info-fill: #00e5f2;
-    --info-on-fill: #081a2d;
-    --info-tint: #dbfbfd;
-    --focus-ring: #1008c8;
+    --info: #1d767d;
+    --info-text: #1d767d;
+    --info-fill: #68e3ed;
+    --info-on-fill: #1c2331;
+    --info-tint: #daf7f9;
+    --focus-ring: #2c4fbb;
 
-    --warn: #6c6601;
-    --warn-text: #6c6601;
-    --warn-fill: #fff345;
-    --warn-on-fill: #081a2d;
-    --warn-bg: #fffbcf;
+    --warn: #6f6915;
+    --warn-text: #6f6915;
+    --warn-fill: #ece362;
+    --warn-on-fill: #1c2331;
+    --warn-bg: #f3f2db;
 
-    --error: #7d030e;
-    --error-text: #7d030e;
-    --error-fill: #7d030e;
+    --error: #861213;
+    --error-text: #861213;
+    --error-fill: #861213;
     --error-on-fill: #ffffff;
-    --error-bg: #ffe4e4;
+    --error-bg: #ffe9e5;
 
-    --dot-ok: #4a7104;
-    --dot-warn: #6c6601;
-    --dot-error: #7d030e;
+    --dot-ok: #4e6f23;
+    --dot-warn: #6f6915;
+    --dot-error: #861213;
 
-    --btn-primary-bg: #1008c8;
+    --btn-primary-bg: #2c4fbb;
     --btn-primary-fg: #ffffff;
-    --btn-disabled-fg: #5a6c81;
+    --btn-disabled-fg: #61697b;
 
-    --fill-grad: linear-gradient(90deg, #4a7104, #02777f);
-    --track: rgba(8, 26, 45, 0.12);
+    --fill-grad: linear-gradient(90deg, #4e6f23, #1d767d);
+    --track: rgba(28, 35, 49, 0.1);
 
-    --selection-bg: #ffc2f0;
-    --selection-fg: #081a2d;
+    --selection-bg: #ccd8f7;
+    --selection-fg: #1c2331;
 
     --glow-dot: none;
     --glow-fill: none;

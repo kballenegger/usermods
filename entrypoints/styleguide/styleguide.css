@@ -16,7 +16,7 @@
 .sg-head {
   background: var(--surface-1);
   border: var(--border-width) solid var(--border-strong);
-  box-shadow: var(--shadow-card);
+  border-radius: var(--r-card);
   padding: 18px 20px;
   margin-bottom: 24px;
   display: flex;
@@ -25,15 +25,15 @@
   flex-wrap: wrap;
 }
 
+/* The wordmark: one of the display face's two jobs, and its largest appearance anywhere. */
 .sg-head h1 {
   font-family: var(--font-display);
-  font-size: 28px;
+  font-size: 30px;
   font-weight: 400;
   margin: 0;
   letter-spacing: 0.02em;
   text-transform: lowercase;
-  color: var(--live-text);
-  text-shadow: 3px 3px 0 var(--accent-edge);
+  color: var(--primary-text);
 }
 
 .sg-head p {
@@ -48,18 +48,18 @@
 .sg-section {
   background: var(--surface-1);
   border: var(--border-width) solid var(--border-strong);
-  box-shadow: var(--shadow-card);
+  border-radius: var(--r-card);
   padding: 18px 20px;
   margin-bottom: 20px;
 }
 
 .sg-section > h2 {
-  font-family: var(--font-display);
-  font-size: 15px;
-  font-weight: 400;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: var(--fw-label);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--live-text);
+  letter-spacing: var(--lbl-tracking);
+  color: var(--primary-text);
   margin: 0 0 4px;
 }
 
@@ -85,11 +85,11 @@
 }
 
 .sg-row > h3 {
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: var(--fs-label);
-  font-weight: 400;
+  font-weight: var(--fw-label);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: var(--lbl-tracking);
   color: var(--text-2);
   margin: 0 0 8px;
 }
