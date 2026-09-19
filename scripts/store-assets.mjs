@@ -161,7 +161,23 @@ async function launch() {
   };
 }
 
+/**
+ * What a CAPTURE seeds in place of the migrated legacy profile.
+ *
+ * The asserting flows all seed the old single-provider shape and let the extension migrate it,
+ * which is the migration's regression test — but it leaves the composer saying "demo" on a provider
+ * called "127.0.0.1:<port>", and that is not what belongs in the README. A capture is pointed at the
+ * same mock, under the name and model a reader would actually see.
+ */
+function captureProviders() {
+  return {
+    connections: { v: 1, list: [{ id: 'capture', kind: 'openai-compatible', label: 'Anthropic', baseUrl: BASE_URL, apiKey: '', extraModels: ['claude-opus-5'] }] },
+    modelChoice: { connectionId: 'capture', model: 'claude-opus-5', label: 'Anthropic' },
+  };
+}
+
 async function openPanel(ctx, extId, { settings = {}, storage = {} } = {}) {
+  storage = { ...captureProviders(), ...storage };
   const page = await ctx.newPage();
   await page.setViewportSize({ width: PANEL.width, height: PANE_H });
   await page.goto(`chrome-extension://${extId}/sidepanel.html`);
