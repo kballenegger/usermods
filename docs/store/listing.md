@@ -230,5 +230,6 @@ Section 7 of [../../PRIVACY.md](../../PRIVACY.md) carries the required sentence:
 - Expect the broad host permission and the `userScripts` API to draw a slower review. The
   justifications in [permissions.md](permissions.md) are written to be pasted verbatim.
 - Before submitting, re-check that the permission list in the dashboard matches the built manifest
-  (`.output/chrome-mv3/manifest.json`): `sidePanel`, `storage`, `scripting`, `tabs`, `userScripts`,
+  (`.output/store-chrome-mv3/manifest.json`, from `npm run build:store` — the store build's own
+  output folder): `sidePanel`, `storage`, `scripting`, `tabs`, `userScripts`,
   `declarativeNetRequest`, plus `<all_urls>` host permissions.

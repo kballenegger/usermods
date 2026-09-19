@@ -7,8 +7,31 @@ import { defineConfig } from 'wxt';
  */
 const storeBuild = process.env.USERMODS_STORE === '1';
 
+/**
+ * Test builds (smoke, screenshots, store-assets, styleguide, settings-capture — anything that
+ * launches a browser against the built extension) get their own output folder too, set by
+ * `USERMODS_TEST_BUILD=1` in the relevant package.json scripts. See scripts/build-dir.mjs, which
+ * scripts that load the extension read this same folder name from.
+ *
+ * Without this, every one of those commands ran a plain `wxt build` into `.output/chrome-mv3` —
+ * the SAME folder Chrome has the real unpacked extension loaded from — so a verification run could
+ * silently overwrite the live extension mid-session. Three separate outDirTemplate values keep
+ * `.output/chrome-mv3` written only by a deliberate `npm run build` or `npm run dev`.
+ */
+const testBuild = process.env.USERMODS_TEST_BUILD === '1';
+
+// Order matters: a store build launched for testing (there isn't one today, but if that ever
+// happens) should land in the test folder, not the store folder, since the test folder is the one
+// nothing but test scripts ever read from.
+const outDirTemplate = testBuild
+  ? 'test-{{browser}}-mv{{manifestVersion}}{{modeSuffix}}'
+  : storeBuild
+    ? 'store-{{browser}}-mv{{manifestVersion}}{{modeSuffix}}'
+    : '{{browser}}-mv{{manifestVersion}}{{modeSuffix}}'; // WXT's own default template
+
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
+  outDirTemplate,
   vite: () => ({
     define: { __STORE_BUILD__: JSON.stringify(storeBuild) },
   }),
