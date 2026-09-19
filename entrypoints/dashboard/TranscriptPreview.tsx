@@ -1,3 +1,4 @@
+import { SentImages } from '../sidepanel/Attachments';
 import { toolRowTitle } from '@/lib/transcript';
 import type { ChatItem } from '@/lib/types';
 
@@ -29,6 +30,10 @@ export function TranscriptPreview({ items }: { items: ChatItem[] }) {
           case 'user':
             return (
               <div key={i} className="msg user">
+                {/* Read-only: no onOpen, so the thumbnails are pictures rather than buttons. The
+                    dashboard has no chat id in hand to read the blob store with, and a preview pane
+                    is for scanning a conversation, not for inspecting its attachments. */}
+                {it.images && it.images.length > 0 && <SentImages images={it.images} />}
                 {it.text}
                 {it.refs && it.refs.length > 0 && (
                   <div className="row" style={{ marginTop: 4 }}>
@@ -101,6 +106,11 @@ export function transcriptText(items: ChatItem[]): string {
   for (const it of items) {
     switch (it.kind) {
       case 'user':
+        parts.push(it.text);
+        // Filenames are searchable text: "the one where I pasted hero-mock.png" is how someone
+        // actually looks for a chat.
+        for (const img of it.images ?? []) if (img.name) parts.push(img.name);
+        break;
       case 'assistant':
       case 'note':
       case 'error':

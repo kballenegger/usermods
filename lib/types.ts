@@ -1,5 +1,8 @@
 // Shared types used across the background worker, content script and side panel.
+import type { AttachedImage, ImageThumb } from './images';
 import type { WaitCondition } from './agent/wait';
+
+export type { AttachedImage, ImageThumb };
 
 /** A saved userscript. `source` is the canonical full userscript text, header included. */
 export interface Mod {
@@ -153,6 +156,10 @@ export function resolveTheme(stored: Partial<Settings> | undefined): ThemeChoice
 }
 
 // Provider-neutral conversation format. Adapters translate to each API's wire shape.
+//
+// `image` carries only png/jpeg: every attachment is re-encoded to one of those in the panel
+// (entrypoints/sidepanel/images.ts) before it becomes a Part, so a WebP or GIF the user attached
+// never reaches a backend that may not take it.
 export type Part =
   | { type: 'text'; text: string }
   | { type: 'image'; mediaType: 'image/png' | 'image/jpeg'; data: string }
@@ -243,7 +250,7 @@ export type AgentEvent = AgentEventBody & { chatId: string };
  * must stay JSON-serializable.
  */
 export type ChatItem =
-  | { kind: 'user'; id: string; text: string; refs?: ElementRef[]; queued?: boolean }
+  | { kind: 'user'; id: string; text: string; refs?: ElementRef[]; images?: ImageThumb[]; queued?: boolean }
   | { kind: 'assistant'; text: string }
   | { kind: 'tool'; id: string; name: string; input: Record<string, unknown>; summary?: string; isError?: boolean }
   | { kind: 'proposal'; proposal: ModProposal; saved?: boolean }
@@ -255,6 +262,12 @@ export interface UserTurn {
   id: string;
   text: string;
   refs?: ElementRef[];
+  /**
+   * Images the user pasted, dropped or picked, already decoded, downscaled and re-encoded by the
+   * panel (see lib/images.ts for the policy). They become `image` parts at the FRONT of the
+   * rendered user message, because every provider expects the picture before the words about it.
+   */
+  images?: AttachedImage[];
 }
 
 /** An element the user picked on the page. */

@@ -1,10 +1,12 @@
 // Persistent chats. A chat is scoped to a site (host) and lives in chrome.storage.local so it
-// survives side-panel reloads and browser restarts. Three keys per chat:
+// survives side-panel reloads and browser restarts. Four keys per chat:
 //   'chats'              — Chat[] metadata index, newest activity first
 //   'chat:<id>:messages' — Msg[] model history, written by the background worker
 //   'chat:<id>:items'    — ChatItem[] panel transcript, written by the side panel
+//   'chat:<id>:blobs'    — full-size attached images by content hash (lib/blobs.ts)
+import { blobsKey, elidedImageNote, type AttachedImage, type ImageThumb } from './images.ts';
 import type { TitleSource } from './title';
-import type { ChatItem, Msg } from './types';
+import type { ChatItem, Msg, Part } from './types';
 
 const INDEX_KEY = 'chats';
 /** Oldest chats beyond this are dropped so the index cannot grow without bound. */
@@ -60,6 +62,17 @@ export function isArchived(chat: Chat): boolean {
 
 export const messagesKey = (id: string) => `chat:${id}:messages`;
 export const itemsKey = (id: string) => `chat:${id}:items`;
+export { blobsKey };
+
+/**
+ * Every storage key a chat owns. Deleting a chat — by hand, in bulk, or by falling off the end of
+ * the MAX_CHATS index — removes all of them together, so an attached image can never outlive the
+ * conversation it was attached to. One list, so a fifth key added later is not forgotten by one of
+ * the three call sites.
+ */
+export function chatKeys(id: string): string[] {
+  return [messagesKey(id), itemsKey(id), blobsKey(id)];
+}
 
 /** Hostname of a page URL, without "www.". Empty string for chrome:// and other non-http pages. */
 export function hostFromUrl(url: string): string {
@@ -159,7 +172,7 @@ async function writeIndex(chats: Chat[]): Promise<void> {
 async function writeIndexCapped(chats: Chat[]): Promise<void> {
   const { kept, dropped } = capChats(chats);
   await writeIndex(kept);
-  if (dropped.length) await chrome.storage.local.remove(dropped.flatMap((id) => [messagesKey(id), itemsKey(id)]));
+  if (dropped.length) await chrome.storage.local.remove(dropped.flatMap(chatKeys));
 }
 
 export async function listChats(host?: string): Promise<Chat[]> {
@@ -271,7 +284,7 @@ export async function renameChat(id: string, title: string): Promise<void> {
 
 export async function deleteChat(id: string): Promise<void> {
   await writeIndex((await readIndex()).filter((c) => c.id !== id));
-  await chrome.storage.local.remove([messagesKey(id), itemsKey(id)]);
+  await chrome.storage.local.remove(chatKeys(id));
 }
 
 /**
@@ -286,7 +299,7 @@ export async function bulkChats(ids: string[], action: 'archive' | 'unarchive' |
   const chats = await readIndex();
   if (action === 'delete') {
     await writeIndex(chats.filter((c) => !wanted.has(c.id)));
-    await chrome.storage.local.remove([...wanted].flatMap((id) => [messagesKey(id), itemsKey(id)]));
+    await chrome.storage.local.remove([...wanted].flatMap(chatKeys));
     return;
   }
   // Capped like every other index write. A bulk unarchive is the case that needs it: an index of
@@ -316,16 +329,77 @@ export async function loadMessages(id: string): Promise<Msg[]> {
   return (r[messagesKey(id)] as Msg[] | undefined) ?? [];
 }
 
-/** Screenshots are large; drop image data so a long chat stays well under the storage quota. */
+/** How many of the most recent user turns keep their attached images at full size in the history. */
+export const KEEP_IMAGE_TURNS = 2;
+
+/**
+ * Shrink the model history before it is written to storage.
+ *
+ * Two different rules, because the two kinds of image are not the same thing:
+ *
+ *   - A SCREENSHOT taken by a tool is dropped entirely, always. It is a picture of a page the agent
+ *     can simply look at again, so keeping it costs a megabyte to save a tool call.
+ *   - An ATTACHED image came from the user and cannot be re-fetched from anywhere. The most recent
+ *     KEEP_IMAGE_TURNS user turns keep theirs whole, so "make it look like this" still works on the
+ *     next turn and the one after; older ones become the same one-line stub a screenshot gets, and
+ *     the full copy survives in the chat's blob store for the panel to show.
+ *
+ * Both keep the STRUCTURE intact: a stub replaces the image part in place, so every message still
+ * has content and every adapter still emits a valid request.
+ */
 export function slimMessages(messages: Msg[]): Msg[] {
-  return messages.map((m) => ({
-    ...m,
-    content: m.content.map((p) =>
+  const keepFrom = imageKeepIndex(messages, KEEP_IMAGE_TURNS);
+  return messages.map((m, i) => {
+    const content = m.content.map((p) =>
       p.type === 'tool_result'
         ? { ...p, content: p.content.map((c) => (c.type === 'image' ? { type: 'text' as const, text: '[screenshot omitted from history]' } : c)) }
         : p,
-    ),
-  }));
+    );
+    return { ...m, content: i >= keepFrom ? content : elideAttachedImages(content) };
+  });
+}
+
+/**
+ * Index of the message that starts the Nth-from-last user TURN. Everything from there on keeps its
+ * attached images; everything before it is stubbed.
+ *
+ * A user message carrying tool results is not a turn (the agent loop writes results back as role
+ * 'user'), which is the same rule lib/agent/compact.ts uses — the two have to agree, or a history
+ * would be trimmed differently on its way to storage than on its way to the model.
+ */
+function imageKeepIndex(messages: Msg[], turns: number): number {
+  let seen = 0;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (!m || m.role !== 'user' || m.content.some((p) => p.type === 'tool_result')) continue;
+    seen += 1;
+    if (seen === turns) return i;
+  }
+  return 0; // fewer turns than we promised to keep: nothing is old enough to stub
+}
+
+/** Replace every image part in one message's content with its stub, numbered as it was attached. */
+export function elideAttachedImages(content: Part[]): Part[] {
+  let n = 0;
+  let changed = false;
+  const out = content.map((p) => {
+    if (p.type !== 'image') return p;
+    const stub: Part = { type: 'text', text: elidedImageNote(n) };
+    n += 1;
+    changed = true;
+    return stub;
+  });
+  return changed ? out : content;
+}
+
+/** Every blob hash a transcript still refers to, so nothing else has to know the item shape. */
+export function referencedHashes(items: ChatItem[]): string[] {
+  const out: string[] = [];
+  for (const it of items) {
+    if (it.kind !== 'user' || !it.images) continue;
+    for (const img of it.images as ImageThumb[]) if (img.hash) out.push(img.hash);
+  }
+  return out;
 }
 
 /**
@@ -333,13 +407,16 @@ export function slimMessages(messages: Msg[]): Msg[] {
  * already there, plus the user's turn, so the conversation survives a provider error. The turn is
  * not appended twice if a retry already recorded identical text at the end.
  */
-export function appendTurn(history: Msg[], turn: { text: string }): Msg[] {
+export function appendTurn(history: Msg[], turn: { text: string; images?: AttachedImage[] }): Msg[] {
   const text = turn.text.trim();
   if (!text) return [...history];
   const last = history[history.length - 1];
   const lastText = last?.role === 'user' ? last.content.find((p) => p.type === 'text')?.text?.trim() : undefined;
   if (lastText === text) return [...history];
-  return [...history, { role: 'user', content: [{ type: 'text', text: turn.text }] }];
+  // Images first, exactly as the loop would have rendered them (lib/agent/loop.ts turnParts), so a
+  // turn recovered from a failed run looks the same to the model as one that went through cleanly.
+  const images: Part[] = (turn.images ?? []).map((img) => ({ type: 'image', mediaType: img.mediaType, data: img.data }));
+  return [...history, { role: 'user', content: [...images, { type: 'text', text: turn.text }] }];
 }
 
 export async function saveMessages(id: string, messages: Msg[]): Promise<void> {

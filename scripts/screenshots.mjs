@@ -56,7 +56,7 @@
 
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
-import { COMPACT_MARKER, FAST_MARKER, SLOW_MARKER, SUMMARY_MARKER, WAIT_MARKER } from './mock-llm.mjs';
+import { COMPACT_MARKER, FAST_MARKER, IMAGES_MARKER, SLOW_MARKER, SUMMARY_MARKER, WAIT_MARKER } from './mock-llm.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -82,6 +82,7 @@ const DASHBOARD_SHOT = process.argv.includes('--dashboard-capture');
 const THEME = process.argv.includes('--theme');
 const TABBAR = process.argv.includes('--tabbar');
 const WAIT = process.argv.includes('--wait');
+const IMAGES = process.argv.includes('--images');
 
 /**
  * Where the tab bar's captures go when --tabbar is asked to write them (`--tabbar-capture`). These
@@ -97,7 +98,7 @@ const STYLEGUIDE = process.argv.includes('--styleguide');
 /** True when this run is capturing screenshots rather than asserting behaviour (see MASK below). */
 const CAPTURING =
   !SMOKE && !CHATS && !ISOLATION && !COMPACTION && !DASHBOARD && !DASHBOARD_SHOT && !THEME &&
-  !TABBAR && !TABBAR_SHOT && !WAIT && !STYLEGUIDE;
+  !TABBAR && !TABBAR_SHOT && !WAIT && !IMAGES && !STYLEGUIDE;
 
 /** See note 4: a first-run setup instruction, not the steady state the README should show. */
 const HIDE_SETUP_NOTICE = '.app > .notice, .dash-inner > .notice { display: none !important; }';
@@ -2754,6 +2755,242 @@ async function tabbarFlow({ capture = false } = {}) {
 }
 
 // ---------------------------------------------------------------------------
+// Attached images: paste, drop, send, reload.
+// ---------------------------------------------------------------------------
+//
+// Everything about an attachment that a unit test cannot reach is here: the clipboard and the
+// drop event really carrying a File, the browser really decoding and re-encoding it, and — the
+// assertion the whole feature rests on — what the backend actually received.
+//
+// The mock records every image_url part it is handed (scripts/mock-llm.mjs: collectImages), with
+// its media type, decoded byte count, dimensions read out of the header, and whether it sat before
+// the text part of its message. So this flow does not assert that the panel "looks like it sent an
+// image"; it reads the wire.
+
+const IMAGES_PROMPT = 'make the header look like this';
+
+/**
+ * A PNG generated in the page, as a File, so the paste and the drop carry real image bytes rather
+ * than a fixture we would have to keep in the repo. `w`/`h` are the source size: the point of the
+ * 6000px case is that the panel shrinks it rather than refusing it.
+ */
+const MAKE_PNG = `async (opts) => {
+  const canvas = document.createElement('canvas');
+  canvas.width = opts.w;
+  canvas.height = opts.h;
+  const ctx = canvas.getContext('2d');
+  // Something with structure, so a downscale is visible and the JPEG encoder has work to do.
+  ctx.fillStyle = opts.bg;
+  ctx.fillRect(0, 0, opts.w, opts.h);
+  ctx.fillStyle = opts.fg;
+  for (let i = 0; i < opts.w; i += Math.max(8, Math.round(opts.w / 24))) ctx.fillRect(i, 0, Math.max(4, opts.w / 80), opts.h);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = Math.round(opts.h / 6) + 'px sans-serif';
+  ctx.fillText(opts.label, Math.round(opts.w / 12), Math.round(opts.h / 2));
+  const blob = await new Promise((r) => canvas.toBlob(r, 'image/png'));
+  return new File([blob], opts.name, { type: 'image/png' });
+}`;
+
+/** Paste a generated PNG into the composer through a real ClipboardEvent carrying a File. */
+async function pasteImage(panel, opts) {
+  await panel.evaluate(
+    async ([make, o]) => {
+      const file = await eval(make)(o);
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      const ta = document.querySelector('.composer textarea');
+      ta.focus();
+      ta.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+    },
+    [MAKE_PNG, opts],
+  );
+}
+
+/** Drop a generated image onto a target, through a real DragEvent carrying a File. */
+async function dropImage(panel, selector, opts) {
+  await panel.evaluate(
+    async ([make, o, sel]) => {
+      const file = await eval(make)(o);
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      const target = document.querySelector(sel);
+      target.dispatchEvent(new DragEvent('dragover', { dataTransfer: dt, bubbles: true, cancelable: true }));
+      target.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+    },
+    [MAKE_PNG, opts, selector],
+  );
+}
+
+/** Drop a file the panel must refuse, so the note it shows can be read. */
+async function dropSvg(panel, selector) {
+  await panel.evaluate(
+    ([sel]) => {
+      const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10"/></svg>';
+      const file = new File([svg], 'diagram.svg', { type: 'image/svg+xml' });
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      const target = document.querySelector(sel);
+      target.dispatchEvent(new DragEvent('dragover', { dataTransfer: dt, bubbles: true, cancelable: true }));
+      target.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+    },
+    [selector],
+  );
+}
+
+/** Wait until the composer strip holds exactly `n` thumbnails. */
+async function waitForThumbs(panel, n, timeout = 20_000) {
+  await panel.waitForFunction((want) => document.querySelectorAll('.composer .attach img').length === want, n, { timeout });
+}
+
+async function imagesFlow() {
+  const b = await launch('light');
+  const fail = (m) => {
+    throw new Error(`images: ${m}`);
+  };
+  try {
+    await clearViolations();
+    await fetch(`${CONTROL_BASE}/__requests`, { method: 'DELETE' }).catch(() => {});
+    const panel = await openPanel(b.ctx, b.extId);
+    await openSite(b.ctx, 'https://en.wikipedia.org/wiki/Common_kingfisher');
+    await waitForComposer(panel);
+
+    // --- 1. A pasted screenshot, and a dropped one --------------------------
+    await pasteImage(panel, { w: 1200, h: 800, bg: '#123456', fg: '#2e5bfc', label: 'PASTED', name: 'pasted-mock.png' });
+    await waitForThumbs(panel, 1);
+
+    // The second arrives by drop, onto the message list rather than the composer: both are drop
+    // targets, and a mockup dragged onto the conversation is the natural gesture.
+    await dropImage(panel, '.messages', { w: 6000, h: 6000, bg: '#301040', fg: '#f343d3', label: 'DROPPED', name: 'dropped-huge.png' });
+    await waitForThumbs(panel, 2);
+
+    // Each thumbnail carries a size, and the 6000px one was SHRUNK rather than refused — which is
+    // the difference between a cap that helps and a cap that gets in the way.
+    const labels = await panel.locator('.composer .attach .attach-size').allTextContents();
+    if (labels.length !== 2) fail(`expected 2 size labels, got ${labels.length}`);
+    for (const l of labels) {
+      if (!/\d+×\d+ · /.test(l)) fail(`a thumbnail's size label read ${JSON.stringify(l)}`);
+    }
+    const huge = labels.find((l) => l.startsWith('1568×1568'));
+    if (!huge) fail(`the 6000×6000 image was not downscaled to 1568 on its long edge: ${labels.join(' | ')}`);
+
+    // --- 2. An SVG is refused, with a note ----------------------------------
+    await dropSvg(panel, '.composer');
+    await panel.locator('.composer .attach-note').waitFor({ timeout: 10_000 });
+    const note = (await panel.locator('.composer .attach-note').textContent()) ?? '';
+    if (!/SVG is not supported/i.test(note)) fail(`the SVG refusal read ${JSON.stringify(note)}`);
+    if ((await panel.locator('.composer .attach img').count()) !== 2) fail('the refused SVG was attached anyway');
+
+    // --- 3. Removing one -----------------------------------------------------
+    await panel.locator('.composer .attach .attach-x').first().click();
+    await waitForThumbs(panel, 1);
+    const left = (await panel.locator('.composer .attach .attach-size').first().textContent()) ?? '';
+    if (!left.startsWith('1568×1568')) fail(`removing the first thumbnail left ${JSON.stringify(left)}; the wrong one went`);
+
+    // A capture of the composer carrying attachments. Taken with two thumbnails, so it shows the
+    // strip doing its job; the removal above is re-done after.
+    await pasteImage(panel, { w: 1200, h: 800, bg: '#123456', fg: '#2e5bfc', label: 'PASTED', name: 'pasted-mock.png' });
+    await waitForThumbs(panel, 2);
+    await panel.locator('.composer textarea').fill(IMAGES_PROMPT);
+    await panel.waitForTimeout(300);
+    await shot(panel, '08-images-composer.png');
+    await panel.locator('.composer .attach .attach-x').last().click();
+    await waitForThumbs(panel, 1);
+
+    // --- 4. Send, and read what the backend was handed -----------------------
+    await panel.locator('.composer button.btn.primary').click();
+    await panel.locator('.messages .msg.assistant', { hasText: IMAGES_MARKER }).waitFor({ timeout: 60_000 });
+    await panel.waitForTimeout(400);
+
+    const requests = (await fetchRequests()).filter((r) => r.script === 'attached-images');
+    if (!requests.length) fail('the mock never received a request for the attached-images script');
+    const first = requests[0];
+    const sent = first.images ?? [];
+    if (sent.length !== 1) fail(`the request carried ${sent.length} image parts; exactly 1 was attached`);
+    const [only] = sent;
+    if (only.mediaType !== 'image/jpeg') fail(`the attachment was sent as ${only.mediaType}; it is re-encoded to JPEG`);
+    if (!only.beforeText) fail('the image part came AFTER the text part of its message; providers expect image then text');
+    if (only.width !== 1568 || only.height !== 1568) {
+      fail(`the sent image measured ${only.width}×${only.height}; it should have been downscaled to 1568×1568`);
+    }
+    if (!(only.bytes > 1000 && only.bytes <= 1_200_000)) fail(`the sent image was ${only.bytes} bytes, outside the expected range`);
+
+    // The caption the model can refer to the picture by, in the same message.
+    const userMsg = (first.messages ?? []).filter((m) => m.role === 'user').pop();
+    const captions = (Array.isArray(userMsg?.content) ? userMsg.content : [])
+      .filter((p) => p.type === 'text')
+      .map((p) => p.text)
+      .join('\n');
+    if (!/\[attached image 1: 1568x1568 jpeg, dropped-huge\.png\]/.test(captions)) {
+      fail(`the user message carried no caption for the attachment: ${JSON.stringify(captions.slice(0, 300))}`);
+    }
+
+    // --- 5. The sent bubble, the lightbox ------------------------------------
+    const bubbleThumbs = panel.locator('.messages .msg.user .attach img');
+    if ((await bubbleThumbs.count()) !== 1) fail(`the sent bubble shows ${await bubbleThumbs.count()} thumbnails, expected 1`);
+    await shot(panel, '08-images-sent.png');
+
+    await panel.locator('.messages .msg.user button.attach').first().click();
+    await panel.locator('.lightbox img').waitFor({ timeout: 10_000 });
+    // The overlay shows the FULL image out of the blob store, not the thumbnail it was opened from.
+    await panel
+      .waitForFunction(
+        () => {
+          const img = document.querySelector('.lightbox img');
+          return !!img && img.naturalWidth > 320;
+        },
+        null,
+        { timeout: 15_000 },
+      )
+      .catch(() => fail('the lightbox never loaded the full-size image from the chat blob store'));
+    await panel.keyboard.press('Escape');
+    await panel.locator('.lightbox').waitFor({ state: 'detached', timeout: 10_000 });
+
+    // --- 6. A reload still shows the picture ---------------------------------
+    await reloadPanel(panel);
+    await panel.locator('.messages .msg.user .attach img').first().waitFor({ timeout: 30_000 });
+    const afterReload = await panel.locator('.messages .msg.user .attach img').count();
+    if (afterReload !== 1) fail(`after a reload the bubble shows ${afterReload} thumbnails, expected 1`);
+    // Rendered from the transcript's own data URL, so it is there without touching the blob store.
+    const thumbSrc = await panel.locator('.messages .msg.user .attach img').first().getAttribute('src');
+    if (!thumbSrc?.startsWith('data:image/')) fail(`the restored thumbnail src was ${JSON.stringify((thumbSrc ?? '').slice(0, 40))}`);
+
+    // --- 7. Storage: a thumbnail in the transcript, the full copy beside it ---
+    const storage = await panel.evaluate(async () => {
+      const all = await chrome.storage.local.get(null);
+      const out = { items: null, blobs: null, itemsBytes: 0 };
+      for (const [k, v] of Object.entries(all)) {
+        if (k.endsWith(':items')) {
+          out.items = v;
+          out.itemsBytes = JSON.stringify(v).length;
+        }
+        if (k.endsWith(':blobs')) out.blobs = v;
+      }
+      return out;
+    });
+    const stored = (storage.items ?? []).find((it) => it.kind === 'user' && it.images?.length);
+    if (!stored) fail('the stored transcript has no user row carrying images');
+    const [thumb] = stored.images;
+    if (!thumb.hash) fail('the stored thumbnail carries no blob hash');
+    if (!thumb.thumb?.startsWith('data:image/')) fail('the stored thumbnail is not a data URL');
+    if (thumb.width !== 1568 || thumb.height !== 1568) fail(`the stored row records ${thumb.width}×${thumb.height}`);
+    const blobs = storage.blobs ?? {};
+    if (!blobs[thumb.hash]) fail(`the blob store has no entry for hash ${thumb.hash} (keys: ${Object.keys(blobs).join(',')})`);
+    if (blobs[thumb.hash].data.length <= thumb.thumb.length) {
+      fail('the stored blob is no larger than its thumbnail, so the full-size copy was never written');
+    }
+    // The transcript is read and rewritten constantly; the thumbnail must not make it heavy.
+    if (storage.itemsBytes > 300_000) fail(`the stored transcript is ${storage.itemsBytes} bytes; the thumbnail is too big for it`);
+
+    await assertNoViolations('images');
+    console.log(
+      'images: OK — pasted and dropped, 6000px downscaled to 1568, SVG refused, one removed, one image part sent before the text as JPEG with its caption, bubble thumbnail, lightbox opened from the blob store and closed on Escape, thumbnail survived a reload, zero invalid requests',
+    );
+  } finally {
+    await b.close();
+  }
+}
+
+// ---------------------------------------------------------------------------
 
 /**
  * The living specimen, captured in both themes for docs/design.md.
@@ -2813,6 +3050,10 @@ async function main() {
       await waitFlow();
       return;
     }
+    if (IMAGES) {
+      await imagesFlow();
+      return;
+    }
     if (THEME) {
       await themeFlow();
       return;
@@ -2844,6 +3085,7 @@ async function main() {
       await themeFlow();
       await tabbarFlow();
       await waitFlow();
+      await imagesFlow();
       return;
     }
     // The dark set: the design system's own palette, and what the README leads with.

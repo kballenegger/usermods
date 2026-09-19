@@ -1,3 +1,4 @@
+import { imageNote } from '../images.ts';
 import { createProvider } from '../providers';
 import { renderRunResult, type RunResult } from '../runscript';
 import { DEFAULT_CONTEXT_BUDGET, type AgentEventBody, type ElementRef, type ModProposal, type Msg, type Part, type Settings, type UserTurn } from '../types';
@@ -62,8 +63,26 @@ function renderTurn(turn: UserTurn, page: { url: string; title: string } | null,
     const html = ref.html.length > 2500 ? ref.html.slice(0, 2500) + '…' : ref.html;
     lines.push(`[@${ref.token} = ${ref.label} — selector: ${ref.selector}]`, html);
   }
+  // A caption per attached image, so the model can refer to "the second screenshot" and knows what
+  // it is looking at without measuring it. The pictures themselves are separate parts, placed
+  // before this text by turnParts().
+  (turn.images ?? []).forEach((img, i) => lines.push(imageNote(img, i)));
   if (injected) lines.push('[The user sent this while you were working. Take it into account from here on.]');
   return `${lines.join('\n')}\n\n${turn.text}`.trim();
+}
+
+/**
+ * One user turn as content parts: every attached image FIRST, then the text.
+ *
+ * The order is not cosmetic. Anthropic documents that an image placed before the text it is about
+ * gives better results, the Responses API groups images after text in its own input array anyway,
+ * and a chat-completions backend simply reads the parts in order — so image-then-text is the one
+ * arrangement all three treat as "here is a picture, and here is what I am asking about it".
+ */
+function turnParts(turn: UserTurn, page: { url: string; title: string } | null, injected: boolean): Part[] {
+  const parts: Part[] = (turn.images ?? []).map((img) => ({ type: 'image', mediaType: img.mediaType, data: img.data }));
+  parts.push({ type: 'text', text: renderTurn(turn, page, injected) });
+  return parts;
 }
 
 /** Drop a trailing assistant turn whose tool calls were never answered, so the history stays valid. */
@@ -79,7 +98,7 @@ export async function runAgent(input: AgentInput): Promise<Msg[]> {
   const messages: Msg[] = [...input.history];
 
   const page = await env.pageInfo().catch(() => null);
-  messages.push({ role: 'user', content: [{ type: 'text', text: renderTurn(input.turn, page, false) }] });
+  messages.push({ role: 'user', content: turnParts(input.turn, page, false) });
   emit({ type: 'accepted', id: input.turn.id });
 
   try {
@@ -208,7 +227,9 @@ export async function runAgent(input: AgentInput): Promise<Msg[]> {
       // Anything the user typed meanwhile joins this message, after the tool results.
       const queued = signal.aborted ? [] : input.pullQueued();
       for (const q of queued) {
-        results.push({ type: 'text', text: renderTurn(q, null, true) });
+        // A queued message rides back with the tool results, images and all. Its pictures go in
+        // before its text for the same reason a fresh turn's do.
+        results.push(...turnParts(q, null, true));
         emit({ type: 'accepted', id: q.id });
       }
       messages.push({ role: 'user', content: results });

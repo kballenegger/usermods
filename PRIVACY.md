@@ -37,6 +37,7 @@ never uploads it anywhere.
 | **Saved mods** — the full userscript text, its header metadata, its enabled state, and any `@require` libraries and `@resource` files downloaded at install time | `chrome.storage.local` | So your mods can run on matching pages. |
 | **Mod values** — data your scripts save with `GM_setValue`, including values imported from a Tampermonkey backup | `chrome.storage.local` | The storage that userscripts expect. It belongs to the script, not to usermods. |
 | **Chat history** — your messages, the model's replies, the tool calls made and their results, and the page address and title of the tab a chat belongs to | `chrome.storage.local` | So a conversation survives closing the panel. Capped at 200 chats, oldest dropped. Screenshots are stripped from stored history. |
+| **Images you attach** — the pictures you paste, drop or pick in the composer, stored as a small thumbnail in the transcript and one full-size copy per chat | `chrome.storage.local` | So a reopened panel still shows what you sent. Deleted with the chat they belong to. |
 | **The first-run data notice acknowledgement** | `chrome.storage.local` | So you are asked once rather than every time. |
 
 You can delete any of it: remove a chat or a mod from the panel, sign out to erase subscription
@@ -61,6 +62,8 @@ Settings**:
   tool.
 - **The output of scripts the model runs** with `run_script` on the page, including anything they
   log to the console.
+- **Any images you attach** to a message, downscaled and re-encoded in the panel first — which also
+  strips their EXIF metadata, so location and device information in a phone screenshot is not sent.
 
 Three consequences are worth stating plainly:
 

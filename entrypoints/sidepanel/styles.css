@@ -1385,3 +1385,150 @@ input[type='checkbox']:checked::after {
   }
 }
 
+
+/* ---------------------------------------------------------------------------
+ * Attached images
+ *
+ * The composer strip, the thumbnails inside a sent bubble, and the full-size overlay. Every colour
+ * is a token, so this lands unchanged in whichever of the two open design directions wins; the
+ * only thing it asserts is shape — a 2px block edge and a hard offset shadow, like everything else
+ * on this screen.
+ * ------------------------------------------------------------------------ */
+
+.attach-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  align-items: flex-start;
+}
+
+/* Inside a sent bubble the strip sits above the text rather than beside the chips. */
+.attach-strip.sent {
+  margin-bottom: var(--sp-2);
+}
+
+.attach {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  padding: 0;
+  border: var(--border-width) solid var(--border-control);
+  border-radius: var(--r-field);
+  background: var(--surface-well);
+  box-shadow: var(--shadow-press);
+  /* Wide enough that "1568×1568 · 168 KB" fits on one line at the default panel width: the size
+     is the only thing on the chip that carries information, and a truncated one carries none. */
+  max-width: 152px;
+  cursor: default;
+}
+
+/* The clickable thumbnails in a sent bubble are buttons; they get the pointer and a live edge. */
+button.attach {
+  cursor: pointer;
+  transition: border-color 120ms ease;
+}
+
+button.attach:hover {
+  border-color: var(--primary);
+}
+
+button.attach:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.attach img {
+  display: block;
+  width: 100%;
+  /* A fixed box keeps a strip of mixed portrait and landscape images from stepping up and down.
+     `contain` rather than `cover`, because a mockup cropped by the UI showing it is a lie about
+     what was attached. */
+  height: 72px;
+  object-fit: contain;
+  background: var(--surface-well);
+}
+
+.attach-size {
+  display: block;
+  padding: 2px var(--sp-1);
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.attach-x {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  font-size: var(--fs-label);
+  line-height: 1;
+  color: var(--text-1);
+  background: var(--surface-2);
+  border: var(--border-width) solid var(--border-control);
+  border-radius: var(--r-field);
+  cursor: pointer;
+}
+
+.attach-x:hover {
+  color: var(--error-text);
+  border-color: var(--error);
+}
+
+/* Why a paste or a drop was refused. One line, in the error tone, above the textarea. */
+.attach-note {
+  font-size: var(--fs-meta);
+  color: var(--error-text);
+  padding: var(--sp-1) 0;
+}
+
+/* A file is over the panel: say where it will land. */
+.composer.dragging textarea {
+  border-color: var(--live);
+  background: var(--live-tint);
+}
+
+/* ---------------------------------------------------------------------------
+ * The full-size overlay
+ * ------------------------------------------------------------------------ */
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  /* The page behind stays faintly visible, so it reads as something on top of the panel rather
+     than as a new screen the user has to find their way back from. */
+  background: color-mix(in srgb, var(--brand-ink) 88%, transparent);
+}
+
+.lightbox img {
+  max-width: 100%;
+  max-height: calc(100% - 64px);
+  object-fit: contain;
+  border: var(--border-width) solid var(--border-control);
+  background: var(--surface-well);
+}
+
+.lightbox-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+  color: var(--text-2);
+}

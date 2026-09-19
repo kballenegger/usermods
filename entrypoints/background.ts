@@ -63,7 +63,10 @@ export default defineBackground(() => {
         for (const id of sessions.abort(req.chatId)) postAgentEvent(req.chatId, { type: 'unqueued', id });
         return;
       }
-      const turn: UserTurn = { id: req.id, text: req.text, refs: req.refs };
+      // `images` rides along with the turn. It is the only part of a message that is expensive to
+      // move, and it moves exactly once: the panel has already downscaled and re-encoded it, the
+      // loop turns it into image parts, and slimMessages decides how long the history keeps it.
+      const turn: UserTurn = { id: req.id, text: req.text, refs: req.refs, images: req.images };
       const { start } = sessions.accept(req.chatId, req.tabId, turn);
       if (start) void runChat(req.chatId, req.tabId, turn);
     });

@@ -19,6 +19,7 @@
 // Everything here is pure except `compact`, which takes its model call as a parameter, so the
 // whole policy is testable in node without a browser or a provider.
 
+import { elidedImageNote } from '../images.ts';
 import type { Msg, Part } from '../types';
 
 // ---------------------------------------------------------------------------
@@ -225,6 +226,18 @@ export function elide(messages: Msg[], target: number): { messages: Msg[]; chang
   const names = toolNames(messages);
   const cutoff = recentTurnStart(messages, PROTECT_RECENT_TURNS);
 
+  // Attached images in old turns are elided first, before any tool result is touched.
+  //
+  // They are the cheapest thing to lose and the most expensive thing to keep: IMAGE_TOKENS each,
+  // resent on every call for the rest of the chat, and — unlike a tool result — the model cannot
+  // call anything to get one back, so there is no point protecting "the most recent of each kind"
+  // the way ELIDABLE_TOOLS are protected. What makes it safe is that the user's own recent turns
+  // are off-limits (the same `cutoff`), so "make it look like this" keeps its picture for as long
+  // as the request is live, and the full-size copy is still in the chat's blob store for the panel.
+  const images = elideOldImages(messages, cutoff);
+  messages = images.messages;
+  if (images.changed && estimateTokens(messages) <= target) return { messages, changed: true };
+
   // Candidates, oldest first, and the latest of each tool kind marked off-limits.
   interface Candidate {
     msg: number;
@@ -258,7 +271,7 @@ export function elide(messages: Msg[], target: number): { messages: Msg[]; chang
   }
 
   const usable = candidates.filter((c) => !protectedKeys.has(`${c.msg}:${c.part}`));
-  if (!usable.length) return { messages, changed: false };
+  if (!usable.length) return { messages, changed: images.changed };
 
   // Largest first; ties broken oldest first, so a long-settled snapshot goes before a newer one.
   const order = [...usable].sort((a, b) => b.tokens - a.tokens || a.msg - b.msg || a.part - b.part);
@@ -270,7 +283,7 @@ export function elide(messages: Msg[], target: number): { messages: Msg[]; chang
     drop.add(`${c.msg}:${c.part}`);
     total -= c.tokens;
   }
-  if (!drop.size) return { messages, changed: false };
+  if (!drop.size) return { messages, changed: images.changed };
 
   const out = messages.map((m, i) => {
     if (!m.content.some((_, j) => drop.has(`${i}:${j}`))) return m;
@@ -284,6 +297,31 @@ export function elide(messages: Msg[], target: number): { messages: Msg[]; chang
     };
   });
   return { messages: out, changed: true };
+}
+
+/**
+ * Replace every attached image before `cutoff` with its one-line stub.
+ *
+ * Only user-attached images are touched. A screenshot lives inside a tool_result, which this
+ * skips entirely — those are elided by the tool-result pass above, with the stub that tells the
+ * model it can take another one. An attached image has no such option, so its stub simply says it
+ * was there, numbered as the user attached it.
+ */
+export function elideOldImages(messages: Msg[], cutoff: number): { messages: Msg[]; changed: boolean } {
+  let changed = false;
+  const out = messages.map((m, i) => {
+    if (i >= cutoff || !m.content.some((p) => p.type === 'image')) return m;
+    let n = 0;
+    const content = m.content.map((p) => {
+      if (p.type !== 'image') return p;
+      const replaced: Part = { type: 'text', text: elidedImageNote(n) };
+      n += 1;
+      changed = true;
+      return replaced;
+    });
+    return { ...m, content };
+  });
+  return changed ? { messages: out, changed } : { messages, changed: false };
 }
 
 /** Where the most recent result of `name` lives, so it can be protected. */
@@ -337,7 +375,9 @@ export function renderForSummary(messages: Msg[], maxCharsPerPart = 2000): strin
           lines.push(`${m.role === 'user' ? 'USER' : 'ASSISTANT'}: ${clip(p.text)}`);
           break;
         case 'image':
-          lines.push(`${m.role === 'user' ? 'USER' : 'ASSISTANT'}: [image]`);
+          // The caption text part that follows carries the dimensions and the filename, so the
+          // summary already has what it needs to mention the picture; this only marks its place.
+          lines.push(`${m.role === 'user' ? 'USER' : 'ASSISTANT'}: [attached image]`);
           break;
         case 'tool_call':
           // propose_mod inputs go in whole: the mod code is what section 4 has to reproduce.
