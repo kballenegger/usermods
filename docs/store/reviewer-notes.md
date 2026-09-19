@@ -3,17 +3,19 @@
 The text to paste into the developer dashboard's **Notes for reviewers** field (Privacy practices
 tab, below the permission justifications).
 
-**Before pasting:** the placeholder `[reviewer key: PASTE HERE]` must be replaced with the real
-reviewer key. Do not do it by hand and do not commit the key back into this file — run:
+**Before pasting:** the placeholders `[reviewer key: PASTE HERE]` and
+`[reviewer base URL: PASTE HERE]` must be replaced with the real reviewer key and base URL. Do not
+do it by hand and do not commit either one back into this file — run:
 
 ```sh
-USERMODS_REVIEWER_KEY='…' node scripts/reviewer-notes.mjs | pbcopy
+USERMODS_REVIEWER_KEY='…' USERMODS_REVIEWER_BASE_URL='…' node scripts/reviewer-notes.mjs | pbcopy
 ```
 
-which prints the short version with the key substituted, ready to paste.
+which prints the short version with both substituted, ready to paste.
 
-**The reviewer key is time-limited.** The current one is an OpenAI-compatible endpoint
-(`[reviewer base URL: PASTE HERE]`, model `ornith`) and **expires 2026-10-03**. If a review runs
+**The reviewer key is time-limited.** The current one is for an OpenAI-compatible endpoint (the
+reviewer endpoint, base URL kept in 1Password, Klaw vault, item "Ornith API - chrome-app-review -
+14 days"; model `ornith`) and **expires 2026-10-03**. If a review runs
 past that date the reviewer will hit an auth error, which is why the pasted text tells them to ask
 via the support URL rather than conclude the extension is broken. Re-issue the key and update the
 listing's note if the review is still open near that date.

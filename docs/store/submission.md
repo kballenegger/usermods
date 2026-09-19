@@ -16,7 +16,7 @@ for the policy. Field names and limits checked against `developer.chrome.com` on
 | | |
 |---|---|
 | Developer account | Register at the [dashboard](https://chrome.google.com/webstore/devconsole) and pay the **one-time $5 USD** registration fee. Verify the account's email address, or publishing is blocked. |
-| Model API key | The reviewer key exists: an OpenAI-compatible endpoint, `[reviewer base URL: PASTE HERE]`, model `ornith`, **expiring 2026-10-03**. It goes in the reviewer-notes field via `scripts/reviewer-notes.mjs`, never into the repo. Revoke it once the review clears. |
+| Model API key | The reviewer key exists: an OpenAI-compatible endpoint (the reviewer endpoint, base URL kept in 1Password, Klaw vault, item "Ornith API - chrome-app-review - 14 days"), model `ornith`, **expiring 2026-10-03**. It goes in the reviewer-notes field via `scripts/reviewer-notes.mjs`, never into the repo. Revoke it once the review clears. |
 | The package | `npm run zip:store` → upload `.output/usermods-0.1.0-chrome.zip`. Current build: 375,104 bytes, sha256 `b7b304c1bfc2a2486e15ceaa19524a8f7a5ec0b1b543898c09ccac382f4b826b`. |
 
 **Upload the zip first.** The dashboard derives the item name and the permission-justification
@@ -205,24 +205,26 @@ reachable before submitting — **push the repo and confirm the link renders** f
 
 ### Notes for reviewers
 
-Do not copy this one out of the file by hand — the text in the repo carries a placeholder where the
-key goes. Generate it with the key substituted and put it straight on the clipboard:
+Do not copy this one out of the file by hand — the text in the repo carries placeholders where the
+key and the base URL go. Generate it with both substituted and put it straight on the clipboard:
 
 ```sh
-USERMODS_REVIEWER_KEY='<the reviewer key>' node scripts/reviewer-notes.mjs | pbcopy
+USERMODS_REVIEWER_KEY='<the reviewer key>' USERMODS_REVIEWER_BASE_URL='<the reviewer endpoint>' node scripts/reviewer-notes.mjs | pbcopy
 ```
 
 Then paste into the field. The script reads the **short version** from
-[reviewer-notes.md](reviewer-notes.md#short-version--paste-this) (2,489 characters), replaces
-`[reviewer key: PASTE HERE]`, writes the result to stdout and the character count to stderr, and
-exits non-zero if the env var is missing or the placeholder has gone. The key never touches the
-repository.
+[reviewer-notes.md](reviewer-notes.md#short-version--paste-this), replaces
+`[reviewer key: PASTE HERE]` and `[reviewer base URL: PASTE HERE]`, writes the result to stdout and
+the character count to stderr, and exits non-zero if either env var is missing, the base URL does
+not start with `https://`, or either placeholder has gone. Neither the key nor the base URL ever
+touches the repository.
 
 Without a key the reviewer cannot exercise the chat at all, and the likeliest outcome is a
 rejection for a feature that "does not work".
 
-**The reviewer key expires 2026-10-03.** It is an OpenAI-compatible endpoint
-(`[reviewer base URL: PASTE HERE]`, model `ornith`), and the pasted notes tell the reviewer to
+**The reviewer key expires 2026-10-03.** It is for an OpenAI-compatible endpoint (the reviewer
+endpoint, base URL kept in 1Password, Klaw vault, item "Ornith API - chrome-app-review - 14 days";
+model `ornith`), and the pasted notes tell the reviewer to
 request a fresh one via the support URL if it has lapsed. If a review is still open near that date,
 issue a new key and update this field in the dashboard.
 
