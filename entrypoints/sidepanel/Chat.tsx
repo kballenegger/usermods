@@ -1677,16 +1677,21 @@ function chatOptionLabel(c: ChatRecord): string {
   // The mod comes BEFORE the relative time, and the time is dropped entirely when there is one.
   //
   // A <select> cannot ellipse per-part the way the draft bar does — the option is one string and
-  // the browser truncates whatever runs past the box. With the order "title · 3m ago · ✎ <mod>",
-  // the mod name is last and is therefore the part that always dies: at the panel's own 420px the
-  // owner saw it cut to a single letter ("✎ k"), which names no mod and is worse than saying
-  // nothing. So the mod takes the slot the timestamp had.
+  // the browser truncates whatever runs past the box. With the order "title · 3m ago · <mod>", the
+  // mod name is last and is therefore the part that always dies: at the panel's own 420px the owner
+  // saw it cut to a single letter, which names no mod and is worse than saying nothing. So the mod
+  // takes the slot the timestamp had.
   //
   // Dropping the time is the right trade rather than a reluctant one: "which installed script does
   // sending a message here rewrite" is a fact about consequences, and "3m ago" is a fact about
   // ordering that the list is ALREADY sorted by. The full string stays in the option's title
   // attribute, so the time is one hover away.
-  if (c.editingModName) return `${c.title} · ✎ ${c.editingModName}`;
+  //
+  // The marker is the WORD "editing", not a pencil glyph. --font-ui is the system stack, so a mark
+  // like ✎ comes from whatever fallback font the machine happens to have and does not read as a
+  // pencil on every one of them — and an option's text cannot be styled, so there is no way to put
+  // it in a face we control. A word costs a few characters and is legible everywhere.
+  if (c.editingModName) return `${c.title} · editing ${c.editingModName}`;
   return `${c.title} · ${relativeTime(c.updatedAt)}`;
 }
 
