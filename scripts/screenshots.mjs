@@ -68,7 +68,7 @@
 
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
-import { ARTIFACT_V1, ARTIFACT_V2, ARTIFACT_V3, COMPACT_MARKER, FAST_MARKER, IMAGES_MARKER, RESUME as RESUME_CONV, SLOW_MARKER, SUMMARY_MARKER, WAIT_MARKER } from './mock-llm.mjs';
+import { ARTIFACT_V1, ARTIFACT_V2, ARTIFACT_V3, COMPACT_MARKER, FAST_MARKER, IMAGES_MARKER, RESUME as RESUME_CONV, SLOW_MARKER, SUMMARY_MARKER, VISION as VISION_CONV, WAIT_MARKER } from './mock-llm.mjs';
 import { extDir } from './build-dir.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -96,6 +96,7 @@ const THEME = process.argv.includes('--theme');
 const TABBAR = process.argv.includes('--tabbar');
 const WAIT = process.argv.includes('--wait');
 const IMAGES = process.argv.includes('--images');
+const VISION = process.argv.includes('--vision');
 const ARTIFACT = process.argv.includes('--artifact');
 /** The artifact flow, asserted AND capturing the two draft-panel states for the PR. */
 const ARTIFACT_SHOT = process.argv.includes('--artifact-capture');
@@ -123,7 +124,7 @@ const SETTINGS_SHOT = process.argv.includes('--settings-capture');
 /** True when this run is capturing screenshots rather than asserting behaviour (see MASK below). */
 const CAPTURING =
   !SMOKE && !CHATS && !ISOLATION && !COMPACTION && !DASHBOARD && !DASHBOARD_SHOT && !THEME &&
-  !TABBAR && !TABBAR_SHOT && !WAIT && !IMAGES && !STYLEGUIDE && !ARTIFACT && !ARTIFACT_SHOT &&
+  !TABBAR && !TABBAR_SHOT && !WAIT && !IMAGES && !VISION && !STYLEGUIDE && !ARTIFACT && !ARTIFACT_SHOT &&
   !PANELSCOPE && !RESUME;
 
 /** See note 4: a first-run setup instruction, not the steady state the README should show. */
@@ -3508,6 +3509,167 @@ async function imagesFlow() {
 }
 
 // ---------------------------------------------------------------------------
+// Vision: a screenshot reaches a model that can see, and a model that cannot says so.
+// ---------------------------------------------------------------------------
+//
+// The owner's report was that the agent said "the screenshot tool did fire — but the image came
+// back empty because this backend can't attach images to tool results". That was true of the code
+// and false of the backend: lib/providers/openai.ts replaced every picture inside a tool_result
+// with a sentence saying so, on every endpoint, because a chat/completions `tool` message cannot
+// hold an image. The fix puts the image in the user message that follows the tool messages, which
+// is what the Responses adapter already did.
+//
+// So this flow reads the wire, twice:
+//
+//   (a) against an ordinary mock, a `screenshot` tool call must arrive as a real image_url part, in
+//       a user message, AFTER the tool message that answers the call — and the mock's validator
+//       must be satisfied by that arrangement, which is the half a unit test cannot prove because
+//       only a real backend enforces the adjacency rule;
+//   (b) against a mock that answers 400 to any request carrying a picture (the 'no-vision' fault),
+//       the run must still finish, the panel must say plainly what happened, and every later
+//       request must carry no image at all.
+//
+// Both use the real screenshot tool. Unlike chrome.userScripts, chrome.tabs.captureVisibleTab works
+// in an automated profile, so this is the one flow that drives that tool for real.
+
+/**
+ * Every image part the mock saw, across a whole scripted conversation.
+ *
+ * Read from /__requests rather than from the transcript: an image in the panel proves the tool ran,
+ * and this flow is about what left the extension.
+ */
+function imagesIn(requests) {
+  return requests.flatMap((r) => r.images ?? []);
+}
+
+async function visionFlow() {
+  const fail = (m) => {
+    throw new Error(`vision: ${m}`);
+  };
+
+  // --- (a) a backend that accepts images -----------------------------------
+  {
+    const b = await launch('dark');
+    try {
+      await clearViolations();
+      await clearFaults();
+      await fetch(`${CONTROL_BASE}/__requests`, { method: 'DELETE' }).catch(() => {});
+      const panel = await openPanel(b.ctx, b.extId);
+      await openSite(b.ctx, FIXTURE_URL);
+      await waitForComposer(panel);
+
+      await panel.locator('.composer textarea').fill(VISION_CONV.sighted.prompt);
+      await panel.locator('.composer button.btn.primary').click();
+      await panel.locator('.messages .msg.assistant', { hasText: VISION_CONV.sighted.done }).waitFor({ timeout: 90_000 });
+
+      const requests = await requestsFor('vision-sighted');
+      if (requests.length < 2) fail(`the mock saw ${requests.length} requests; the screenshot turn should make two`);
+
+      // The screenshot really left the extension as a picture, not as a sentence about a picture.
+      const sent = imagesIn(requests);
+      if (!sent.length) fail('no image part reached the backend — the screenshot was dropped, which is the bug this flow exists for');
+      const shot = sent[0];
+      if (shot.role !== 'user') fail(`the image was sent in a ${shot.role} message; a chat-completions tool message cannot hold one`);
+      if (!/^image\/(jpeg|png)$/.test(shot.mediaType)) fail(`the screenshot was sent as ${shot.mediaType}`);
+      if (!(shot.bytes > 500)) fail(`the screenshot was ${shot.bytes} bytes, which is not a real capture`);
+      // The downscale: a capture is brought to MAX_EDGE before it is sent (lib/images.ts). The
+      // harness runs at DPR 1, so a small viewport is already inside the box — the assertion that
+      // matters is that nothing enormous goes out.
+      if (shot.width > 1568 || shot.height > 1568) fail(`the screenshot went out at ${shot.width}×${shot.height}, over the 1568px limit`);
+
+      // The ordering the API is strict about, read off the request the mock actually received: the
+      // tool message answers the call, and the image sits in the user message after it. The mock's
+      // validator enforces adjacency independently (checkToolAdjacency), and assertNoViolations
+      // below is what proves this history would not be a 400 on a real backend.
+      const second = requests[1];
+      const roles = (second.messages ?? []).map((m) => m.role);
+      const toolAt = roles.lastIndexOf('tool');
+      if (toolAt < 0) fail('the follow-up request carried no tool message at all');
+      if (roles[toolAt - 1] !== 'assistant') fail(`the tool message at ${toolAt} does not follow its assistant message (roles: ${roles.join(',')})`);
+      if (roles[toolAt + 1] !== 'user') fail(`nothing follows the tool message; the image needs a user message to ride in (roles: ${roles.join(',')})`);
+      const carrier = second.messages[toolAt + 1];
+      const parts = Array.isArray(carrier.content) ? carrier.content : [];
+      if (!parts.some((p) => p.type === 'image_url')) fail('the message after the tool message carries no image part');
+      // The tool text points at it rather than denying it.
+      const toolText = second.messages[toolAt].content;
+      if (/does not accept images/i.test(String(toolText))) fail(`the tool result still tells the model the backend refuses images: ${JSON.stringify(toolText)}`);
+
+      await assertNoViolations('vision (sighted)');
+    } finally {
+      await b.close();
+    }
+  }
+
+  // --- (b) a backend that refuses them -------------------------------------
+  {
+    const b = await launch('dark');
+    try {
+      await clearViolations();
+      await fetch(`${CONTROL_BASE}/__requests`, { method: 'DELETE' }).catch(() => {});
+      // Standing, not one-shot: a real text-only endpoint refuses every request with a picture and
+      // answers every request without one, and the fallback is only meaningful against that.
+      await setFaults([{ kind: 'no-vision' }]);
+
+      const panel = await openPanel(b.ctx, b.extId);
+      await openSite(b.ctx, FIXTURE_URL);
+      await waitForComposer(panel);
+
+      await panel.locator('.composer textarea').fill(VISION_CONV.blind.prompt);
+      await panel.locator('.composer button.btn.primary').click();
+      // The run completes. That is the headline: a text-only backend used to end the turn with a
+      // red 400 the user had to decode.
+      await panel.locator('.messages .msg.assistant', { hasText: VISION_CONV.blind.done }).waitFor({ timeout: 90_000 });
+
+      // The panel says why, in words, rather than leaving the model looking stupid.
+      const notes = await panel.locator('.messages .label').allTextContents();
+      const said = notes.find((t) => /does not accept images/i.test(t));
+      if (!said) fail(`the panel never explained the fallback; its notes were ${JSON.stringify(notes)}`);
+      if (!/without them|leave images out/i.test(said)) fail(`the note does not say what was done about it: ${JSON.stringify(said)}`);
+
+      const requests = await requestsFor('vision-blind');
+      if (requests.length < 3) fail(`expected at least 3 requests (the refused one, its re-send, and the next step); saw ${requests.length}`);
+
+      // Exactly ONE request in the whole conversation carried a picture: the first one that had a
+      // screenshot to send. Everything after it went without, which is the "remembered, not
+      // re-discovered" half of the feature — the fallback must not be paid for once per step.
+      //
+      // (Request 0 is the opening turn, before the screenshot has been taken, so the picture first
+      // appears in the request that follows the tool call rather than in the very first one.)
+      const withImages = requests.filter((r) => r.hasImages);
+      if (withImages.length !== 1) fail(`${withImages.length} requests carried images; after the first refusal there should be none`);
+      const at = requests.indexOf(withImages[0]);
+      if (withImages[0].fault !== 'no-vision') fail('the mock did not refuse the request that carried the picture');
+
+      // The re-send is immediate: it is the very next request, with no backoff in between, because
+      // a vision rejection is `rejected` and lib/agent/retry.ts would not retry it at all.
+      const resend = requests[at + 1];
+      if (!resend) fail('the refused request was never re-sent; the run should not have got this far');
+      if (resend.hasImages) fail('the re-send still carried the picture');
+      if (resend.fault) fail(`the re-send was itself faulted (${resend.fault}); it should have been let through`);
+
+      // And the model was told the truth in place of the image, so it stops taking screenshots.
+      const toolMsg = (resend.messages ?? []).filter((m) => m.role === 'tool').pop();
+      if (!toolMsg) fail('the re-send carried no tool message');
+      if (!/does not accept images/i.test(String(toolMsg.content))) {
+        fail(`the tool result does not tell the model why it got no picture: ${JSON.stringify(String(toolMsg.content).slice(0, 200))}`);
+      }
+      if (!/get_styles|find_elements|get_page/.test(String(toolMsg.content))) {
+        fail('the tool result does not steer the model at the structural tools it should use instead');
+      }
+
+      await assertNoViolations('vision (blind)');
+    } finally {
+      await clearFaults();
+      await b.close();
+    }
+  }
+
+  console.log(
+    'vision: OK — a screenshot reached the model as an image part in the user message after its tool message, a refusing backend was detected once, re-sent immediately without images, explained in the panel and remembered so no later request carried one, zero invalid requests',
+  );
+}
+
+// ---------------------------------------------------------------------------
 
 /**
  * The living specimen, captured in both themes for docs/design.md.
@@ -3871,6 +4033,10 @@ async function main() {
       await imagesFlow();
       return;
     }
+    if (VISION) {
+      await visionFlow();
+      return;
+    }
     if (ARTIFACT || ARTIFACT_SHOT) {
       await artifactFlow({ capture: ARTIFACT_SHOT });
       return;
@@ -3921,6 +4087,7 @@ async function main() {
       await tabbarFlow();
       await waitFlow();
       await imagesFlow();
+      await visionFlow();
       await artifactFlow();
       await resumeFlow();
       return;
