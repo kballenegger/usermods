@@ -17,7 +17,7 @@ for the policy. Field names and limits checked against `developer.chrome.com` on
 |---|---|
 | Developer account | Register at the [dashboard](https://chrome.google.com/webstore/devconsole) and pay the **one-time $5 USD** registration fee. Verify the account's email address, or publishing is blocked. |
 | Model API key | The reviewer key exists: an OpenAI-compatible endpoint (the reviewer endpoint, base URL kept in 1Password, Klaw vault, item "Ornith API - chrome-app-review - 14 days"), model `ornith`, **expiring 2026-10-03**. It goes in the reviewer-notes field via `scripts/reviewer-notes.mjs`, never into the repo. Revoke it once the review clears. |
-| The package | `npm run zip:store` → upload `.output/usermods-0.1.0-chrome.zip`. Current build: 375,303 bytes, sha256 `5ab0332f5bc9c01f502bd2fdc8610c7456f3caa4dbaae50a1bdea74ae19f4360`. |
+| The package | `npm run zip:store` → upload `.output/usermods-0.1.0-chrome.zip`. Current build: 400,699 bytes, sha256 `8175a054e00d82acb75d49107c0b74ea8444a65edd0d2ec159022357e5384caf`. |
 
 **Upload the zip first.** The dashboard derives the item name and the permission-justification
 fields from the uploaded manifest, so the Privacy tab is incomplete until it has one.
