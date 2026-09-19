@@ -976,7 +976,7 @@ async function artifactFlow({ capture = false } = {}) {
       fail('the proposal card still offered its own Save rather than "Open in draft"');
     }
 
-    if (capture) await shot(panel, '08-artifact-collapsed.png');
+    if (capture) await shot(panel, '09-artifact-collapsed.png');
 
     // --- 2. The second turn's request carries the draft. This is the assertion the feature is for.
     await sendForVersion(panel, ARTIFACT_PROMPTS[1], 2);
@@ -1008,7 +1008,7 @@ async function artifactFlow({ capture = false } = {}) {
     if (!added[0].includes('#1155dd')) fail(`the added line was not the new colour: ${JSON.stringify(added[0])}`);
     if (!removed[0].includes('#888')) fail(`the removed line was not the old colour: ${JSON.stringify(removed[0])}`);
 
-    if (capture) await shot(panel, '09-artifact-diff.png');
+    if (capture) await shot(panel, '10-artifact-diff.png');
 
     // --- 4. Rolling back to v1 through the UI makes v1 the draft — as an appended version, and as
     // what the NEXT request carries.

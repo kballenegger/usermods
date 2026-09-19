@@ -28,6 +28,7 @@ import {
   type AttachedImage,
 } from '../lib/images.ts';
 import { KEEP_IMAGE_TURNS, appendTurn, chatKeys, itemsKey, messagesKey, referencedHashes, slimMessages } from '../lib/chats.ts';
+import { artifactKey } from '../lib/artifact.ts';
 import { elideOldImages, estimatePart, IMAGE_TOKENS } from '../lib/agent/compact.ts';
 import type { ChatItem, Msg, Part } from '../lib/types.ts';
 import { pruneBlobs } from '../lib/blobs.ts';
@@ -273,7 +274,10 @@ test('tier 1 reports no change when every image is recent', () => {
 
 test('a chat owns a blobs key alongside its messages and items', () => {
   assert.equal(blobsKey('abc'), 'chat:abc:blobs');
-  assert.deepEqual(chatKeys('abc').sort(), [blobsKey('abc'), itemsKey('abc'), messagesKey('abc')].sort());
+  // Every per-chat key, not just the blobs one: chatKeys() is the single list every deletion route
+  // uses, so this asserts the whole set — a key added later and forgotten here fails loudly rather
+  // than leaking storage for the life of the profile. The draft mod's key is in it for that reason.
+  assert.deepEqual(chatKeys('abc').sort(), [blobsKey('abc'), itemsKey('abc'), messagesKey('abc'), artifactKey('abc')].sort());
 });
 
 test('the same image hashes to the same key and a different one does not', () => {
