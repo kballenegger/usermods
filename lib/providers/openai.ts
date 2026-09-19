@@ -87,6 +87,10 @@ export function toOpenAIMessages(system: string, messages: Msg[], sendImages = t
     if (m.role === 'assistant') {
       const text = m.content.filter((p): p is Extract<Part, { type: 'text' }> => p.type === 'text').map((p) => p.text).join('');
       const calls = m.content.filter((p): p is Extract<Part, { type: 'tool_call' }> => p.type === 'tool_call');
+      // An assistant turn with neither words nor calls has nothing this protocol can carry: a
+      // Responses turn that was all reasoning (its `opaque` items are not ours to send), or a reply
+      // that came back empty. `content: null` with no tool_calls is a 400, so the turn is left out.
+      if (!text.trim() && !calls.length) continue;
       out.push({
         role: 'assistant',
         content: text || null,

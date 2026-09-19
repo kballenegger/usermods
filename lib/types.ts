@@ -69,6 +69,15 @@ export type ThemeChoice = 'system' | 'dark' | 'light';
  */
 export type SidePanelScope = 'tab' | 'window';
 
+/**
+ * What every model-facing function takes: the adapters, the titler, the compaction summariser.
+ *
+ * It is no longer what is STORED. The provider half (`provider`, `baseUrl`, `apiKey`, `model`,
+ * `images`) comes from the connection and model a chat resolved to, and the rest are the global
+ * preferences (`Prefs`, below); effectiveSettings() in lib/connections.ts puts the two together for
+ * one run. A profile saved by a build that stored all of this under 'settings' is migrated into a
+ * connection the first time it is read (migrateLegacySettings, same file).
+ */
 export interface Settings {
   provider: ProviderKind;
   /** Optional base URL override. For openai-compatible this is required (e.g. http://localhost:11434/v1). */
@@ -105,6 +114,9 @@ export interface Settings {
    */
   images?: ImagesSetting;
 }
+
+/** The global preferences: the part of `Settings` stored under 'settings', none of it about a provider. */
+export type Prefs = Pick<Settings, 'autoNameChats' | 'theme' | 'contextBudget' | 'sidePanelScope'>;
 
 /**
  * Default context budget, in estimated tokens. Well under the 200k window of the models this ships
@@ -205,8 +217,14 @@ export type Part =
   | { type: 'image'; mediaType: 'image/png' | 'image/jpeg'; data: string }
   | { type: 'tool_call'; id: string; name: string; input: Record<string, unknown> }
   | { type: 'tool_result'; toolCallId: string; content: Part[]; isError?: boolean }
-  /** A provider-specific item replayed verbatim by the provider that produced it (e.g. reasoning items). */
-  | { type: 'opaque'; provider: string; item: unknown };
+  /**
+   * A provider-specific item replayed verbatim by the provider that produced it (e.g. reasoning
+   * items) — and only by it. `provider` is the adapter's tag and `model` the model that wrote the
+   * item; since the model can change mid-conversation, an adapter replays an item only when both
+   * match and otherwise rebuilds the turn from its neutral parts (lib/providers/responses.ts
+   * toInput). `model` is absent on histories stored before it was recorded.
+   */
+  | { type: 'opaque'; provider: string; model?: string; item: unknown };
 
 export interface Msg {
   role: 'user' | 'assistant';

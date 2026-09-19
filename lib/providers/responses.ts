@@ -17,15 +17,36 @@ export interface ResponsesConfig {
 
 type Item = Record<string, unknown>;
 
-/** Exported for test/compact.test.ts, which asserts that a compacted history still converts cleanly. */
-export function toInput(messages: Msg[], tag: string): Item[] {
+/**
+ * The neutral history as Responses input items.
+ *
+ * A turn this backend produced is replayed from its `opaque` items — the original output items,
+ * reasoning included — and every other turn is rebuilt from its neutral parts. "This backend" means
+ * the same TAG and the same MODEL: the model can be swapped mid-conversation, and an encrypted
+ * reasoning item is the private state of the model that wrote it. One from ChatGPT is never sent to
+ * xAI (different tag), and one from a model the chat has since left is not sent to its successor
+ * either (different model) — those turns fall back to their neutral text and tool calls, which is
+ * always a valid history, because the API only objects to a reasoning item WITHOUT the item it
+ * reasons about, never to the item without its reasoning. `model` is optional on both sides so a
+ * history stored before it was recorded still replays the way it always did.
+ *
+ * Exported for test/compact.test.ts and test/swap.test.ts.
+ */
+export function toInput(messages: Msg[], tag: string, model?: string): Item[] {
   const input: Item[] = [];
   for (const m of messages) {
     if (m.role === 'assistant') {
-      const opaque = m.content.filter((p): p is Extract<Part, { type: 'opaque' }> => p.type === 'opaque' && p.provider === tag);
+      const opaque = m.content.filter(
+        (p): p is Extract<Part, { type: 'opaque' }> =>
+          p.type === 'opaque' && p.provider === tag && (model === undefined || p.model === undefined || p.model === model),
+      );
       if (opaque.length) {
         // We produced this turn: replay the original output items verbatim (reasoning, messages, calls).
-        for (const p of opaque) input.push(p.item as Item);
+        const items = opaque.map((p) => p.item as Item);
+        // …except reasoning that reasons about nothing: a turn cut off while it was still thinking
+        // ends in a reasoning item with no message or call after it, and the API rejects exactly that.
+        while (items.length && items[items.length - 1]?.type === 'reasoning') items.pop();
+        input.push(...items);
         continue;
       }
       for (const p of m.content) {
@@ -63,7 +84,7 @@ export function createResponsesProvider(cfg: ResponsesConfig): Provider {
         body: JSON.stringify({
           model: cfg.model,
           instructions: system,
-          input: toInput(messages, cfg.tag),
+          input: toInput(messages, cfg.tag, cfg.model),
           tools: tools.map((t: ToolDef) => ({ type: 'function', name: t.name, description: t.description, parameters: t.inputSchema, strict: false })),
           tool_choice: 'auto',
           parallel_tool_calls: false,
@@ -105,7 +126,7 @@ export function createResponsesProvider(cfg: ResponsesConfig): Provider {
             case 'response.output_item.done': {
               const item = ev.item as Item;
               // Keep the raw item for replay, then derive the neutral parts.
-              content.push({ type: 'opaque', provider: cfg.tag, item });
+              content.push({ type: 'opaque', provider: cfg.tag, model: cfg.model, item });
               if (item.type === 'message' && Array.isArray(item.content)) {
                 const text = (item.content as Item[]).map((c) => (typeof c.text === 'string' ? c.text : '')).join('');
                 if (text) content.push({ type: 'text', text });
