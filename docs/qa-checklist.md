@@ -544,8 +544,9 @@ Same flow as section 11, with the **SuperGrok subscription** preset / "xAI subsc
 1. From the worktree root: `npm run build:store`.
    **Expected:** build completes clean (same as a normal build, just with `USERMODS_STORE=1`).
    **If it fails:** paste the build output.
-2. Load `.output/chrome-mv3` (the store build's output — same output dir, so unload/reload the
-   dev build first or use a separate profile) as an unpacked extension.
+2. Load `.output/store-chrome-mv3` (the store build's own output folder, separate from
+   `.output/chrome-mv3` so this never touches the extension already loaded from the normal build)
+   as an unpacked extension, in a separate profile or alongside the dev build.
 3. Open Settings.
    **Expected:** the preset row has **no** "ChatGPT subscription" or "SuperGrok subscription"
    buttons; the Provider `<select>` has only **"Anthropic (Messages API)"** and **"OpenAI-

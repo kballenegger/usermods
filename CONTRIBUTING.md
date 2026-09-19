@@ -31,13 +31,27 @@ You do not need a real model at all for the tests or the smoke run — both use 
 |---|---|
 | `npm run dev` | WXT dev server with hot reload, Chrome. `dev:firefox` for the Firefox target. |
 | `npm run build` | Production build to `.output/chrome-mv3`. `build:firefox` for Firefox. |
-| `npm run build:store` | The Chrome Web Store variant: sets `USERMODS_STORE=1`, which drops subscription sign-in and tree-shakes `lib/oauth.ts` out of the bundle. `zip` and `zip:store` package the two builds. |
+| `npm run build:store` | The Chrome Web Store variant: sets `USERMODS_STORE=1`, which drops subscription sign-in and tree-shakes `lib/oauth.ts` out of the bundle, and builds to `.output/store-chrome-mv3`. `zip` and `zip:store` package the two builds. |
 | `npm run typecheck` | `tsc --noEmit`. |
 | `npm test` | Node's built-in runner over `test/*.test.ts`, via `--experimental-strip-types`. No bundler, no browser, fast. |
-| `npm run smoke` | Builds, then drives the real side panel headless in Playwright against `scripts/mock-llm.mjs`, asserting the whole chat loop end to end. |
+| `npm run smoke` | Builds to `.output/test-chrome-mv3`, then drives the real side panel headless in Playwright against `scripts/mock-llm.mjs`, asserting the whole chat loop end to end. |
 | `npm run screenshots` | Regenerates the README images through the same harness. |
 | `npm run store-assets` | Regenerates the Chrome Web Store screenshots and promo tiles into `docs/store/assets/`. |
 | `npm run styleguide` | Rebuilds and recaptures the living style guide into `docs/design/`, which `docs/design.md` embeds. |
+
+### Three output folders, on purpose
+
+`.output/chrome-mv3` (from `npm run build` / `npm run dev`) is the only folder meant to be loaded
+unpacked in a real browser — it is the one this file's setup instructions point at, and it is
+probably the one you have open in Chrome right now. `npm run build:store` writes to
+`.output/store-chrome-mv3` instead, and every script that launches a browser against a build
+(`smoke`, `screenshots`, `store-assets`, `styleguide`, `screenshots:settings`) writes to
+`.output/test-chrome-mv3` (set via `USERMODS_TEST_BUILD=1`, see `scripts/build-dir.mjs`). Before
+this split, all of those wrote to the same `.output/chrome-mv3`, so running `npm run smoke` (or a
+store build) while the real extension was loaded from that folder would silently replace it —
+Chrome reloads whatever is on disk the next time the service worker restarts, mid-session. Keeping
+the three apart means only a deliberate `build` or `dev` ever touches the folder Chrome is actually
+pointed at.
 
 Two notes on the harness. `scripts/mock-llm.mjs` is a local server that replays scripted
 conversations over the OpenAI wire protocol, so neither `smoke` nor `screenshots` needs an API key or
