@@ -122,6 +122,8 @@ const STYLEGUIDE = process.argv.includes('--styleguide');
  * that needs re-shooting on its own after a setting is added.
  */
 const SETTINGS_SHOT = process.argv.includes('--settings-capture');
+/** Rewrite 11-model-picker.png alone, for the same reason. */
+const PICKER_SHOT = process.argv.includes('--picker-capture');
 
 /** True when this run is capturing screenshots rather than asserting behaviour (see MASK below). */
 const CAPTURING =
@@ -535,7 +537,7 @@ async function settings(theme = 'dark', name = '04-settings.png') {
           v: 1,
           list: [
             { id: 'cap-anthropic', kind: 'anthropic', label: 'Anthropic', baseUrl: '', apiKey: 'sk-ant-capture-placeholder', extraModels: ['claude-opus-5'], models: { ids: ['claude-haiku-4-5', 'claude-opus-5', 'claude-sonnet-5'], fetchedAt: Date.now() - 4 * 60_000 } },
-            { id: 'cap-ollama', kind: 'openai-compatible', label: 'Ollama', baseUrl: 'http://localhost:11434/v1', apiKey: '', models: { ids: ['qwen3-coder:30b', 'llama3.3:70b'], fetchedAt: Date.now() - 60 * 60_000 } },
+            { id: 'cap-ollama', kind: 'openai-compatible', label: 'Ollama', baseUrl: `${CONTROL_BASE}/alt/v1`, apiKey: '', models: { ids: ['qwen3-coder:30b', 'llama3.3:70b'], fetchedAt: Date.now() - 60 * 60_000 } },
             { id: 'cap-chatgpt', kind: 'chatgpt', label: 'ChatGPT subscription', baseUrl: '', apiKey: '' },
           ],
         },
@@ -560,6 +562,43 @@ async function settings(theme = 'dark', name = '04-settings.png') {
     await panel.setViewportSize({ width: PANEL.width, height: Math.max(PANEL.height, full) });
     // Let the resize settle and the container-query top bar re-lay-out before the shutter.
     await panel.waitForTimeout(400);
+    return await shot(panel, name);
+  } finally {
+    await b.close();
+  }
+}
+
+/**
+ * 11 — the model picker, open over a finished conversation.
+ *
+ * Two providers with their lists already cached (and fresh, so opening the picker fetches nothing):
+ * the capture's "Anthropic", which is the mock, and a second one standing in for a local server,
+ * which is the mock's other prefix. Nothing here can reach a real endpoint.
+ */
+async function modelPickerShot(theme = 'dark', name = '11-model-picker.png') {
+  const b = await launch(theme);
+  try {
+    const now = Date.now();
+    const panel = await openPanel(b.ctx, b.extId, {
+      settings: { theme },
+      storage: {
+        connections: {
+          v: 1,
+          list: [
+            { id: 'capture', kind: 'openai-compatible', label: 'Anthropic', baseUrl: BASE_URL, apiKey: '', extraModels: ['claude-opus-5'], models: { ids: ['claude-haiku-4-5', 'claude-opus-5', 'claude-sonnet-5'], fetchedAt: now } },
+            { id: 'capture-local', kind: 'openai-compatible', label: 'Ollama', baseUrl: `${CONTROL_BASE}/alt/v1`, apiKey: '', models: { ids: ['qwen3-coder:30b', 'llama3.3:70b', 'gemma3:27b'], fetchedAt: now } },
+          ],
+        },
+        modelChoice: { connectionId: 'capture', model: 'claude-opus-5', label: 'Anthropic' },
+      },
+    });
+    await openSite(b.ctx, 'https://en.wikipedia.org/wiki/Common_kingfisher');
+    await runConversation(panel, PROMPT, { refreshTitle: true });
+    await panel.locator('[data-testid="model-button"]').click();
+    await panel.locator('[data-testid="model-option"][data-model="qwen3-coder:30b"]').waitFor({ timeout: 10_000 });
+    // Rest the highlight on a model from the OTHER provider: the picture is about switching.
+    await panel.locator('[data-testid="model-option"][data-model="qwen3-coder:30b"]').hover();
+    await panel.waitForTimeout(300);
     return await shot(panel, name);
   } finally {
     await b.close();
@@ -2222,11 +2261,15 @@ function seedChats() {
     ...over,
   });
   const chats = [
+    // Two of the three carry the model they talk to, as any chat that has run since models became a
+    // per-chat choice does; the third is a chat from before, which shows none.
     mk('chat-wiki-1', 'en.wikipedia.org', 'hide the sidebar and widen the article', now - 5 * 60_000, {
       url: 'https://en.wikipedia.org/wiki/Common_kingfisher',
+      model: { connectionId: 'capture', model: 'claude-opus-5', label: 'Anthropic' },
     }),
     mk('chat-wiki-2', 'en.wikipedia.org', 'dim the infobox images', now - 40 * 60_000, {
       url: 'https://en.wikipedia.org/wiki/Common_kingfisher',
+      model: { connectionId: 'capture-local', model: 'qwen3-coder:30b', label: 'Ollama' },
     }),
     mk('chat-hn-1', 'news.ycombinator.com', 'make the comment threads readable', now - 2 * 60 * 60_000, {
       url: 'https://news.ycombinator.com/news',
@@ -2252,6 +2295,8 @@ function seedChats() {
 
 /** Open dashboard.html with chats and mods already in storage. */
 async function openDashboard(ctx, extId, { storage = {}, settings = {} } = {}) {
+  // Same rule as openPanel: a capture names its provider the way a reader would see it.
+  if (CAPTURING || DASHBOARD_SHOT) storage = { ...captureProviders(), ...storage };
   const page = await ctx.newPage();
   await page.setViewportSize({ width: 1280, height: 950 });
   await page.goto(`chrome-extension://${extId}/dashboard.html`);
@@ -4699,6 +4744,10 @@ async function main() {
       await modelsFlow();
       return;
     }
+    if (PICKER_SHOT) {
+      await modelPickerShot('dark', '11-model-picker.png');
+      return;
+    }
     if (SETTINGS_SHOT) {
       await settings('dark', '04-settings.png');
       await settings('light', '04-settings-light.png');
@@ -4757,6 +4806,7 @@ async function main() {
     await chatProposal('light', '01-chat-proposal-light.png');
     await mods('light', '03-mods-light.png');
     await settings('light', '04-settings-light.png');
+    await modelPickerShot('dark', '11-model-picker.png');
 
     const files = fs.readdirSync(OUT_DIR).filter((f) => f.endsWith('.png')).sort();
     log(`wrote ${files.length} screenshots to docs/screenshots/`);

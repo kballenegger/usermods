@@ -21,7 +21,7 @@ pick `.output/chrome-mv3`. Either way, open **Details** on usermods and turn on 
 Scripts** — Chrome requires that toggle for any extension that runs user scripts, and nothing works
 without it.
 
-Then open the side panel, go to Settings, and point it at a provider. For development, a local model
+Then open the side panel, go to Settings, add a provider, and pick its model under the message box. For development, a local model
 (Ollama, LM Studio, mlx_lm) through the OpenAI-compatible preset costs nothing and is usually enough.
 You do not need a real model at all for the tests or the smoke run — both use a scripted mock.
 
@@ -70,6 +70,8 @@ things live:
   `.user.js` redirect rule. It is the biggest file and the center of everything.
 - **`entrypoints/sidepanel/`** — the React UI: `Chat.tsx`, `ModsView.tsx`, `SettingsView.tsx`,
   `Consent.tsx` (the first-run data notice), and `App.tsx` which tracks the active tab.
+  `ProvidersSection.tsx` is the provider list in Settings, `ModelPicker.tsx` the model dropdown
+  under the composer, and `useConnections.ts` the live read of connections both are drawn from.
 - **`entrypoints/content.ts`** — DOM snapshotting, the element picker, selector and style lookups.
 - **`entrypoints/install/`** — the install page a `.user.js` navigation lands on.
 - **`lib/providers/`** — one adapter per wire protocol behind the `Provider` interface in
@@ -83,7 +85,12 @@ things live:
 - **`lib/mods.ts`** — userscript header parsing and match logic. `lib/gm.ts` — the `GM_*` / `GM.*`
   shim injected around every registered script. `lib/connect.ts` — `@connect` enforcement.
   `lib/tampermonkey.ts` — backup import. `lib/install.ts` / `lib/installurl.ts` — the install path.
-- **`lib/chats.ts`** — per-site chat persistence in `chrome.storage.local`.
+- **`lib/chats.ts`** — per-site chat persistence in `chrome.storage.local`, including the model
+  each chat talks to.
+- **`lib/connections.ts`** — the connected providers and per-chat model selection: the migration
+  from the old single-provider settings, CRUD, what counts as connected, what the picker lists, and
+  `effectiveSettings()`, which turns a chat's selection into the `Settings` every adapter takes.
+  `lib/modellist.ts` — how each backend lists its models, and the fallback when one cannot.
 - **`lib/buildflags.ts`** — the store-build flag and everything that depends on it.
 
 The pure logic is deliberately separated from the `chrome.*` calls, in files that import types only.
@@ -95,7 +102,7 @@ write something with real logic in it, put the logic where a node test can reach
 Most endpoints need no code at all — anything speaking the Anthropic Messages or OpenAI
 chat-completions protocol works today by typing a base URL into the Custom preset. Only a genuinely
 different wire protocol or auth scheme needs a new adapter. If you just want a one-click preset for a
-service that speaks an existing protocol, that is the `KEY_PRESETS` array in `SettingsView.tsx` and
+service that speaks an existing protocol, that is the `KEY_PRESETS` array in `lib/connections.ts` and
 nothing else.
 
 For a real adapter:
@@ -107,7 +114,10 @@ For a real adapter:
    calls into `Part`s, and map its finish reason onto the `stopReason` union. Honour `signal` so Stop
    works.
 3. Wire it into the `switch` in `lib/providers/index.ts`.
-4. Add a preset in `entrypoints/sidepanel/SettingsView.tsx`.
+4. Add a preset in `lib/connections.ts`, and teach `modelsRequest` in `lib/modellist.ts` how the
+   backend lists its models. Then add the adapter to the swap matrix in `test/swap.test.ts`: the
+   model can be changed mid-conversation, so your adapter has to produce a valid request from a
+   history any other adapter wrote, and must never replay another backend's `opaque` parts.
 5. Test the translation layer. Request shaping and response parsing are pure functions of their
    input — factor them so a node test can exercise them without the network.
 

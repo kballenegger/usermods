@@ -351,6 +351,13 @@ async function shotChat(b, composer) {
   const site = await openSite(b.ctx, WIKI);
   await waitForComposer(panel);
   await runConversation(panel, 'hide the sidebar and make the article full width');
+  // The draft panel and the model line arrive under the transcript after the proposal has already
+  // been scrolled to, which leaves the card's last row behind them. The picture is of the card.
+  await panel.evaluate(() => {
+    const m = document.querySelector('.messages');
+    if (m) m.scrollTop = m.scrollHeight;
+  });
+  await panel.waitForTimeout(200);
 
   const l = tmp('chat-site');
   const r = tmp('chat-panel');

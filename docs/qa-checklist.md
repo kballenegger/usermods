@@ -483,10 +483,11 @@ You need a Tampermonkey install (or another Chrome profile with it) to produce r
 Only present in the GitHub build (`npm run build`), not `build:store`. Skip if testing the store
 build.
 
-1. Settings tab → click the **ChatGPT** preset button (or set Provider to "ChatGPT subscription
-   (Sign in with ChatGPT)").
-   **Expected:** a card reading "Not signed in to ChatGPT." with a primary **Sign in with
-   ChatGPT** button.
+1. Settings tab → under **Add provider**, click **ChatGPT subscription**.
+   **Expected:** a provider card named "ChatGPT subscription" is added and opens, its summary line
+   reading **Not signed in**, with a card inside reading "Not signed in to ChatGPT" and a primary
+   **Sign in with ChatGPT** button. The **ChatGPT subscription** button under Add provider is now
+   disabled (one sign-in per vendor).
    **If it fails:** side panel DevTools.
 2. Click **Sign in with ChatGPT**.
    **Expected:** a new tab opens to the vendor's device-code page, and the panel shows a large
@@ -496,14 +497,23 @@ build.
 3. Complete sign-in in the opened tab with a real ChatGPT Plus/Pro/Team account, entering the
    code shown.
    **Expected:** within ~2 s polling intervals, the panel updates to "Signed in to ChatGPT as
-   `<label>`" with a **Sign out** button.
+   `<label>`" with a **Sign out** button, and the provider's summary line reads **Connected**.
    **If it fails:** side panel DevTools, service worker console (poll/token exchange) — copy any
    error from the "Sign-in was interrupted. Start again." path if polling times out.
-4. Click **Fetch models** in the Model field.
-   **Expected:** a dropdown-backed list of model ids populates, or an explicit error if the plan
-   returns none.
-   **If it fails:** side panel DevTools.
-5. Pick a model, go to Chat, send a real one-line request on a real page.
+4. Click **Fetch models** on the provider card. **This is the step that used to fail with "Could
+   not list models: 400" straight after a successful sign-in** — the ChatGPT backend requires a
+   `client_version` query parameter, and cannot be reached by any automated test.
+   **Expected:** the status line under the button reads "*N* models listed · updated just now",
+   with no error. In the service worker's Network tab the request is
+   `GET …/backend-api/codex/models?client_version=<x.y.z>` and answers 200.
+   **If it fails:** copy the status line **verbatim** — it now carries the server's own message
+   after the status code, e.g. "Could not list models (400): …", which says what the backend
+   wanted. A failed listing is followed by "Showing a built-in list instead, which may be out of
+   date. You can also type a model id." and the chat's model picker still offers that built-in
+   list, labelled **built-in list**; if the backend names a newer minimum client version, bump
+   `CHATGPT_CLIENT_VERSION` in `lib/modellist.ts`.
+5. Go to Chat, open the model button under the message box, pick one of the ChatGPT models, and
+   send a real one-line request on a real page.
    **Expected:** a real streamed response and (ideally) a working proposal, same shape as the
    mock-LLM smoke test but against the live ChatGPT backend. This exercises real API usage
    against your subscription — keep it to one small turn.
@@ -529,9 +539,11 @@ Same flow as section 11, with the **SuperGrok subscription** preset / "xAI subsc
    but it is not itself a bug unless the error is unhandled/uncaught (panel should show a
    readable error, not crash or hang on "Waiting for approval…" forever).
    **If it fails:** side panel DevTools, service worker console — copy the exact status/error.
-3. Once signed in, **Fetch models**, confirm the datalist has entries (default model preset is
-   `grok-4.6`).
-   **If it fails:** side panel DevTools.
+3. Once signed in, **Fetch models** on the provider card, and confirm the status line reports a
+   count rather than an error (`grok-4.6` is offered either way; it comes with the preset). The
+   xAI proxy is as undocumented as the ChatGPT one, so a failure here reads "Could not list models
+   (status): <the proxy's own message>" followed by the built-in-list note — copy it verbatim.
+   **If it fails:** side panel DevTools, service worker console.
 4. Send one real turn in Chat.
    **Expected:** streamed response, tool calls resolve.
    **If it fails:** side panel DevTools, service worker console.
@@ -548,9 +560,8 @@ Same flow as section 11, with the **SuperGrok subscription** preset / "xAI subsc
    `.output/chrome-mv3` so this never touches the extension already loaded from the normal build)
    as an unpacked extension, in a separate profile or alongside the dev build.
 3. Open Settings.
-   **Expected:** the preset row has **no** "ChatGPT subscription" or "SuperGrok subscription"
-   buttons; the Provider `<select>` has only **"Anthropic (Messages API)"** and **"OpenAI-
-   compatible (chat/completions)"** — no ChatGPT/xAI subscription options at all.
+   **Expected:** the **Add provider** row has **no** "ChatGPT subscription" or "SuperGrok
+   subscription" buttons — only the key-based and Custom presets.
    **If it fails:** side panel DevTools — view page source / React DevTools if available to
    confirm the options are actually absent from the DOM, not just hidden.
 4. Open the consent notice (Settings → **Review data notice**, or fresh profile first run).
@@ -559,11 +570,15 @@ Same flow as section 11, with the **SuperGrok subscription** preset / "xAI subsc
    `STORE_BUILD` conditionals in `Consent.tsx` should have dropped that language.
    **If it fails:** side panel DevTools; screenshot the exact wording that leaked through.
 5. If you have a profile previously signed in to ChatGPT/xAI from the GitHub build, point this
-   store build at that same profile's data (or manually set `provider: 'chatgpt'` in storage).
-   **Expected:** a red banner: "This build of usermods does not include subscription sign-in, so
-   your ChatGPT / SuperGrok provider was switched back to the default. Add an API key below, or
-   install the GitHub build to sign in with a subscription again." — and Settings falls back to
-   the Anthropic provider with empty base URL / API key.
+   store build at that same profile's data.
+   **Expected:** a red line at the top of Providers: "This build of usermods does not include
+   subscription sign-in, so ChatGPT subscription cannot be used here. It is kept as it was: add a
+   provider with an API key below, or install the GitHub build to use it again." The provider
+   stays in the list with the summary **Not available in this build** and only a **Remove**
+   button; it does **not** appear in the chat's model picker, and a chat that was using it says
+   "ChatGPT subscription is not available in this build of usermods. Pick another model to
+   continue." with **Send** disabled. Nothing was rewritten: going back to the GitHub build finds
+   the provider and its sign-in intact.
    **If it fails:** side panel DevTools.
 
 ---
@@ -600,8 +615,9 @@ same base URL with different model ids also works.
 
 **Part A — a vision model sees the screenshot.**
 
-1. Settings → **Custom OpenAI API** preset, base URL and model set to your vision model. Leave
-   **Images** on **Auto**.
+1. Settings → **Add provider** → **Custom OpenAI API**, base URL set to your server. Leave
+   **Images** on **Auto**. In Chat, pick your vision model from the model button under the message
+   box.
 2. Open the panel on a page with something visually distinctive above the fold — a coloured
    banner, a large hero image, a chart. Ask something that can only be answered by looking, and
    that is not in the DOM text: *"take a screenshot and tell me what colour the header is"*, or
@@ -627,8 +643,8 @@ same base URL with different model ids also works.
 
 **Part B — a text-only model falls back, once.**
 
-4. Settings → same base URL, model switched to a text-only one (a plain 7B/8B instruct model with
-   no vision). **Images** still on **Auto**. Start a **new chat** — the memory is per endpoint and
+4. Same provider, but pick a text-only model in the chat's model picker (a plain 7B/8B instruct
+   model with no vision). **Images** still on **Auto**. Start a **new chat** — the memory is per endpoint and
    model, so the vision model's success does not carry over, and a fresh chat keeps the two
    transcripts readable.
 5. Ask the same "take a screenshot and tell me…" question.
@@ -651,17 +667,80 @@ same base URL with different model ids also works.
    **Expected:** the message sends, and a note says plainly that the attachment was not sent
    because the model does not accept images. The thumbnail still shows in your own bubble — you
    attached it, and the transcript should not lie about that.
-8. Settings → set **Images** to **Never**, start a new chat on the *vision* model, and ask for a
-   screenshot.
+8. Settings → open the provider's card and set **Images** to **Never**, start a new chat on the
+   *vision* model, and ask for a screenshot.
    **Expected:** no picture is sent even though the model could take one — the setting wins. Set it
    back to **Auto** afterwards.
-9. Finally, switch back to the vision model preset from step 1 and ask for a screenshot again.
+9. Finally, pick the vision model from step 1 again in the model picker and ask for a screenshot.
    **Expected:** it sees it. The text-only model being remembered as blind must not have blinded
    the vision model at the same base URL — the memory is per endpoint **and** model, and this is
    the step that proves it.
    **If it fails:** this is the worst failure mode in the feature (a working vision model silently
    degraded); service worker console, plus `chrome.storage.local.get('vision:unsupported')` run
    there, which lists exactly which endpoint+model pairs have been remembered.
+
+---
+
+## 16. Two real providers, and swapping the model mid-chat
+
+`npm run smoke:models` proves the mechanics against the mock: which endpoint and model every
+request went to, and that the converted history was structurally valid. What it cannot prove is
+that two **real** backends, speaking two different protocols, accept each other's history. This
+section needs two real providers on different protocols — ideally Anthropic plus any
+OpenAI-compatible endpoint, and a ChatGPT sign-in as the third if you have one.
+
+1. Settings → add both providers, with keys. **Expected:** each card's summary reads
+   **Connected**, and **Fetch models** on each reports a count.
+2. If you are upgrading a profile that had a single provider: **Expected:** it is already there
+   as the first card, named after its preset or its host, with the key in place, and the chat's
+   model button already shows the model you were using. Nothing needed re-entering.
+3. In Chat, open the model button under the message box. **Expected:** both providers' models,
+   grouped under their names; typing filters; ↑/↓ and Enter pick; Escape closes and returns focus
+   to the button.
+4. Pick a model on provider A and ask for something that needs tools **and a screenshot**:
+   *"take a screenshot, read the page, and tell me what the header looks like"*. Let it finish.
+5. Pick a model on provider B (the other protocol) and continue: *"now hide that header"*.
+   **Expected:** a divider in the transcript reading *switched to `<model>` · `<provider>`*, and a
+   normal reply that clearly knows what turn 1 found — it was sent the whole conversation.
+   **Expected NOT:** a 400. The failure this step exists to catch is the new provider rejecting
+   the old one's history: Anthropic refusing a tool id it did not mint ("tool_use.id: String
+   should match pattern"), an empty text block ("text content blocks must be non-empty"),
+   chat/completions refusing an assistant message with neither content nor tool calls, or a
+   Responses backend refusing a reasoning item. **If it fails:** copy the error row verbatim — it
+   names the rule — plus the direction (A→B) and both model ids.
+6. Swap back to A and send another turn, then, if you have it, swap to a ChatGPT model and send
+   one more, then back to Anthropic. **Expected:** every direction works. Going *back* to a
+   reasoning model is the interesting one: its own earlier reasoning is replayed to it, and no
+   other model's is.
+7. Send something slow ("read the whole page carefully and summarise it") and **while it is
+   running** pick a different model. **Expected:** the line beside the model button reads
+   "Applies from the next turn. The reply in progress stays on the model it started with."; the
+   running reply finishes normally; the next message goes to the new model and the transcript
+   marks the switch there, not earlier.
+8. Reload the panel, and restart the browser. **Expected:** the chat still shows the model it was
+   on; a **New chat** starts on the last model you picked; the dashboard's chat rows show each
+   chat's model and the preview shows the *switched to* lines.
+9. Settings → **Remove** the provider the current chat is on (confirm). Back in Chat:
+   **Expected:** the model button reads **Pick a model**, the line under it reads "The provider
+   this chat was using (`<name>`) was removed. Pick another model to continue.", and **Send** is
+   disabled. Nothing is sent anywhere until you pick a model. **This must never silently continue
+   on the other provider.**
+10. A long chat: drop **Context budget** to 20000, run a few page-reading turns until a
+    "compacted" note appears, then swap provider and continue. **Expected:** works; the summary is
+    ordinary text and travels like any other message.
+
+---
+
+## 17. The message box grows
+
+`npm run smoke:composer` measures this; the manual pass is for feel.
+
+1. Type a long message with Shift+Enter line breaks. **Expected:** the box grows a line at a time,
+   with no scrollbar inside it, until about ten lines, then stops growing and scrolls.
+2. Paste a few hundred lines. **Expected:** the box is capped (on a short window, at about 40% of
+   the panel); the tab bar at the top and the buttons under the box are all still on screen.
+3. Press Enter. **Expected:** the message sends and the box returns to its resting height.
+   Shift+Enter still makes a new line; Enter still sends.
 
 ---
 
@@ -689,6 +768,10 @@ same base URL with different model ids also works.
 | 14 | Export a mod → import into Tampermonkey | | |
 | 15 | Screenshot to a vision model on a custom OpenAI endpoint | | |
 | 15 | Text-only model: one fallback, note, no repeat screenshots | | |
+| 11 | ChatGPT **Fetch models** after sign-in returns a list (was a 400) | | |
+| 16 | Two real providers: swap mid-chat in every direction, no 400s | | |
+| 16 | Swap during a run applies next turn; removed provider blocks Send | | |
+| 17 | Message box grows, caps, shrinks after send | | |
 
 For any **Fail** row, file an issue (or note here) with: the step number, the exact error text
 copied from the console named in that step, the Chrome version (`chrome://version`), and whether

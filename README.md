@@ -13,6 +13,7 @@ Userscripts, userstyles, usermods.
 ## Why
 
 - **Any backend.** Anthropic's API, OpenAI, OpenRouter, or anything OpenAI-compatible: Ollama, LM Studio, vLLM, mlx_lm. Your key, your machine, no account, no hosted service.
+- **Several at once, and switch mid-conversation.** Connect as many providers as you use. The model is picked in the chat itself, from a dropdown under the message box that lists every connected provider's models, and you can change it at any point: the next turn goes to the new model with the whole conversation, tool calls included. [Details](#choosing-the-model-in-the-chat).
 - **Use the subscription you already pay for.** Sign in with ChatGPT (Plus, Pro, Team) or SuperGrok / X Premium+ straight from Settings. No API key, no local proxy, no per-token bill. [Details](#using-a-subscription-instead-of-an-api-key).
 - **The model actually sees the page.** It has tools to read a pruned DOM, list elements, read computed styles, take screenshots, and run scripts to test its work before proposing anything. Screenshots reach any vision model, whichever protocol its backend speaks; a text-only endpoint is detected once and told to work structurally instead. [Details](#screenshots-and-models-that-cannot-see-them).
 - **Show it what you mean.** Paste or drop a screenshot or a mockup into the composer, or pick one with *Attach image*. Images are shrunk and re-encoded in the panel before they go anywhere, up to four per message. [Details](#attaching-images).
@@ -43,14 +44,18 @@ Early. The core loop works end to end: chat, page inspection, live testing, prop
       <sub><b>Mods.</b> Saved scripts, split by whether they match the page you are on. Toggle, run, export or delete each one.</sub>
     </td>
     <td width="50%" valign="top">
-      <img src="docs/screenshots/04-settings.png" alt="Settings showing provider presets and the ChatGPT subscription card, not signed in.">
-      <sub><b>Settings.</b> Presets for the common backends, and a sign-in card for the two subscriptions that work without an API key.</sub>
+      <img src="docs/screenshots/04-settings.png" alt="Settings showing three connected providers, one opened to its name, base URL, API key and Fetch models, and the Add provider presets below.">
+      <sub><b>Settings.</b> Every provider you have connected, each with its own key or sign-in and its own model list, and presets for adding another.</sub>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
       <img src="docs/screenshots/05-install.png" alt="The install page previewing a script fetched from Greasy Fork, with its matches, GM permissions and required library.">
       <sub><b>Installing an outside script.</b> A <code>.user.js</code> link shows what it matches, what it is granted and what it loads, before anything is saved.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/11-model-picker.png" alt="The model picker open under the message box: a filter field, then the models of two connected providers, Anthropic and Ollama, grouped under their names, with Refresh models and Manage providers at the bottom.">
+      <sub><b>Pick the model in the chat.</b> Every connected provider's models, under the message box. Change it mid-conversation and the next turn goes to the new one.</sub>
     </td>
   </tr>
 </table>
@@ -139,7 +144,7 @@ Then in Chrome:
 
 1. Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked**, and pick `.output/chrome-mv3`.
 2. Click **Details** on usermods and turn on **Allow User Scripts**. Chrome requires this toggle for any extension that runs user scripts, including Tampermonkey.
-3. Click the usermods icon to open the side panel **on that tab**. Go to **Settings**, pick a provider, paste a key (or a local server URL), and save.
+3. Click the usermods icon to open the side panel **on that tab**. Go to **Settings**, click a preset under **Add provider**, and paste a key (or a local server URL). It saves as you type. Back in **Chat**, the model is the dropdown under the message box.
 
 ### Where the panel opens
 
@@ -183,6 +188,21 @@ panel reload, and one click finishes the run; the service worker is stopped mid-
 the chat says it was interrupted; and the panel is closed mid-run and reopened while the run is
 still going. "Never a re-run" is asserted from `GET /__requests`: the prompt is in the conversation
 exactly once, the resumed request carries the earlier tool results, and no tool call is made twice.
+
+The models flow (`npm run smoke:models`) is about providers and the in-chat model picker. The mock
+answers on any path prefix and records the endpoint and model of every request, so one port serves
+several "providers" that can be told apart on the wire. The flow seeds a profile in the old
+single-provider shape and checks it was migrated into one connection (key, model and Images setting
+included, once); adds two more providers through Settings; drives the picker from the keyboard alone;
+sends turn 1 to one model and turn 2 to a model on the other endpoint, and asserts from
+`GET /__requests` which endpoint and model each request used, that the first turn's tool call and
+result were carried over, and that the mock's validator found nothing wrong with any request;
+reloads; swaps during a run and watches the running turn finish on the old model while the queued
+message uses the new one; types a model id for a provider that cannot list; removes the chat's
+provider and checks nothing is sent; checks the layout at 320px; and lists models from a mock of the
+ChatGPT Codex backend, which answers 400 without `client_version` exactly as the real one does.
+Every other flow still seeds the old settings shape, so each of them exercises the migration too.
+`npm run smoke:composer` measures the growing message box in a real panel.
 Backoff is shortened for the flow through a `chrome.storage.local` key (`debug:retryPolicy`), which
 only the extension's own contexts can write.
 
@@ -201,6 +221,38 @@ Two wire protocols, any endpoint:
 
 The base URL is always editable. Anything that speaks one of the two protocols will work, so a self-hosted gateway, a corporate proxy, or a model router all drop in.
 
+A preset is a starting point, not a slot: **Add provider** adds to a list, so you can have Anthropic,
+OpenRouter and two different local servers connected at the same time, each with its own name, key,
+Images setting and model list. A provider counts as *connected* once it has what it needs — an API
+key, a sign-in, or a base URL of your own that needs neither — and its status line says which.
+Removing a provider deletes its key from the device.
+
+Upgrading from a build that had a single provider: your provider, base URL, key, model and Images
+setting become the first entry in the list, and the chat keeps using the same model. Nothing to redo.
+
+### Choosing the model in the chat
+
+Under the message box is the model this chat is talking to. Open it and you get every model from
+every connected provider, grouped by provider, with a filter; **Refresh models** asks the providers
+again, and **Manage providers…** goes to Settings. Lists are cached, and refreshed when you open the
+picker if they are a day old.
+
+- **It is per chat.** Each chat remembers its model, across reloads and restarts; a new chat starts
+  on the last model you picked. The dashboard shows each chat's model.
+- **Swap whenever you like.** The next turn goes to the new model with the full conversation —
+  tool calls, tool results, images, and any compaction summary — converted for that provider's
+  protocol. The transcript marks the spot: *switched to claude-sonnet-5 · Anthropic*. What does not
+  travel is another model's private reasoning (OpenAI's encrypted reasoning items): those are only
+  ever sent back to the model that wrote them.
+- **Swapping during a run** applies from the next turn, and the panel says so; the reply in progress
+  finishes on the model it started with. A message queued behind it uses the new one.
+- **An endpoint that cannot list its models** (plenty of local servers) still works: type the model
+  id into the picker's field and choose *Use "…" on* that provider. It is remembered.
+- **If a chat's provider is removed or signed out**, the chat says so under the message box and
+  waits for you to pick another model. It never quietly sends your page to a different provider.
+- Titles and compaction summaries use the chat's model too. The context budget is one setting for
+  every provider, so set it for the smallest context window you use.
+
 ### Using a subscription instead of an API key
 
 Two subscriptions can sign in directly from Settings, with no API key and no local process:
@@ -210,7 +262,7 @@ Two subscriptions can sign in directly from Settings, with no API key and no loc
 | ChatGPT subscription | Plus, Pro, Team | "Sign in with ChatGPT" device code. Opens a page, you type a short code, done. |
 | SuperGrok subscription | SuperGrok, or X Premium+ on the X account you sign in with | xAI's coding-agent OAuth, same device-code flow. |
 
-Both talk to the vendor's Responses API backend that their own coding agents use. Tokens are stored in extension local storage and refreshed automatically. Use **Fetch models** after signing in to see which model ids your plan allows.
+Both talk to the vendor's Responses API backend that their own coding agents use. Tokens are stored in extension local storage and refreshed automatically. The model picker lists the model ids your plan allows once you are signed in (the ChatGPT backend is asked the way the open-source Codex CLI asks it). If a listing fails, a short built-in list is offered instead, marked as such, and you can always type a model id.
 
 Caveats worth knowing:
 
@@ -252,7 +304,7 @@ A sent message shows its thumbnails in the bubble — click one for the full-siz
 it. Attachments belong to the chat they were composed in: switching chats with a half-written
 message and a pending mockup leaves both exactly where you put them.
 
-Attached images go to the model endpoint you configured, the same way page content does. The
+Attached images go to the provider that chat is using, the same way page content does. The
 transcript keeps a small thumbnail so a reopened panel shows it instantly; the full-size copy is
 stored once per chat and deleted with the chat. In the history resent to the model, the two most
 recent turns keep their images and older ones become `[attached image 1 elided]`, exactly as
@@ -272,8 +324,8 @@ to the user message immediately after it, which is what the Responses API backen
 and what every vision-capable OpenAI-compatible endpoint reads correctly.
 
 That leaves the question the protocol cannot answer: **OpenAI-compatible** is whatever endpoint you
-typed in, and plenty of what speaks it has no vision at all. The **Images** setting (that provider
-only) decides what to do about it:
+typed in, and plenty of what speaks it has no vision at all. The **Images** setting — one per
+OpenAI-compatible provider, in its card in Settings — decides what to do about it:
 
 | | |
 |---|---|
@@ -370,7 +422,8 @@ file* and *Migrate from Tampermonkey* are all here too.
 
 **Settings** is the same view the side panel shows, so the dashboard is a complete home: Chats ·
 Mods · Settings. The strip across the top counts what you have, shows whether *Allow User Scripts*
-is on, and names the provider and model in use.
+is on, and names the providers that are connected. Each chat row shows the model that chat uses, and
+the transcript preview marks where it changed.
 
 Anything changed in the side panel shows up here without a reload, and vice versa.
 
@@ -405,7 +458,7 @@ side panel (React)  ──rpc──▶  background service worker  ──▶  LL
 
 - Page content that the model reads is untrusted. The system prompt tells the model to treat it as data, and every generated script is shown to you before it is saved. Read it.
 - Scripts run in an isolated world: they see the DOM but not the page's JavaScript globals. Default `@match` is the current site only.
-- Your API key is stored in extension local storage and sent only to the endpoint you configure.
+- Your API keys are stored in extension local storage, and each is sent only to the provider it belongs to. Removing a provider deletes its key.
 
 Found a vulnerability? Please report it privately through GitHub's **Report a vulnerability** button
 rather than opening an issue. [SECURITY.md](SECURITY.md) has the scope and what to expect.
@@ -415,7 +468,7 @@ rather than opening an issue. [SECURITY.md](SECURITY.md) has the scope and what 
 usermods has no server, no account and no telemetry. The author receives nothing.
 
 To change a page, the model has to see it, so when you send a message usermods sends — **directly
-from your browser to the endpoint you configured, and nowhere else** — your message, the page's
+from your browser to the provider you picked for that chat, and nowhere else** — your message, the page's
 address and title, a pruned copy of its HTML, details of elements it looks up or you point at, and a
 screenshot of the visible tab when the model asks for one. If the page is your mailbox or your bank,
 that content goes too; close the panel on pages you would rather not share. Point usermods at a
