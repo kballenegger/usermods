@@ -1325,10 +1325,15 @@ async function switcherOptions(panel) {
  *
  * So: click, and if the input did not appear, click again. The button is idempotent — it only ever
  * sets rename mode on — so a retry costs nothing and the wait is on the state that matters.
+ *
+ * Located by `data-action`, not by text. Below the chatbar's 520px breakpoint these controls are
+ * icon-only and their names live in a visually-hidden span, so a text locator would be matching
+ * something the harness cannot see and a user cannot click; `hasText: 'Archive'` also matched
+ * UNARCHIVE, which is the opposite button.
  */
 async function startRename(panel, attempts = 3) {
   for (let i = 0; i < attempts; i++) {
-    await panel.locator('.chatbar button.btn', { hasText: 'Rename' }).click({ timeout: 10_000 }).catch(() => {});
+    await panel.locator('.chatbar [data-action="rename"]').click({ timeout: 10_000 }).catch(() => {});
     try {
       await panel.locator('.chatbar input.rename').waitFor({ timeout: 3000 });
       return;
@@ -1402,7 +1407,7 @@ async function chatsFlow() {
     if (stored.length !== 1) fail(`an unsent New chat was persisted: the index holds ${stored.length} chats`);
 
     // --- 5. Archiving takes it out of the default view, into an Archived group.
-    const archiveBtn = panel.locator('.chatbar button.btn', { hasText: 'Archive' });
+    const archiveBtn = panel.locator('.chatbar [data-action="archive"]');
     if (!(await archiveBtn.count())) fail('the switcher had no Archive button');
     await archiveBtn.click();
     await panel.waitForTimeout(600);
@@ -1430,8 +1435,8 @@ async function chatsFlow() {
     await panel.waitForTimeout(1200);
     const openedUser = await panel.locator('.messages .msg.user').first().textContent();
     if (!openedUser?.includes(PROMPT)) fail(`selecting the archived chat did not open its transcript (got ${JSON.stringify(openedUser)})`);
-    if (!(await panel.locator('.chatbar button.btn', { hasText: 'Unarchive' }).count())) fail('an open archived chat offered no Unarchive button');
-    if (!(await panel.locator('.chatbar button.btn.danger', { hasText: 'Delete' }).count())) fail('an open archived chat offered no Delete button');
+    if (!(await panel.locator('.chatbar [data-action="unarchive"]').count())) fail('an open archived chat offered no Unarchive button');
+    if (!(await panel.locator('.chatbar [data-action="delete"].danger').count())) fail('an open archived chat offered no Delete button');
 
     // --- 7. Renaming by hand: the select becomes an input, Escape abandons it, Enter commits.
     const MY_NAME = 'Kingfisher reading layout';
@@ -1457,7 +1462,7 @@ async function chatsFlow() {
     await panel.locator('textarea').fill('and dim the images a little');
     await panel.locator('.composer button.btn.primary').click();
     await panel.waitForTimeout(1500);
-    await panel.locator('.chatbar button.btn', { hasText: 'Archive' }).waitFor({ timeout: 20_000 }).catch(() => {});
+    await panel.locator('.chatbar [data-action="archive"]').waitFor({ timeout: 20_000 }).catch(() => {});
     // Long enough for a title call to have landed, had the chat been eligible for one.
     await panel.waitForTimeout(3000);
     await reopenPanel(panel);

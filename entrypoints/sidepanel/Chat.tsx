@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Activity } from './Activity';
 import { IDLE_ACTIVITY, activityFromEvent, allDisconnected, withActivity, withoutActivity, type ChatActivity } from '@/lib/activity';
 import { archivedChats, isArchived, liveChats, loadItems, pickChatToShow, relativeTime, saveItems, titleFromText, type Chat as ChatRecord } from '@/lib/chats';
+import { ArchiveIcon, DeleteIcon, RenameIcon, UnarchiveIcon } from './components/icons';
 import { HANDOFF_KEY, resolveHandoff, type ChatHandoff } from '@/lib/dashboard';
 import { findByName } from '@/lib/modmatch';
 import { modFromProposal } from '@/lib/mods';
@@ -10,28 +11,6 @@ import { RECONNECT_NOTE, looksUnfinished, reduceItems, toolDotClass, toolDotStat
 import type { AgentEvent, ChatItem, ContentEvent, ElementRef, Mod, ModProposal } from '@/lib/types';
 
 const SAVE_DEBOUNCE_MS = 400;
-
-/**
- * A chatbar action label that can give up its tail when the bar is narrow.
- *
- * The switcher's <select> has to carry a chat title, and the two actions beside it were eating the
- * width it needed — "Full-width Wikipedia articles · n" truncated mid-word at the default side
- * panel size. The actions are the part that can afford to lose characters: RENAME and ARCHIVE are
- * still unmistakable as REN and ARCH next to a chat you are already looking at.
- *
- * The tail is CLIPPED rather than removed, exactly as the top bar's `.tab-action-label` is, so the
- * full word stays in the DOM: `title` and the accessibility tree keep it, and the smoke suite's
- * `hasText: 'Archive'` locators keep matching, because `display: none` would take the text out of
- * both. Above the chatbar's container breakpoint the tail comes back and the labels are whole.
- */
-function ActionLabel({ head, tail }: { head: string; tail: string }) {
-  return (
-    <>
-      {head}
-      <span className="action-tail">{tail}</span>
-    </>
-  );
-}
 
 export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: string; host: string }) {
   const [chats, setChats] = useState<ChatRecord[]>([]);
@@ -705,23 +684,55 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
           )}
           {renaming !== null ? (
             // Mousedown, not click: the input's blur would close rename mode before a click landed.
-            <button className="btn primary" onMouseDown={(e) => e.preventDefault()} onClick={() => void commitRename()} title="Save this name">Save</button>
+            <button className="btn primary" data-action="save-name" onMouseDown={(e) => e.preventDefault()} onClick={() => void commitRename()} title="Save this name">Save</button>
           ) : (
-            <button className="btn" onClick={startRename} disabled={!chatId} title="Give this chat your own name. It will not be renamed automatically afterwards.">
-              <ActionLabel head="Ren" tail="ame" />
+            <button
+              className="btn action"
+              data-action="rename"
+              onClick={startRename}
+              disabled={!chatId}
+              aria-label="Rename"
+              title="Give this chat your own name. It will not be renamed automatically afterwards."
+            >
+              <RenameIcon />
+              <span className="action-label">Rename</span>
             </button>
           )}
           {renaming !== null ? null : viewingArchived ? (
             <>
-              <button className="btn" onClick={() => void setArchived(chatId!, false)} title="Move this chat back to the main list">
-                <ActionLabel head="Unarch" tail="ive" />
+              <button
+                className="btn action"
+                data-action="unarchive"
+                onClick={() => void setArchived(chatId!, false)}
+                aria-label="Unarchive"
+                title="Move this chat back to the main list"
+              >
+                <UnarchiveIcon />
+                <span className="action-label">Unarchive</span>
               </button>
-              <button className="btn danger" onClick={() => void removeChat()} title="Delete this chat for good">Delete</button>
+              <button
+                className="btn action danger"
+                data-action="delete"
+                onClick={() => void removeChat()}
+                aria-label="Delete"
+                title="Delete this chat for good"
+              >
+                <DeleteIcon />
+                <span className="action-label">Delete</span>
+              </button>
             </>
           ) : (
             // Archive is reversible, so it stays a secondary button; coral is kept for Delete.
-            <button className="btn" onClick={() => void setArchived(chatId!, true)} disabled={!chatId} title="Archive this chat: it moves to the Archived group and stops opening by default">
-              <ActionLabel head="Arch" tail="ive" />
+            <button
+              className="btn action"
+              data-action="archive"
+              onClick={() => void setArchived(chatId!, true)}
+              disabled={!chatId}
+              aria-label="Archive"
+              title="Archive this chat: it moves to the Archived group and stops opening by default"
+            >
+              <ArchiveIcon />
+              <span className="action-label">Archive</span>
             </button>
           )}
         </div>

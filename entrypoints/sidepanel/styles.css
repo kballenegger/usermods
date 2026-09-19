@@ -331,8 +331,9 @@ button.pill,
  * The select gets the slack, and the buttons never take any.
  *
  * `flex: 1 1 auto` alone was not enough: the buttons' own content width still won, so a long chat
- * title ellipsised while RENAME and ARCHIVE sat at their full intrinsic size. `flex: none` on the
- * actions states the priority outright — the title is the content, the actions are chrome.
+ * title ellipsised while the actions sat at their full intrinsic size. `flex: none` on the actions
+ * states the priority outright — the title is the content, the actions are chrome. Below the
+ * breakpoint they are three 28px squares, so what they take is a constant the title can plan for.
  */
 .chatbar select {
   flex: 1 1 auto;
@@ -353,12 +354,73 @@ button.pill,
 }
 
 /*
- * Narrow is the default: the tail is clipped to a 1px box, the way the top bar hides its action
- * labels, so the word survives in the accessibility tree and in every text-matching locator while
- * giving its pixels back to the title. `display: none` would take the text out along with the
- * pixels, which is exactly what must not happen here.
+ * The switcher's actions: the same family as the top bar's right-hand controls.
+ *
+ * They used to clip their own labels to "REN" and "ARCH" when the bar was narrow. That gave the
+ * title its pixels back, but an abbreviation is a word you have to decode, and at 11px uppercase
+ * "ARCH" beside a chat title is genuinely hard to read. So the narrow state drops the word
+ * altogether and shows a mark instead — which is the pattern the top bar already established two
+ * rows above this one, at the same 520px breakpoint.
+ *
+ * Matching it means matching it exactly: 28px box, --border-control outline, the same hover, the
+ * same global focus ring. Everything below is the `.tabs button.tab-action` rule with the same
+ * values, not similar ones, so the two bars cannot drift apart.
  */
-.chatbar .btn .action-tail {
+.chatbar .btn.action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-1);
+  min-width: 28px;
+  min-height: 28px;
+  padding: var(--sp-1) var(--sp-2);
+  border: var(--border-width) solid var(--border-control);
+  border-radius: var(--r-field);
+  background: none;
+  font-size: var(--fs-label);
+  line-height: 1;
+  color: var(--text-2);
+  /* Same properties as the family it joins, so hover arrives at the same speed in both bars. */
+  transition: color 120ms ease, background 120ms ease, border-color 120ms ease;
+  box-shadow: none;
+}
+
+.chatbar .btn.action:hover:not(:disabled) {
+  color: var(--primary-text);
+  border-color: var(--primary);
+  background: var(--surface-2);
+}
+
+/* Delete keeps coral: it is the one destructive control in the bar, and that has to survive the
+   move to an icon, where there is no word left to warn anybody. */
+.chatbar .btn.action.danger {
+  color: var(--error-text);
+  border-color: var(--error);
+}
+
+.chatbar .btn.action.danger:hover:not(:disabled) {
+  color: var(--error-text);
+  border-color: var(--error);
+  background: var(--surface-2);
+}
+
+/* The mark rides the text colour, so every state above moves it with the label. */
+.chatbar .btn.action .ico {
+  flex: none;
+  display: block;
+}
+
+/*
+ * Narrow is the default, and the label is hidden the visually-hidden way — clipped to a 1px box,
+ * never `display: none`, which would take the name out of the accessibility tree too. The word is
+ * WHOLE in there: "Rename", "Archive", "Unarchive", "Delete", never a stem. Nothing in this panel
+ * abbreviates a label any more.
+ *
+ * Revealed above the breakpoint rather than hidden below it, for the same reason the top bar does
+ * it that way: an engine without container queries then keeps the compact bar, which fits
+ * everywhere, instead of the wide one, which does not.
+ */
+.chatbar .btn.action .action-label {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -371,11 +433,11 @@ button.pill,
 }
 
 @container chatbar (min-width: 520px) {
-  .chatbar .btn {
-    padding: 6px 11px;
+  .chatbar .btn.action {
+    padding: var(--sp-1) var(--sp-3);
   }
 
-  .chatbar .btn .action-tail {
+  .chatbar .btn.action .action-label {
     position: static;
     width: auto;
     height: auto;
