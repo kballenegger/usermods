@@ -65,7 +65,19 @@ export type RpcRequest =
    * uses (header re-parsed, dependencies resolved), so a chat never accumulates copies of its own
    * mod. A linked mod that has since been deleted falls back to creating a new one, and says so.
    */
-  | { type: 'artifact.save'; chatId: string }
+  | { type: 'artifact.save'; chatId: string; overwriteModId?: string }
+  /**
+   * Break the draft's link to its mod, so the next Save creates a separate one — the panel's
+   * "Save as a new mod instead". The mod itself is untouched and goes on running.
+   */
+  | { type: 'artifact.detach'; chatId: string }
+  /**
+   * Bring an installed mod into a chat to edit it. One request behind every entry point: the Mods
+   * tab's row, the dashboard's row, a new chat's empty state and the composer's picker. It reuses
+   * the chat already editing that mod (unarchiving it), seeds the current chat when it is empty, or
+   * makes a new one — never over an unsaved draft.
+   */
+  | { type: 'mods.edit'; modId: string; currentChatId?: string; host: string }
   | { type: 'oauth.status'; kind: OAuthKind }
   | { type: 'oauth.start'; kind: OAuthKind }
   | { type: 'oauth.poll'; kind: OAuthKind }
@@ -106,7 +118,26 @@ interface RpcResults {
   'artifact.get': Artifact | null;
   'artifact.rollback': Artifact;
   'artifact.rename': Artifact;
-  'artifact.save': { artifact: Artifact; mod: Mod; created: boolean; relinked: boolean };
+  /**
+   * Either the save that happened, or — for an unlinked draft whose name and reach match a mod that
+   * already exists — the question of which the user meant. See saveArtifactAsMod's duplicate guard.
+   */
+  'artifact.save': { artifact: Artifact; mod: Mod; created: boolean; relinked: boolean } | { duplicate: { id: string; name: string } };
+  'artifact.detach': Artifact;
+  'mods.edit': {
+    chatId: string;
+    /** The host that chat lives under, which is what a side-panel handoff has to be addressed to. */
+    host: string;
+    created: boolean;
+    reused: boolean;
+    unarchived: boolean;
+    mod: Mod;
+    artifact: Artifact;
+    /** Whether the mod's patterns cover the tab the user is on. */
+    runsHere: boolean;
+    /** A page it plainly does run on, when one falls out of a simple pattern; '' otherwise. */
+    likelyUrl: string;
+  };
   'agent.attach': AgentAttachState;
 }
 

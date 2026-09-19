@@ -28,9 +28,11 @@ export function ArtifactPanel({
   onSelect,
   onTry,
   onSave,
+  onDetach,
   onExport,
   onRename,
   onRollback,
+  editingModName,
   openDashboard,
 }: {
   artifact: Artifact;
@@ -43,9 +45,17 @@ export function ArtifactPanel({
   onSelect: (n: number) => void;
   onTry: () => void | Promise<void>;
   onSave: () => void | Promise<void>;
+  /** Break the link to the installed mod, so the next Save creates a separate one. */
+  onDetach: () => void | Promise<void>;
   onExport: () => void;
   onRename: (name: string) => void | Promise<void>;
   onRollback: (n: number) => void | Promise<void>;
+  /**
+   * The name of the mod this draft is an edit of, resolved from the live mod list by the caller.
+   * Empty when the draft is linked to a mod that has since been deleted, which is why the panel
+   * tests THIS rather than `artifact.linkedModId` before claiming to be editing something.
+   */
+  editingModName?: string;
   openDashboard: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -53,6 +63,8 @@ export function ArtifactPanel({
   /** The draft name while it is being edited inline, or null when it is a heading again. */
   const [renaming, setRenaming] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  /** True once the user has asked to detach and been shown what it does. */
+  const [detaching, setDetaching] = useState(false);
   const renameRef = useRef<HTMLInputElement>(null);
 
   const current = currentVersion(artifact);
@@ -120,7 +132,13 @@ export function ArtifactPanel({
             className="btn primary"
             onClick={() => void onSave()}
             disabled={busy}
-            title={artifact.linkedModId ? 'Write this version over the mod this chat created' : 'Save this draft as a mod and enable it'}
+            title={
+              editingModName
+                ? `Write this version over “${editingModName}”, the installed mod this chat is editing`
+                : artifact.linkedModId
+                  ? 'Write this version over the mod this chat created'
+                  : 'Save this draft as a mod and enable it'
+            }
             data-testid="artifact-save"
           >
             {saveLabel}
@@ -136,6 +154,52 @@ export function ArtifactPanel({
           </button>
         </div>
       </div>
+
+      {/* What this draft IS, when it is an edit of something already installed.
+          It sits under the bar rather than inside the body, because it changes what every button
+          above it means — Save writes over a mod that is running on people's pages right now — and
+          a panel that only admits that when you expand it is a panel that lets you do it by
+          accident. One line, collapsed or not. */}
+      {editingModName && (
+        <div className="artifact-editing" data-testid="artifact-editing">
+          <span className="artifact-editing-label">Editing</span>
+          <span className="artifact-editing-name" title={editingModName}>
+            {editingModName}
+          </span>
+          <span className="grow" />
+          {detaching ? (
+            <>
+              <span className="muted" data-testid="artifact-detach-explain">
+                Saving will create a new mod. “{editingModName}” stays installed and unchanged.
+              </span>
+              <button
+                className="btn"
+                onClick={() => {
+                  setDetaching(false);
+                  void onDetach();
+                }}
+                disabled={busy}
+                data-testid="artifact-detach-confirm"
+              >
+                Detach
+              </button>
+              <button className="linklike" onClick={() => setDetaching(false)} data-testid="artifact-detach-cancel">
+                Cancel
+              </button>
+            </>
+          ) : (
+            <button
+              className="linklike"
+              onClick={() => setDetaching(true)}
+              disabled={busy}
+              title={`Stop editing “${editingModName}”. The next Save creates a separate mod and leaves that one alone.`}
+              data-testid="artifact-detach"
+            >
+              Save as a new mod instead
+            </button>
+          )}
+        </div>
+      )}
 
       {open && (
         <div className="artifact-body" data-testid="artifact-body">
@@ -269,7 +333,7 @@ export function ArtifactPanel({
             </button>
             {artifact.linkedModId && (
               <span className="muted artifact-linked" data-testid="artifact-linked">
-                saved · updates in place
+                {editingModName ? `saved · updates “${editingModName}” in place` : 'saved · updates in place'}
               </span>
             )}
           </div>

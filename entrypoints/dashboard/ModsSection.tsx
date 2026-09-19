@@ -25,6 +25,7 @@ export function ModsSection({
   onChanged,
   origins = new Map(),
   onOpenChat,
+  onEditMod,
 }: {
   mods: Mod[];
   loaded: boolean;
@@ -32,6 +33,8 @@ export function ModsSection({
   /** Which chat each mod came from, by mod id (lib/dashboard modOrigins). */
   origins?: Map<string, { chat: Chat; versions: number }>;
   onOpenChat?: (chat: Chat) => void;
+  /** Open this mod in a chat on its own page, with the side panel pointed at it. */
+  onEditMod?: (mod: Mod) => void;
 }) {
   const [filter, setFilter] = useState<ModFilter>({ site: '', enabled: 'all', query: '' });
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -202,6 +205,7 @@ export function ModsSection({
                   })
                 }
                 onToggle={() => void toggle(m)}
+                onEdit={onEditMod ? () => onEditMod(m) : undefined}
                 onExport={() => exportOne(m)}
                 onUpdate={() => void update(m)}
                 onDelete={() => void remove(m)}
@@ -238,6 +242,7 @@ function ModRow({
   onOpen,
   onToggleSelect,
   onToggle,
+  onEdit,
   onExport,
   onUpdate,
   onDelete,
@@ -251,6 +256,8 @@ function ModRow({
   onOpen: () => void;
   onToggleSelect: () => void;
   onToggle: () => void;
+  /** Open this mod in a chat. Absent when the page cannot do the handoff. */
+  onEdit?: () => void;
   onExport: () => void;
   onUpdate: () => void;
   onDelete: () => void;
@@ -328,6 +335,14 @@ function ModRow({
         <label className="muted" style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: 11 }}>
           <input type="checkbox" checked={mod.enabled} onChange={onToggle} data-testid="mod-toggle" /> on
         </label>
+        {/* The primary verb on a mod row, because it is the one that leads somewhere rather than
+            producing a file: it opens the mod in a chat on its own page. The others stay plain
+            pills, and this one keeps the same shape so the row does not grow a hero. */}
+        {onEdit && (
+          <button className="pill" onClick={onEdit} aria-label={`Edit “${mod.name}” in chat`} title={`Open “${mod.name}” in a chat on its page and keep building on it`} data-testid="mod-edit-in-chat">
+            Edit in chat
+          </button>
+        )}
         <button className="pill" onClick={onExport} data-testid="mod-export">
           Export
         </button>

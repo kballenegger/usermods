@@ -670,7 +670,165 @@ const ARTIFACT_SCRIPTS = [
   },
 ];
 
-SCRIPTS.push(WAIT_SCRIPT, WAIT_STOP_SCRIPT, ...ARTIFACT_SCRIPTS, visionScript('vision-sighted', VISION.sighted), visionScript('vision-blind', VISION.blind));
+// ---------------------------------------------------------------------------
+// The edit-a-mod flow (screenshots.mjs --editmod).
+//
+// The owner's report: there is no easy way to keep adding to a mod. Everything below is a scripted
+// model playing the three directions that answer it.
+//
+// The script under edit is an IMPORTED userscript with a real metadata block — @require, @grant,
+// @connect, @run-at, a @version the Update button compares against — because that is the case the
+// draft's kept-header machinery exists for, and the case a generated header would silently destroy.
+// Every propose_mod here carries ONLY a body and four fields, exactly as a real model's does, so
+// the flow's assertion that the block survived is an assertion about the product and not about the
+// mock being careful.
+// ---------------------------------------------------------------------------
+
+/** The edit flow's marker, so its transcript is identifiable the way the others are. */
+export const EDITMOD_MARKER = 'EDITMODMARKER-3b9f';
+
+/**
+ * The imported userscript the flow installs and then edits.
+ *
+ * A function of the base URL because its @require must resolve: installing a userscript fetches its
+ * dependencies, so a dead @require is an install failure rather than a test fixture. The library is
+ * served by this same server (/__fixture/kingfisher-lib.js), which also lets the flow assert that
+ * the FETCHED BODY is still attached after an edit — a stronger claim than the @require line
+ * surviving.
+ */
+export function editModSource(baseUrl) {
+  return `// ==UserScript==
+// @name        Kingfisher Notes
+// @namespace   https://example.org/usermods
+// @description Adds a notes box to kingfisher articles.
+// @version     2.4.1
+// @match       *://*.wikipedia.org/wiki/*
+// @require     ${baseUrl}/__fixture/kingfisher-lib.js
+// @grant       GM_setValue
+// @grant       GM_getValue
+// @connect     api.example.org
+// @run-at      document-end
+// ==/UserScript==
+
+GM_setValue('installed', true);
+document.documentElement.dataset.kingfisherNotes = 'v1';`;
+}
+
+/** The body of the first revision: the model keeps what was there and adds one line. */
+export const EDITMOD_V2 = `GM_setValue('installed', true);
+document.documentElement.dataset.kingfisherNotes = 'v2';
+document.documentElement.dataset.kingfisherExtra = 'added-by-chat';`;
+
+/**
+ * The body the SECOND chat proposes, after finding the mod on the page and opening it.
+ *
+ * It has to differ from what that mod already holds (EDITMOD_V2), or addVersion dedupes it — a
+ * model re-proposing the script that is already installed is not a new version, by design. So this
+ * is a real further change, which is also what the scenario is about: a fresh chat picking up an
+ * existing mod and adding to it rather than starting a second one.
+ */
+export const EDITMOD_V2B = `GM_setValue('installed', true);
+document.documentElement.dataset.kingfisherNotes = 'v2';
+document.documentElement.dataset.kingfisherExtra = 'added-by-chat';
+document.documentElement.dataset.kingfisherMarked = 'yes';`;
+
+/** The body of the revision proposed after a detach, which becomes a SEPARATE mod. */
+export const EDITMOD_V3 = `GM_setValue('installed', true);
+document.documentElement.dataset.kingfisherNotes = 'v3-detached';`;
+
+const EDITMOD_NAME = 'Kingfisher Notes';
+const EDITMOD_MATCHES = ['*://*.wikipedia.org/wiki/*'];
+
+/** propose_mod arguments for one revision: a body and four fields, and no header. */
+function editModProposal(code, name = EDITMOD_NAME) {
+  return {
+    name,
+    description: 'Adds a notes box to kingfisher articles.',
+    matches: EDITMOD_MATCHES,
+    untested_reason: 'chrome.userScripts is unavailable in this automated profile',
+    code,
+  };
+}
+
+export const EDITMOD_PROMPTS = {
+  /** Sent in a chat that was seeded from the mod by "Edit in chat": the draft is already there. */
+  revise: 'add a second data attribute to the notes box',
+  /** Sent in a BRAND-NEW chat: the model has to notice the mod in the page list and open it. */
+  fromScratch: 'also mark the article as having notes',
+  /** Sent after the user detached: the same shape of request, but it must become its own mod. */
+  afterDetach: 'now make it say v3-detached instead',
+};
+
+const EDITMOD_SCRIPTS = [
+  {
+    // The seeded chat. The draft block already carries the mod, so no open_mod is needed — the
+    // model edits what it was handed, which is the behaviour the draft block's "you are EDITING an
+    // installed mod" lines are for.
+    name: 'editmod-revise',
+    match: /add a second data attribute to the notes box/i,
+    steps: [
+      {
+        text: `${EDITMOD_MARKER} the draft is the installed mod, so I will keep everything it does and add the attribute.`,
+        calls: [{ name: 'propose_mod', args: editModProposal(EDITMOD_V2) }],
+      },
+    ],
+  },
+  {
+    // The brand-new chat. Two steps on purpose: open_mod first (which is the whole point — the
+    // model saw the mod in the page list and picked it up rather than writing a second one), then
+    // the revision. A one-step script would prove nothing about open_mod.
+    name: 'editmod-open',
+    match: /also mark the article as having notes/i,
+    steps: [
+      {
+        text: `${EDITMOD_MARKER} there is already a mod for this on the page. Opening it rather than writing a second one.`,
+        calls: [{ name: 'open_mod', args: { mod_id: '__EDITMOD_ID__' } }],
+      },
+      {
+        text: `${EDITMOD_MARKER} read it. Adding the attribute and keeping the rest.`,
+        calls: [{ name: 'propose_mod', args: editModProposal(EDITMOD_V2B) }],
+      },
+    ],
+  },
+  {
+    name: 'editmod-detached',
+    match: /now make it say v3-detached instead/i,
+    steps: [
+      {
+        text: `${EDITMOD_MARKER} here is that change.`,
+        calls: [{ name: 'propose_mod', args: editModProposal(EDITMOD_V3) }],
+      },
+    ],
+  },
+];
+
+/**
+ * The mod id the `editmod-open` script passes to open_mod.
+ *
+ * A mod's id is a UUID minted at install time, so the script cannot hold it: the flow installs the
+ * mod, reads the id out of storage, and POSTs it here before sending the message that triggers the
+ * script. That is honest in the way that matters — the model is still choosing an id it was shown
+ * in the page list, and the flow's assertion is that the LIST carried that id at all.
+ */
+let editModId = '';
+export function setEditModId(id) {
+  editModId = id;
+}
+
+/** Substitute the live mod id into a scripted open_mod call. */
+function resolveArgs(args) {
+  if (args?.mod_id === '__EDITMOD_ID__') return { ...args, mod_id: editModId };
+  return args;
+}
+
+SCRIPTS.push(
+  WAIT_SCRIPT,
+  WAIT_STOP_SCRIPT,
+  ...ARTIFACT_SCRIPTS,
+  ...EDITMOD_SCRIPTS,
+  visionScript('vision-sighted', VISION.sighted),
+  visionScript('vision-blind', VISION.blind),
+);
 
 /** The fixture page the wait flow drives. Served by this server so the flow needs no live site. */
 const ASYNC_FIXTURE = `<!doctype html>
@@ -1317,7 +1475,9 @@ async function streamStep(res, step, model, { slowFirstByte = false, dropAfterCh
 
   const calls = step.calls ?? [];
   calls.forEach((call, index) => {
-    const args = JSON.stringify(call.args ?? {});
+    // resolveArgs substitutes anything the script could not know at authoring time — today only the
+    // edit-a-mod flow's live mod id, which is a UUID minted at install.
+    const args = JSON.stringify(resolveArgs(call.args ?? {}));
     // The adapter accumulates name and arguments across deltas, so split them to exercise that.
     chunk({ tool_calls: [{ index, id: `call_${index}_${Date.now()}`, type: 'function', function: { name: call.name, arguments: '' } }] });
     for (const part of chunkString(args, 96)) {
@@ -1407,6 +1567,29 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  /**
+   * The live mod id the edit-a-mod flow's `open_mod` call should carry.
+   *
+   * A mod's id is a UUID minted at install, so a static script cannot hold one. The flow installs
+   * the mod, reads the id out of chrome.storage, and POSTs it here before sending the message that
+   * runs the script. Nothing else in the mock needs this, which is why it is one endpoint and one
+   * variable rather than a general templating mechanism.
+   */
+  if (url.pathname === '/__editmod') {
+    if (req.method === 'POST') {
+      try {
+        setEditModId(String(JSON.parse(await readBody(req)).modId ?? ''));
+      } catch {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: { message: 'bad mod id' } }));
+        return;
+      }
+    }
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ modId: editModId }));
+    return;
+  }
+
   // The recorded request log, for the isolation flow's cross-conversation assertions.
   if (url.pathname === '/__requests') {
     if (req.method === 'DELETE') {
@@ -1436,6 +1619,20 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname === '/__fixture/async.html') {
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
     res.end(ASYNC_FIXTURE);
+    return;
+  }
+
+  /**
+   * The @require library the edit-a-mod flow's fixture userscript loads.
+   *
+   * It is served rather than pointed at a dead URL because installing a userscript FETCHES its
+   * dependencies — a @require that will not load is an install failure, by design. Serving a real
+   * one also makes the round-trip assertion stronger: the flow can check that the fetched body is
+   * still attached to the mod after an edit, not merely that the @require line survived.
+   */
+  if (url.pathname === '/__fixture/kingfisher-lib.js') {
+    res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' });
+    res.end('window.__kingfisherLib = { version: 1 };\n');
     return;
   }
 

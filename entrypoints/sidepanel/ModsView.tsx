@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { summarizeImport } from '@/lib/importreport';
 import { rpc } from '@/lib/rpc';
 import type { Mod, ScriptPreview } from '@/lib/types';
+import { HANDOFF_KEY, type ChatHandoff } from '@/lib/dashboard';
 import { urlMatches } from '@/lib/mods';
+import { EditModIcon } from './components/icons';
 import { InstallPreview } from './components/InstallPreview';
 import { TampermonkeyCard } from './components/TampermonkeyCard';
 
@@ -12,7 +14,7 @@ interface Pending {
   downloadUrl?: string;
 }
 
-export function ModsView({ tabId, pageUrl }: { tabId: number | null; pageUrl: string }) {
+export function ModsView({ tabId, pageUrl, host, onEditInChat }: { tabId: number | null; pageUrl: string; host: string; onEditInChat: () => void }) {
   const [mods, setMods] = useState<Mod[]>([]);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
@@ -39,6 +41,37 @@ export function ModsView({ tabId, pageUrl }: { tabId: number | null; pageUrl: st
     const r = await rpc({ type: 'mods.try', tabId, modId: m.id });
     if (!r.ok) alert(r.error);
   }
+  /**
+   * Open a mod in a chat and go there — the Mods tab's half of "Edit in chat".
+   *
+   * The decision of WHICH chat is the background's (rpc 'mods.edit'), the same one the dashboard's
+   * row, the empty state's shortcuts, the composer's picker and the open_mod tool all go through:
+   * reuse the chat already editing this mod, seed the current chat if it is empty, otherwise make a
+   * new one. All this view does is ask, and then hand over to the Chat tab, which reads the handoff
+   * and lands on the chat the background chose.
+   */
+  async function editInChat(m: Mod) {
+    setError('');
+    setStatus('');
+    try {
+      const r = await rpc({ type: 'mods.edit', modId: m.id, host });
+      // The same session-storage handoff the dashboard's Open uses, so the Chat tab opens the chat
+      // the background chose rather than whichever one this host last used.
+      const handoff: ChatHandoff = { chatId: r.chatId, host: r.host, at: Date.now() };
+      await chrome.storage.session.set({ [HANDOFF_KEY]: handoff }).catch(() => {});
+      // A mod for another site lands its chat under THAT host, and the Chat tab only shows the host
+      // the current page is on — so switching tabs would show the wrong chat and silently drop the
+      // handoff. Saying so beats a tab switch that appears to have done nothing.
+      if (r.host && r.host !== host) {
+        setStatus(`“${m.name}” is for ${r.host}. Its chat is ready — open ${r.likelyUrl || r.host} and the panel will land on it.`);
+        return;
+      }
+      onEditInChat();
+    } catch (e) {
+      fail(e);
+    }
+  }
+
   function exportMod(m: Mod) {
     const blob = new Blob([m.source], { type: 'text/javascript' });
     const a = document.createElement('a');
@@ -109,7 +142,7 @@ export function ModsView({ tabId, pageUrl }: { tabId: number | null; pageUrl: st
 
   const here = mods.filter((m) => pageUrl && urlMatches(pageUrl, [...m.matches, ...m.includeGlobs]));
   const elsewhere = mods.filter((m) => !here.includes(m));
-  const cardProps = { onToggle: toggle, onRemove: remove, onTry: tryNow, onExport: exportMod, onUpdate: update };
+  const cardProps = { onToggle: toggle, onRemove: remove, onTry: tryNow, onExport: exportMod, onUpdate: update, onEdit: (m: Mod) => void editInChat(m) };
 
   return (
     <div className="view stack">
@@ -175,6 +208,7 @@ function ModCard({
   onTry,
   onExport,
   onUpdate,
+  onEdit,
 }: {
   m: Mod;
   onToggle: (m: Mod) => void;
@@ -182,6 +216,7 @@ function ModCard({
   onTry: (m: Mod) => void;
   onExport: (m: Mod) => void;
   onUpdate: (m: Mod) => void;
+  onEdit: (m: Mod) => void;
 }) {
   // An enabled mod is alive: the toggle at the foot of the card carries the volt. A disabled one
   // recedes rather than being decorated with an "off" marker. How it recedes is the theme's
@@ -212,6 +247,20 @@ function ModCard({
           <input type="checkbox" checked={m.enabled} onChange={() => onToggle(m)} /> {m.enabled ? 'on' : 'off'}
         </label>
         <span className="grow" />
+        {/* First of the verbs, and the only one carrying an icon: it is the thing this row is for
+            now, and it leaves the panel for the Chat tab, which the mark says before the word is
+            read. Its accessible name is the full sentence, not "Edit". */}
+        <button
+          className="btn action"
+          onClick={() => onEdit(m)}
+          aria-label={`Edit “${m.name}” in chat`}
+          title={`Open “${m.name}” in a chat and keep building on it`}
+          data-testid="mod-edit-in-chat"
+          data-mod-id={m.id}
+        >
+          <EditModIcon />
+          <span className="action-label">Edit in chat</span>
+        </button>
         <button className="btn" onClick={() => onTry(m)}>Run once</button>
         <button className="btn" onClick={() => onExport(m)}>Export</button>
         {m.downloadUrl && <button className="btn" onClick={() => onUpdate(m)}>Update</button>}
