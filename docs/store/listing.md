@@ -12,10 +12,23 @@ dashboard. Companion files: [permissions.md](permissions.md) for the reviewer ju
 usermods — userscripts by chat
 ```
 
-(The store caps the item name at 30 characters; this is exactly 30. A plain `usermods` also works if
-a shorter name is preferred.)
+30 characters. The item name is **not a dashboard field**: the store takes it from the manifest's
+`name`, so changing it means changing `wxt.config.ts` and rebuilding, not editing the listing.
 
-## Summary (132 characters max)
+The manifest `name` limit is **75 characters**, universal across locales since February 2024 (it
+was 45 for English before that). This file previously said the cap was 30 — that was wrong, and
+nothing was being cut off; 30 is simply the length this title happens to be.
+
+That matters only if a longer name is ever wanted: there is room. What there is *not* room for is
+the store's display truncation, which is a separate thing from the limit and kicks in well before
+75 characters in listing tiles and search results. Keeping the name short is still the right call,
+so this stays as it is. A plain `usermods` also works if a shorter name is preferred.
+
+**The manifest currently ships `name: "usermods"`, not this title.** Decide before submitting which
+one the store should show, and if it is this one, change `manifest.name` in `wxt.config.ts` and
+rebuild — see the note in [submission.md](submission.md#title).
+
+## Summary (132 characters max — confirmed against the current docs)
 
 ```
 Customize any website by chatting with the AI of your choice: it reads the page, writes a userscript, runs it on every visit.
@@ -36,6 +49,11 @@ English (United States).
 ---
 
 ## Detailed description
+
+3,136 characters. Google publishes no numeric limit for this field — the "Creating a great listing
+page" doc only asks for something "concise, informative, and accurate, using more than just one
+sentence" — and the widely repeated 16,000-character figure appears nowhere in the current docs.
+This description is far short of any limit the field could plausibly have, so it is not a concern.
 
 ```
 Every website has that one thing. The sidebar you never use, the banner that comes back every visit,
@@ -150,9 +168,14 @@ Paste the single-purpose statement from [permissions.md](permissions.md#single-p
 ## Permission justifications
 
 Paste the corresponding paragraph from [permissions.md](permissions.md#permission-justifications)
-into each permission's field. The dashboard lists one field per permission in the manifest
-(`sidePanel`, `storage`, `scripting`, `tabs`, `userScripts`, `declarativeNetRequest`) plus one for
-host permissions.
+into each permission's field. The dashboard generates one field per permission declared in the
+manifest — here `sidePanel`, `storage`, `scripting`, `tabs`, `userScripts`,
+`declarativeNetRequest` — plus one for host permissions.
+
+The published docs describe this only as a single "Permissions justification" section with "a field
+for you to state the justification for each permission", and do not confirm in text whether host
+permissions get their own separate field or are folded into the same list. `permissions.md` has a
+paragraph written for each of the seven either way, so the answer does not change what gets pasted.
 
 ## Remote code
 
