@@ -502,6 +502,38 @@ Diff lines are tinted **and** signed: the `+` and `-` are part of the text, so a
 survive a colour-vision deficiency and a greyscale screenshot, which the live and error tints alone
 would not.
 
+### The editing line, the picker, the duplicate question
+Three surfaces that arrived with *edit an installed mod*, and they share one rule: each is a **row of
+the chat column** (`flex: none`, between the transcript and the composer), never a modal and never an
+item inside `.messages`. A 420px panel has no room for a dialog that dims what it covers, and
+anything that lives in the transcript moves the message you are reading when it appears.
+
+**Editing &lt;mod name&gt;** sits directly under the draft bar and is shown collapsed as well as
+expanded. It takes the **primary**, like the rail and the current-version chip, because it states
+what the chat is building rather than warning about it — editing an installed mod is the intended
+thing, not a hazard. It is under the bar rather than inside the body because it changes what every
+button above it means: Save there rewrites a script that is running on real pages right now, and a
+disclosure you have to expand the panel to see is one you can act without seeing. The detach control
+beside it is a `linklike`, and confirms in place rather than in a `confirm()` — it says what
+detaching does *and* what it does not do ("stays installed and unchanged"), which is the part a user
+is right to worry about.
+
+**The mod picker** is the Mods list's vocabulary at panel scale: full-width rows, the name taking the
+slack and ellipsing last, the match pattern in mono at label size behind it, a disabled mod receding
+rather than wearing an "off" badge. Mods that run on the current page come first under their own
+label. The search field appears only past six mods; below that it is a field that adds a step to a
+list you can already read.
+
+**The duplicate question** wears `--surface-2` and the primary rail, not the error surface: nothing
+has gone wrong and nothing has been written. Neither button is the primary-as-default and neither is
+coral, because the product genuinely has no preference — updating rewrites a mod they may not have
+meant, keeping both leaves two scripts on one page, and only the user knows which they wanted.
+
+Icon-and-word buttons (`.btn.action`) are a family now rather than a chatbar detail: the flex row,
+the gap between mark and word, and the mark's own `flex: none` are unscoped, and only the chatbar's
+compact 28px geometry and its icon-only breakpoint stay scoped to it. The first mod card to use one
+rendered with the icon jammed against its label, because all three rules lived one selector away.
+
 ### Dashboard list / detail / editor
 Header card with the wordmark in the display face, stat tiles whose numbers are big pixel type in
 `--text-1` (not lime — a count of archived chats is not alive), section tabs matching the panel's,

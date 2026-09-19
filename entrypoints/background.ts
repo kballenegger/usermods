@@ -10,10 +10,11 @@ import { resyncPlan } from '@/lib/resync';
 import { mapStack, prepareRunScript, renderRunResult, type RunResult } from '@/lib/runscript';
 import { shouldUpdate } from '@/lib/version';
 import { loadMods, modFromProposal, modFromSource, parseHeader, previewFromSource, upsertMod, deleteMod, saveMods } from '@/lib/mods';
-import { appendTurn, archiveChat, bulkChats, countTurns, createChat, deleteChat, getChat, listChats, loadItems, loadMessages, markTitleRefreshed, renameChat, saveItems, saveMessages, setChatArtifact, setChatModel, setModelTitle, touchChat } from '@/lib/chats';
+import { appendTurn, archiveChat, bulkChats, countTurns, createChat, deleteChat, getChat, hostFromUrl, isArchived, listChats, loadItems, loadMessages, markTitleRefreshed, renameChat, saveItems, saveMessages, setChatArtifact, setChatModel, setModelTitle, touchChat } from '@/lib/chats';
 import { loadRuns, markInterrupted, pruneRuns, resumableRuns, saveRuns, type RunMap, type RunRecord } from '@/lib/runstate';
 import { reduceItems } from '@/lib/transcript';
-import { addVersion, currentVersion, draftBlock, loadArtifact, recordProposal, rollbackTo, saveArtifact, toProposal, toSource, type Artifact } from '@/lib/artifact';
+import { addVersion, adoptMod, currentVersion, detachFromMod, draftBlock, fromMod, loadArtifact, recordProposal, rollbackTo, saveArtifact, toProposal, toSource, type Artifact } from '@/lib/artifact';
+import { draftStanding, duplicateOf, editModPlan, likelyUrlFor, modsBlock, modsForUrl, openModDecision, runsOnPage } from '@/lib/modmatch';
 import { buildTitleInput, completedTurns, sanitizeTitle, titleDecision, TITLE_SYSTEM_PROMPT } from '@/lib/title';
 import { createProvider } from '@/lib/providers';
 import { VISION_FALLBACK_PANEL_NOTE, createVisionMemory, resolveImagesSetting, visionKeyFor } from '@/lib/providers/vision';
@@ -404,6 +405,11 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
     // The first message of a chat names it. Every message records the page it was sent from, so
     // the dashboard can reopen the chat on that page rather than the site's front door.
     url = await tabUrl(session.tabId);
+    // The mods on this page, read once at the top of the turn. Once per turn and not once per
+    // message is the right granularity: a mod installed mid-turn is not something the model is
+    // owed mid-sentence, and re-reading the whole mod list for every queued message would put a
+    // storage read (and every mod's full source) on the hot path of a streaming reply.
+    const installedMods = await loadMods().catch(() => [] as Mod[]);
     await touchChat(chatId, history.length || !turn ? { url } : { title: turn.text, url });
     const outcome = await runAgent({
       settings,
@@ -450,6 +456,53 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
       },
       retry: { policy: retryPolicy },
       draft: () => (artifact ? draftBlock(artifact) : ''),
+      // Which mods already run on the page this turn is being sent from. Read fresh each time it is
+      // asked for rather than captured once: open_mod links this chat to one of them mid-turn, and
+      // the queued message that follows must see "THIS CHAT IS EDITING THIS ONE" against it.
+      installed: () => modsBlock(modsForUrl(installedMods, url, artifact?.linkedModId)),
+      onOpenMod: async (modId, replace) => {
+        const mod = (await loadMods()).find((m) => m.id === modId);
+        // The id came from a list this same worker wrote, so a miss means the mod was deleted
+        // between the turn opening and the call. Naming the ones that are there beats "not found".
+        if (!mod) {
+          const here = modsForUrl(await loadMods(), url);
+          return {
+            ok: false,
+            reason: here.length
+              ? `There is no installed mod with id ${modId}. The ids on this page are: ${here.map((m) => m.id).join(', ')}.`
+              : `There is no installed mod with id ${modId}, and nothing is installed on this page.`,
+          };
+        }
+        const decision = openModDecision(draftStanding(artifact), { replace, alreadyLinked: artifact?.linkedModId === mod.id });
+        if (!decision.ok) return { ok: false, reason: decision.reason };
+        if (!decision.noop) {
+          // Adopt, rather than replace: the versions this chat already held stay in the strip, so
+          // a chat that opened the wrong mod is one rollback away from where it was.
+          artifact = artifact ? adoptMod(artifact, mod) : fromMod(chatId, mod);
+          await saveArtifact(artifact);
+          await setChatArtifact(chatId, artifact.id, artifact.versions.length);
+          // The panel re-reads the artifact on this event, which is how the "Editing <name>" line
+          // and the draft's code appear while the run is still going.
+          post({ type: 'artifact', version: artifact.current });
+        }
+        return {
+          ok: true,
+          version: artifact ? artifact.current : null,
+          text: [
+            decision.noop
+              ? `This chat is already editing \u201C${mod.name}\u201D. Its current script is below.`
+              : `\u201C${mod.name}\u201D is now this chat's draft (v${artifact!.current}), and Save will write over that mod in place. Its current script is below \u2014 read it before you change anything, and keep what it already does.`,
+            mod.grants.length ? `It is granted: ${mod.grants.join(', ')}.` : '',
+            mod.requires.length ? `It loads ${mod.requires.length} @require script(s), which are kept for you.` : '',
+            'Its ==UserScript== metadata block is kept and re-attached on save, so do NOT write one into your code.',
+            '```javascript',
+            mod.source,
+            '```',
+          ]
+            .filter(Boolean)
+            .join('\n'),
+        };
+      },
       onProposal: async (proposal) => {
         artifact = await recordProposal(chatId, proposal);
         // The index carries only the flag, so the dashboard can badge a chat without reading every
@@ -850,7 +903,137 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
       return next;
     }
     case 'artifact.save':
-      return saveArtifactAsMod(req.chatId);
+      return saveArtifactAsMod(req.chatId, req.overwriteModId);
+    case 'artifact.detach': {
+      const a = await requireArtifact(req.chatId);
+      const next = detachFromMod(a);
+      await saveArtifact(next);
+      // null, not undefined: the link is gone, and the index must stop claiming this chat edits
+      // anything. The mod itself is untouched — nothing here loads, writes or deletes it.
+      await setChatArtifact(req.chatId, next.id, next.versions.length, null);
+      return next;
+    }
+    case 'mods.edit':
+      return editModInChat(req.modId, req.currentChatId ?? null, req.host, req.model ?? null);
+  }
+}
+
+/**
+ * Bring a mod into a chat — the one mechanism behind "Edit in chat" on the Mods tab and in the
+ * dashboard, the empty state's shortcuts, the composer's picker, and (through onOpenMod) the
+ * open_mod tool.
+ *
+ * It returns the chat to show and what it did, and never destroys anything: an existing editing
+ * chat is reused (unarchived if it was archived), an empty chat on screen is seeded, and anything
+ * else gets a chat of its own — which is what keeps an unsaved draft in the current chat safe.
+ *
+ * The decision itself is `editModPlan` in lib/modmatch.ts, so it is testable without storage; this
+ * function is the I/O around it.
+ */
+async function editModInChat(
+  modId: string,
+  currentChatId: string | null,
+  host: string,
+  /**
+   * The model the composer was showing, when the caller has a composer. A chat CREATED here starts
+   * on it, exactly as a chat created by a first message does. Callers without one (the Mods tab, the
+   * dashboard) pass nothing, and the chat takes the new-chat default on its first run
+   * (resolveChatModel). A reused or seeded chat keeps the model it already has.
+   */
+  model: ModelSelection | null = null,
+): Promise<{ chatId: string; host: string; created: boolean; reused: boolean; unarchived: boolean; mod: Mod; artifact: Artifact; runsHere: boolean; likelyUrl: string }> {
+  const mod = (await loadMods()).find((m) => m.id === modId);
+  if (!mod) throw new Error('That mod no longer exists.');
+  const chats = await listChats();
+  // The page in front of the user, read once: it decides which host a new chat is filed under and
+  // whether the panel has to say "this mod does not run here".
+  const url = await activeUrl();
+  const runsHere = runsOnPage(mod, url);
+  const likelyUrl = likelyUrlFor([...mod.matches, ...mod.includeGlobs]);
+  // Whether a chat counts as "empty" needs its draft and its transcript, and asking that of 200
+  // chats would be 400 storage reads. It is only ever asked of the ONE chat on screen.
+  const current = currentChatId ? (chats.find((c) => c.id === currentChatId) ?? null) : null;
+  const currentCandidate = current
+    ? {
+        id: current.id,
+        host: current.host,
+        archived: isArchived(current),
+        updatedAt: current.updatedAt,
+        editingModId: current.editingModId,
+        ...(await chatStanding(current.id)),
+      }
+    : null;
+  const plan = editModPlan(
+    modId,
+    chats.map((c) => ({ id: c.id, host: c.host, archived: isArchived(c), updatedAt: c.updatedAt, editingModId: c.editingModId })),
+    currentCandidate,
+  );
+
+  let chatId: string;
+  let created = false;
+  let unarchived = false;
+  if (plan.action === 'reuse') {
+    chatId = plan.chatId;
+    if (plan.unarchive) {
+      await archiveChat(chatId, false);
+      unarchived = true;
+    }
+  } else if (plan.action === 'seed') {
+    chatId = plan.chatId;
+  } else {
+    // Which host a new chat belongs to.
+    //
+    // The page in front of the user wins whenever the mod actually runs there. A mod matching
+    // `*://*.wikipedia.org/wiki/*` read on en.wikipedia.org belongs in en.wikipedia.org's switcher,
+    // not under a bare "wikipedia.org" the user has never been on — and a chat filed under a host
+    // the panel is not showing is a chat the panel cannot open, because the switcher is per host.
+    //
+    // Only when the mod does NOT run here is a host derived from its patterns, which is the case
+    // where the current page is genuinely the wrong answer: editing a Reddit mod from a Wikipedia
+    // tab should not leave its chat filed under Wikipedia forever.
+    const derived = runsHere ? hostFromUrl(url) : hostFromUrl(likelyUrl);
+    chatId = (await createChat(derived || host, model)).id;
+    created = true;
+  }
+
+  // Reuse keeps whatever draft that chat has — it is already this mod's, and a chat mid-revision
+  // must not be rewound to what is installed. Every other path seeds or adopts.
+  const existing = await loadArtifact(chatId);
+  let artifact: Artifact;
+  if (plan.action === 'reuse' && existing?.linkedModId === modId) artifact = existing;
+  else {
+    artifact = existing ? adoptMod(existing, mod) : fromMod(chatId, mod);
+    await saveArtifact(artifact);
+  }
+  await setChatArtifact(chatId, artifact.id, artifact.versions.length, { id: mod.id, name: mod.name });
+  return {
+    chatId,
+    // Read back rather than remembered: a reuse landed on a chat whose host this function never
+    // chose, and a handoff addressed to the wrong host is one the panel silently ignores.
+    host: (await getChat(chatId))?.host ?? host,
+    created,
+    reused: plan.action === 'reuse',
+    unarchived,
+    mod,
+    artifact,
+    runsHere,
+    likelyUrl,
+  };
+}
+
+/** Whether a chat has nothing in it, and whether what it has is saved anywhere. Two storage reads. */
+async function chatStanding(chatId: string): Promise<{ empty: boolean; unsaved: boolean }> {
+  const [artifact, items] = await Promise.all([loadArtifact(chatId), loadItems(chatId).catch(() => [] as ChatItem[])]);
+  return { empty: !artifact && !items.length, unsaved: draftStanding(artifact) === 'unsaved' };
+}
+
+/** The URL of the tab the user is looking at, or '' when there is not one. */
+async function activeUrl(): Promise<string> {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    return tab?.url ?? '';
+  } catch {
+    return '';
   }
 }
 
@@ -882,18 +1065,53 @@ async function requireArtifact(chatId: string): Promise<Artifact> {
  * in the dashboard), so a new one was created. The panel tells the user rather than silently
  * appearing to update something that no longer exists.
  */
-async function saveArtifactAsMod(chatId: string): Promise<{ artifact: Artifact; mod: Mod; created: boolean; relinked: boolean }> {
+/**
+ * What the panel's "Keep both" sends as `overwriteModId`: save a new mod and do not ask again.
+ *
+ * It is exported-by-convention rather than by module (the panel holds its own copy as NEW_MOD)
+ * because lib/rpc.ts is the contract between the two and a shared constant would make this file an
+ * import target for the panel, which it is not. The value is not a UUID, so it can never collide
+ * with a real mod id.
+ */
+const KEEP_BOTH = 'new';
+
+async function saveArtifactAsMod(
+  chatId: string,
+  overwriteModId?: string,
+): Promise<{ artifact: Artifact; mod: Mod; created: boolean; relinked: boolean } | { duplicate: { id: string; name: string } }> {
   const artifact = await requireArtifact(chatId);
   const proposal = toProposal(artifact);
   if (!proposal) throw new Error('This draft has no versions to save.');
 
-  const linked = artifact.linkedModId ? (await loadMods()).find((m) => m.id === artifact.linkedModId) : undefined;
+  const mods = await loadMods();
+  const linked = artifact.linkedModId ? mods.find((m) => m.id === artifact.linkedModId) : undefined;
   const relinked = !!artifact.linkedModId && !linked;
 
+  // The duplicate guard. An UNLINKED save has no id to aim at, so a mod with the same name and the
+  // same reach is almost certainly the thing being revised rather than something to sit beside —
+  // two identical mods both run, fight each other, and are indistinguishable in the list. The
+  // choice is the user's, so this returns the question rather than picking an answer; the panel
+  // asks, and calls back with overwriteModId (update) or with the flag cleared (keep both).
+  //
+  // A LINKED save never asks: it has an id and updates in place, which is already the right thing.
+  // The user's answer to the duplicate question, when there was one. KEEP_BOTH is "neither of the
+  // installed ones": it suppresses the guard without naming a mod to write, which is the only one
+  // of the three answers a mod id cannot express. Any other value must name a mod that exists —
+  // a stale id (the twin was deleted while the question was on screen) falls through to creating a
+  // new mod rather than throwing, which is what "keep both" would have done anyway.
+  const target = overwriteModId && overwriteModId !== KEEP_BOTH ? mods.find((m) => m.id === overwriteModId) : undefined;
+  if (!linked && !overwriteModId) {
+    const twin = duplicateOf(mods, { name: proposal.name, matches: proposal.matches });
+    if (twin) return { duplicate: { id: twin.id, name: twin.name } };
+  }
+
+  // `into` is the mod being written: the chat's link, or the one the user chose to overwrite.
+  const into = linked ?? target;
   let mod: Mod;
-  if (linked) {
-    // In place: same id, same enabled flag, same GM value store, same createdAt.
-    mod = await saveEditedSource(linked.id, toSource(artifact));
+  if (into) {
+    // In place: same id, same enabled flag, same GM value store, same createdAt. This is also what
+    // keeps a DISABLED mod disabled when it is edited in chat and saved.
+    mod = await saveEditedSource(into.id, toSource(artifact));
   } else {
     mod = modFromProposal(proposal as ModProposal);
     await resolveDependencies(mod);
@@ -905,7 +1123,10 @@ async function saveArtifactAsMod(chatId: string): Promise<{ artifact: Artifact; 
   // both read this to tell the version that is installed from the one the model has since proposed.
   const next: Artifact = { ...artifact, linkedModId: mod.id, savedVersion: artifact.current };
   await saveArtifact(next);
-  return { artifact: next, mod, created: !linked, relinked };
+  // The index mirror follows the link, so the switcher's "Editing" label and the dashboard's chat
+  // list are right the moment a first save creates the link.
+  await setChatArtifact(chatId, next.id, next.versions.length, { id: mod.id, name: mod.name });
+  return { artifact: next, mod, created: !into, relinked };
 }
 
 // ---------- installing outside userscripts ----------

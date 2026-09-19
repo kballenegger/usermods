@@ -158,6 +158,96 @@
   margin: 0;
 }
 
+/* --- "Editing <mod name>" -------------------------------------------------- */
+
+/*
+ * The line that says this draft is an edit of something already installed.
+ *
+ * It sits between the bar and the body, so it is on screen in the collapsed state too — the state
+ * the panel is in most of the time, and the one in which Save is one click away from rewriting a
+ * mod that is running on real pages. A disclosure that only appears when you expand the panel is a
+ * disclosure you can act without seeing.
+ *
+ * It takes the PRIMARY, like the rail and the current-version chip: it is a fact about what the
+ * chat is building, which is the primary's meaning here. Not the accent (the hero card's) and not
+ * a warning tint — editing an installed mod is the normal, intended thing, not a hazard.
+ */
+.artifact-editing {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  padding: var(--sp-1) var(--sp-4) var(--sp-2);
+  border-top: var(--border-width) solid var(--border-hair);
+  font-size: var(--fs-meta);
+  color: var(--text-2);
+}
+
+.artifact-editing-label {
+  font-size: var(--fs-label);
+  font-weight: var(--fw-label);
+  text-transform: uppercase;
+  letter-spacing: var(--lbl-tracking);
+  color: var(--primary-text);
+  flex: none;
+}
+
+/*
+ * The mod's name, which is the whole information in this row — so it ellipses rather than wrapping
+ * and it keeps a usable floor, the same bargain the draft name strikes on the bar above it.
+ */
+.artifact-editing-name {
+  color: var(--text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
+/* The detach explanation wraps under the buttons on a narrow panel rather than squeezing them. */
+.artifact-editing .muted {
+  flex: 1 1 100%;
+  font-size: var(--fs-label);
+}
+
+/* --- The duplicate question ------------------------------------------------ */
+
+/*
+ * "You already have a mod with this name and these patterns. Update it, or keep both?"
+ *
+ * A row of the chat column like the draft panel itself, so asking cannot move the transcript. It
+ * wears the notice surface rather than the error one: nothing has gone wrong and nothing has been
+ * written — the save is simply ambiguous, and only the user can resolve it.
+ *
+ * Neither button is the default and neither is coral: updating rewrites a mod they may not have
+ * meant, keeping both leaves two scripts fighting over one page, and the product has no basis for
+ * preferring either.
+ */
+.artifact-dupe {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-4) var(--sp-3);
+  background: var(--surface-2);
+  border-top: var(--border-width) solid var(--border-hair);
+  box-shadow: inset 2px 0 0 var(--primary-fill);
+  font: 400 var(--fs-meta) / 1.4 var(--font-ui);
+  color: var(--text-2);
+}
+
+.artifact-dupe .row {
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  align-items: center;
+}
+
+.artifact-dupe button.btn {
+  padding: 3px 8px;
+  font-size: var(--fs-label);
+}
+
 /* --- Expanded ------------------------------------------------------------- */
 
 .artifact-body {

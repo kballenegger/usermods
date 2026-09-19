@@ -7,19 +7,31 @@ import { ModelPicker, NEXT_TURN_NOTE } from './ModelPicker';
 import { useConnections } from './useConnections';
 import { carriesFiles, fileFromDataUrlText, filesFromTransfer, processImageFile } from './images';
 import { proposalCardLabel, proposalCardState, toSource, type Artifact } from '@/lib/artifact';
+import { modsForUrl } from '@/lib/modmatch';
+import { ModPicker } from './components/ModPicker';
 import { IDLE_ACTIVITY, activityFromEvent, allDisconnected, withActivity, withoutActivity, type ChatActivity } from '@/lib/activity';
 import { putBlobs } from '@/lib/blobs';
 import { archivedChats, isArchived, liveChats, loadItems, pickChatToShow, relativeTime, saveItems, titleFromText, type Chat as ChatRecord } from '@/lib/chats';
-import { ArchiveIcon, DeleteIcon, RenameIcon, UnarchiveIcon } from './components/icons';
+import { ArchiveIcon, DeleteIcon, EditModIcon, RenameIcon, UnarchiveIcon } from './components/icons';
 import { mutateConnections, rememberModel, resolveSelection, sameSelection, saveModelChoice, selectionForChat, type ModelSelection } from '@/lib/connections';
 import { exportFilename, HANDOFF_KEY, resolveHandoff, type ChatHandoff } from '@/lib/dashboard';
 import { ACCEPT_ATTR, MAX_IMAGES_PER_MESSAGE, capNote, emptyTextFor, type AttachedImage, type ImageThumb } from '@/lib/images';
 import { rpc, type AgentPortRequest } from '@/lib/rpc';
 import { INTERRUPTED_TEXT, RESUME_HINT, RESUME_LABEL, type ResumableRun } from '@/lib/runstate';
-import { RECONNECT_NOTE, lastModel, looksUnfinished, modelRowText, reduceItems, settleInterrupted, toolDotClass, toolDotState, toolRowTitle, unqueuedItem } from '@/lib/transcript';
-import type { AgentEvent, ChatItem, ContentEvent, ElementRef, ModProposal } from '@/lib/types';
+import { lastModel, modelRowText, reduceItems, repairRowGap, settleInterrupted, toolDotClass, toolDotState, toolRowTitle, unqueuedItem } from '@/lib/transcript';
+import type { AgentEvent, ChatItem, ContentEvent, ElementRef, Mod, ModProposal } from '@/lib/types';
 
 const SAVE_DEBOUNCE_MS = 400;
+
+/**
+ * The answer "Keep both" gives to the duplicate question: save a NEW mod, do not ask again.
+ *
+ * It is a sentinel rather than a second flag on the request because the question has exactly three
+ * answers — update that one, update a different one, or make a new one — and one field that can
+ * carry all three keeps the background's branch a single lookup instead of two booleans that can
+ * contradict each other. The background finds no mod with this id and falls through to creating.
+ */
+const NEW_MOD = 'new';
 
 /**
  * What the composer holds for one chat while you are not looking at it.
@@ -116,6 +128,20 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
   const [shownVersion, setShownVersion] = useState<number | null>(null);
   /** What Save/Update last did, shown under the bar for a moment. */
   const [artifactNote, setArtifactNote] = useState('');
+  /**
+   * Every installed mod, for the empty state's shortcuts and the picker. Read once and refreshed on
+   * any write to the mods key, so installing a mod in another tab makes it pickable here without a
+   * panel reload.
+   */
+  const [mods, setMods] = useState<Mod[]>([]);
+  /** Open when the user asked to pick a mod to edit. */
+  const [pickingMod, setPickingMod] = useState(false);
+  /**
+   * The save that stopped to ask. An unlinked draft whose name and reach match an installed mod
+   * could be a revision of it or a deliberate second mod, and only the user knows which — so the
+   * save comes back with the question instead of an answer, and this holds it until they choose.
+   */
+  const [duplicate, setDuplicate] = useState<{ id: string; name: string } | null>(null);
   const [picking, setPicking] = useState(false);
   /** The draft title while the switcher is in rename mode, or null when it is a select again. */
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -125,11 +151,6 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
   const bottomRef = useRef<HTMLDivElement>(null);
   /** The chat the panel is showing, readable from the port listener, which outlives renders. */
   const chatIdRef = useRef<string | null>(null);
-  /**
-   * Chats whose restored transcript looked cut off mid-run, so the next event for each says so
-   * once. Per chat, because two chats can both have been interrupted.
-   */
-  const reconnectRef = useRef<Set<string>>(new Set());
   /**
    * The debounced save for the visible chat: the id it was scheduled for, and its timer. Held in a
    * ref rather than an effect cleanup so a chat or host switch can FLUSH it — writing A's items
@@ -294,11 +315,10 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
           setLoaded(true);
           return;
         }
-        const stored = settle(show.id, await readItems(show.id));
+        const stored = loadRepaired(show.id, await readItems(show.id));
         if (!live()) return;
         setChats(list);
         showChat(show.id, stored);
-        markReconnect(show.id, stored);
         setLoaded(true);
         requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ block: 'end' }));
       } catch {
@@ -334,6 +354,18 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: 'end' });
   }, [items]);
+
+  // Every installed mod, for the empty state's shortcuts and the picker. It follows the storage key
+  // rather than being read once, so a mod installed on the Mods tab is offered here immediately.
+  useEffect(() => {
+    const read = () => rpc({ type: 'mods.list' }).then(setMods).catch(() => {});
+    void read();
+    const onChanged = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
+      if (area === 'local' && 'mods' in changes) void read();
+    };
+    chrome.storage.onChanged.addListener(onChanged);
+    return () => chrome.storage.onChanged.removeListener(onChanged);
+  }, []);
 
   /**
    * Write the pending transcript before the panel goes away.
@@ -393,14 +425,9 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
   function applyOffscreen(id: string, e: AgentEvent) {
     const chain = offscreenChain(id);
     const next = chain.then(async (prev) => {
-      let base = prev;
-      if (reconnectRef.current.has(id)) {
-        reconnectRef.current.delete(id);
-        base = [...base, { kind: 'note', text: RECONNECT_NOTE }];
-      }
       // An 'unqueued' for an invisible chat cannot put text back in the composer — that composer
       // belongs to the chat on screen — so the bubble simply goes away.
-      const reduced = reduceItems(base, e);
+      const reduced = reduceItems(prev, e);
       if (reduced !== prev) await saveItems(id, reduced).catch(() => {});
       return reduced;
     });
@@ -509,16 +536,11 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
           if (dropped.refs) setRefs((r) => [...r, ...dropped.refs!]);
         }
       }
-      updateItems((prev) => {
-        // A run that outlived the panel keeps streaming into a port we no longer hold. We cannot
-        // recover the text we missed, so the first event back into that chat just says so.
-        let base = prev;
-        if (reconnectRef.current.has(e.chatId)) {
-          reconnectRef.current.delete(e.chatId);
-          base = [...base, { kind: 'note', text: RECONNECT_NOTE }];
-        }
-        return reduceItems(base, e);
-      });
+      // No "reconnected" note here any more. A run that outlives the panel is recorded by the
+      // background while no panel is attached, so an event arriving on this port never follows a
+      // stretch nobody kept; the one gap that can still lose rows is found when a transcript is
+      // LOADED (loadRepaired), which is the only place there is evidence of it.
+      updateItems((prev) => reduceItems(prev, e));
     });
     port.onDisconnect.addListener(() => {
       portRef.current = null;
@@ -962,13 +984,26 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
     }
   }
 
-  /** Remember that this chat's restored transcript stops mid-run, so its next event says so once. */
-  function markReconnect(id: string, stored: ChatItem[]) {
-    // A chat the background says is running has been captured the whole time (by this panel, or by
-    // the background while no panel was open), so a tool row without a result there is a tool that
-    // is running right now, not output that went missing.
-    if (looksUnfinished(stored) && !liveAtAttachRef.current.has(id)) reconnectRef.current.add(id);
-    else reconnectRef.current.delete(id);
+  /**
+   * A stored transcript, made truthful before it is shown: an interrupted run's dangling rows are
+   * closed (settle), and a transcript that is genuinely missing rows says so, once, in words that
+   * claim no more than that (repairRowGap in lib/transcript.ts has the rule and the reasons).
+   *
+   * "Running" is asked of BOTH what the worker reported at attach and what this panel has seen
+   * since. The second half matters: a chat that started running after the panel opened, was
+   * switched away from and is now switched back to has a tool row with no result because the tool
+   * is running — and the old check, which only knew about the moment of attach, called that lost
+   * output. A repaired transcript is written back, so the note is part of the chat from then on
+   * rather than something each reload rediscovers.
+   */
+  function loadRepaired(id: string, raw: ChatItem[]): ChatItem[] {
+    const settled = settle(id, raw);
+    const repaired = repairRowGap(settled, {
+      running: liveAtAttachRef.current.has(id) || runningRef.current.has(id),
+      interrupted: resumableRef.current.get(id)?.state === 'interrupted',
+    });
+    if (repaired !== settled) void saveItems(id, repaired).catch(() => {});
+    return repaired;
   }
 
   /**
@@ -983,9 +1018,8 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
     void readItems(id)
       .then((raw) => {
         if (genRef.current !== gen) return;
-        const stored = settle(id, raw);
+        const stored = loadRepaired(id, raw);
         showChat(id, stored);
-        markReconnect(id, stored);
         setLoaded(true);
         requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ block: 'end' }));
       })
@@ -1110,10 +1144,21 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
    * copy, with both of them running on the page. An id cannot drift, so the second save updates the
    * first save's mod and the count stays at one.
    */
-  async function saveArtifact() {
+  async function saveArtifact(overwriteModId?: string) {
     if (!chatId || !artifact) return;
     try {
-      const r = await rpc({ type: 'artifact.save', chatId });
+      // NEW_MOD is "Keep both": it answers the duplicate question with "neither of the installed
+      // ones", which the background reads as an instruction to go ahead and create. A plain
+      // `undefined` could not say that — it is also what an ordinary first Save sends, and the
+      // guard would simply ask the same question again.
+      const r = await rpc({ type: 'artifact.save', chatId, ...(overwriteModId ? { overwriteModId } : {}) });
+      // The save stopped to ask which mod the user meant. Nothing has been written; the panel puts
+      // the question on screen and calls back with their answer.
+      if ('duplicate' in r) {
+        setDuplicate(r.duplicate);
+        return;
+      }
+      setDuplicate(null);
       setArtifact(r.artifact);
       setArtifactNote(
         r.relinked
@@ -1122,6 +1167,9 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
             ? `Saved “${r.mod.name}” · enabled`
             : `Updated “${r.mod.name}” in place`,
       );
+      // The switcher's "Editing" label comes off the chat index, which the background has just
+      // written, so the list is refetched to pick it up.
+      void rpc({ type: 'chats.list', host }).then((list) => setChats(list)).catch(() => {});
       // Nothing is stamped on the transcript. Which card reads as saved is derived from the
       // artifact's savedVersion every render — see proposalCardState. Writing a boolean onto the
       // rows instead is what made a LATER proposal inherit an earlier save: the flag said "this
@@ -1129,6 +1177,60 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
       // revised the draft those two stopped being the same statement.
     } catch (e) {
       updateItems((prev) => [...prev, { kind: 'error', text: `Could not save the draft: ${e instanceof Error ? e.message : String(e)}` }]);
+    }
+  }
+
+  /**
+   * Stop this draft from being an edit of its mod: "Save as a new mod instead".
+   *
+   * It breaks the link and nothing else. The mod keeps its id, its source, its on/off state and its
+   * GM values, and goes on running exactly as it did — detaching is not deleting, and there is no
+   * path from this button to a mod disappearing. What changes is only what the NEXT Save does: it
+   * creates a separate mod rather than writing over that one.
+   */
+  async function detachArtifact() {
+    if (!chatId || !artifact) return;
+    const was = artifact.name;
+    try {
+      setArtifact(await rpc({ type: 'artifact.detach', chatId }));
+      setArtifactNote(`Detached. Saving now creates a new mod; “${was}” is untouched and still installed.`);
+      void rpc({ type: 'chats.list', host }).then((list) => setChats(list)).catch(() => {});
+    } catch (e) {
+      updateItems((prev) => [...prev, { kind: 'error', text: `Could not detach the draft: ${e instanceof Error ? e.message : String(e)}` }]);
+    }
+  }
+
+  /**
+   * Bring an installed mod into a chat to edit it — the empty state's shortcuts and the picker.
+   *
+   * The decision of WHICH chat is the background's (rpc 'mods.edit'), shared with the Mods tab, the
+   * dashboard and the open_mod tool, so all five entry points behave identically. All this does is
+   * follow it: switch to the chat it names, refresh the list, and say what happened.
+   */
+  async function editMod(mod: Mod) {
+    setPickingMod(false);
+    try {
+      const r = await rpc({ type: 'mods.edit', modId: mod.id, host, model: selectionRef.current, ...(chatId ? { currentChatId: chatId } : {}) });
+      const list = await rpc({ type: 'chats.list', host });
+      setChats(list);
+      if (r.chatId !== chatIdRef.current) openChat(r.chatId);
+      else setArtifact(r.artifact);
+      const where = r.reused
+        ? `Opened the chat that made “${r.mod.name}”.`
+        : r.created
+          ? `Started a new chat to edit “${r.mod.name}”. Your other draft is untouched.`
+          : `Editing “${r.mod.name}”.`;
+      // A mod that does not run here is worth saying out loud: the page tools will look at THIS
+      // page, which is not where the mod does its work, and a user who does not know that reads
+      // every "I can't find that element" as the product being broken.
+      const scope = r.runsHere
+        ? ''
+        : r.likelyUrl
+          ? ` It does not run on this page — tools will inspect the tab you are on. It runs on ${r.likelyUrl}.`
+          : ' It does not run on this page — tools will inspect the tab you are on.';
+      setArtifactNote(`${where}${scope}`);
+    } catch (e) {
+      updateItems((prev) => [...prev, { kind: 'error', text: `Could not open that mod: ${e instanceof Error ? e.message : String(e)}` }]);
     }
   }
 
@@ -1176,6 +1278,19 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
   }
 
   const unsupported = !pageUrl || /^(chrome|edge|about|chrome-extension|devtools):/.test(pageUrl);
+  /**
+   * The installed mods that run on the page in front of the user, for the empty state's shortcuts.
+   * The same function the model's prompt block uses (lib/modmatch modsForUrl), so what the user is
+   * offered and what the model is told about are the same list by construction.
+   */
+  const modsHere = mods.filter((m) => modsForUrl([m], pageUrl).length > 0);
+  /**
+   * The name of the mod this chat is editing, or ''. Resolved from the live mod list rather than
+   * remembered, so a mod renamed on the Mods tab is named correctly here, and a mod that has since
+   * been DELETED resolves to nothing — which is right: the chat is no longer editing anything that
+   * exists, and claiming otherwise would be the panel lying about what Save is going to do.
+   */
+  const editingModName = artifact?.linkedModId ? (mods.find((m) => m.id === artifact.linkedModId)?.name ?? '') : '';
   const live = liveChats(chats);
   const archived = archivedChats(chats);
   const current = chatId ? chats.find((c) => c.id === chatId) : undefined;
@@ -1224,20 +1339,38 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
             <select value={chatId ?? ''} onChange={(e) => switchTo(e.target.value || null)} title={`Chats on ${host}`}>
               <option value="">New chat…</option>
               {live.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.title} · {relativeTime(c.updatedAt)}
+                <option key={c.id} value={c.id} title={chatOptionTitle(c)}>
+                  {chatOptionLabel(c)}
                 </option>
               ))}
               {archived.length > 0 && (
                 <optgroup label="Archived">
                   {archived.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.title} · {relativeTime(c.updatedAt)}
+                    <option key={c.id} value={c.id} title={chatOptionTitle(c)}>
+                      {chatOptionLabel(c)}
                     </option>
                   ))}
                 </optgroup>
               )}
             </select>
+          )}
+          {/* Editing a mod is a first-class way to start, so it sits with the chat's own actions
+              rather than behind the Mods tab. It is enabled whether or not this chat has anything
+              in it: picking a mod from a chat that is mid-draft opens a NEW chat for it (the
+              background's editModPlan decides), so this can never cost the user their work. */}
+          {renaming === null && (
+            <button
+              className="btn action"
+              data-action="edit-mod"
+              onClick={() => setPickingMod((v) => !v)}
+              aria-expanded={pickingMod}
+              aria-label="Edit a mod"
+              title="Open one of your installed mods in a chat and keep building on it"
+              data-testid="edit-a-mod"
+            >
+              <EditModIcon />
+              <span className="action-label">Edit a mod</span>
+            </button>
           )}
           {renaming !== null ? (
             // Mousedown, not click: the input's blur would close rename mode before a click landed.
@@ -1310,6 +1443,28 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
                 <span className="muted">hide the sidebar · make the font bigger · add a button that copies the title</span>
               </>
             )}
+          </div>
+        )}
+        {/* The mods already running on this page, offered as one tap each.
+            This is the empty state doing the job the owner's report was about: the answer to "how
+            do I keep adding to a mod" should be on screen before you type anything, not something
+            you have to know to ask for. With nothing installed here it renders nothing at all, so
+            a first-run panel is exactly as it was. */}
+        {loaded && items.length === 0 && !unsupported && modsHere.length > 0 && (
+          <div className="empty-mods" data-testid="empty-mods">
+            <div className="label">or keep building on a mod that runs here</div>
+            {modsHere.map((m) => (
+              <button
+                key={m.id}
+                className="btn"
+                onClick={() => void editMod(m)}
+                title={`Open “${m.name}” in this chat and keep building on it`}
+                data-testid="empty-mod"
+                data-mod-id={m.id}
+              >
+                Edit {m.name}
+              </button>
+            ))}
           </div>
         )}
         {items.map((it, i) => {
@@ -1443,6 +1598,28 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
         )}
         <div ref={bottomRef} />
       </div>
+      {pickingMod && <ModPicker mods={mods} pageUrl={pageUrl} onPick={(m) => void editMod(m)} onCancel={() => setPickingMod(false)} />}
+      {/* The save that stopped to ask. Neither button is destructive and neither is the default:
+          updating rewrites a mod the user may not have meant, keeping both leaves two mods running
+          on the same page, and only they know which they wanted. */}
+      {duplicate && (
+        <div className="artifact-dupe" data-testid="artifact-duplicate">
+          <div>
+            “{duplicate.name}” is already installed with the same name and the same match patterns. Update it, or keep both?
+          </div>
+          <div className="row">
+            <button className="btn primary" onClick={() => void saveArtifact(duplicate.id)} data-testid="artifact-duplicate-update">
+              Update the existing mod
+            </button>
+            <button className="btn" onClick={() => void saveArtifact(NEW_MOD)} data-testid="artifact-duplicate-keep">
+              Keep both
+            </button>
+            <button className="linklike" onClick={() => setDuplicate(null)} data-testid="artifact-duplicate-cancel">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
       {/* The draft, pinned. It is a row of the chat column — not an item in the transcript — so it
           appears and disappears without moving the messages or their scroll position, exactly as
           the activity line does. */}
@@ -1454,10 +1631,12 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
           selected={shownVersion ?? artifact.current}
           onSelect={setShownVersion}
           onTry={tryArtifact}
-          onSave={saveArtifact}
+          onSave={() => saveArtifact()}
+          onDetach={detachArtifact}
           onExport={exportArtifact}
           onRename={renameArtifact}
           onRollback={rollbackArtifact}
+          editingModName={editingModName}
           openDashboard={() => void openDashboard()}
         />
       )}
@@ -1550,6 +1729,45 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
       {viewing && <Lightbox chatId={chatId} image={viewing} onClose={() => setViewing(null)} />}
     </div>
   );
+}
+
+/**
+ * How a chat reads in the switcher.
+ *
+ * A chat that is editing an installed mod says so, because that is the most important thing about
+ * it: sending a message there changes a script that is already running on the user's pages. A
+ * <select> can carry no markup, so the badge is a text marker rather than a chip — which is also
+ * why it is a pencil and a name rather than a coloured pill, and why it goes after the title
+ * instead of before it (the title is still how the user finds the row they want).
+ *
+ * The name comes off the chat index mirror (Chat.editingModName), so this costs no extra read.
+ */
+function chatOptionLabel(c: ChatRecord): string {
+  // The mod comes BEFORE the relative time, and the time is dropped entirely when there is one.
+  //
+  // A <select> cannot ellipse per-part the way the draft bar does — the option is one string and
+  // the browser truncates whatever runs past the box. With the order "title · 3m ago · <mod>", the
+  // mod name is last and is therefore the part that always dies: at the panel's own 420px the owner
+  // saw it cut to a single letter, which names no mod and is worse than saying nothing. So the mod
+  // takes the slot the timestamp had.
+  //
+  // Dropping the time is the right trade rather than a reluctant one: "which installed script does
+  // sending a message here rewrite" is a fact about consequences, and "3m ago" is a fact about
+  // ordering that the list is ALREADY sorted by. The full string stays in the option's title
+  // attribute, so the time is one hover away.
+  //
+  // The marker is the WORD "editing", not a pencil glyph. --font-ui is the system stack, so a mark
+  // like ✎ comes from whatever fallback font the machine happens to have and does not read as a
+  // pencil on every one of them — and an option's text cannot be styled, so there is no way to put
+  // it in a face we control. A word costs a few characters and is legible everywhere.
+  if (c.editingModName) return `${c.title} · editing ${c.editingModName}`;
+  return `${c.title} · ${relativeTime(c.updatedAt)}`;
+}
+
+/** The whole truth for the option's tooltip, including the time the label gives up. */
+function chatOptionTitle(c: ChatRecord): string {
+  const base = `${c.title} · ${relativeTime(c.updatedAt)}`;
+  return c.editingModName ? `${base} · editing the installed mod “${c.editingModName}”` : base;
 }
 
 /**

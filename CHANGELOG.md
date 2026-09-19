@@ -25,6 +25,24 @@ First public release, and the first submission to the Chrome Web Store.
   a short window), then scrolls inside; it goes back to its resting height when you send.
 - A per-chat draft mod with versions, a diff between them, rollback, and update-in-place, so a mod
   is refined over several turns instead of re-proposed from scratch.
+- **Edit any installed mod in chat.** Every mod row — in the Mods tab and in the dashboard — has
+  **Edit in chat**, which opens that mod as the chat's draft: the installed script is v1, **Update
+  mod** writes changes back over the same mod (same id, same on/off state, same `GM_setValue`
+  store), and the chat says which mod it is editing, in the draft panel, the chat switcher and the
+  dashboard's chat list. **Save as a new mod instead** breaks the link and leaves the original
+  installed and untouched.
+  - It works on mods from anywhere: written in chat, installed from a URL, imported from a file, or
+    migrated from a Tampermonkey backup, enabled or disabled, page-world or isolated. An imported
+    script's `==UserScript==` block is kept whole and re-attached on save, so `@require`, `@grant`,
+    `@connect`, `@run-at`, `@version` and the rest survive an edit the model made without seeing
+    them; only the name, description and `@match` lines are rewritten.
+  - Three ways in besides the mod row: a new chat lists the mods that run on the page as one-tap
+    entries, **Edit a mod…** beside the chat switcher opens a picker of everything installed, and
+    the model is told each turn which mods already run on the current URL and can adopt one with a
+    new `open_mod` tool rather than writing a second mod that does the same job. Picking a mod never
+    discards a chat's unsaved draft — it opens a new chat instead and says so.
+- Saving a mod whose name and match patterns match one already installed asks whether to update that
+  one or keep both, instead of silently leaving two scripts fighting over the same page.
 - History compaction against a context budget you set: old page snapshots and tool output are
   trimmed first, then the earlier part of the conversation is summarised.
 - A live activity line with stall detection, so a long run is never a silent one.
@@ -43,6 +61,13 @@ First public release, and the first submission to the Chrome Web Store.
   panel reopened mid-run shows the run in progress. If Chrome stops the service worker, the browser
   quits or the extension reloads mid-run, the chat says **This run was interrupted.** and offers
   the same Resume. Nothing resumes on its own.
+- The "reconnected" note no longer overstates what was lost. Since the background keeps a run's
+  transcript whenever no panel is attached, the only thing that can still go missing is a few rows
+  on screen — streamed text, or a tool row's result — from the instant a panel page goes away. The
+  note now appears only when a stored transcript shows that (a row still claiming to be in progress
+  in a chat that is neither running nor interrupted), closes those rows, and says what is intact:
+  the conversation the model sees, the draft and your saved mods. It is never shown for a run that
+  is still going, which the old check got wrong for a chat started after the panel opened.
 - Chats are stored per site, several per site, named by the model after the first reply (you can
   rename, and your rename sticks), and archived rather than deleted.
 
@@ -142,12 +167,13 @@ First public release, and the first submission to the Chrome Web Store.
 
 ### Testing harness
 
-- A Playwright harness driving the real extension against a mock LLM: seventeen browser flows
+- A Playwright harness driving the real extension against a mock LLM: eighteen browser flows
   (`npm run smoke`) covering the chat loop, chats, per-chat isolation, history compaction, the
   dashboard, panel scope, themes, the top bar, `wait_for`, images, vision, the draft artifact,
-  resume, the growing message box, and providers and model switching. The mock serves several
-  "providers" on one port and records the endpoint and model of every request, so the models flow
-  proves from the wire which model each turn went to. The vision flow is the only one that drives the real `screenshot` tool, and reads the
+  editing an installed mod, resume, the growing message box, and providers and model switching.
+  The mock serves several "providers" on one port and records the endpoint and model of every
+  request, so the models flow proves from the wire which model each turn went to. The vision flow
+  is the only one that drives the real `screenshot` tool, and reads the
   wire both ways: that a capture arrives as an image part in the right message, and that a backend
   refusing images is detected once, worked around, explained, and not asked twice. The mock's
   request validator now enforces the tool-message adjacency rule as well, which is what makes the

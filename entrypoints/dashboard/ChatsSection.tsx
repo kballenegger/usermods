@@ -530,6 +530,16 @@ function ChatRow({
               draft{typeof chat.artifactVersions === 'number' ? ` · ${chat.artifactVersions} version${chat.artifactVersions === 1 ? '' : 's'}` : ''}
             </span>
           )}
+          {/* Which installed mod this chat edits. It comes off the index mirror
+              (Chat.editingModName), so the list costs no extra read — and it is the badge that
+              matters most on this page, because it says a message in that chat rewrites a script
+              that is already running. It sits after the draft badge, which says how much history
+              there is; this one says what the history is FOR. */}
+          {chat.editingModName && (
+            <span className="badge" data-testid="chat-editing" title={`This chat edits the installed mod “${chat.editingModName}”. Saving its draft rewrites that mod in place.`}>
+              editing · {chat.editingModName}
+            </span>
+          )}
           {archived && <span className="badge" data-testid="chat-archived">archived</span>}
         </div>
       </div>

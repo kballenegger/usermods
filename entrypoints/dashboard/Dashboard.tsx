@@ -84,6 +84,42 @@ export function Dashboard() {
     })();
   }, []);
 
+  /**
+   * Bring a mod into a chat and open that chat on its page — the dashboard's "Edit in chat".
+   *
+   * It is `openChat` with one step in front of it: the background decides WHICH chat (rpc
+   * 'mods.edit', the same decision the side panel's mod rows, empty state, picker and the open_mod
+   * tool all go through), and then the existing handoff carries the user there. Nothing about the
+   * handoff is duplicated here, which is why "Open" and "Edit in chat" cannot drift apart.
+   *
+   * sidePanel.open must be called synchronously inside the gesture, and the RPC is an await — so
+   * the panel is opened FIRST, before we know which chat it will show. That is safe: the handoff is
+   * written before the tab navigates, and the panel reads it when it mounts on that host.
+   */
+  const editMod = useCallback(
+    (mod: Mod) => {
+      try {
+        const p = chrome.sidePanel.open({ windowId: chrome.windows.WINDOW_ID_CURRENT });
+        if (p && typeof p.catch === 'function') p.catch(() => {});
+      } catch {
+        /* not a gesture any more: the tab still opens and the panel restores this chat when opened */
+      }
+      void (async () => {
+        try {
+          const r = await rpc({ type: 'mods.edit', modId: mod.id, host: '' });
+          const handoff: ChatHandoff = { chatId: r.chatId, host: r.host, at: Date.now() };
+          await chrome.storage.session.set({ [HANDOFF_KEY]: handoff }).catch(() => {});
+          const url = r.likelyUrl || (r.host ? `https://${r.host}` : '');
+          if (url) await chrome.tabs.create({ url, active: true }).catch(() => {});
+          await refresh();
+        } catch (e) {
+          setError(e instanceof Error ? e.message : String(e));
+        }
+      })();
+    },
+    [refresh],
+  );
+
   // Stay live while the side panel works: anything it changes lands in chrome.storage.local, and
   // both the chat index and the mod list are single keys there. (The overview's provider line keeps
   // itself current: useConnections listens to storage on its own.)
@@ -166,7 +202,7 @@ export function Dashboard() {
         </nav>
 
         {section === 'chats' && <ChatsSection chats={chats} loaded={loaded} onChanged={refresh} />}
-        {section === 'mods' && <ModsSection mods={mods} loaded={loaded} onChanged={refresh} origins={origins} onOpenChat={openChat} />}
+        {section === 'mods' && <ModsSection mods={mods} loaded={loaded} onChanged={refresh} origins={origins} onOpenChat={openChat} onEditMod={editMod} />}
         {/* The panel's own Settings view, unchanged: it reads and writes lib/settings, which is the
             same storage this page reads, so the overview above follows a change made here. */}
         {section === 'settings' && (

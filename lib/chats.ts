@@ -75,6 +75,22 @@ export interface Chat {
    * takes the default a new chat would (selectionForChat) and has it written here on its next run.
    */
   model?: ModelSelection;
+  /**
+   * The installed mod this chat's draft is linked to, mirrored onto the index from the artifact.
+   *
+   * It is a mirror on purpose. The artifact's linkedModId stays the single source of truth — it is
+   * what a save reads — but "which chat edits this mod" and "is this chat editing something" are
+   * questions the switcher, the dashboard's chat list and the mod row's Edit button all ask about
+   * EVERY chat at once, and answering them from the artifacts means reading one storage key per
+   * chat. The name rides along for the same reason: a label that would otherwise cost a second
+   * read of the whole mod list.
+   *
+   * Both are cleared when the draft is detached. A stale name (the mod was renamed elsewhere) is
+   * refreshed on the next save; a stale id whose mod was deleted resolves to nothing, which is
+   * what the callers already handle.
+   */
+  editingModId?: string;
+  editingModName?: string;
 }
 
 /** A chat's title source, defaulting for records written before the field existed. */
@@ -311,12 +327,22 @@ export function countTurns(messages: Msg[]): number {
  * artifact is bookkeeping, and touchChat bumps updatedAt and unarchives — which would reorder the
  * switcher and resurrect an archived chat every time the model proposed something in it.
  */
-export async function setChatArtifact(id: string, artifactId: string, versions: number): Promise<void> {
+export async function setChatArtifact(id: string, artifactId: string, versions: number, editing?: { id: string; name: string } | null): Promise<void> {
   const chats = await readIndex();
   const chat = chats.find((c) => c.id === id);
-  if (!chat || (chat.artifactId === artifactId && chat.artifactVersions === versions)) return;
+  if (!chat) return;
+  // `undefined` means "leave the link alone" and `null` means "there is no link any more", which is
+  // the difference between a proposal (which says nothing about linkage) and a detach (which says
+  // everything). A plain optional could not tell those apart.
+  const nextModId = editing === undefined ? chat.editingModId : (editing?.id ?? undefined);
+  const nextModName = editing === undefined ? chat.editingModName : (editing?.name ?? undefined);
+  if (chat.artifactId === artifactId && chat.artifactVersions === versions && chat.editingModId === nextModId && chat.editingModName === nextModName) return;
   chat.artifactId = artifactId;
   chat.artifactVersions = versions;
+  if (nextModId === undefined) delete chat.editingModId;
+  else chat.editingModId = nextModId;
+  if (nextModName === undefined) delete chat.editingModName;
+  else chat.editingModName = nextModName;
   await writeIndex(chats);
 }
 

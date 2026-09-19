@@ -366,6 +366,31 @@ button.pill,
  * same global focus ring. Everything below is the `.tabs button.tab-action` rule with the same
  * values, not similar ones, so the two bars cannot drift apart.
  */
+/*
+ * A button that carries an icon beside its word, wherever it is.
+ *
+ * `.btn.action` grew up inside the chatbar, where it is icon-only below a breakpoint and every rule
+ * about it was scoped to `.chatbar`. "Edit in chat" on a mod card is the same kind of control in a
+ * different place, and without this it rendered as an icon jammed against its label with no space
+ * at all — the gap, the alignment and the mark's own flex rules all lived one selector away.
+ *
+ * So the two things every such button needs are unscoped here, and everything that is genuinely
+ * about the chatbar's compact geometry (its 28px minimums, its border, its icon-only breakpoint)
+ * stays scoped below.
+ */
+.btn.action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-1);
+}
+
+/* The mark rides the text colour, so every button state moves it with the label. */
+.btn.action .ico {
+  flex: none;
+  display: block;
+}
+
 .chatbar .btn.action {
   display: inline-flex;
   align-items: center;
@@ -979,6 +1004,143 @@ details > summary::-webkit-details-marker {
   letter-spacing: 0.2em;
   color: var(--text-3);
   margin-bottom: var(--sp-2);
+}
+
+/*
+ * The mods already running on this page, offered from a new chat's empty state.
+ *
+ * It follows the empty state rather than joining it: the empty state is centred prose with a big
+ * playful mark, and a row of buttons inside that block would read as decoration. This is a separate
+ * stack under it, left-aligned like the rest of the panel, because these are things to press.
+ *
+ * Each entry is a plain outline button and not the primary. "Describe how this page should change"
+ * is still the first thing to do; editing an existing mod is the other thing, offered rather than
+ * urged, and two primaries on an empty screen would say the panel had an opinion it does not have.
+ */
+.empty-mods {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--sp-2);
+  padding: 0 var(--sp-4) var(--sp-4);
+}
+
+.empty-mods .label {
+  text-align: center;
+  margin-bottom: 0;
+}
+
+/* The name is the information, so the button wraps rather than truncating it. */
+.empty-mods button.btn {
+  text-align: left;
+  white-space: normal;
+}
+
+/* --- The mod picker -------------------------------------------------------- */
+
+/*
+ * "Edit a mod": pick one of your installed mods to keep building on.
+ *
+ * A row of the chat column, like the draft panel and the activity line, rather than a modal. A
+ * 420px panel has no room for a dialog that dims what it covers, and the list it shows is the one
+ * from the Mods tab, which the user already knows how to read. It is capped and scrolls internally
+ * so a profile with sixty mods cannot push the composer off the bottom.
+ */
+.modpicker {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding: var(--sp-2) var(--sp-4) var(--sp-3);
+  background: var(--surface-1);
+  border-top: var(--border-width) solid var(--border-hair);
+  box-shadow: inset 2px 0 0 var(--primary-fill);
+  max-height: 60%;
+  overflow: auto;
+}
+
+.modpicker > .row {
+  align-items: baseline;
+}
+
+.modpicker > .row .label {
+  margin-bottom: 0;
+}
+
+.modpicker input[type='search'] {
+  width: 100%;
+  margin-bottom: var(--sp-1);
+}
+
+.modpicker-group {
+  margin-top: var(--sp-2);
+  margin-bottom: 0;
+  color: var(--text-3);
+}
+
+/*
+ * One mod. A full-width button rather than a row with a button in it: the whole thing is one
+ * action, and a target the width of the panel is what a 420px column wants.
+ *
+ * Three parts on one line — the name, an "off" marker when it is disabled, and where it runs — with
+ * the name taking the slack and the location ellipsing first. The name is what is being chosen; a
+ * match pattern is context.
+ */
+.modpicker-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  width: 100%;
+  text-align: left;
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--surface-2);
+  border: var(--border-width) solid var(--border-hair);
+  border-radius: var(--r-field);
+  color: var(--text-1);
+  font: 400 var(--fs-meta) / 1.4 var(--font-ui);
+  cursor: pointer;
+}
+
+.modpicker-row:hover {
+  border-color: var(--border-strong);
+}
+
+.modpicker-row:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+/* A disabled mod recedes the way a disabled mod card does, and is still perfectly pickable. */
+.modpicker-row.off .modpicker-name {
+  color: var(--text-2);
+}
+
+.modpicker-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modpicker-off {
+  flex: none;
+  font-size: var(--fs-label);
+  font-weight: var(--fw-label);
+  text-transform: uppercase;
+  letter-spacing: var(--lbl-tracking);
+  color: var(--text-3);
+}
+
+.modpicker-where {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  color: var(--text-3);
 }
 
 /* Section labels: 12px semibold, uppercase, tracked out. */

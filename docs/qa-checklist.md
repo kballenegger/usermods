@@ -177,8 +177,14 @@ several steps to answer ("read the whole page, list all the buttons, then propos
 9. Start a long run, **close the side panel**, wait ten seconds, reopen it while the run is still
    going.
    **Expected:** the activity line, **Stop** and **Queue** are showing; the rows produced while the
-   panel was closed are in the transcript; there is no "reconnected — earlier output … was not
-   captured" note.
+   panel was closed are in the transcript, no tool row is stuck on an amber dot once the run is
+   over, and there is **no** "some rows from this run are not shown here …" note. That note now
+   appears only when a stored transcript really is missing rows — a tool row with no result, or a
+   bubble still marked queued, in a chat that is neither running nor interrupted — which takes a
+   panel page dying in the instant before the background notices its port closed. When it does
+   appear it closes those rows ("result not shown here · the model received it") and says what is
+   intact: the conversation the model sees, the draft and saved mods. It is never shown for a run
+   that is still going, and an interrupted run says "This run was interrupted." instead.
 10. Start a run with a model that thinks for well over 30 seconds before its first byte, with the
     side panel **closed**. Reopen after a minute.
     **Expected:** the run is still going or has finished; it was not interrupted. (This is the
@@ -282,6 +288,68 @@ ways — by reading `chrome.sidePanel.getOptions()`. Two things are left to you 
     **Expected:** the old behaviour — a **new** tab on the chat's page, the dashboard still open
     behind it, and the window-wide panel showing that chat.
     **If it fails:** the dashboard tab's console.
+
+---
+
+## 4b. Edit an installed mod in chat (including an imported one)
+
+The half of this that automation cannot reach is the real user-scripts world: the smoke flow runs in
+a profile where **Allow User Scripts** cannot be turned on, so it never watches an edited mod
+actually run on a page load. That is what steps 5-7 below are for.
+
+1. Install an outside userscript with dependencies — the one from section 5 or 6 is ideal, anything
+   with a `@require` and at least one `@grant`. Note its name.
+2. In the **Mods** tab, click **Edit in chat** on its row.
+   **Expected:** the panel switches to Chat on a chat whose draft panel is already open at **v1**,
+   its button reads **Update mod** (not *Save*), and the line under the bar reads
+   **EDITING &lt;name&gt;** with **Save as a new mod instead** beside it. Expanding the draft shows the
+   script body *without* its `==UserScript==` header.
+   **If it fails:** side panel DevTools.
+3. Ask for a small change ("add a console.log at the top" is enough) and let it propose.
+   **Expected:** the proposal card says **Save & update mod**, not *Save & enable*.
+   **If it fails:** side panel DevTools.
+4. Click **Update mod**.
+   **Expected:** the status line says *Updated "&lt;name&gt;" in place*, and the **Mods** tab still
+   shows exactly ONE mod with that name.
+   **If it fails:** side panel DevTools; also check the Mods tab for a second copy.
+5. Open the mod in the dashboard's source editor (**Dashboard → Mods → click the row**).
+   **Expected:** the header is intact — every `@require`, `@grant`, `@connect`, `@run-at`,
+   `@version` and `@namespace` line the script arrived with is still there, exactly once, and the
+   change from step 3 is in the body.
+   **If it fails:** this is the round trip breaking; copy the whole source into the issue.
+6. Reload a page the mod matches.
+   **Expected:** the mod still works — the `@require` library loaded and no `ReferenceError` in the
+   page console. This is the step the automated flow cannot do.
+   **If it fails:** page console.
+7. If the script uses `GM_setValue`, confirm its stored values survived: whatever it remembered
+   before the edit is still remembered.
+   **If it fails:** page console; a lost store means the save created a new mod id.
+8. Back in the chat, click **Save as a new mod instead**, then **Detach**.
+   **Expected:** the EDITING line disappears, the bar's button goes back to **Save**, and the Mods
+   tab still shows the original mod, unchanged and still enabled.
+   **If it fails:** side panel DevTools; check the Mods tab for a deleted or altered original.
+9. Ask for another change and press **Save**.
+   **Expected:** because the name and match patterns are unchanged, the panel ASKS —
+   *"&lt;name&gt;" is already installed with the same name and the same match patterns. Update it, or
+   keep both?* Choose **Keep both**.
+   **Expected:** two mods now, the original untouched.
+   **If it fails:** side panel DevTools.
+10. Start a **New chat** on a page one of your mods matches.
+    **Expected:** the empty state lists that mod as **Edit &lt;name&gt;** under *or keep building on a
+    mod that runs here*. Clicking **Edit a mod…** in the chat bar opens a picker with the mods for
+    this page first.
+    **If it fails:** side panel DevTools.
+11. In that same new chat, ask for something that plainly belongs with an installed mod ("also hide
+    the footer", on a site where you have a mod that hides something).
+    **Expected:** the model opens the existing mod (an `open_mod` row in the transcript) and
+    proposes an updated version of it, rather than proposing a second mod. Saving updates that one.
+    **Note:** this is model behaviour, not a hard guarantee — a model that instead asks which you
+    meant is also correct. A model that silently creates a second mod doing the same job is not.
+12. With an unsaved draft in the current chat (propose something and do NOT save), press
+    **Edit a mod…** and pick a different mod.
+    **Expected:** a NEW chat opens for that mod and the status says so. Switch back: your unsaved
+    draft is exactly where you left it.
+    **If it fails:** this one matters most — an unsaved draft must never be replaced.
 
 ---
 
@@ -755,6 +823,7 @@ OpenAI-compatible endpoint, and a ChatGPT sign-in as the third if you have one.
 | 3a | Lost connection retries, Resume, interrupted run | | |
 | 4 | Chat persistence: reload, restart, second chat | | |
 | 4a | Side panel: this tab only, every tab, dashboard Open | | |
+| 4b | Edit an installed mod in chat (imported, round trip, detach, duplicate) | | |
 | 5 | Install from Greasy Fork `.user.js` link | | |
 | 6 | `@require` + `GM_setValue`/`GM_getValue` sync (2 tabs) | | |
 | 7 | `GM_xmlhttpRequest` with/without matching `@connect` | | |

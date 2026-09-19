@@ -43,6 +43,12 @@ export interface ArtifactVersion {
   source: VersionSource;
   /** The proposal this version came from, for 'proposal' versions. */
   proposalId?: string;
+  /**
+   * The ==UserScript== block this version's script came with, for a draft that started life outside
+   * this product. Absent on a version the model wrote, whose header is generated from the four
+   * fields above. See DraftHeader and toSource.
+   */
+  header?: DraftHeader;
 }
 
 /**
@@ -153,6 +159,8 @@ export interface NewVersion {
   proposalId?: string;
   /** Set on a proposal the model could not test; cleared by any version that is testable. */
   untestedReason?: string;
+  /** See ArtifactVersion.header: the original block, for a draft that came from an imported mod. */
+  header?: DraftHeader;
 }
 
 /**
@@ -174,6 +182,13 @@ export function addVersion(a: Artifact, v: NewVersion, at = Date.now()): Artifac
     return a.untestedReason === v.untestedReason ? a : { ...a, untestedReason: v.untestedReason };
   }
   const n = a.versions.reduce((max, x) => Math.max(max, x.n), 0) + 1;
+  // The header is INHERITED when the new version does not bring one of its own. This is what makes
+  // an imported userscript survive being edited in chat: the model's propose_mod carries a body and
+  // four fields and knows nothing about @require or @grant, so without this the first revision
+  // would quietly re-emit a generated header and strip every dependency the script needs. A version
+  // that does bring a header (open_mod adopting a different mod) replaces it, which is right —
+  // that is a different script.
+  const header = v.header ?? current?.header;
   const version: ArtifactVersion = {
     n,
     code: v.code,
@@ -183,6 +198,7 @@ export function addVersion(a: Artifact, v: NewVersion, at = Date.now()): Artifac
     createdAt: at,
     source: v.source,
     ...(v.proposalId ? { proposalId: v.proposalId } : {}),
+    ...(header ? { header } : {}),
   };
   return {
     ...a,
@@ -217,6 +233,9 @@ export function rollbackTo(a: Artifact, n: number, at = Date.now()): Artifact {
       description: target.description,
       matches: target.matches,
       source: 'rollback',
+      // Explicit rather than inherited: rolling back to a version that predates an open_mod must
+      // restore THAT version's header too, not the one the draft happens to be wearing now.
+      ...(target.header ? { header: target.header } : {}),
       // A rollback is the user choosing a script they have already seen; whatever caveat the model
       // attached to the version being restored travels back with it.
       ...(untestedOf(a, n) ? { untestedReason: untestedOf(a, n) } : {}),
@@ -241,10 +260,17 @@ export function createArtifact(chatId: string, v: NewVersion, at = Date.now(), i
   return addVersion(empty, v, at);
 }
 
-/** The current draft as a full userscript, header and all — what Try, Save and Export use. */
+/**
+ * The current draft as a full userscript, header and all — what Try, Save and Export use.
+ *
+ * A draft that came from an imported mod keeps that mod's own header and gets it back here, with
+ * only the name, description and matches rewritten inside it (reheader). A draft the model wrote
+ * from nothing has no header to keep, so one is generated as it always was.
+ */
 export function toSource(a: Artifact): string {
   const v = currentVersion(a);
   if (!v) return '';
+  if (v.header) return `${reheader(v.header.text, v)}\n\n${v.code.trim()}\n`;
   return buildSource({ name: v.name, description: v.description, matches: v.matches, code: v.code });
 }
 
@@ -262,31 +288,85 @@ export function toProposal(a: Artifact): ModProposal | null {
 }
 
 /**
+ * What a version of a mod that came from OUTSIDE this product needs to carry.
+ *
+ * A mod the model wrote has a header that buildSource can re-emit from four fields, so the draft
+ * only ever had to hold the body. A mod that was imported — from a URL, a file, a Tampermonkey
+ * backup — does not: its header carries `@require`, `@resource`, `@grant GM_setValue`, `@run-at`,
+ * `@connect`, `@noframes`, a `@version` the Update button compares against, `@downloadURL`, and
+ * whatever else its author wrote. Re-emitting that from a name, a description and a match list
+ * would silently strip every one of them and leave a script that throws at page load.
+ *
+ * So a version keeps the header it arrived with, verbatim, and `toSource` puts that header back
+ * rather than generating one. Only the fields the draft is allowed to change (name, description,
+ * matches) are rewritten INSIDE it — see reheader() — which is what lets the model rename a mod or
+ * widen its reach without knowing anything about the twenty other lines it must not touch.
+ */
+export interface DraftHeader {
+  /** The ==UserScript== block exactly as it was, including both fences. */
+  text: string;
+}
+
+/**
  * An artifact seeded from a saved mod, already linked to it. This is how a chat that starts from an
  * existing mod ("change this one") gets a draft whose first version is what is installed, rather
  * than a draft that begins at the model's first rewrite.
  *
  * The body comes from the mod's source with its header stripped by the same parser the rest of the
- * product uses, so a mod written by hand and a mod written in chat both arrive here as a body plus
- * the header fields, and a later save re-emits a header the same way.
+ * product uses, and the header itself is KEPT on the version (see DraftHeader) so a save puts back
+ * the one the script came with rather than a generated one.
  */
 export function fromMod(chatId: string, mod: Mod, at = Date.now(), id: string = crypto.randomUUID()): Artifact {
-  const header = parseHeader(mod.source);
-  const a = createArtifact(
-    chatId,
-    {
-      code: stripHeaderBody(mod.source),
-      name: header.name || mod.name,
-      description: header.description || mod.description,
-      matches: mod.matches.length ? [...mod.matches] : [...header.matches],
-      source: 'user-edit',
-    },
-    at,
-    id,
-  );
+  const a = createArtifact(chatId, versionFromMod(mod), at, id);
   // v1 IS the installed mod, byte for byte, so it is already the saved version. A chat that starts
   // from an existing mod otherwise opens offering to "save" something that is already saved.
   return { ...a, linkedModId: mod.id, savedVersion: a.current };
+}
+
+/**
+ * Adopt a mod's source as the draft of a chat that already has one — what the open_mod tool does.
+ *
+ * It APPENDS rather than starting over, for the same reason a rollback appends: the versions the
+ * chat already holds are work someone did, and a history that loses them cannot be walked back. So
+ * the mod becomes the newest version, the link and savedVersion point at it, and v1..vn are still
+ * in the strip. `openModDecision` in lib/modmatch.ts decides whether this is allowed to happen at
+ * all when those earlier versions were never saved anywhere.
+ */
+export function adoptMod(a: Artifact, mod: Mod, at = Date.now()): Artifact {
+  const next = addVersion(a, versionFromMod(mod), at);
+  return { ...next, linkedModId: mod.id, savedVersion: next.current };
+}
+
+/** One new version holding a mod's body, its header and its identity. */
+function versionFromMod(mod: Mod): NewVersion {
+  const header = parseHeader(mod.source);
+  const block = mod.source.match(/\/\/\s*==UserScript==[\s\S]*?\/\/\s*==\/UserScript==/)?.[0];
+  return {
+    code: stripHeaderBody(mod.source),
+    name: header.name || mod.name,
+    description: header.description || mod.description,
+    matches: mod.matches.length ? [...mod.matches] : [...header.matches],
+    source: 'user-edit',
+    ...(block ? { header: { text: block } } : {}),
+  };
+}
+
+/**
+ * Break the link to the mod, so the next Save creates a separate one — the panel's "Save as a new
+ * mod instead".
+ *
+ * It touches the ARTIFACT and nothing else: the mod keeps its id, its source, its enabled state and
+ * its GM values, and goes on running exactly as it did. Detaching is not deleting, and there is no
+ * path from here to a mod being removed.
+ *
+ * savedVersion goes with the link, because it is a statement about that mod: with nothing linked,
+ * "which version is installed" has no answer, and leaving the number behind would make the panel
+ * read a fresh, unsaved draft as already saved.
+ */
+export function detachFromMod(a: Artifact): Artifact {
+  if (!a.linkedModId) return a;
+  const { linkedModId: _drop, savedVersion: _drop2, ...rest } = a;
+  return rest;
 }
 
 /**
@@ -296,6 +376,54 @@ export function fromMod(chatId: string, mod: Mod, at = Date.now(), id: string = 
  */
 function stripHeaderBody(source: string): string {
   return source.replace(/\/\/\s*==UserScript==[\s\S]*?\/\/\s*==\/UserScript==\s*/, '').trim();
+}
+
+/**
+ * A kept header with the three fields the draft owns rewritten inside it.
+ *
+ * @name and @description are replaced in place (so their position and padding survive); @match
+ * lines are replaced as a group, because the draft's list is authoritative and a stale line left
+ * behind would widen the script's reach. Every other line is passed through untouched — that is the
+ * whole point. Locale-suffixed keys (@name:fr) are left alone: parseHeader treats them as fallbacks
+ * and rewriting them would be translating on the author's behalf.
+ */
+export function reheader(header: string, v: { name: string; description: string; matches: string[] }): string {
+  const lines = header.split('\n');
+  const out: string[] = [];
+  let matchesWritten = false;
+  const pad = (key: string) => (key.length >= 11 ? ' ' : ' '.repeat(12 - key.length));
+  for (const line of lines) {
+    // The key pattern is parseHeader's, `[\w:-]+`, and the colon is load-bearing. With `[\w-]+` a
+    // locale-suffixed line like `// @name:fr  Vieux` matched as key "name" with ":fr  Vieux" as its
+    // value, so it was rewritten into a SECOND `@name` — two names in one header, and the author's
+    // translation destroyed. Capturing the whole key lets the switch below see "name:fr", which is
+    // not "name", so the line falls through to being passed along untouched.
+    const kv = line.match(/^(\s*\/\/\s*)@([\w:-]+)(\s*)(.*?)\s*$/);
+    if (!kv) {
+      out.push(line);
+      continue;
+    }
+    const [, lead, key, gap] = kv as [string, string, string, string, string];
+    if (key === 'name') out.push(`${lead}@name${gap || pad('name')}${v.name}`);
+    else if (key === 'description') out.push(`${lead}@description${gap || pad('description')}${v.description}`);
+    else if (key === 'match') {
+      // The first @match becomes the whole new list; the rest are dropped, so a draft that narrowed
+      // its reach does not keep the pattern it dropped.
+      if (!matchesWritten) {
+        matchesWritten = true;
+        for (const m of v.matches) out.push(`${lead}@match${gap || pad('match')}${m}`);
+      }
+    } else out.push(line);
+  }
+  // A header with no @match at all (an @include-only script) gains the draft's patterns rather than
+  // losing them: the draft's list is what the panel showed the user and what the save registers on.
+  if (!matchesWritten && v.matches.length) {
+    const end = out.findIndex((l) => /\/\/\s*==\/UserScript==/.test(l));
+    const insert = v.matches.map((m) => `// @match${pad('match')}${m}`);
+    if (end >= 0) out.splice(end, 0, ...insert);
+    else out.push(...insert);
+  }
+  return out.join('\n');
 }
 
 // ---------------------------------------------------------------------------
@@ -513,13 +641,34 @@ export function draftHeadline(a: Artifact): string {
 export function draftBlock(a: Artifact): string {
   const v = currentVersion(a);
   if (!v) return '';
-  return [
+  const lines = [
     draftHeadline(a),
     'This is the draft in the user’s artifact panel, not page content. Edits the user asks for apply to it.',
-    '```javascript',
-    v.code,
-    '```',
-  ].join('\n');
+  ];
+  // A draft that IS an installed mod is a different job from a draft on its way to becoming one:
+  // the script already works, people already rely on it, and the model's licence is to change what
+  // was asked and leave the rest exactly as it found it. Saying so here rather than only in the
+  // system prompt means it is true of THIS turn — a chat that opened a mod half way through is
+  // told so from that turn on.
+  if (a.linkedModId) {
+    lines.push(
+      `This draft is an installed mod (id ${a.linkedModId}) that the user is EDITING. Saving rewrites that mod in place.`,
+      'Read the code below before changing it, keep everything it already does unless the user asks otherwise, and propose the COMPLETE updated script.',
+    );
+    // The header is the part a model is most likely to drop, because propose_mod does not carry it
+    // and nothing else in the conversation shows it. It is quoted in full so "keep the metadata
+    // block" is an instruction with the block attached rather than a rule about something unseen.
+    if (v.header) {
+      lines.push(
+        'Its ==UserScript== metadata block is kept for you and re-attached on save — do NOT write one into your code, and do not drop its @require, @resource, @grant, @connect or @run-at lines:',
+        '```',
+        v.header.text,
+        '```',
+      );
+    }
+  }
+  lines.push('```javascript', v.code, '```');
+  return lines.join('\n');
 }
 
 // ---------------------------------------------------------------------------
