@@ -30,6 +30,7 @@
 //
 // .ts extensions and type-only imports of ./types: this module is unit tested under
 // node --experimental-strip-types, whose resolver does not guess extensions.
+import { CHATGPT_CODEX_BASE, STORE_BUILD, XAI_PROXY_BASE } from './buildflags.ts';
 import type { ProviderKind } from './types';
 
 /**
@@ -48,12 +49,17 @@ export interface ModelListTarget {
   apiKey: string;
 }
 
-/** Default bases, restated here (not imported) so this module stays a leaf the node runner can load. */
+/**
+ * Default bases. The two subscription ones come from lib/buildflags and are blanked by the
+ * compile-time flag, so a store bundle carries neither vendor endpoint — docs/store/package-audit.md
+ * states that neither string appears anywhere in that package, and this keeps it true. (A store
+ * build never lists a subscription provider anyway: the background refuses before it gets here.)
+ */
 const DEFAULT_BASE: Record<ProviderKind, string> = {
   anthropic: 'https://api.anthropic.com',
   'openai-compatible': 'https://api.openai.com/v1',
-  chatgpt: 'https://chatgpt.com/backend-api/codex',
-  xai: 'https://cli-chat-proxy.grok.com/v1',
+  chatgpt: STORE_BUILD ? '' : CHATGPT_CODEX_BASE,
+  xai: STORE_BUILD ? '' : XAI_PROXY_BASE,
 };
 
 /** `base` + `path`, with `query` appended whether or not the base already carries a query string. */
@@ -195,10 +201,13 @@ export function listFailureMessage(status: number, bodyText: string): string {
  * models nobody here can guess — a local server, a proxy — and inventing names for it would be worse
  * than saying it could not be listed.
  */
-export const FALLBACK_MODELS: Readonly<Record<'chatgpt' | 'xai', readonly string[]>> = {
-  chatgpt: ['gpt-6-astra', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.5'],
-  xai: ['grok-4.6', 'grok-4', 'grok-code-fast-1'],
-};
+export const FALLBACK_MODELS: Readonly<Record<'chatgpt' | 'xai', readonly string[]>> = STORE_BUILD
+  ? // A store build has no subscription providers to list for, so it carries no list either.
+    { chatgpt: [], xai: [] }
+  : {
+      chatgpt: ['gpt-6-astra', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.5'],
+      xai: ['grok-4.6', 'grok-4', 'grok-code-fast-1'],
+    };
 
 export function fallbackModels(kind: ProviderKind): string[] {
   return kind === 'chatgpt' || kind === 'xai' ? [...FALLBACK_MODELS[kind]] : [];
