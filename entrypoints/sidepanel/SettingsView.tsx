@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { STORE_BUILD, migrateSettingsForBuild } from '@/lib/buildflags';
 import { rpc, type OAuthKind, type OAuthLoginState } from '@/lib/rpc';
+import { FALLBACK_NOTE } from '@/lib/modellist';
 import { loadSettings, saveSettings } from '@/lib/settings';
 import { resolveScope } from '@/lib/sidepanel';
 import { applyTheme } from '@/lib/theme';
@@ -83,8 +84,9 @@ export function SettingsView({ onReviewNotice }: { onReviewNotice?: () => void }
     setSaved(true);
     try {
       const list = await rpc({ type: 'models.list' });
-      setModels(list);
-      if (!list.length) setModelsError('The backend returned no models.');
+      setModels(list.models);
+      if (list.fallback) setModelsError(`${list.error ?? 'Could not list models.'} ${FALLBACK_NOTE}`);
+      else if (!list.models.length) setModelsError('The backend returned no models.');
     } catch (e) {
       setModelsError(e instanceof Error ? e.message : String(e));
     }

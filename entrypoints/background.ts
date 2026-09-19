@@ -18,12 +18,8 @@ import { buildTitleInput, completedTurns, sanitizeTitle, titleDecision, TITLE_SY
 import { createProvider } from '@/lib/providers';
 import { VISION_FALLBACK_PANEL_NOTE, createVisionMemory, resolveImagesSetting, visionKeyFor } from '@/lib/providers/vision';
 import { MAX_EDGE, SCREENSHOT_CAPTURE_FORMAT, SCREENSHOT_QUALITY, fitWithin, parseDataUrl } from '@/lib/images';
-import {
-  CHATGPT_CODEX_BASE,
-  STORE_BUILD,
-  XAI_PROXY_BASE,
-  unavailableProviderMessage,
-} from '@/lib/buildflags';
+import { STORE_BUILD, isSubscriptionProvider, unavailableProviderMessage } from '@/lib/buildflags';
+import { listFailureMessage, listWithFallback, modelsRequest, parseModelIds, type ModelListResult, type ModelListTarget } from '@/lib/modellist';
 import type { OAuthKind } from '@/lib/oauth';
 import type { AgentAttachState, AgentPortRequest, OAuthLoginState, RpcRequest } from '@/lib/rpc';
 import { SessionMap } from '@/lib/sessions';
@@ -1206,43 +1202,33 @@ async function startLogin(kind: OAuthKind): Promise<OAuthLoginState> {
   return entry.state;
 }
 
-/** Model ids for the configured provider, where the backend can list them. */
-async function listModels(): Promise<string[]> {
+/**
+ * Model ids for the configured provider, where the backend can list them.
+ *
+ * The request and the parsing are lib/modellist.ts (pure, unit tested); all that happens here is
+ * fetching the sign-in headers a subscription provider needs and doing the I/O. A subscription
+ * provider whose listing fails answers with a built-in list and the reason, so signing in never
+ * leaves the model field with nothing to offer.
+ */
+async function listModels(): Promise<ModelListResult> {
   const s = await loadSettings();
-  let url: string;
-  let headers: Record<string, string>;
-  switch (s.provider) {
-    case 'chatgpt': {
-      if (STORE_BUILD) throw new Error(unavailableProviderMessage('chatgpt'));
+  const target: ModelListTarget = { kind: s.provider, baseUrl: s.baseUrl, apiKey: s.apiKey };
+  // Outside the fallback: "not available in this build" is not a listing failure to paper over.
+  if (STORE_BUILD && isSubscriptionProvider(target.kind)) throw new Error(unavailableProviderMessage(target.kind));
+  return listWithFallback(target.kind, async () => {
+    let auth: Record<string, string> = {};
+    if (!STORE_BUILD && target.kind === 'chatgpt') {
       const o = await oauthModule();
-      url = `${(s.baseUrl || CHATGPT_CODEX_BASE).replace(/\/+$/, '')}/models`;
-      headers = o.chatgptHeaders(await o.getValidTokens('chatgpt'));
-      break;
-    }
-    case 'xai': {
-      if (STORE_BUILD) throw new Error(unavailableProviderMessage('xai'));
+      auth = o.chatgptHeaders(await o.getValidTokens('chatgpt'));
+    } else if (!STORE_BUILD && target.kind === 'xai') {
       const o = await oauthModule();
-      const t = await o.getValidTokens('xai');
-      url = `${(s.baseUrl || XAI_PROXY_BASE).replace(/\/+$/, '')}/models`;
-      const h = o.xaiProxyHeaders('', t.access);
-      delete h['x-grok-model-override'];
-      headers = h;
-      break;
+      auth = o.xaiProxyHeaders('', (await o.getValidTokens('xai')).access);
     }
-    case 'openai-compatible':
-      url = `${(s.baseUrl || 'https://api.openai.com/v1').replace(/\/+$/, '')}/models`;
-      headers = s.apiKey ? { authorization: `Bearer ${s.apiKey}` } : {};
-      break;
-    case 'anthropic':
-      url = `${(s.baseUrl || 'https://api.anthropic.com').replace(/\/+$/, '')}/v1/models?limit=100`;
-      headers = { 'x-api-key': s.apiKey, 'anthropic-version': '2023-06-01' };
-      break;
-  }
-  const r = await fetch(url, { headers });
-  if (!r.ok) throw new Error(`Could not list models: ${r.status}`);
-  const body = (await r.json()) as { data?: Array<{ id?: string; slug?: string }>; models?: Array<{ id?: string; slug?: string }> };
-  const entries = body.data ?? body.models ?? [];
-  return entries.map((m) => m.id ?? m.slug ?? '').filter(Boolean).sort();
+    const { url, headers } = modelsRequest(target, auth);
+    const r = await fetch(url, { headers });
+    if (!r.ok) throw new Error(listFailureMessage(r.status, await r.text().catch(() => '')));
+    return parseModelIds(await r.json());
+  });
 }
 
 // ---------- userScripts ----------

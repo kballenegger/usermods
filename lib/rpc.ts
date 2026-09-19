@@ -1,5 +1,6 @@
 import type { Artifact } from './artifact';
 import type { Chat } from './chats';
+import type { ModelListResult } from './modellist';
 import type { ResumableRun } from './runstate';
 import type { AgentEvent, ChatItem, Mod, ScriptPreview, UserTurn } from './types';
 
@@ -97,7 +98,7 @@ interface RpcResults {
   'oauth.status': { signedIn: boolean; label?: string };
   'oauth.start': OAuthLoginState;
   'oauth.poll': OAuthLoginState;
-  'models.list': string[];
+  'models.list': ModelListResult;
   'chats.list': Chat[];
   'chats.listAll': Chat[];
   'chats.transcript': ChatItem[];
