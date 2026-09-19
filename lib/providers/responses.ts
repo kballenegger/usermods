@@ -2,6 +2,7 @@
 // backends, which speak Responses rather than chat completions. Generic: the caller supplies the
 // base URL, headers and any body extras.
 import type { Msg, Part, ToolDef } from '../types';
+import { ProviderError, fetchOrNetworkError, httpError, readStream, streamIncomplete } from './errors.ts';
 import type { Provider, ProviderResponse } from './types';
 
 export interface ResponsesConfig {
@@ -55,7 +56,7 @@ export function createResponsesProvider(cfg: ResponsesConfig): Provider {
   return {
     async chat({ system, messages, tools, signal, callbacks }): Promise<ProviderResponse> {
       const headers = await cfg.headers();
-      const res = await fetch(`${base}/responses`, {
+      const res = await fetchOrNetworkError(`${base}/responses`, {
         method: 'POST',
         signal,
         headers: { 'content-type': 'application/json', accept: 'text/event-stream', ...headers },
@@ -72,22 +73,18 @@ export function createResponsesProvider(cfg: ResponsesConfig): Provider {
           ...cfg.body,
         }),
       });
-      if (!res.ok || !res.body) {
-        const body = await res.text().catch(() => '');
-        throw new Error(`${res.status} ${res.statusText}: ${body.slice(0, 500)}`);
-      }
+      if (!res.ok || !res.body) throw await httpError(res);
 
       const content: Part[] = [];
       let stopReason: ProviderResponse['stopReason'] = 'end_turn';
       let sawToolCall = false;
+      // A Responses stream ends with response.completed or response.incomplete (a failure throws).
+      // A body that stops before either has been cut off; see the same check in openai.ts.
+      let sawTerminal = false;
 
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
       let buf = '';
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
+      await readStream(res.body, signal, (chunk) => {
+        buf += chunk;
         let nl: number;
         while ((nl = buf.indexOf('\n')) >= 0) {
           const line = buf.slice(0, nl).trim();
@@ -125,6 +122,7 @@ export function createResponsesProvider(cfg: ResponsesConfig): Provider {
               break;
             }
             case 'response.completed': {
+              sawTerminal = true;
               const status = ev.response?.status;
               const reason = ev.response?.incomplete_details?.reason;
               if (status === 'incomplete' && reason === 'max_output_tokens') stopReason = 'max_tokens';
@@ -132,17 +130,32 @@ export function createResponsesProvider(cfg: ResponsesConfig): Provider {
               break;
             }
             case 'response.incomplete':
+              sawTerminal = true;
               stopReason = ev.response?.incomplete_details?.reason === 'max_output_tokens' ? 'max_tokens' : 'other';
               break;
             case 'response.failed':
-              throw new Error(ev.response?.error?.message ?? 'The model request failed.');
+              throw streamedError(ev.response?.error);
             case 'error':
-              throw new Error(ev.error?.message ?? ev.message ?? 'The model request failed.');
+              throw streamedError(ev.error ?? ev);
           }
         }
-      }
+      });
+      if (!sawTerminal) throw streamIncomplete();
       if (sawToolCall && stopReason === 'end_turn') stopReason = 'tool_use';
       return { content, stopReason };
     },
   };
+}
+
+/**
+ * Error codes a Responses backend reports INSIDE a 200 stream that mean "try again": the server
+ * fell over or is shedding load. Everything else (a bad request, a policy rejection, an unknown
+ * model) is reported as 'rejected', because sending the same request again gets the same answer.
+ */
+const TRANSIENT_CODES = /^(server_error|internal_error|overloaded|overloaded_error|rate_limit_exceeded|rate_limit_error|service_unavailable|timeout)$/i;
+
+function streamedError(err: { code?: unknown; type?: unknown; message?: unknown } | null | undefined): ProviderError {
+  const message = typeof err?.message === 'string' && err.message ? err.message : 'The model request failed.';
+  const code = typeof err?.code === 'string' ? err.code : typeof err?.type === 'string' ? err.type : '';
+  return new ProviderError(message, { kind: TRANSIENT_CODES.test(code) ? 'overloaded' : 'rejected' });
 }

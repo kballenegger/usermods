@@ -67,6 +67,34 @@ export interface ActivityState {
   queued?: number;
   /** The port went away mid-run: the service worker died under us. */
   disconnected?: boolean;
+  /**
+   * The model request failed and the loop is waiting to make it again (lib/agent/retry.ts).
+   * `remainingMs` is how much of that wait is left, computed by the panel from the event's `until`.
+   */
+  retry?: { reason: RetryReason; attempt: number; max: number; remainingMs: number; status?: number };
+}
+
+/** Why the request is being retried, as the loop reports it. 'offline' spends no attempt. */
+export type RetryReason = 'network' | 'stream' | 'rate_limit' | 'overloaded' | 'server' | 'offline';
+
+/**
+ * What went wrong, in the line's own voice: short, lower case, no blame. A dropped stream and a
+ * connection that never opened are the same thing to the person watching, so they share a label.
+ */
+export function retryLabel(reason: RetryReason, status?: number): string {
+  switch (reason) {
+    case 'network':
+    case 'stream':
+      return 'connection lost';
+    case 'rate_limit':
+      return 'rate limited by the provider';
+    case 'overloaded':
+      return 'the provider is overloaded';
+    case 'server':
+      return status ? `the provider returned ${status}` : 'the provider returned an error';
+    case 'offline':
+      return 'you are offline';
+  }
 }
 
 /** What the component renders. `segments` join with " · ". */
@@ -153,6 +181,22 @@ export function activityFor(state: ActivityState): Activity | null {
 
   if (state.phase === 'idle') return null;
 
+  // A retry in progress is the whole story while it lasts: what went wrong, when the next attempt
+  // is, and which one it will be. It takes the warning colour and offers Stop, because a user who
+  // knows the network is gone should not have to sit through five attempts to say so. It is also
+  // exempt from the stall rule below — a 60 second Retry-After is silence by arrangement.
+  if (state.retry) {
+    const r = state.retry;
+    if (r.reason === 'offline') {
+      segments.push('waiting for the connection to come back');
+    } else {
+      const secs = Math.ceil(r.remainingMs / 1000);
+      segments.push(secs > 0 ? `retrying in ${secs}s` : 'retrying now', `attempt ${r.attempt} of ${r.max}`);
+    }
+    if (state.queued) segments.push(`${state.queued} queued`);
+    return { tone: 'warn', label: retryLabel(r.reason, r.status), monoJoin: ' ', segments, action: 'stop', pulse: false };
+  }
+
   // A wait that is legitimately in progress is held to its own, later threshold (WAIT_STALL_MS).
   const waiting = state.phase === 'tool' && state.tool === WAIT_TOOL;
   const stalled = state.sinceLastEvent >= (waiting ? WAIT_STALL_MS : STALL_MS);
@@ -222,6 +266,8 @@ export interface ChatActivity {
   queued: number;
   /** The port went away while this chat was mid-run. */
   disconnected?: boolean;
+  /** The model request is being retried; `until` is when the next attempt starts (Date.now()). */
+  retry?: { reason: RetryReason; attempt: number; max: number; until: number; status?: number };
 }
 
 /** A chat with nothing to say. Also what an unknown chat reads as, so lookups need no null check. */
@@ -229,8 +275,9 @@ export const IDLE_ACTIVITY: ChatActivity = { phase: 'idle', startedAt: null, las
 
 /** The shape of a port event this layer cares about. Structurally satisfied by AgentEvent. */
 type ActivityEvent =
-  | { type: 'status'; phase: Phase; tool?: string; detail?: string; iteration?: number }
+  | { type: 'status'; phase: Phase; tool?: string; detail?: string; iteration?: number; retry?: ChatActivity['retry'] }
   | { type: 'text' }
+  | { type: 'text_discard' }
   | { type: 'accepted' }
   | { type: 'unqueued' }
   | { type: 'done' }
@@ -259,10 +306,16 @@ export function activityFromEvent(a: ChatActivity, e: ActivityEvent, now: number
         // A new phase has not written anything yet.
         writing: false,
         disconnected: false,
+        // Set explicitly, never inherited: the ordinary status event that follows a retry wait
+        // carries no `retry`, and that absence is what puts the line back to normal.
+        retry: s.retry,
       };
     }
     case 'text':
-      return { ...a, lastEventAt: now, writing: a.phase === 'model' ? true : a.writing };
+      return { ...a, lastEventAt: now, writing: a.phase === 'model' ? true : a.writing, retry: undefined };
+    case 'text_discard':
+      // The attempt that was writing has failed; whatever comes next starts from "waiting" again.
+      return { ...a, lastEventAt: now, writing: false };
     case 'accepted':
     case 'unqueued':
       return { ...a, lastEventAt: now, queued: Math.max(0, a.queued - 1) };

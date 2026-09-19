@@ -1,12 +1,17 @@
+// Every value import below carries its .ts extension, as lib/transcript.ts explains: `npm test`
+// runs this file through node --experimental-strip-types (test/loop.test.ts drives the whole loop
+// against a fake provider), and node's ESM resolver does not guess extensions or directory indexes.
 import { imageNote } from '../images.ts';
-import { createProvider } from '../providers';
-import { renderRunResult, type RunResult } from '../runscript';
-import { DEFAULT_CONTEXT_BUDGET, type AgentEventBody, type ElementRef, type ModProposal, type Msg, type Part, type Settings, type UserTurn } from '../types';
-import { MAX_ITERATIONS, countReads, readBudgetNudge, wrapUpNudge } from './budget';
-import { compact, needsCompaction } from './compact';
-import { SYSTEM_PROMPT } from './prompt';
-import { checkProposal, type ProposalContext } from './propose';
-import { TOOLS } from './tools';
+import { createProvider } from '../providers/index.ts';
+import type { Provider } from '../providers/types';
+import { renderRunResult, type RunResult } from '../runscript.ts';
+import { DEFAULT_CONTEXT_BUDGET, type AgentEventBody, type ModProposal, type Msg, type Part, type Settings, type UserTurn } from '../types.ts';
+import { MAX_ITERATIONS, countReads, readBudgetNudge, wrapUpNudge } from './budget.ts';
+import { compact, needsCompaction } from './compact.ts';
+import { SYSTEM_PROMPT } from './prompt.ts';
+import { checkProposal, type ProposalContext } from './propose.ts';
+import { withRetry, type RetryDeps, type RetryPolicy } from './retry.ts';
+import { TOOLS } from './tools.ts';
 import {
   EMPTY_TALLY,
   foldWait,
@@ -17,7 +22,7 @@ import {
   waitActivityDetail,
   type WaitOutcome,
   type WaitSpec,
-} from './wait';
+} from './wait.ts';
 
 /** Everything a tool needs from the browser. Implemented in the background worker. */
 export interface AgentEnv {
@@ -38,7 +43,13 @@ export interface AgentEnv {
 export interface AgentInput {
   settings: Settings;
   history: Msg[];
-  turn: UserTurn;
+  /**
+   * The message that starts this run, or null to RESUME: carry on from `history` exactly as it
+   * stands, adding no user turn at all. That is what the panel's Resume button does after a run
+   * failed or was interrupted — the model gets the same conversation again, tool results and all,
+   * and simply continues, so the prompt is never sent twice and no finished tool runs again.
+   */
+  turn: UserTurn | null;
   /** Messages the user sent while this run was in progress. Drained between model calls. */
   pullQueued: () => UserTurn[];
   env: AgentEnv;
@@ -77,7 +88,44 @@ export interface AgentInput {
    * one (the unit tests) simply proposes as before.
    */
   onProposal?: (p: ModProposal) => Promise<number | null>;
+  /**
+   * Called with the conversation each time it reaches a point worth keeping: once the user's turn
+   * is in it, and after every step whose tool calls have all been answered. The history is valid
+   * for every provider at each of those points, so whatever kills the run next — an exhausted
+   * retry, the service worker being evicted, the browser quitting — the caller has something it can
+   * resume from. Awaited, so checkpoints land in order; failures are ignored.
+   */
+  onCheckpoint?: (messages: Msg[]) => void | Promise<void>;
+  /** The provider to talk to. Defaults to the one `settings` describes; tests pass a fake. */
+  provider?: Provider;
+  /** The retry policy and its clock, for the model request (lib/agent/retry.ts). */
+  retry?: { policy?: RetryPolicy; deps?: Partial<RetryDeps> };
 }
+
+/**
+ * How a run ended. `messages` is ALWAYS a history every adapter will accept: a run that failed
+ * hands back everything it completed, so the caller saves real progress rather than the bare
+ * prompt. `failure` is set when the model request failed for good (not retryable, or out of
+ * retries); Stop is not a failure.
+ *
+ * A result rather than an error with the messages attached: the caller does the same thing with
+ * the messages on every path (save them), and a thrown error that must be caught to reach the
+ * normal return value is a return value wearing a disguise.
+ */
+export interface RunOutcome {
+  messages: Msg[];
+  failure?: { message: string };
+}
+
+/**
+ * The one synthetic line a resume may add. A conversation saved mid-run ends on a user message (the
+ * prompt, or a step's tool results), which is exactly what every API wants to see last, so normally
+ * nothing is added. The exception is a history that ends on an ASSISTANT message — a run that was
+ * interrupted in the instant between finishing and being marked finished. Anthropic's current
+ * models reject a trailing assistant message outright (it reads as a prefill), so that one case
+ * gets a user line saying what happened.
+ */
+export const RESUME_NUDGE = '[The previous run was interrupted before it finished. Continue from where you left off.]';
 
 /**
  * One user turn as the model sees it: where the page is, what the draft mod currently is, which
@@ -124,29 +172,78 @@ function turnParts(turn: UserTurn, page: { url: string; title: string } | null, 
   return parts;
 }
 
-/** Drop a trailing assistant turn whose tool calls were never answered, so the history stays valid. */
-function trimUnanswered(messages: Msg[]): Msg[] {
+/**
+ * Drop a trailing assistant turn whose tool calls were never answered, so the history stays valid.
+ * Every adapter needs this: chat-completions and Responses reject a tool call with no output, and
+ * Anthropic rejects a tool_use with no tool_result.
+ */
+export function trimUnanswered(messages: Msg[]): Msg[] {
   const last = messages[messages.length - 1];
   if (last?.role === 'assistant' && last.content.some((p) => p.type === 'tool_call')) return messages.slice(0, -1);
   return messages;
 }
 
-export async function runAgent(input: AgentInput): Promise<Msg[]> {
-  const { settings, env, emit, signal } = input;
-  const provider = createProvider(settings);
-  const messages: Msg[] = [...input.history];
+/** The words of the last message the user actually typed, for a resumed run's proposal checks. */
+function lastUserText(messages: Msg[]): string {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i]!;
+    if (m.role !== 'user' || m.content.some((p) => p.type === 'tool_result')) continue;
+    return m.content.map((p) => (p.type === 'text' ? p.text : '')).join('\n');
+  }
+  return '';
+}
 
-  const page = await env.pageInfo().catch(() => null);
+/**
+ * Has a run_script succeeded since the last proposal? A resumed run rebuilds this from the history,
+ * because the flag it replaces lived in the run that died: without it, a model that tested its
+ * script, lost the connection and resumed would be told to test it again.
+ */
+function testedSinceProposal(messages: Msg[]): boolean {
+  const failed = new Set<string>();
+  for (const m of messages) for (const p of m.content) if (p.type === 'tool_result' && p.isError) failed.add(p.toolCallId);
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i]!;
+    if (m.role === 'user' && !m.content.some((p) => p.type === 'tool_result')) return false; // the turn began here
+    if (m.role !== 'assistant') continue;
+    for (let j = m.content.length - 1; j >= 0; j--) {
+      const p = m.content[j]!;
+      if (p.type !== 'tool_call') continue;
+      if (p.name === 'propose_mod') return false;
+      if (p.name === 'run_script' && !failed.has(p.id)) return true;
+    }
+  }
+  return false;
+}
+
+export async function runAgent(input: AgentInput): Promise<RunOutcome> {
+  const { settings, env, emit, signal } = input;
+  const provider = input.provider ?? createProvider(settings);
+  const messages: Msg[] = [...input.history];
   const draft = () => input.draft?.() ?? '';
-  messages.push({ role: 'user', content: turnParts(input.turn, page, false, draft()) });
-  emit({ type: 'accepted', id: input.turn.id });
+  const checkpoint = () => Promise.resolve(input.onCheckpoint?.(trimUnanswered(messages))).catch(() => {});
+
+  if (input.turn) {
+    const page = await env.pageInfo().catch(() => null);
+    messages.push({ role: 'user', content: turnParts(input.turn, page, false, draft()) });
+    emit({ type: 'accepted', id: input.turn.id });
+  } else {
+    // Resuming. The conversation is sent as it stands; see RESUME_NUDGE for the one exception.
+    const kept = trimUnanswered(messages);
+    if (kept !== messages) messages.splice(0, messages.length, ...kept);
+    if (messages[messages.length - 1]?.role === 'assistant') messages.push({ role: 'user', content: [{ type: 'text', text: RESUME_NUDGE }] });
+  }
+  // The turn is safe before the first request is made: a run that dies waiting for its first byte
+  // still has the user's message in the saved conversation, so Resume needs nothing resent.
+  await checkpoint();
 
   try {
     await loop();
   } catch (e) {
-    if (!signal.aborted) throw e;
+    // Stop is not a failure. Anything else is the model request failing for good: the messages
+    // completed so far go back to the caller either way, which is the whole point.
+    if (!signal.aborted) return { messages: trimUnanswered(messages), failure: { message: e instanceof Error ? e.message : String(e) } };
   }
-  return signal.aborted ? trimUnanswered(messages) : messages;
+  return { messages: signal.aborted ? trimUnanswered(messages) : messages };
 
   /**
    * Keep the history inside the context budget before every provider call.
@@ -179,7 +276,9 @@ export async function runAgent(input: AgentInput): Promise<Msg[]> {
     // Whether a run_script has completed since the last proposal, which is what propose_mod's
     // "test it first" check reads. Held here rather than derived from the message history, because
     // by the time the history is stored a tool result is provider-neutral text.
-    const ctx: ProposalContext = { testedSinceProposal: false, userText: input.turn.text };
+    const ctx: ProposalContext = input.turn
+      ? { testedSinceProposal: false, userText: input.turn.text }
+      : { testedSinceProposal: testedSinceProposal(messages), userText: lastUserText(messages) };
     // How much this turn has waited (lib/agent/wait.ts). Waiting is neither a read nor an act, so
     // it has its own counter: it must not trip the read budget (polling was the problem wait_for
     // exists to remove, and charging for the fix would push the model straight back to polling),
@@ -205,14 +304,53 @@ export async function runAgent(input: AgentInput): Promise<Msg[]> {
       }
       // The panel's activity line is driven entirely by these: it has no other way to tell a model
       // that is thinking from one that has hung.
-      emit({ type: 'status', phase: 'model', detail: i === 0 ? 'waiting for model' : 'continuing', iteration: i + 1 });
-      const res = await provider.chat({
-        system: SYSTEM_PROMPT,
-        messages,
-        tools: TOOLS,
-        signal,
-        callbacks: { onText: (delta) => emit({ type: 'text', delta }) },
-      });
+      const modelStatus = () => emit({ type: 'status', phase: 'model', detail: i === 0 ? 'waiting for model' : 'continuing', iteration: i + 1 });
+      modelStatus();
+      // The model request, and only the model request, is retried (lib/agent/retry.ts). Nothing
+      // below this call runs twice: the tools execute once, after a reply has arrived whole.
+      //
+      // `streamed` counts the text this ATTEMPT has put on screen. A reply that dies half-way is
+      // not part of the conversation, and the retry streams its own from the start, so the panel is
+      // told to take those characters back before it sees the same sentence again.
+      let streamed = 0;
+      const res = await withRetry(
+        () => {
+          streamed = 0;
+          return provider.chat({
+            system: SYSTEM_PROMPT,
+            messages,
+            tools: TOOLS,
+            signal,
+            callbacks: {
+              onText: (delta) => {
+                streamed += delta.length;
+                emit({ type: 'text', delta });
+              },
+            },
+          });
+        },
+        {
+          signal,
+          policy: input.retry?.policy,
+          deps: input.retry?.deps,
+          onAttemptFailed: () => {
+            if (streamed) emit({ type: 'text_discard', chars: streamed });
+            streamed = 0;
+          },
+          onRetry: (n) =>
+            emit({
+              type: 'status',
+              phase: 'model',
+              detail: 'retrying',
+              iteration: i + 1,
+              retry: { reason: n.reason, attempt: n.attempt, max: n.max, until: Date.now() + n.delayMs, ...(n.status === undefined ? {} : { status: n.status }) },
+            }),
+          onOffline: (capMs) =>
+            emit({ type: 'status', phase: 'model', detail: 'offline', iteration: i + 1, retry: { reason: 'offline', attempt: 0, max: 0, until: Date.now() + capMs } }),
+          // Back to the ordinary label: the wait is over and a request is in flight again.
+          onResume: modelStatus,
+        },
+      );
       messages.push({ role: 'assistant', content: res.content });
 
       const calls = res.content.filter((p): p is Extract<Part, { type: 'tool_call' }> => p.type === 'tool_call');
@@ -278,6 +416,8 @@ export async function runAgent(input: AgentInput): Promise<Msg[]> {
         emit({ type: 'accepted', id: q.id });
       }
       messages.push({ role: 'user', content: results });
+      // Every call in this step has its result, so the conversation is whole again: keep it.
+      await checkpoint();
       if (signal.aborted) {
         ranOut = false;
         break;

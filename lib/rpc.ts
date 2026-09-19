@@ -1,5 +1,6 @@
 import type { Artifact } from './artifact';
 import type { Chat } from './chats';
+import type { ResumableRun } from './runstate';
 import type { AgentEvent, ChatItem, Mod, ScriptPreview, UserTurn } from './types';
 
 export type OAuthKind = 'chatgpt' | 'xai';
@@ -70,7 +71,14 @@ export type RpcRequest =
   | { type: 'oauth.poll'; kind: OAuthKind }
   | { type: 'oauth.cancel'; kind: OAuthKind }
   | { type: 'oauth.signout'; kind: OAuthKind }
-  | { type: 'models.list' };
+  | { type: 'models.list' }
+  /**
+   * What the panel asks the moment it has opened its port: which chats are running right now (and
+   * what each is doing), and which have a run that stopped short and can be resumed. Answered only
+   * after the background has written out any transcript it was keeping while no panel was open, so
+   * the panel can read storage afterwards and trust it.
+   */
+  | { type: 'agent.attach' };
 
 /** Response shape per request type. Anything not listed here answers { ok: true }. */
 interface RpcResults {
@@ -99,6 +107,13 @@ interface RpcResults {
   'artifact.rollback': Artifact;
   'artifact.rename': Artifact;
   'artifact.save': { artifact: Artifact; mod: Mod; created: boolean; relinked: boolean };
+  'agent.attach': AgentAttachState;
+}
+
+/** See 'agent.attach'. `status` is the last status event the run posted, if it has posted one. */
+export interface AgentAttachState {
+  running: Record<string, { startedAt: number; status?: Extract<AgentEvent, { type: 'status' }> }>;
+  resumable: Record<string, ResumableRun>;
 }
 
 export type RpcResponse<T extends RpcRequest['type']> = T extends keyof RpcResults ? RpcResults[T] : { ok: true };
@@ -115,5 +130,13 @@ export async function rpc<T extends RpcRequest['type']>(req: Extract<RpcRequest,
  * the whole panel, and the panel may be looking at a different chat than the one that is running,
  * so nothing may be inferred from "the port's current chat".
  */
-export type AgentPortRequest = ({ type: 'send'; tabId: number; chatId: string } & UserTurn) | { type: 'abort'; chatId: string };
+export type AgentPortRequest =
+  | ({ type: 'send'; tabId: number; chatId: string } & UserTurn)
+  | { type: 'abort'; chatId: string }
+  /**
+   * Carry on a run that failed or was interrupted, from the conversation as it was saved. No text
+   * travels with this, deliberately: nothing is added to the conversation, so the prompt cannot be
+   * sent twice.
+   */
+  | { type: 'resume'; tabId: number; chatId: string };
 export type AgentPortEvent = AgentEvent;
