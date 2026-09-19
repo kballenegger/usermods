@@ -168,7 +168,7 @@ export function createOpenAIProvider(settings: Settings, deps: OpenAIProviderDep
       // Does this request carry a picture at all, and are we allowed to send it? A history with no
       // images takes the plain path and never consults the store.
       const carriesImages = hasImages(messages);
-      let withImages = carriesImages && (await shouldSendImages(setting, key, memory));
+      const withImages = carriesImages && (await shouldSendImages(setting, key, memory));
 
       let res = await send(withImages);
 
@@ -192,7 +192,6 @@ export function createOpenAIProvider(settings: Settings, deps: OpenAIProviderDep
         if (isVisionRejection(res.status, body)) {
           await memory.markUnsupported(key);
           deps.onVisionUnsupported?.(key);
-          withImages = false;
           res = await send(false);
         } else {
           throw new ProviderError(`${res.status} ${res.statusText}: ${body.slice(0, 500)}`.trim(), {
