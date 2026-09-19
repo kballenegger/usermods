@@ -55,6 +55,11 @@ export function reduceItems(items: ChatItem[], event: AgentEventBody): ChatItem[
       for (let i = items.length - 1; i >= 0; i--) {
         const it = items[i];
         if (it?.kind !== 'proposal') continue;
+        // Already stamped with this number: the event is a duplicate, not a second proposal, so
+        // nothing changes. (The de-duped re-proposal case — the model proposing the same script
+        // twice, which addVersion collapses — arrives as a row with NO version, and is stamped with
+        // the version it de-duped into, which is the truthful answer to "which version is this
+        // card?".)
         if (it.version === event.version) return items;
         const next = items.slice();
         next[i] = { ...it, version: event.version };

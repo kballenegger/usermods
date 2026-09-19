@@ -624,7 +624,9 @@ async function saveArtifactAsMod(chatId: string): Promise<{ artifact: Artifact; 
   await upsertMod(mod);
   await syncRegistrations();
 
-  const next: Artifact = { ...artifact, linkedModId: mod.id };
+  // Which version the mod now holds, not merely that a save happened. The panel and the transcript
+  // both read this to tell the version that is installed from the one the model has since proposed.
+  const next: Artifact = { ...artifact, linkedModId: mod.id, savedVersion: artifact.current };
   await saveArtifact(next);
   return { artifact: next, mod, created: !linked, relinked };
 }

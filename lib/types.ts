@@ -285,8 +285,14 @@ export type ChatItem =
    * A proposal, as history. `version` is the artifact version this proposal became, so a card in
    * the transcript can say "v2" and its button can select that version in the artifact panel
    * rather than acting on its own copy of the code. Absent on cards written before drafts existed.
+   *
+   * There is deliberately no `saved` here. Whether a card is the version that is installed is read
+   * from the artifact (see proposalCardState), because it changes every time the draft does — a
+   * boolean written onto the row at save time went on claiming "saved" after the model had proposed
+   * something else, which is the bug that made a fresh proposal look like it was already installed.
+   * `saved` on a transcript restored from an older build is simply ignored.
    */
-  | { kind: 'proposal'; proposal: ModProposal; saved?: boolean; version?: number }
+  | { kind: 'proposal'; proposal: ModProposal; version?: number }
   | { kind: 'note'; text: string }
   | { kind: 'error'; text: string };
 

@@ -4,15 +4,13 @@ import { openDashboard } from './App';
 import { ArtifactPanel } from './ArtifactPanel';
 import { Lightbox, PendingStrip, SentImages, type PendingImage } from './Attachments';
 import { carriesFiles, fileFromDataUrlText, filesFromTransfer, processImageFile } from './images';
-import { toSource, type Artifact } from '@/lib/artifact';
+import { proposalCardLabel, proposalCardState, toSource, type Artifact } from '@/lib/artifact';
 import { IDLE_ACTIVITY, activityFromEvent, allDisconnected, withActivity, withoutActivity, type ChatActivity } from '@/lib/activity';
 import { putBlobs } from '@/lib/blobs';
 import { archivedChats, isArchived, liveChats, loadItems, pickChatToShow, relativeTime, saveItems, titleFromText, type Chat as ChatRecord } from '@/lib/chats';
 import { ArchiveIcon, DeleteIcon, RenameIcon, UnarchiveIcon } from './components/icons';
 import { exportFilename, HANDOFF_KEY, resolveHandoff, type ChatHandoff } from '@/lib/dashboard';
 import { ACCEPT_ATTR, MAX_IMAGES_PER_MESSAGE, capNote, emptyTextFor, type AttachedImage, type ImageThumb } from '@/lib/images';
-import { findByName } from '@/lib/modmatch';
-import { modFromProposal } from '@/lib/mods';
 import { rpc, type AgentPortRequest } from '@/lib/rpc';
 import { RECONNECT_NOTE, looksUnfinished, reduceItems, toolDotClass, toolDotState, toolRowTitle, unqueuedItem } from '@/lib/transcript';
 import type { AgentEvent, ChatItem, ContentEvent, ElementRef, ModProposal } from '@/lib/types';
@@ -929,9 +927,11 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
             ? `Saved “${r.mod.name}” · enabled`
             : `Updated “${r.mod.name}” in place`,
       );
-      // Every proposal card in the transcript is history of this same draft, so a save marks them
-      // all rather than leaving earlier cards offering a Save that would do the same thing.
-      updateItems((prev) => prev.map((it) => (it.kind === 'proposal' ? { ...it, saved: true } : it)));
+      // Nothing is stamped on the transcript. Which card reads as saved is derived from the
+      // artifact's savedVersion every render — see proposalCardState. Writing a boolean onto the
+      // rows instead is what made a LATER proposal inherit an earlier save: the flag said "this
+      // chat saved something", the card read it as "this script is installed", and after the model
+      // revised the draft those two stopped being the same statement.
     } catch (e) {
       updateItems((prev) => [...prev, { kind: 'error', text: `Could not save the draft: ${e instanceof Error ? e.message : String(e)}` }]);
     }
@@ -1145,11 +1145,17 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
               // its own frozen copy. That is what stops the transcript and the panel disagreeing
               // about what "the mod" is after four proposals.
               const version = it.version;
+              // Saved-ness is a fact about the DRAFT, read fresh every render, never a flag left on
+              // the row. A card is 'saved' only while the mod holds this very version; the moment
+              // the model proposes a revision, the new card reads 'update' and the old one stops
+              // claiming to be what is installed.
+              const cardState = proposalCardState(artifact, version);
               return (
-                <div key={i} className="card hero">
+                <div key={i} className="card hero" data-testid="proposal-card" data-card-state={cardState}>
                   <div>
                     <div className="label">
                       proposed mod{version ? <span className="card-version" data-testid="card-version"> · v{version}</span> : null}
+                      {cardState === 'saved' ? <span className="card-saved" data-testid="card-saved"> · saved</span> : null}
                     </div>
                     <h4>{it.proposal.name}</h4>
                   </div>
@@ -1165,22 +1171,36 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
                   </details>
                   <div className="row">
                     <button className="btn" onClick={() => void tryProposal(it.proposal)} disabled={tabId == null}>Run once</button>
+                    {/* Save is on the card again, and it is the SAME save the draft panel offers:
+                        it writes the current draft over the mod this chat is linked to. A revised
+                        proposal is a new version of one mod, not a second mod, so the button says
+                        "update" rather than minting a copy — and it is disabled only once the mod
+                        really does hold this version. */}
+                    <button
+                      className="btn primary"
+                      onClick={() => void saveArtifact()}
+                      disabled={cardState === 'saved' || cardState === 'none'}
+                      title={
+                        cardState === 'saved'
+                          ? 'This version is the mod that is installed'
+                          : cardState === 'update'
+                            ? 'Write the current draft over the mod this chat created'
+                            : 'Save this draft as a mod and enable it'
+                      }
+                      data-testid="card-save"
+                    >
+                      {proposalCardLabel(cardState)}
+                    </button>
                     {version && artifact ? (
                       <button
-                        className="btn primary"
+                        className="linklike"
                         onClick={() => setShownVersion(version)}
                         title="Select this version in the draft panel below"
                         data-testid="card-open-in-draft"
                       >
                         Open in draft
                       </button>
-                    ) : (
-                      // A card from before drafts existed, or one whose version could not be
-                      // recorded: it keeps the save it has always offered.
-                      <button className="btn primary" onClick={() => void saveArtifact()} disabled={it.saved || !artifact}>
-                        {it.saved ? 'Saved · enabled' : 'Save & enable'}
-                      </button>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               );

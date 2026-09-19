@@ -458,6 +458,17 @@
 }
 
 /*
+ * "· saved" beside the version, on the one card whose version the installed mod actually holds.
+ *
+ * It is the card's only claim to being installed, and it moves: propose a revision and it leaves
+ * this card for the new one. That is the whole point — it is rendered from the draft's savedVersion
+ * every time, never from a flag left behind by an earlier save.
+ */
+.card-saved {
+  color: var(--ok, var(--text-2));
+}
+
+/*
  * What Save, Update or a rollback just did. A row of the chat column like the panel itself, so it
  * cannot move the transcript either.
  */
