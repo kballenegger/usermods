@@ -101,6 +101,15 @@ const WAIT = process.argv.includes('--wait');
 const IMAGES = process.argv.includes('--images');
 const ARTIFACT = process.argv.includes('--artifact');
 const EDITMOD = process.argv.includes('--editmod');
+/**
+ * Rewrite only the captures the edit-a-mod feature changed: the Mods view (its rows grew an "Edit
+ * in chat" button) in both themes, and the new "Editing <name>" shot.
+ *
+ * Regenerating everything would rewrite captures nothing in this change touched, with whatever
+ * incidental differences a fresh run brings — and docs/screenshots/hero-github.png is hand-captured
+ * and must never be written from here at all.
+ */
+const EDITMOD_SHOT = process.argv.includes('--editmod-capture');
 /** The artifact flow, asserted AND capturing the two draft-panel states for the PR. */
 const ARTIFACT_SHOT = process.argv.includes('--artifact-capture');
 const PANELSCOPE = process.argv.includes('--panelscope');
@@ -129,6 +138,9 @@ const CAPTURING =
   !SMOKE && !CHATS && !ISOLATION && !COMPACTION && !DASHBOARD && !DASHBOARD_SHOT && !THEME &&
   !TABBAR && !TABBAR_SHOT && !WAIT && !IMAGES && !STYLEGUIDE && !ARTIFACT && !ARTIFACT_SHOT &&
   !PANELSCOPE && !RESUME && !EDITMOD;
+// --editmod-capture writes screenshots, so it wears the capture mask (the untested line is an
+// artefact of the automated profile, not of the product; see HIDE_UNTESTED_LINE).
+const CAPTURING_EDITMOD = EDITMOD_SHOT;
 
 /** See note 4: a first-run setup instruction, not the steady state the README should show. */
 const HIDE_SETUP_NOTICE = '.app > .notice, .dash-inner > .notice { display: none !important; }';
@@ -151,7 +163,7 @@ const HIDE_SETUP_NOTICE = '.app > .notice, .dash-inner > .notice { display: none
 const HIDE_UNTESTED_LINE = '.card .label.untested { display: none !important; }';
 
 /** Everything the capture path masks: the setup notice always, the untested line only when capturing. */
-const MASK = CAPTURING ? `${HIDE_SETUP_NOTICE}\n${HIDE_UNTESTED_LINE}` : HIDE_SETUP_NOTICE;
+const MASK = CAPTURING || CAPTURING_EDITMOD ? `${HIDE_SETUP_NOTICE}\n${HIDE_UNTESTED_LINE}` : HIDE_SETUP_NOTICE;
 
 /**
  * A real, popular Greasy Fork script, fetched live for the install screenshot: it has a @require
@@ -485,6 +497,50 @@ async function mods(theme = 'dark', name = '03-mods.png') {
     await openSite(b.ctx, 'https://en.wikipedia.org/wiki/Common_kingfisher');
     await panel.waitForTimeout(1000);
     await panel.locator('.tab-group [data-view="mods"]').click();
+    await panel.waitForTimeout(600);
+    return await shot(panel, name);
+  } finally {
+    await b.close();
+  }
+}
+
+/**
+ * 11 — a chat editing an installed mod: the "Editing <name>" line above the draft panel.
+ *
+ * This is the headline of the feature and the one state a static shot can carry: a conversation
+ * whose draft IS a mod that is already installed, saying so, with Update rather than Save on the
+ * bar and a way out beside it.
+ *
+ * It installs a real imported userscript and opens it through the product's own "Edit in chat", so
+ * the picture is of the actual flow rather than of seeded storage — the same reason the other
+ * captures drive the panel instead of writing state.
+ */
+async function editingCapture(theme = 'dark', name = '11-editing.png') {
+  const b = await launch(theme);
+  try {
+    const panel = await openPanel(b.ctx, b.extId, { settings: { theme } });
+    await openSite(b.ctx, 'https://en.wikipedia.org/wiki/Common_kingfisher');
+    await waitForComposer(panel);
+    const installed = await panel.evaluate(async (source) => {
+      const res = await chrome.runtime.sendMessage({ type: 'mods.install', source, enabled: true });
+      return res?.ok ? res.data : { error: res?.error };
+    }, editModSource(CONTROL_BASE));
+    if (installed.error) throw new Error(`editing capture: the fixture would not install: ${installed.error}`);
+    const modId = (await storedMods(panel))[0].id;
+    await fetch(`${CONTROL_BASE}/__editmod`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ modId }),
+    });
+
+    await panel.locator('.tabs button[data-view="mods"]').click();
+    const edit = panel.locator(`[data-testid="mod-edit-in-chat"][data-mod-id="${modId}"]`);
+    await edit.waitFor({ state: 'visible', timeout: 15_000 });
+    await edit.click();
+    await panel.locator('[data-testid="artifact-editing"]').waitFor({ timeout: 20_000 });
+
+    // One turn, so the shot is a conversation rather than an empty chat with a panel under it.
+    await sendForVersion(panel, EDITMOD_PROMPTS.revise, 2);
     await panel.waitForTimeout(600);
     return await shot(panel, name);
   } finally {
@@ -4134,6 +4190,14 @@ async function main() {
       await editModFlow();
       return;
     }
+    if (EDITMOD_SHOT) {
+      // Only what this feature changed. hero-github.png is hand-captured and is never written here.
+      await mods('dark', '03-mods.png');
+      await mods('light', '03-mods-light.png');
+      await editingCapture('dark', '11-editing.png');
+      await dashboardFlow({ capture: true });
+      return;
+    }
     if (PANELSCOPE) {
       await panelScopeFlow();
       return;
@@ -4192,6 +4256,7 @@ async function main() {
     await settings('dark', '04-settings.png');
     await install('dark', '05-install.png');
     await migrate('dark');
+    await editingCapture('dark', '11-editing.png');
     await dashboardFlow({ capture: true });
 
     // The light set: the same three screens the README puts side by side with their dark twins.

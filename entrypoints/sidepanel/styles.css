@@ -366,6 +366,31 @@ button.pill,
  * same global focus ring. Everything below is the `.tabs button.tab-action` rule with the same
  * values, not similar ones, so the two bars cannot drift apart.
  */
+/*
+ * A button that carries an icon beside its word, wherever it is.
+ *
+ * `.btn.action` grew up inside the chatbar, where it is icon-only below a breakpoint and every rule
+ * about it was scoped to `.chatbar`. "Edit in chat" on a mod card is the same kind of control in a
+ * different place, and without this it rendered as an icon jammed against its label with no space
+ * at all — the gap, the alignment and the mark's own flex rules all lived one selector away.
+ *
+ * So the two things every such button needs are unscoped here, and everything that is genuinely
+ * about the chatbar's compact geometry (its 28px minimums, its border, its icon-only breakpoint)
+ * stays scoped below.
+ */
+.btn.action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-1);
+}
+
+/* The mark rides the text colour, so every button state moves it with the label. */
+.btn.action .ico {
+  flex: none;
+  display: block;
+}
+
 .chatbar .btn.action {
   display: inline-flex;
   align-items: center;
