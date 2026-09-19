@@ -32,13 +32,14 @@
 
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
+import { extDir } from './build-dir.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const EXT_DIR = path.join(ROOT, '.output', 'chrome-mv3');
+const EXT_DIR = extDir(ROOT, { requireTestBuild: true });
 const OUT_DIR = path.join(ROOT, 'docs', 'store', 'assets');
 const PORT = Number(process.env.MOCK_LLM_PORT ?? 8793);
 const BASE_URL = `http://127.0.0.1:${PORT}/v1`;
