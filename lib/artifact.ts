@@ -393,7 +393,12 @@ export function reheader(header: string, v: { name: string; description: string;
   let matchesWritten = false;
   const pad = (key: string) => (key.length >= 11 ? ' ' : ' '.repeat(12 - key.length));
   for (const line of lines) {
-    const kv = line.match(/^(\s*\/\/\s*)@([\w-]+)(\s*)(.*?)\s*$/);
+    // The key pattern is parseHeader's, `[\w:-]+`, and the colon is load-bearing. With `[\w-]+` a
+    // locale-suffixed line like `// @name:fr  Vieux` matched as key "name" with ":fr  Vieux" as its
+    // value, so it was rewritten into a SECOND `@name` — two names in one header, and the author's
+    // translation destroyed. Capturing the whole key lets the switch below see "name:fr", which is
+    // not "name", so the line falls through to being passed along untouched.
+    const kv = line.match(/^(\s*\/\/\s*)@([\w:-]+)(\s*)(.*?)\s*$/);
     if (!kv) {
       out.push(line);
       continue;
