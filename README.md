@@ -1,7 +1,5 @@
 <p align="center"><img src="docs/banner.png" alt="usermods. Your web. Your rules. Vibe-code userscripts in place." width="100%"></p>
 
-<p align="center"><a href="docs/branding.md"><img src="assets/icon.svg" alt="usermods BBS pixel u icon" width="64" height="64"></a><br><a href="docs/branding.md">BBS Underground — canonical branding and project handoff</a></p>
-
 # usermods
 
 **Vibe-code userscripts in place.** An open-source browser extension that lets you customize any website by chatting with the LLM of your choice.
@@ -10,9 +8,7 @@ Open the side panel on any page, describe what you want changed, and usermods in
 
 Userscripts, userstyles, usermods.
 
-<p align="center">
-  <img src="docs/screenshots/01-chat-proposal.png" alt="The usermods side panel on a Wikipedia article: the model reads the page, checks its selectors, and proposes a full-width mod with Try and Save buttons." width="420">
-</p>
+<p align="center"><img src="docs/screenshots/hero-github.png" alt="usermods in the Chrome side panel next to a GitHub repository page, mid-conversation: a proposed mod that collapses the file list is saved and enabled, and the user is asking for a follow-up change." width="100%"></p>
 
 ## Why
 
