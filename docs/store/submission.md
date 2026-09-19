@@ -16,7 +16,7 @@ for the policy. Field names and limits checked against `developer.chrome.com` on
 | | |
 |---|---|
 | Developer account | Register at the [dashboard](https://chrome.google.com/webstore/devconsole) and pay the **one-time $5 USD** registration fee. Verify the account's email address, or publishing is blocked. |
-| Model API key | Create a **scoped, spend-capped** key for the reviewer. It goes in the reviewer-notes field, not in the repo. Revoke it once the review clears. |
+| Model API key | The reviewer key exists: an OpenAI-compatible endpoint, `[reviewer base URL: PASTE HERE]`, model `ornith`, **expiring 2026-10-03**. It goes in the reviewer-notes field via `scripts/reviewer-notes.mjs`, never into the repo. Revoke it once the review clears. |
 | The package | `npm run zip:store` → upload `.output/usermods-0.1.0-chrome.zip`. Current build: 375,104 bytes, sha256 `b7b304c1bfc2a2486e15ceaa19524a8f7a5ec0b1b543898c09ccac382f4b826b`. |
 
 **Upload the zip first.** The dashboard derives the item name and the permission-justification
@@ -205,12 +205,26 @@ reachable before submitting — **push the repo and confirm the link renders** f
 
 ### Notes for reviewers
 
-Paste the fenced **short version** from
-[reviewer-notes.md](reviewer-notes.md#short-version--paste-this) — 2,174 characters.
+Do not copy this one out of the file by hand — the text in the repo carries a placeholder where the
+key goes. Generate it with the key substituted and put it straight on the clipboard:
 
-**Replace `[reviewer key: PASTE HERE]` with the real scoped API key before submitting.** Without a
-key the reviewer cannot exercise the chat at all, and the likeliest outcome is a rejection for a
-feature that "does not work".
+```sh
+USERMODS_REVIEWER_KEY='<the reviewer key>' node scripts/reviewer-notes.mjs | pbcopy
+```
+
+Then paste into the field. The script reads the **short version** from
+[reviewer-notes.md](reviewer-notes.md#short-version--paste-this) (2,489 characters), replaces
+`[reviewer key: PASTE HERE]`, writes the result to stdout and the character count to stderr, and
+exits non-zero if the env var is missing or the placeholder has gone. The key never touches the
+repository.
+
+Without a key the reviewer cannot exercise the chat at all, and the likeliest outcome is a
+rejection for a feature that "does not work".
+
+**The reviewer key expires 2026-10-03.** It is an OpenAI-compatible endpoint
+(`[reviewer base URL: PASTE HERE]`, model `ornith`), and the pasted notes tell the reviewer to
+request a fresh one via the support URL if it has lapsed. If a review is still open near that date,
+issue a new key and update this field in the dashboard.
 
 > Google documents neither this field nor its character limit anywhere on developer.chrome.com. It
 > exists in the dashboard UI. If it rejects the text as too long, cut from the bottom up — the
@@ -238,7 +252,8 @@ There is no "show in search results" toggle — that behaviour is what Public vs
       undocumented vendor endpoints in a listing that declares what it talks to.
 - [ ] `manifest.version` is `0.1.0` and matches `package.json`.
 - [ ] `manifest.name` is `usermods` — the store title, unchanged.
-- [ ] The reviewer-notes field has a **real key** in place of the placeholder.
+- [ ] The reviewer-notes field was generated with `scripts/reviewer-notes.mjs` and carries a **real
+      key**, not the placeholder — and the key has not expired (2026-10-03).
 - [ ] `PRIVACY.md` is pushed and its GitHub URL renders.
 - [ ] Permission fields in the dashboard match the built manifest exactly — no extra, none missing.
 - [ ] [CHANGELOG.md](../../CHANGELOG.md) has the v0.1.0 entry.
