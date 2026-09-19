@@ -91,9 +91,9 @@
 .activity button.activity-action {
   flex: none;
   margin-left: auto;
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: var(--fs-label);
-  font-weight: 400;
+  font-weight: var(--fw-label);
   line-height: 1;
   text-transform: uppercase;
   letter-spacing: var(--lbl-tracking);

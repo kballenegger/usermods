@@ -7,10 +7,11 @@
  * is dressed by the same palette as the panel and follows it through a restyle with no edit here.
  * Do not hard-code a hex in this file: if a colour is missing, it is a missing token.
  *
- * At page width the brand gets more room than the 420px panel allows, so this is where the banner's
- * devices are used most freely — a blue header block under the wordmark, pixel section labels, and
- * stat tiles that are solid colour blocks rather than outlined cards. The rule that survives from
- * the panel is the same one: anything you READ sits on a solid panel in a text face.
+ * At page width the brand gets more room than the 420px panel allows, and this option spends it on
+ * the two places the pixel display face is still used: the wordmark in the header, and the big stat
+ * numbers. Everything else — section labels, tabs, row titles — is the text face at --fw-label, and
+ * the tiles are quiet outlined cards rather than colour blocks. The rule that survives from the
+ * panel unchanged: anything you READ sits on a solid panel in a text face.
  */
 
 .dash {
@@ -32,8 +33,8 @@
 /* ---------- header, tabs ---------- */
 
 /*
- * The header block. At page width the wordmark gets the banner's own treatment: pixel type, lime,
- * with the accent's hard offset behind it, on a solid panel that runs the width of the content.
+ * The header block. The wordmark keeps the pixel face — it is the brand's signature and this is the
+ * largest surface it gets — but the panel under it is an ordinary card: a 1px edge, no lift.
  *
  * The mark sits with the wordmark inside h1, centred on each other, so the 32px image does not hang
  * below the text baseline the way a baseline-aligned row would leave it.
@@ -46,7 +47,7 @@
   margin-bottom: 14px;
   background: var(--surface-1);
   border: var(--border-width) solid var(--border-strong);
-  box-shadow: var(--shadow-card);
+  border-radius: var(--r-card);
   padding: 14px 16px;
 }
 .dash-head h1 {
@@ -54,15 +55,24 @@
   align-items: center;
   gap: 10px;
   font-family: var(--font-display);
-  font-size: var(--fs-title);
+  font-size: var(--fs-wordmark);
   margin: 0;
   font-weight: 400;
   letter-spacing: 0.02em;
   text-transform: lowercase;
-  color: var(--live-text);
-  /* 1px, not 2px. The offset was tuned to Pixelify's heavier strokes; against Jersey's finer ones
-     a 2px shadow covers a large share of each letterform and the wordmark turns muddy. */
-  text-shadow: 1px 1px 0 var(--accent-edge);
+  color: var(--primary-text);
+  /*
+   * NO text-shadow, which is a change from option A and was made by looking at the capture.
+   *
+   * A 1px offset behind Jersey 10 at this size does not read as the banner's hard shadow; it reads
+   * as chromatic fringing, because a one-pixel colour edge on a pixel face is exactly what a
+   * mis-converged display looks like. Option A could carry it because everything around it was
+   * also hard-edged and saturated, so the offset was clearly a device. Here it has no company and
+   * it just looks broken — worse in day, where pink on white fringes hardest.
+   *
+   * The wordmark is identified by its FACE, which nothing else in the interface uses. That is
+   * enough, and it is cleaner.
+   */
 }
 .dash-head .sub {
   color: var(--text-2);
@@ -70,8 +80,8 @@
 }
 
 /*
- * Section tabs. The active one is a solid lime block with an ink label — the same treatment the
- * panel's tab bar uses, so "which section am I on" is answered the same way on both surfaces.
+ * Section tabs. The active one is a solid primary block with a white label — the same treatment
+ * the panel's tab bar uses, so "which section am I on" is answered the same way on both surfaces.
  */
 .dash-tabs {
   display: flex;
@@ -83,12 +93,13 @@
 .dash-tabs button {
   background: none;
   border: 0;
+  border-radius: var(--r-pill);
   color: var(--text-2);
   padding: 8px 12px;
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: 12px;
-  font-weight: 400;
-  letter-spacing: 0.06em;
+  font-weight: var(--fw-label);
+  letter-spacing: var(--lbl-tracking);
   text-transform: uppercase;
   cursor: pointer;
 }
@@ -96,21 +107,20 @@
   color: var(--text-1);
 }
 .dash-tabs button.active {
-  color: var(--live-on-fill);
-  background: var(--live-fill);
-  box-shadow: var(--shadow-press);
+  color: var(--primary-on-fill);
+  background: var(--primary-fill);
 }
 
-/* ---------- section labels: pixel type, uppercase, tracked ---------- */
+/* ---------- section labels: semibold text face, uppercase, tracked ---------- */
 
 .dash-label {
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: var(--fs-label);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: var(--lbl-tracking);
   color: var(--text-2);
   margin: 0 0 6px;
-  font-weight: 400;
+  font-weight: var(--fw-label);
 }
 
 /* ---------- overview strip ---------- */
@@ -126,26 +136,29 @@
   border: var(--border-width) solid var(--border-strong);
   border-radius: var(--r-card);
   padding: 12px 14px;
-  box-shadow: var(--shadow-card);
 }
 /*
- * The number is the point of a stat tile, so it is set big in the pixel display face — this is
- * exactly the short-label job that face is for. The key under it stays small and tracked.
+ * The number is the point of a stat tile, and it is the second of the display face's two jobs. At
+ * 26px it is large enough that the pixel grid reads as a deliberate mark rather than as a font
+ * that failed to load, which is the whole test for using it at all.
+ *
+ * It is --text-1, not lime. In option A every stat number was lime; here lime means "alive", and
+ * a count of archived chats is not alive.
  */
 .stat .n {
-  font-size: 26px;
+  font-size: var(--fs-stat);
   font-variant-numeric: tabular-nums;
   font-family: var(--font-display);
   font-weight: 400;
   line-height: 1.1;
-  color: var(--live-text);
+  color: var(--text-1);
 }
 .stat .k {
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: var(--fs-label);
-  font-weight: 400;
+  font-weight: var(--fw-label);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: var(--lbl-tracking);
   color: var(--text-2);
   margin-top: 4px;
 }
@@ -162,7 +175,6 @@
   padding: 10px 14px;
   margin-bottom: 18px;
   font-size: 12px;
-  box-shadow: var(--shadow-card);
 }
 .overview-notes .sep {
   color: var(--text-3);
@@ -222,7 +234,6 @@
   padding: 7px 10px;
   margin-bottom: 10px;
   font-size: 12px;
-  box-shadow: var(--shadow-raise);
 }
 
 /* ---------- the two-pane layout ---------- */
@@ -274,8 +285,8 @@
   display: flex;
   gap: 10px;
   align-items: flex-start;
-  background: var(--surface-1);
-  border: var(--border-width) solid var(--border-strong);
+  background: var(--surface-2);
+  border: var(--border-width) solid var(--border-hair);
   border-radius: var(--r-field);
   padding: 9px 11px;
   cursor: pointer;
@@ -283,7 +294,6 @@
   width: 100%;
   font: inherit;
   color: inherit;
-  box-shadow: var(--shadow-raise);
 }
 /* Selection is carried by this edge alone, so it takes the tone that clears 3:1 in both themes. */
 .rowcard:hover { border-color: var(--primary); }
@@ -406,10 +416,10 @@
 /* Pill buttons, small enough to sit inside a row. */
 /* Row actions are secondary by definition — several per row — so they take the quiet outline. */
 button.pill {
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: var(--fs-label);
-  font-weight: 400;
-  letter-spacing: 0.04em;
+  font-weight: var(--fw-label);
+  letter-spacing: 0.02em;
   text-transform: uppercase;
   border: var(--border-width) solid var(--border-hair);
   background: transparent;
@@ -431,7 +441,17 @@ button.pill.primary {
   color: var(--btn-primary-fg);
   border-color: transparent;
 }
-button.pill.danger { color: var(--error-text); }
+/*
+ * Delete is destructive, but there are four of these per row and a dozen rows on screen. Painting
+ * every one of them red at rest makes red the page's most common colour and stops it meaning
+ * "something is wrong" — so the intent is stated on approach instead, which is when it matters.
+ * The word "delete" carries the meaning at rest; that is the non-colour signal.
+ */
+button.pill.danger:hover:not(:disabled),
+button.pill.danger:focus-visible {
+  color: var(--error-text);
+  border-color: var(--error);
+}
 /*
  * Disabled recedes by surface in both themes, never by opacity — the same rule as .rowcard.dimmed
  * above and button.btn:disabled in styles.css. An 11px label at 0.45 opacity is unreadable on

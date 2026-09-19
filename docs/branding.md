@@ -74,23 +74,33 @@ The five store screenshots keep the neutral window frame and charcoal caption ba
 inside the frame are real product output, and the frame is deliberately quiet so it does not
 compete with them.
 
-## Applying it to the interface — done
+## Applying it to the interface — option B, under review
 
-This was the "remaining follow-up" this document used to list as pending owner confirmation. It is
-now **complete**: Kenneth confirmed the direction and asked for the app to carry the banner's
-boldness rather than a subtle version of it.
+The identity above is settled. **How much of the interface it should cover is not**, and two options
+are open for comparison. Neither is merged.
 
-The design system built from this identity is documented in **[design.md](design.md)**, which is the
-reference to design from: the role palette and its tonal scales, the contrast table, typography,
+- **Option A** (branch `design/volt-bold`, and the state of `main`) takes the banner literally: the
+  electric blue *is* the page, every panel takes a 2px bright border and a hard ink shadow, and
+  every label is pixel type.
+- **Option B** (this branch, `design/muted-banner`) keeps the same six identity hexes and the same
+  hues, and pulls the chroma down for anything larger than a dot or a border: a deep navy page on
+  the banner blue's own hue, 1px edges, small radii, and the pixel face reserved for the wordmark
+  and the stat numbers.
+
+The design system for the option on this branch is documented in **[design.md](design.md)**, which is
+the reference to design from: the role palette and its tonal scales, the contrast table, typography,
 components, motion, theming and the accessibility commitments. Read it before changing anything
-visual.
+visual. Its §2 is a side-by-side of what differs between the two options.
 
-What that pass did, against the original handoff:
+Both options are **behaviour-identical**: only CSS, tokens, design docs, captures and store assets
+differ between them.
 
-1. ~~Apply this BBS direction to the side panel, dashboard, install flow and shared branding surfaces.~~ **Done.** `entrypoints/sidepanel/tokens.css` was rebuilt on this palette as a set of role tokens (`--primary-*`, `--live-*`, `--accent-*`, `--info-*`, `--warn-*`, `--error-*`), and the side panel, dashboard, install page, consent flow and the in-page element picker all follow it. Electric blue is the page itself; lime, pink, cyan and yellow are used as real fills, borders and states.
-2. ~~Preserve usable light/dark themes and current functionality. Validate contrast and focus states.~~ **Done.** Both themes are boldly branded rather than one being a faded version of the other — night lays ink panels on the electric blue, day lays ink-outlined white panels on a cool blue page. Every pairing the UI renders meets WCAG AA in both themes, enforced by `test/contrast.test.ts`.
+What the interface pass did on this branch, against the original handoff:
+
+1. ~~Apply this BBS direction to the side panel, dashboard, install flow and shared branding surfaces.~~ **Done.** `entrypoints/sidepanel/tokens.css` was rebuilt on this palette as a set of role tokens (`--primary-*`, `--live-*`, `--accent-*`, `--info-*`, `--warn-*`, `--error-*`), and the side panel, dashboard, install page, consent flow and the in-page element picker all follow it. On this option the banner's hues carry the whole interface while its chroma is reserved: lime marks only what is alive, pink only the hero card and element chips.
+2. ~~Preserve usable light/dark themes and current functionality. Validate contrast and focus states.~~ **Done.** Night lays navy panels on a deeper navy page; day lays white panels on a soft cool white page. Every pairing the UI renders meets WCAG AA in both themes, and long-form reading pairings meet 7:1, enforced by `test/contrast.test.ts`.
 3. ~~Refresh screenshots and store artwork.~~ **Done.** `docs/screenshots/` and `docs/store/assets/` are regenerated, and the README no longer describes the old Volt design.
-4. ~~Reuse the canonical icon and banner instead of selecting a new exploration.~~ **Done.** No new exploration was selected; the six working-palette colours above are used literally as the identity layer of the system.
+4. ~~Reuse the canonical icon and banner instead of selecting a new exploration.~~ **Done.** No new exploration was selected. The six working-palette colours above remain the identity layer and are used literally in the icon, the banner and the store artwork; inside the interface they are used at their own hues with reduced chroma, and only the lime ok dot appears at full identity strength.
 
 Two things had to be **added** to the palette to make it work as an interface, both recorded with their reasoning in design.md:
 
