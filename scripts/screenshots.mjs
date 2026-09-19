@@ -88,13 +88,9 @@ const WAIT = process.argv.includes('--wait');
 const TABBAR_SHOT_DIR = process.env.TABBAR_SHOT_DIR ?? path.join(os.tmpdir(), 'usermods-tabbar');
 const TABBAR_SHOT = process.argv.includes('--tabbar-capture');
 
-/** Capture the living specimen (entrypoints/styleguide) into docs/design/ for docs/design.md. */
-const STYLEGUIDE = process.argv.includes('--styleguide');
-
 /** True when this run is capturing screenshots rather than asserting behaviour (see MASK below). */
 const CAPTURING =
-  !SMOKE && !CHATS && !ISOLATION && !COMPACTION && !DASHBOARD && !DASHBOARD_SHOT && !THEME &&
-  !TABBAR && !TABBAR_SHOT && !WAIT && !STYLEGUIDE;
+  !SMOKE && !CHATS && !ISOLATION && !COMPACTION && !DASHBOARD && !DASHBOARD_SHOT && !THEME && !TABBAR && !TABBAR_SHOT && !WAIT;
 
 /** See note 4: a first-run setup instruction, not the steady state the README should show. */
 const HIDE_SETUP_NOTICE = '.app > .notice, .dash-inner > .notice { display: none !important; }';
@@ -2747,56 +2743,10 @@ async function tabbarFlow({ capture = false } = {}) {
 
 // ---------------------------------------------------------------------------
 
-/**
- * The living specimen, captured in both themes for docs/design.md.
- *
- * It renders entrypoints/styleguide, which loads the REAL stylesheets, so these images are evidence
- * of what the system actually looks like rather than an illustration of what it is meant to look
- * like. The doc embeds them; if a component changes and this is not re-run, the doc is visibly out
- * of date rather than quietly wrong.
- */
-async function styleguideFlow() {
-  const DESIGN_DIR = path.join(ROOT, 'docs', 'design');
-  fs.mkdirSync(DESIGN_DIR, { recursive: true });
-  const b = await launch('dark');
-  try {
-    for (const theme of ['dark', 'light']) {
-      const page = await b.ctx.newPage();
-      await page.setViewportSize({ width: 1180, height: 1200 });
-      // The stored SETTING, not the attribute: the page calls applyStoredTheme() on mount, which
-      // would overwrite an attribute set here and leave both captures in the default palette.
-      await page.goto(`chrome-extension://${b.extId}/styleguide.html`);
-      await page.evaluate(async (t) => {
-        await chrome.storage.local.set({ settings: { theme: t } });
-      }, theme);
-      await page.reload();
-      await page.waitForSelector('.sg-section');
-      await page.waitForFunction(
-        (t) => document.documentElement.getAttribute('data-theme') === t,
-        theme,
-        { timeout: 10_000 },
-      );
-      await page.evaluate(() => document.fonts.ready);
-      await page.waitForTimeout(500);
-      const file = path.join(DESIGN_DIR, `styleguide-${theme === 'dark' ? 'night' : 'day'}.png`);
-      await page.screenshot({ path: file, fullPage: true });
-      const kb = Math.round(fs.statSync(file).size / 1024);
-      log(`docs/design/${path.basename(file)} (${kb} KB)`);
-      await page.close();
-    }
-  } finally {
-    await b.close();
-  }
-}
-
 async function main() {
   fs.mkdirSync(OUT_DIR, { recursive: true });
   const mock = await startMock();
   try {
-    if (STYLEGUIDE) {
-      await styleguideFlow();
-      return;
-    }
     if (TABBAR || TABBAR_SHOT) {
       await tabbarFlow({ capture: TABBAR_SHOT });
       return;

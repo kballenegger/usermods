@@ -1,15 +1,9 @@
 /*
- * usermods, in the banner's own language.
+ * usermods, dressed in Volt OS.
  *
- * The page is electric blue. Everything you read sits on a solid ink panel laid on that blue,
- * outlined in a bright 2px border and dropped on a hard ink shadow with no blur — the banner's
- * construction, at interface scale. Labels, tabs, buttons and the wordmark are set in the pixel
- * display face; every sentence, every code block and every editor is set in the UI or mono text
- * face at a comfortable size on a flat surface.
- *
- * The rule the old system got right and this one keeps: ONLY ALIVE THINGS GLOW OR PULSE, and alive
- * is always lime. Everything else gets its weight from colour blocks, outlines and offset shadows.
- *
+ * Volt on charcoal: one neon accent, glowing only where something is alive — the active tab, an
+ * enabled mod, a primary action, the proposal card that is the hero of the Chat screen. Everything
+ * else is quiet: white text on gradient cards, grey metadata, hairline separators, no sharp corners.
  * Identifiers (tool names, selectors, match patterns, model ids, @tokens, versions) are mono.
  */
 
@@ -19,9 +13,6 @@
 @import '@fontsource/ibm-plex-mono/latin-400.css';
 @import '@fontsource/ibm-plex-mono/latin-500.css';
 @import '@fontsource/ibm-plex-mono/latin-600.css';
-@import '@fontsource/pixelify-sans/latin-400.css';
-@import '@fontsource/pixelify-sans/latin-600.css';
-@import '@fontsource/pixelify-sans/latin-700.css';
 
 * {
   box-sizing: border-box;
@@ -44,7 +35,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Selection: the accent. Selecting is a small moment of delight, not a state. */
+/* Selection: the browser's default blue belongs to neither theme. */
 ::selection {
   background: var(--selection-bg);
   color: var(--selection-fg);
@@ -52,8 +43,9 @@ body {
 
 /*
  * Scrollbars. `color-scheme` on <html> (lib/theme.ts) already tells the engine which native
- * scrollbar to paint. This only narrows them and tints the thumb to the theme's own track colour,
- * so a scrolling transcript never introduces a colour the palette has not named.
+ * scrollbar to paint, and that alone is the right answer for the overlay scrollbars macOS uses.
+ * This only narrows them and tints the thumb to the theme's own grey, so a scrolling transcript
+ * does not introduce a colour the palette never named.
  */
 * {
   scrollbar-width: thin;
@@ -67,33 +59,11 @@ pre,
 }
 
 /*
- * The pixel display face, as a utility. It is applied by the rules below rather than by hand, and
- * it is never put on a sentence — see the typography note in tokens.css.
- */
-.display,
-.label,
-.muted.label,
-.tabs button,
-button.btn,
-button.pill,
-.wordmark,
-.card h4,
-.page h2,
-.stat .n,
-.stat .k,
-.dash-label,
-.dash-head h1,
-.dash-tabs button {
-  font-family: var(--font-display);
-}
-
-/*
- * Focus: a 2px cyan ring with an ink halo behind it, so it is obvious on the blue page, on an ink
- * panel and on a white card alike. Cyan is reserved for focus and info precisely so that a focused
- * control can never be mistaken for a state.
+ * Focus: a single volt hairline, never a browser default halo. Light uses the deeper chartreuse
+ * (--focus-ring): full volt is only 3.1:1 on white, which is too faint to find a focused control by.
  */
 :focus-visible {
-  outline: 2px solid var(--focus-ring);
+  outline: 1px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -118,9 +88,6 @@ button.pill,
  * chosen from the bar's own width rather than from the viewport. That is the right measure here:
  * the panel is a side panel whose width the user drags, and in the screenshot harness it is a tab
  * at an arbitrary size. No JavaScript is involved — nothing measures, nothing re-renders.
- *
- * Visually it is a solid ink block across the blue page with a lime rule under it. It is chrome, so
- * it is the one place a bright band is allowed to run edge to edge.
  */
 .tabs {
   container-type: inline-size;
@@ -130,9 +97,8 @@ button.pill,
   flex-wrap: nowrap;
   align-items: center;
   gap: var(--sp-2);
-  padding: var(--sp-3) var(--sp-4);
-  background: var(--surface-1);
-  border-bottom: var(--border-width) solid var(--live);
+  padding: var(--sp-3) var(--sp-4) var(--sp-2);
+  border-bottom: 1px solid var(--border-hair);
 }
 
 /* The two ends of the bar. Neither may shrink: the host gives way first, then truncates. */
@@ -156,61 +122,79 @@ button.pill,
   background: none;
   border: 0;
   border-radius: var(--r-pill);
-  color: var(--text-2);
-  font-size: var(--fs-label);
-  font-weight: 700;
-  line-height: 1;
+  color: var(--text-3);
+  font: 600 var(--fs-label) / 1 var(--font-ui);
   letter-spacing: var(--lbl-tracking);
   text-transform: uppercase;
   padding: 0 11px;
   cursor: pointer;
-  transition: color 120ms ease, background 120ms ease;
+  transition: color 160ms ease, background 160ms ease, box-shadow 160ms ease;
 }
 
 .tabs button:hover {
-  color: var(--text-1);
+  color: var(--text-2);
 }
 
 /*
- * The active tab is a solid lime block with an ink label — the loudest thing in the bar, because
- * "which screen am I on" is the bar's only real question. 16.11:1. It needs no glow: it IS the
- * colour, at full strength.
+ * The one tab that is live carries the volt treatment. The label is --accent-text rather than
+ * --volt: they are the same colour in dark, but in light --volt on the --volt-a12 tint is 2.9:1,
+ * and this is the label that says which screen you are on.
  */
-.tabs button.active,
+.tabs button.active {
+  color: var(--accent-text);
+  background: var(--volt-a12);
+  box-shadow: var(--glow-tab);
+}
+
 .tabs button.active:hover {
-  color: var(--live-on-fill);
-  background: var(--live-fill);
-  box-shadow: var(--shadow-press);
+  color: var(--accent-text);
+}
+
+/*
+ * Light has no --glow-tab to separate the active pill from the bar, so the tint gets a hairline of
+ * the accent to sit in. Dark does not need it: the glow already draws that edge.
+ */
+:root[data-theme='light'] .tabs button.active {
+  box-shadow: inset 0 0 0 1px var(--volt-a28);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) .tabs button.active {
+    box-shadow: inset 0 0 0 1px var(--volt-a28);
+  }
 }
 
 
 /*
- * The theme toggle: a ◐ that cycles Dark → Light → System. It is a preference rather than
- * navigation, so it stays an icon button — but on this palette "quiet" is a bordered ink square,
- * not a faded glyph.
+ * The theme toggle: a quiet ◐ that cycles Dark → Light → System.
+ *
+ * It is deliberately the least loud control in the bar — it is a preference, not navigation, so it
+ * takes the faint text step and only comes up to the accent on hover. The glyph rotates with the
+ * mode so the three states are distinguishable at a glance without a label: ◐ dark, ◑ light (the
+ * filled half follows the palette), and System keeps ◐ at reduced opacity, since it is "whichever
+ * the OS says" rather than a colour of its own.
  */
 .theme-toggle {
   flex: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   padding: 0;
-  border: var(--border-width) solid var(--border-control);
-  border-radius: var(--r-field);
+  border: 0;
+  border-radius: var(--r-pill);
   background: none;
-  color: var(--text-2);
-  font-size: 13px;
+  color: var(--text-3);
+  font-size: 14px;
   line-height: 1;
   cursor: pointer;
-  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+  transition: color 160ms ease, background 160ms ease, opacity 160ms ease;
 }
 
 .theme-toggle:hover {
-  color: var(--primary-text);
-  border-color: var(--primary);
-  background: var(--surface-2);
+  color: var(--accent-text);
+  background: var(--volt-a12);
 }
 
 /* Light flips the glyph, so the filled half reads as the side the theme is on. */
@@ -221,7 +205,7 @@ button.pill,
 
 /* System: the same mark, stated less firmly — it is a deferral, not a choice of palette. */
 .theme-toggle[data-theme-choice='system'] {
-  opacity: 0.7;
+  opacity: 0.65;
 }
 
 /*
@@ -257,28 +241,11 @@ button.pill,
   white-space: nowrap;
 }
 
-/*
- * A view is a reading surface.
- *
- * Settings in particular is mostly PROSE — field help that runs to four and five lines — and the
- * first capture of this design put it straight onto the electric blue page. It passed the contrast
- * gate (text-2 on the blue is 5.86:1) and was still tiring to read a paragraph of, because a
- * saturated field behind small text is hard work however well it scores.
- *
- * So the page colour stays visible in the gaps and behind the cards on Mods, where the content is
- * a stack of blocks, and every view that carries prose or form fields paints a solid panel first.
- * The boldness is not lost: it moves to the frame, the tab bar, the fills and the headings.
- */
 .view {
   flex: 1;
   min-height: 0;
   overflow: auto;
   padding: var(--sp-4);
-}
-
-/* The form views (Settings, Consent) read as one long panel rather than a blue field. */
-.view.view-form {
-  background: var(--surface-1);
 }
 
 /* ---------------------------------------------------------------------------
@@ -292,14 +259,13 @@ button.pill,
   flex-direction: column;
 }
 
-/* The chat switcher: a strip on the panel surface above the transcript. */
+/* The chat switcher: a quiet strip above the transcript. */
 .chatbar {
   flex: none;
   display: flex;
   gap: var(--sp-2);
   align-items: center;
   padding: var(--sp-2) var(--sp-4);
-  background: var(--surface-1);
   border-bottom: 1px solid var(--border-hair);
 }
 
@@ -308,10 +274,10 @@ button.pill,
   min-width: 0;
   font: 400 var(--fs-meta) / 1.4 var(--font-ui);
   color: var(--text-1);
-  background: var(--surface-well);
-  border: var(--border-width) solid var(--border-control);
+  background: var(--surface-card);
+  border: 1px solid var(--border-card);
   border-radius: var(--r-field);
-  padding: 6px 9px;
+  padding: 7px 9px;
   cursor: pointer;
 }
 
@@ -321,17 +287,17 @@ button.pill,
 }
 
 /*
- * Rename mode: the input stands exactly where the select was, so the bar does not jump. The live
+ * Rename mode: the input stands exactly where the select was, so the bar does not jump. The volt
  * border is the "you are editing this" state — the one live thing in the strip.
  */
 .chatbar input.rename {
   flex: 1;
   min-width: 0;
   font: 400 var(--fs-meta) / 1.4 var(--font-ui);
-  padding: 6px 9px;
-  border: var(--border-width) solid var(--live);
+  padding: 7px 9px;
+  border: 1px solid var(--volt);
   border-radius: var(--r-field);
-  background: var(--surface-well);
+  background: var(--surface-card);
   color: var(--text-1);
 }
 
@@ -339,16 +305,11 @@ button.pill,
   outline: none;
 }
 
-/*
- * The transcript. This is the longest-form reading surface in the product, so it is a solid panel
- * — not the blue page, not a tint, and nothing patterned behind the text.
- */
 .messages {
   flex: 1;
   min-height: 0;
   overflow: auto;
   padding: var(--sp-4);
-  background: var(--surface-1);
   display: flex;
   flex-direction: column;
   gap: var(--stack-gap);
@@ -360,48 +321,39 @@ button.pill,
   word-break: break-word;
 }
 
-/* What you said: an outlined block with the hard shadow, pushed to the right. */
 .msg.user {
   align-self: flex-end;
   max-width: 90%;
-  background: var(--surface-2);
-  border: var(--border-width) solid var(--primary);
+  background: var(--surface-card);
+  border: 1px solid var(--border-card);
   border-radius: var(--r-field);
-  box-shadow: var(--shadow-press);
-  padding: 8px 11px;
+  padding: 9px 12px;
   font-size: var(--fs-body);
 }
 
-/* Queued: waiting its turn, so stated as an outline with no fill rather than dimmed away. */
+/* Queued: waiting its turn, so dimmed rather than decorated. */
 .msg.user.queued {
-  background: none;
+  opacity: 0.65;
   border-style: dashed;
-  box-shadow: none;
-  color: var(--text-2);
 }
 
-/*
- * Assistant prose: the thing a reader spends the most time on. Plain text-1 on the flat panel, at
- * body size, with generous line height. No colour, no border, no decoration — the transcript earns
- * its boldness from the frame around it, not from the paragraphs.
- */
 .msg.assistant {
   padding: 0 2px;
   color: var(--text-1);
   font-size: var(--fs-body);
-  line-height: 1.6;
 }
 
-/* A tool row: a 2px rail, a status dot and the tool's name in mono. */
+/* A tool row: a hairline rail, a status dot and the tool's name in mono. */
 .tool {
   font-size: var(--fs-meta);
   color: var(--text-2);
-  border-left: var(--border-width) solid var(--border-hair);
+  border-left: 1px solid var(--border-card);
   padding: 2px 0 2px var(--sp-3);
 }
 
+/* The rail is the only marker an errored row has, so it takes the tone that survives on white. */
 .tool.error {
-  border-left-color: var(--error);
+  border-left-color: var(--dot-error);
 }
 
 /*
@@ -428,21 +380,20 @@ button.pill,
   display: none;
 }
 
-/* Tool output is code: mono, 12px, on the inset well. */
 .tool pre {
   margin: var(--sp-2) 0 0;
   white-space: pre-wrap;
   max-height: 200px;
   overflow: auto;
   background: var(--surface-well);
-  border: 1px solid var(--border-hair);
+  border: 1px solid var(--border-card);
   border-radius: var(--r-field);
   padding: var(--sp-2) var(--sp-3);
-  font-size: var(--fs-meta);
+  font-size: var(--fs-label);
   line-height: 1.6;
 }
 
-/* Status dots. Lime is the only one that glows. */
+/* Status dots. Volt is the only one that glows. */
 .dot {
   width: 7px;
   height: 7px;
@@ -474,9 +425,8 @@ button.pill,
   display: flex;
   gap: 6px;
   align-items: center;
-  font-family: var(--font-display);
   font-size: var(--fs-label);
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: var(--lbl-tracking);
   color: var(--text-2);
@@ -493,26 +443,24 @@ button.pill,
 
 .composer {
   flex: none;
-  background: var(--surface-1);
-  border-top: var(--border-width) solid var(--border-hair);
+  border-top: 1px solid var(--border-hair);
   padding: var(--sp-3) var(--sp-4) var(--sp-4);
   display: flex;
   flex-direction: column;
   gap: var(--sp-2);
 }
 
-/* What you type is prose, so the composer is a text surface: UI face, body size, flat well. */
 .composer textarea {
   width: 100%;
   resize: none;
   font: 400 var(--fs-body) / 1.5 var(--font-ui);
-  background: var(--surface-well);
+  background: var(--surface-card);
   color: var(--text-1);
-  border: var(--border-width) solid var(--border-control);
+  border: 1px solid var(--border-card);
   border-radius: var(--r-field);
   padding: 10px 12px;
   min-height: 64px;
-  transition: border-color 120ms ease;
+  transition: border-color 160ms ease;
 }
 
 .composer textarea::placeholder {
@@ -520,7 +468,7 @@ button.pill,
 }
 
 .composer textarea:focus-visible {
-  border-color: var(--focus-ring);
+  border-color: var(--volt);
   outline: none;
 }
 
@@ -536,89 +484,90 @@ button.pill,
 }
 
 /* ---------------------------------------------------------------------------
- * Buttons
- *
- * Every button is a block: 2px outline, hard offset shadow, pixel label. Pressing it moves the
- * block onto its shadow, which is the whole affordance — it looks like something you can push.
+ * Buttons — primary is a volt fill on near-black; danger is coral text, never a fill.
  * ------------------------------------------------------------------------ */
 
-/*
- * The default button is SECONDARY, and it is deliberately the quieter of the two: an outlined block
- * in the hairline tone with no shadow. The first pass gave every button the full bright outline and
- * a hard shadow, and a screen like Settings — which has nine provider presets in a row — became a
- * wall of identical shouting blocks with no way to find the action that mattered.
- *
- * Boldness is a hierarchy, not a volume setting. One primary per screen carries the fill, the
- * shadow and the bright edge; everything beside it is an outline.
- */
 button.btn {
-  font-family: var(--font-display);
-  font-size: var(--fs-meta);
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  border: var(--border-width) solid var(--border-control);
-  background: var(--surface-2);
+  font: 600 var(--fs-meta) / 1 var(--font-ui);
+  border: 1px solid var(--border-card);
+  background: var(--surface-card);
   color: var(--text-1);
-  border-radius: var(--r-field);
+  border-radius: var(--r-pill);
   padding: 8px 14px;
   cursor: pointer;
-  box-shadow: none;
-  transition: transform 80ms ease, box-shadow 80ms ease, background 120ms ease,
-    border-color 120ms ease;
+  transition: opacity 160ms ease, box-shadow 160ms ease;
+  box-shadow: var(--shadow-raise);
 }
 
 button.btn:hover:not(:disabled) {
-  background: var(--surface-well);
-  border-color: var(--primary);
+  opacity: 0.8;
+}
+
+button.btn:active:not(:disabled) {
+  opacity: 0.8;
 }
 
 /*
- * The one filled button: the banner blue, with a white label at 11.11:1. This is the button that
- * gets the whole treatment — the fill, the bright outline and the hard offset shadow — because it
- * is the one the screen is asking you to press.
+ * The one filled button. Light uses the brighter chartreuse with a near-black label rather than
+ * white on --volt, which is only 3.1:1 — see --btn-primary-* in tokens.css.
  */
 button.btn.primary {
   background: var(--btn-primary-bg);
   color: var(--btn-primary-fg);
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow-raise);
-}
-
-button.btn.primary:hover:not(:disabled) {
-  background: var(--primary-fill-hover);
-  border-color: var(--border-strong);
-}
-
-/* The press: the block travels down-right onto its own shadow. */
-button.btn.primary:active:not(:disabled) {
-  transform: translate(2px, 2px);
-  box-shadow: var(--shadow-press);
-}
-
-/* A secondary button has no shadow to travel onto, so it presses by stepping the same distance. */
-button.btn:active:not(:disabled) {
-  transform: translate(1px, 1px);
+  border-color: transparent;
+  box-shadow: var(--glow-fill);
 }
 
 button.btn.danger {
   color: var(--error-text);
   background: none;
-  border-color: var(--error);
+  border-color: var(--border-card);
+  box-shadow: none;
 }
 
 /*
- * Disabled. Not a fade: a fade on a saturated palette reads as broken. The block flattens — it
- * loses its shadow and its outline goes quiet — and the label steps back one tone but stays
- * legible. Same treatment in both themes, because the reason is the same in both.
+ * Disabled. 0.4 opacity is right on charcoal, where a dimmed label still separates from a dark
+ * surface; on white the same value fades a label to roughly 2:1 and the control reads as absent
+ * rather than as unavailable. Light dims less and states it with a muted fill instead.
  */
 button.btn:disabled {
+  opacity: 0.4;
   cursor: default;
-  background: var(--surface-well);
-  color: var(--btn-disabled-fg);
-  border-color: var(--border-hair);
   box-shadow: none;
+}
+
+:root[data-theme='light'] button.btn:disabled {
+  opacity: 1;
+  color: var(--text-3);
+  background: var(--surface-well);
+  border-color: var(--border-card);
+}
+
+/*
+ * A disabled primary keeps the accent so it still reads as the main action, on the volt tint rather
+ * than the full fill. The label is --volt-deep rather than --accent-text: on that pale tint the
+ * accent is 4.1:1, just under AA, and a disabled control is exactly where text is most often too
+ * faint to read.
+ */
+:root[data-theme='light'] button.btn.primary:disabled {
+  background: var(--volt-a25);
+  color: var(--btn-disabled-fg);
+  border-color: transparent;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) button.btn:disabled {
+    opacity: 1;
+    color: var(--text-3);
+    background: var(--surface-well);
+    border-color: var(--border-card);
+  }
+
+  :root:not([data-theme]) button.btn.primary:disabled {
+    background: var(--volt-a25);
+    color: var(--btn-disabled-fg);
+    border-color: transparent;
+  }
 }
 
 button.linklike {
@@ -626,18 +575,17 @@ button.linklike {
   border: 0;
   padding: 0;
   font: inherit;
-  color: var(--primary-text);
+  color: var(--accent-text);
   cursor: pointer;
   text-decoration: underline;
-  text-underline-offset: 2px;
 }
 
 button.linklike:hover {
-  color: var(--accent-text);
+  opacity: 0.8;
 }
 
 /* ---------------------------------------------------------------------------
- * Chips — identifiers, squared off
+ * Chips — identifiers, fully round
  * ------------------------------------------------------------------------ */
 
 .chip {
@@ -646,25 +594,25 @@ button.linklike:hover {
   line-height: 1.5;
   color: var(--text-1);
   background: var(--surface-well);
-  border: 1px solid var(--border-hair);
-  border-radius: var(--r-field);
-  padding: 3px 8px;
+  border: 1px solid var(--border-card);
+  border-radius: var(--r-pill);
+  padding: 3px 10px;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* An element the user pointed at. The accent's job: a thing the user reached out and touched. */
+/* An element the user pointed at: alive, so it carries the accent. */
 .chip.ref {
   color: var(--accent-text);
-  border-color: var(--accent-edge);
-  background: var(--accent-tint);
+  border-color: var(--volt-a28);
+  background: var(--volt-a10);
 }
 
 .chip.warn {
   color: var(--warn-text);
-  border-color: var(--warn);
+  border-color: var(--warn-text);
   background: var(--warn-bg);
 }
 
@@ -683,12 +631,12 @@ button.linklike:hover {
 }
 
 /* ---------------------------------------------------------------------------
- * Cards — solid surface, 2px outline, hard offset shadow, square corners
+ * Cards — gradient surface, hairline border, 20px radius, no drop shadow in dark
  * ------------------------------------------------------------------------ */
 
 .card {
-  background: var(--surface-1);
-  border: var(--border-width) solid var(--border-strong);
+  background: var(--surface-card);
+  border: 1px solid var(--border-card);
   border-radius: var(--r-card);
   padding: var(--card-pad);
   display: flex;
@@ -698,49 +646,55 @@ button.linklike:hover {
 }
 
 /*
- * A card for something switched off. It recedes by losing its lift and its bright edge — not by
- * fading, which on this palette reads as broken rather than as off. The text stays legible.
+ * A card for something switched off. On charcoal, dimming the whole card is enough — the surface is
+ * dark, so a dimmed card still reads. On white, 0.55 opacity takes body text to roughly 2.5:1 and
+ * the card reads as broken rather than as off, so light recedes it by flattening the surface and
+ * dropping the lift instead, and leaves the text alone.
  */
 .card.disabled {
+  opacity: 0.55;
+}
+
+:root[data-theme='light'] .card.disabled {
+  opacity: 1;
   background: var(--surface-well);
-  border-color: var(--border-hair);
   box-shadow: none;
 }
 
-/*
- * One hero per screen. In Chat that is the proposal card. Its signature is the accent: a pink
- * outline over a pink-shadowed block. No glow — the edge and the offset do the work.
- */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) .card.disabled {
+    opacity: 1;
+    background: var(--surface-well);
+    box-shadow: none;
+  }
+}
+
+/* One hero per screen. In Chat that is the proposal card. */
 .card.hero {
-  border-color: var(--accent-edge);
-  box-shadow: 4px 4px 0 var(--accent-edge);
+  border-color: var(--volt-a28);
+  box-shadow: var(--glow-hero);
 }
 
 .card h4 {
   margin: 0;
   font-size: var(--fs-ui);
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 .card .desc {
   color: var(--text-2);
   font-size: var(--fs-meta);
-  font-family: var(--font-ui);
 }
 
-/*
- * Source in a card: a reading surface. Mono, 12px, flat well, quiet hairline — never the display
- * face, and never anything patterned behind it.
- */
 .card pre {
   margin: 0;
   background: var(--surface-well);
-  border: 1px solid var(--border-hair);
+  border: 1px solid var(--border-card);
   border-radius: var(--r-field);
   padding: var(--sp-3);
   font-family: var(--font-mono);
-  font-size: var(--fs-meta);
+  font-size: var(--fs-label);
   line-height: 1.6;
   overflow: auto;
   max-height: 260px;
@@ -780,7 +734,7 @@ details > summary::-webkit-details-marker {
 }
 
 .ok {
-  color: var(--live-text);
+  color: var(--accent-text);
   font-size: var(--fs-meta);
 }
 
@@ -788,10 +742,6 @@ details > summary::-webkit-details-marker {
   color: var(--text-2);
 }
 
-/*
- * An empty state. The banner is playful, and nowhere deserves that more than a screen with nothing
- * on it — so the mark gets to be big and the copy stays short and plain.
- */
 .empty {
   color: var(--text-2);
   text-align: center;
@@ -799,22 +749,11 @@ details > summary::-webkit-details-marker {
   font-size: var(--fs-meta);
 }
 
-.empty::before {
-  content: '▚▚▚';
-  display: block;
-  font-family: var(--font-display);
-  font-size: 20px;
-  letter-spacing: 0.2em;
-  color: var(--accent);
-  margin-bottom: var(--sp-2);
-}
-
-/* Section labels: 11px pixel type, uppercase, tracked out. */
+/* Section labels: 11px, 600, uppercase, tracked out. */
 .label,
 .muted.label {
-  font-family: var(--font-display);
   font-size: var(--fs-label);
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: var(--lbl-tracking);
   color: var(--text-2);
@@ -824,13 +763,13 @@ details > summary::-webkit-details-marker {
 /*
  * The caveat on the hero card: "not tested on this page · <why>".
  *
- * It carries .label so the capture path can mask it by selector (scripts/screenshots.mjs), but a
- * section label's form is meant for one or two words and this is a sentence with a reason attached.
- * Set in the pixel face and in caps it shouts louder than the proposal it qualifies, so it reverts
- * to the UI face in sentence case, in the yellow the system reserves for "attention, not failure".
+ * It carries .label so the capture path can mask it by selector (scripts/screenshots.mjs) and the
+ * guardrails flow can assert it renders, but a section label's form — 11px uppercase, tracked out —
+ * is meant for one or two words. This is a sentence with a reason attached, and set in caps it
+ * wrapped to two shouting lines that read louder than the proposal they qualify. Sentence case in
+ * the amber the design system reserves for "attention, not failure" says it at the right volume.
  */
 .label.untested {
-  font-family: var(--font-ui);
   text-transform: none;
   letter-spacing: 0;
   font-size: var(--fs-meta);
@@ -860,23 +799,20 @@ label.field {
   flex-direction: column;
   gap: var(--sp-1);
   margin-bottom: var(--sp-3);
-  font-family: var(--font-display);
   font-size: var(--fs-label);
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: var(--lbl-tracking);
   color: var(--text-2);
 }
 
-/* The helper text under a field is prose, not a label: UI face, sentence case, 12px. */
+/* The helper text under a field is prose, not a label. */
 label.field > span {
-  font-family: var(--font-ui);
   font-size: var(--fs-meta);
   font-weight: 400;
   text-transform: none;
   letter-spacing: 0;
   color: var(--text-2);
-  line-height: 1.5;
 }
 
 label.field input,
@@ -886,11 +822,11 @@ label.field select,
   text-transform: none;
   letter-spacing: 0;
   padding: 9px 11px;
-  border: var(--border-width) solid var(--border-control);
+  border: 1px solid var(--border-card);
   border-radius: var(--r-field);
-  background: var(--surface-well);
+  background: var(--surface-card);
   color: var(--text-1);
-  transition: border-color 120ms ease;
+  transition: border-color 160ms ease;
 }
 
 label.field select {
@@ -906,7 +842,7 @@ label.field input::placeholder,
 label.field input:focus-visible,
 label.field select:focus-visible,
 .field-row input:focus-visible {
-  border-color: var(--focus-ring);
+  border-color: var(--volt);
   outline: none;
 }
 
@@ -922,27 +858,23 @@ label.field select:focus-visible,
 }
 
 /*
- * The on/off control on a mod card: a squared track with a squared knob. On is a solid lime fill
- * with an ink knob — the same "alive is lime, at full strength" rule the active tab follows — and
- * in the night theme it also glows, because a running mod is the definition of alive.
- *
- * The 2px border is not decoration. Full lime on a white card is 1.23:1, so in day the fill alone
- * could not show where the control is; the border is what carries its boundary, and the knob's
- * travel is a second signal that does not depend on colour at all.
+ * The on/off control on a mod card. The native checkbox's tick is a shape the design system does
+ * not own, so this is a round track with a volt fill when on — a mod that is running glows, and one
+ * that is off is a quiet grey track.
  */
 input[type='checkbox'] {
   appearance: none;
   -webkit-appearance: none;
   margin: 0;
-  width: 32px;
-  height: 18px;
+  width: 30px;
+  height: 17px;
   flex-shrink: 0;
-  border-radius: var(--r-field);
+  border-radius: var(--r-pill);
   background: var(--track);
-  border: var(--border-width) solid var(--border-strong);
+  border: 1px solid var(--border-card);
   position: relative;
   cursor: pointer;
-  transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+  transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
 }
 
 input[type='checkbox']::after {
@@ -950,21 +882,48 @@ input[type='checkbox']::after {
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 10px;
-  height: 10px;
-  border-radius: 1px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
   background: var(--text-2);
-  transition: transform 120ms ease, background 120ms ease;
+  transition: transform 160ms ease, background 160ms ease;
 }
 
 input[type='checkbox']:checked {
-  background: var(--live-fill);
+  background: var(--volt-a25);
+  border-color: var(--volt);
   box-shadow: var(--glow-fill);
 }
 
 input[type='checkbox']:checked::after {
-  background: var(--live-on-fill);
-  transform: translateX(14px);
+  background: var(--volt);
+  transform: translateX(13px);
+}
+
+/*
+ * In dark, "on" is a volt-tinted track plus the glow, and the glow is what carries it. Light has no
+ * glow, and a pale tint with a chartreuse knob is a weak signal for the most important state on the
+ * Mods screen — whether a mod is running. So light states it the other way round: a solid volt
+ * track with a white knob, which is unmistakable at a glance and still the same hue.
+ */
+:root[data-theme='light'] input[type='checkbox']:checked {
+  background: var(--volt);
+  border-color: var(--volt);
+}
+
+:root[data-theme='light'] input[type='checkbox']:checked::after {
+  background: #ffffff;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) input[type='checkbox']:checked {
+    background: var(--volt);
+    border-color: var(--volt);
+  }
+
+  :root:not([data-theme]) input[type='checkbox']:checked::after {
+    background: #ffffff;
+  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -973,25 +932,22 @@ input[type='checkbox']:checked::after {
 
 .notice {
   flex: none;
-  background: var(--surface-1);
-  border: var(--border-width) solid var(--border-strong);
+  background: var(--surface-card);
+  border: 1px solid var(--border-card);
   border-radius: var(--r-field);
   padding: var(--sp-3) var(--sp-4);
   margin: var(--sp-3) var(--sp-4) 0;
-  font-family: var(--font-ui);
   font-size: var(--fs-meta);
-  line-height: 1.55;
   color: var(--text-2);
   white-space: pre-wrap;
-  box-shadow: var(--shadow-raise);
+  box-shadow: var(--shadow-card);
 }
 
-/* A notice inside a card is already inset: no outer margin, quieter surface, no second shadow. */
+/* A notice inside a card is already inset: no outer margin, quieter surface. */
 .card > .notice {
   margin: 0;
   background: var(--surface-well);
-  border: 1px solid var(--border-hair);
-  box-shadow: none;
+  border-color: var(--border-card);
 }
 
 .steps {
@@ -999,7 +955,6 @@ input[type='checkbox']:checked::after {
   padding-left: var(--sp-5);
   color: var(--text-2);
   font-size: var(--fs-meta);
-  line-height: 1.55;
   display: flex;
   flex-direction: column;
   gap: var(--sp-1);
@@ -1010,7 +965,7 @@ input[type='checkbox']:checked::after {
 }
 
 .steps li::marker {
-  color: var(--accent);
+  color: var(--text-3);
 }
 
 /* ---------------------------------------------------------------------------
@@ -1038,26 +993,21 @@ input[type='checkbox']:checked::after {
 .page h2 {
   font-size: var(--fs-title);
   font-weight: 700;
-  letter-spacing: 0.01em;
+  letter-spacing: -0.02em;
   margin: 0;
-  color: var(--text-1);
 }
 
-/*
- * The wordmark: the pixel mark, then "usermods" in the display face with the accent's hard offset
- * behind it — the banner's own treatment, at UI scale.
- */
+/* The pixel mark, then the wordmark. */
 .wordmark {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-family: var(--font-display);
-  font-size: var(--fs-ui);
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: lowercase;
-  color: var(--live-text);
-  text-shadow: 2px 2px 0 var(--accent-edge);
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  font-weight: 600;
+  letter-spacing: var(--lbl-tracking);
+  text-transform: uppercase;
+  color: var(--accent-text);
 }
 
 /*
@@ -1065,8 +1015,10 @@ input[type='checkbox']:checked::after {
  * drawn at a whole multiple of 16 CSS px — 16 here, 32 in the dashboard header. Any other size
  * puts block boundaries between device pixels and the hard edges turn to fringe.
  *
- * image-rendering: pixelated is what makes that hold on a HiDPI screen. It carries its own blue
- * tile, so it needs no treatment per theme and reads the same in day and night.
+ * image-rendering: pixelated is what makes that hold on a HiDPI screen: the browser scales the
+ * 128px source up to the device pixel ratio, and the default smooth filter would blur exactly the
+ * edges the mark is made of. It carries its own blue tile, so it needs no treatment per theme and
+ * reads the same in light and dark.
  */
 .brand-mark {
   display: block;
@@ -1079,13 +1031,12 @@ input[type='checkbox']:checked::after {
 }
 
 /* ---------------------------------------------------------------------------
- * Motion: only alive things move, and none of it for anyone who asked for less.
+ * Motion: opacity and glow only, and none of it for anyone who asked for less.
  * ------------------------------------------------------------------------ */
 
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;
-    animation: none !important;
   }
 }
 
@@ -1109,21 +1060,17 @@ input[type='checkbox']:checked::after {
   min-width: 28px;
   min-height: 28px;
   padding: var(--sp-1) var(--sp-2);
-  /* --border-control, not --border-hair: the hairline is a divider tone at 1.46:1 and at this size
-     it leaves two naked icons where there should be two buttons. A control's outline is what says
-     "this is a control", so it answers to the 3:1 UI rule. */
-  border: var(--border-width) solid var(--border-control);
-  border-radius: var(--r-field);
+  /* --border-card, not --border-hair: the hairline is a separator tone and at 1px on a 28px pill
+     it disappears in light, leaving two naked icons where there should be two buttons. */
+  border: 1px solid var(--border-card);
+  border-radius: var(--r-pill);
   background: none;
-  font-family: var(--font-display);
-  font-size: var(--fs-label);
-  font-weight: 700;
-  line-height: 1;
+  font: 600 var(--fs-label) / 1 var(--font-ui);
   letter-spacing: var(--lbl-tracking);
   text-transform: uppercase;
-  color: var(--text-2);
+  color: var(--text-3);
   cursor: pointer;
-  transition: color 120ms ease, background 120ms ease, border-color 120ms ease;
+  transition: color 160ms ease, background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
 }
 
 /* The theme toggle joins the family: it was a 24px borderless circle, and beside two bordered
@@ -1132,18 +1079,18 @@ input[type='checkbox']:checked::after {
 .tabs .theme-toggle {
   width: 28px;
   height: 28px;
-  border: var(--border-width) solid transparent;
-  border-radius: var(--r-field);
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
 }
 
 .tabs button.tab-action:hover {
-  color: var(--primary-text);
-  border-color: var(--primary);
-  background: var(--surface-2);
+  color: var(--accent-text);
+  border-color: var(--volt-a28);
+  background: var(--volt-a12);
 }
 
 .tabs .theme-toggle:hover {
-  border-color: var(--primary);
+  border-color: var(--volt-a28);
 }
 
 /* The icons sit on the text colour, so every state above moves the mark with the label. */
@@ -1153,17 +1100,31 @@ input[type='checkbox']:checked::after {
 }
 
 /*
- * Settings selected. It is a view of this panel, so it wears exactly the treatment the Chat and
- * Mods tabs wear — a solid lime block with an ink label — rather than inventing a second, quieter
- * idea of "active" for the same question. It is distinguishable without colour too: the resting
- * state is an outline with no fill, and the selected state is a filled block with a hard shadow.
+ * Settings selected. It is a view of this panel, so it wears the tabs' volt treatment rather than
+ * a second, quieter idea of "active" — and it is distinguishable without colour: the border goes
+ * solid accent where the resting state is a hairline, and the label/mark step up to full weight
+ * against a tinted fill. In dark the glow adds a third, non-colour cue.
  */
-.tabs button.tab-action.active,
+.tabs button.tab-action.active {
+  color: var(--accent-text);
+  background: var(--volt-a12);
+  border-color: var(--volt-a28);
+  box-shadow: var(--glow-tab);
+}
+
 .tabs button.tab-action.active:hover {
-  color: var(--live-on-fill);
-  background: var(--live-fill);
-  border-color: var(--live-fill);
-  box-shadow: var(--shadow-press);
+  color: var(--accent-text);
+}
+
+/* Light has no --glow-tab, so the selected border carries the weight on its own. */
+:root[data-theme='light'] .tabs button.tab-action.active {
+  border-color: var(--accent-text);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) .tabs button.tab-action.active {
+    border-color: var(--accent-text);
+  }
 }
 
 /*

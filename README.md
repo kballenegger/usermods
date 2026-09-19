@@ -58,36 +58,23 @@ Early. The core loop works end to end: chat, page inspection, live testing, prop
   </tr>
 </table>
 
-### Design
-
-The interface is built on the banner: electric blue as a real surface colour, lime for anything
-alive, pink, cyan and yellow as confident accents, ink outlines and hard offset pixel shadows, and a
-pixel display face for short labels. Anything you actually read — the transcript, code, the editor,
-settings help — sits on a solid panel in a text face at a comfortable size, because the system's
-first principle is **be bold, and be legible**.
-
-**[docs/design.md](docs/design.md)** is the full style guide: the palette with hexes and OKLCH values
-for both themes, the contrast table, typography, every component with its states and do/don'ts,
-theming and the accessibility commitments. It embeds a living specimen rendered with the real
-stylesheets, so it shows the system rather than describing it.
-
 ### Light and dark
 
 The panel follows your OS by default, and the ◐ in the tab bar cycles Dark → Light → System from
-anywhere. Day is its own design pass, not night inverted: the identity colours drop to the tones that
-can carry text on white, panels take ink outlines in place of the bright borders they use on the blue
-page, and every glow turns off — there is no neon in daylight. Both themes meet WCAG AA, which
+anywhere. Light is its own design pass, not the dark palette inverted: volt darkens to chartreuse
+so it can carry text and fills on white, every glow turns off, and cards take a faint shadow in
+place of the border they cannot rely on at that contrast. Both themes meet WCAG AA, which
 `test/contrast.test.ts` enforces against the token file.
 
 <table>
   <tr>
     <td width="50%" valign="top">
-      <img src="docs/screenshots/01-chat-proposal-light.png" alt="The proposal conversation in the day theme: white ink-outlined panels on a cool blue-white page, the hero card edged in magenta.">
-      <sub><b>Chat, day.</b></sub>
+      <img src="docs/screenshots/01-chat-proposal-light.png" alt="The proposal conversation in light mode: white cards on a pale green-grey background, the hero card outlined in chartreuse.">
+      <sub><b>Chat, light.</b></sub>
     </td>
     <td width="50%" valign="top">
-      <img src="docs/screenshots/01-chat-proposal.png" alt="The same proposal conversation in the night theme: ink panels on electric blue, a lime active tab and the hero card edged in magenta.">
-      <sub><b>Chat, night.</b></sub>
+      <img src="docs/screenshots/01-chat-proposal.png" alt="The same proposal conversation in dark mode: volt on charcoal, the hero card glowing.">
+      <sub><b>Chat, dark.</b></sub>
     </td>
   </tr>
   <tr>

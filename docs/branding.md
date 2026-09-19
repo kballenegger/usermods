@@ -74,27 +74,15 @@ The five store screenshots keep the neutral window frame and charcoal caption ba
 inside the frame are real product output, and the frame is deliberately quiet so it does not
 compete with them.
 
-## Applying it to the interface — done
+## Remaining follow-up — the app UI itself
 
-This was the "remaining follow-up" this document used to list as pending owner confirmation. It is
-now **complete**: Kenneth confirmed the direction and asked for the app to carry the banner's
-boldness rather than a subtle version of it.
+**Pending owner confirmation.** Restyling the interface would replace the current Volt OS look and
+the light mode added the day before this decision, so it is deliberately *not* part of the icon
+work and is being confirmed with Kenneth separately before anyone starts:
 
-The design system built from this identity is documented in **[design.md](design.md)**, which is the
-reference to design from: the role palette and its tonal scales, the contrast table, typography,
-components, motion, theming and the accessibility commitments. Read it before changing anything
-visual.
-
-What that pass did, against the original handoff:
-
-1. ~~Apply this BBS direction to the side panel, dashboard, install flow and shared branding surfaces.~~ **Done.** `entrypoints/sidepanel/tokens.css` was rebuilt on this palette as a set of role tokens (`--primary-*`, `--live-*`, `--accent-*`, `--info-*`, `--warn-*`, `--error-*`), and the side panel, dashboard, install page, consent flow and the in-page element picker all follow it. Electric blue is the page itself; lime, pink, cyan and yellow are used as real fills, borders and states.
-2. ~~Preserve usable light/dark themes and current functionality. Validate contrast and focus states.~~ **Done.** Both themes are boldly branded rather than one being a faded version of the other — night lays ink panels on the electric blue, day lays ink-outlined white panels on a cool blue page. Every pairing the UI renders meets WCAG AA in both themes, enforced by `test/contrast.test.ts`.
-3. ~~Refresh screenshots and store artwork.~~ **Done.** `docs/screenshots/` and `docs/store/assets/` are regenerated, and the README no longer describes the old Volt design.
-4. ~~Reuse the canonical icon and banner instead of selecting a new exploration.~~ **Done.** No new exploration was selected; the six working-palette colours above are used literally as the identity layer of the system.
-
-Two things had to be **added** to the palette to make it work as an interface, both recorded with their reasoning in design.md:
-
-- **Tonal scales.** `#1008C8` is a very dark, saturated blue (OKLCH L=38%). It is excellent as a fill under white or lime text, and as text on a pale page, but unusable as text or as a thin border on a dark navy panel. Each identity colour therefore gained the steps it needs to carry text on both kinds of surface, derived in OKLCH with the hue held steady.
-- **A red.** The banner has no red, and error needs a colour that cannot be mistaken for the magenta accent. Because hue alone cannot achieve that under the common colour-vision deficiencies — pink and red converge to within 1.01:1 under tritanopia — the two roles are separated by lightness, by form, and by always carrying a word.
+1. Apply this BBS direction to the side panel, dashboard, install flow and shared branding surfaces. Start with `entrypoints/sidepanel/tokens.css`, then the corresponding styles and brand marks.
+2. Preserve usable light/dark themes and current functionality. Validate contrast and focus states as tokens change; keep dense content readable.
+3. Refresh screenshots and store artwork after the UI is updated, including `docs/screenshots/` and `docs/store/assets/`. Update README descriptions of the old Volt design to match the implemented result.
+4. Reuse the canonical icon and banner instead of selecting a new exploration. Match their visual language when new assets are needed.
 
 This document and the root `AGENTS.md` are the project-local memory of the decision.
