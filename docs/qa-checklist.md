@@ -136,6 +136,58 @@ first-run surfaces still look right — skip deeper testing here.
 
 ---
 
+## 3a. Lost connection, Resume, and an interrupted run
+
+These need a real network and a real service worker, so they are manual. Use a provider that takes
+several steps to answer ("read the whole page, list all the buttons, then propose something").
+
+1. Start a run. Once the first tool row has appeared, **turn Wi-Fi off**.
+   **Expected:** within a few seconds the activity line turns amber and reads either
+   `you are offline · waiting for the connection to come back` or
+   `connection lost · retrying in 4s · attempt 2 of 5`, with a **Stop** button. No error row
+   appears yet.
+   **If it fails:** service worker console.
+2. **Turn Wi-Fi back on** within about twenty seconds.
+   **Expected:** the line returns to `continuing` / a tool name and the run finishes by itself. The
+   assistant's text is not duplicated, and no tool row appears twice.
+   **If it fails:** side panel DevTools, service worker console.
+3. Start another run, turn Wi-Fi off after the first tool row, and this time **leave it off**
+   (about two minutes while Chrome reports offline; about thirty seconds if it does not).
+   **Expected:** a red error row ("Could not reach the model provider …") with **"Your progress is
+   saved…"** and a **Resume** button under it. The tool rows you already saw are still there. The
+   composer shows **Send**, not Queue.
+   **If it fails:** service worker console.
+4. Close and reopen the side panel.
+   **Expected:** same transcript, same **Resume** button.
+5. Turn Wi-Fi back on and click **Resume**.
+   **Expected:** the run continues from the next step. No new user bubble appears, the earlier
+   tools are not run again, and the run finishes. Resume is gone afterwards.
+   **If it fails:** service worker console; check `chrome.storage.local` key `runs`.
+6. While waiting in step 1's retry state on a fresh run, click **Stop**.
+   **Expected:** the run ends at once (it does not sit out the countdown), and no Resume is offered.
+7. Start a long run. Open `chrome://serviceworker-internals`, find the usermods worker
+   (`chrome-extension://<id>/background.js`) and click **Stop**.
+   **Expected:** within a second or two the panel shows **"This run was interrupted."** with
+   **Resume**. Any tool row that was mid-flight reads `interrupted before it finished`. It does
+   **not** resume by itself. A message you had queued is back in the composer.
+   **If it fails:** side panel DevTools; `chrome.storage.local` key `runs` should show the chat
+   with `state: "interrupted"`.
+8. Click **Resume**.
+   **Expected:** the run continues from the last completed step and finishes; no new user bubble.
+9. Start a long run, **close the side panel**, wait ten seconds, reopen it while the run is still
+   going.
+   **Expected:** the activity line, **Stop** and **Queue** are showing; the rows produced while the
+   panel was closed are in the transcript; there is no "reconnected — earlier output … was not
+   captured" note.
+10. Start a run with a model that thinks for well over 30 seconds before its first byte, with the
+    side panel **closed**. Reopen after a minute.
+    **Expected:** the run is still going or has finished; it was not interrupted. (This is the
+    keepalive; Chrome's 30-second idle timer would otherwise stop the worker.) If a single request
+    runs past five minutes and the worker is stopped anyway, the expected result is step 7's, not
+    a lost run.
+
+---
+
 ## 4. Chat persistence: panel reload, browser restart, second chat, archive/unarchive
 
 1. With an existing chat with a few messages, close and reopen the side panel (or switch tabs
@@ -547,6 +599,7 @@ Same flow as section 11, with the **SuperGrok subscription** preset / "xAI subsc
 | 1 | Try now / Save & enable, reload, mod ran | | |
 | 2 | Element references (picker) | | |
 | 3 | Queue mid-run and Stop | | |
+| 3a | Lost connection retries, Resume, interrupted run | | |
 | 4 | Chat persistence: reload, restart, second chat | | |
 | 4a | Side panel: this tab only, every tab, dashboard Open | | |
 | 5 | Install from Greasy Fork `.user.js` link | | |

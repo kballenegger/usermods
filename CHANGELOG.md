@@ -26,6 +26,21 @@ First public release, and the first submission to the Chrome Web Store.
 - History compaction against a context budget you set: old page snapshots and tool output are
   trimmed first, then the earlier part of the conversation is summarised.
 - A live activity line with stall detection, so a long run is never a silent one.
+- A lost connection costs a pause, not the run. A model request that fails for a reason that will
+  pass — no network, a stream that drops mid-reply, a 408/425/429/5xx, an overloaded provider — is
+  retried up to five times with backoff (about 1s, 2s, 4s, 8s, 16s, honouring `Retry-After` up to a
+  minute), and the activity line says so: `connection lost · retrying in 4s · attempt 2 of 5`. Only
+  the request is retried; a tool never runs twice. While the machine is offline the run waits for
+  it to come back instead of spending attempts. **Stop** ends a wait immediately.
+- A long outage costs one click, never a re-run. When retries run out (or the error is not one
+  retrying can fix, such as a bad key), everything the run completed — every reply, tool call and
+  tool result — is kept, and the error carries a **Resume** button. Resume continues from the last
+  completed step: your message is not sent again and the page is not re-inspected.
+- Runs survive the side panel and the service worker. The conversation is saved after every
+  completed step. Closing the panel mid-run no longer loses the rows it produced meanwhile, and a
+  panel reopened mid-run shows the run in progress. If Chrome stops the service worker, the browser
+  quits or the extension reloads mid-run, the chat says **This run was interrupted.** and offers
+  the same Resume. Nothing resumes on its own.
 - Chats are stored per site, several per site, named by the model after the first reply (you can
   rename, and your rename sticks), and archived rather than deleted.
 
