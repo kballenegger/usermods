@@ -42,6 +42,26 @@ export function reduceItems(items: ChatItem[], event: AgentEventBody): ChatItem[
     }
     case 'proposal':
       return [...items, { kind: 'proposal', proposal: event.proposal }];
+    case 'artifact': {
+      // The version the proposal just became. It arrives immediately after its 'proposal' event,
+      // from the same tool call, so it stamps the LAST proposal row — which is the one the loop
+      // just emitted. Stamping by position rather than by matching the code is deliberate: two
+      // identical proposals in one chat are two rows and the second one is the one that just
+      // happened, and comparing code would put the number on the first.
+      //
+      // A transcript with no proposal row to stamp (one restored from before drafts existed, or a
+      // reconnect that missed the proposal) is left exactly as it is: the card simply carries no
+      // version and offers its old Save, which is the honest fallback.
+      for (let i = items.length - 1; i >= 0; i--) {
+        const it = items[i];
+        if (it?.kind !== 'proposal') continue;
+        if (it.version === event.version) return items;
+        const next = items.slice();
+        next[i] = { ...it, version: event.version };
+        return next;
+      }
+      return items;
+    }
     case 'accepted': {
       // The message has entered the model conversation, so it is no longer merely queued.
       if (!items.some((it) => it.kind === 'user' && it.id === event.id && it.queued)) return items;

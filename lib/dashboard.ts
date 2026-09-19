@@ -188,6 +188,30 @@ export function editorSync(
   return dirty ? 'conflict' : 'adopt';
 }
 
+/**
+ * Which chat a mod came from, by mod id, built from the chats that have a draft.
+ *
+ * The link is stored on the ARTIFACT (linkedModId), not on the mod, because it is the draft that
+ * knows what it saved and a mod imported from a file or a Tampermonkey backup has no chat at all.
+ * That makes this the one direction that needs building: the Mods list has a mod and wants the chat.
+ *
+ * Two chats can end up pointing at the same mod — save a draft in one chat, then in another chat
+ * ask for "the same thing" and save that over it — and the most recently updated chat wins, which
+ * is the one whose draft is the mod's current contents.
+ */
+export function modOrigins(
+  entries: Array<{ chat: Chat; linkedModId?: string; versions: number }>,
+): Map<string, { chat: Chat; versions: number }> {
+  const out = new Map<string, { chat: Chat; versions: number }>();
+  for (const e of entries) {
+    if (!e.linkedModId) continue;
+    const existing = out.get(e.linkedModId);
+    if (existing && existing.chat.updatedAt >= e.chat.updatedAt) continue;
+    out.set(e.linkedModId, { chat: e.chat, versions: e.versions });
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------------------
 // The side-panel handoff
 // ---------------------------------------------------------------------------

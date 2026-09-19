@@ -53,7 +53,7 @@
 
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
-import { COMPACT_MARKER, FAST_MARKER, SLOW_MARKER, SUMMARY_MARKER, WAIT_MARKER } from './mock-llm.mjs';
+import { ARTIFACT_V1, ARTIFACT_V2, ARTIFACT_V3, COMPACT_MARKER, FAST_MARKER, SLOW_MARKER, SUMMARY_MARKER, WAIT_MARKER } from './mock-llm.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -79,6 +79,9 @@ const DASHBOARD_SHOT = process.argv.includes('--dashboard-capture');
 const THEME = process.argv.includes('--theme');
 const TABBAR = process.argv.includes('--tabbar');
 const WAIT = process.argv.includes('--wait');
+const ARTIFACT = process.argv.includes('--artifact');
+/** The artifact flow, asserted AND capturing the two draft-panel states for the PR. */
+const ARTIFACT_SHOT = process.argv.includes('--artifact-capture');
 
 /**
  * Where the tab bar's captures go when --tabbar is asked to write them (`--tabbar-capture`). These
@@ -94,7 +97,7 @@ const STYLEGUIDE = process.argv.includes('--styleguide');
 /** True when this run is capturing screenshots rather than asserting behaviour (see MASK below). */
 const CAPTURING =
   !SMOKE && !CHATS && !ISOLATION && !COMPACTION && !DASHBOARD && !DASHBOARD_SHOT && !THEME &&
-  !TABBAR && !TABBAR_SHOT && !WAIT && !STYLEGUIDE;
+  !TABBAR && !TABBAR_SHOT && !WAIT && !STYLEGUIDE && !ARTIFACT && !ARTIFACT_SHOT;
 
 /** See note 4: a first-run setup instruction, not the steady state the README should show. */
 const HIDE_SETUP_NOTICE = '.app > .notice, .dash-inner > .notice { display: none !important; }';
@@ -575,15 +578,24 @@ async function smoke() {
     const code = await panel.locator('.messages .card pre').first().textContent();
     if (!code?.includes('vector-toc-pinned-container')) fail('proposal code did not contain the expected selector');
 
-    // Saving it puts a real mod in storage.
-    await panel.locator('.messages .card button.btn.primary').click();
-    await panel.locator('.messages .card button.btn.primary', { hasText: 'Saved · enabled' }).waitFor({ timeout: 10_000 });
+    // The proposal became the chat's draft, and the draft panel is where it is saved from now. The
+    // card keeps Run once and points at the panel; Save moved there because the panel, not the
+    // card, is what the next proposal updates. (The full draft lifecycle — versions, diff, rollback,
+    // update in place — is the artifact flow below; this only checks that the ordinary path from a
+    // first proposal to a saved mod still works.)
+    const draft = panel.locator('[data-testid="artifact"]');
+    if (!(await draft.count())) fail('the proposal did not become a draft in the artifact panel');
+    if ((await panel.locator('[data-testid="artifact-current"]').textContent())?.trim() !== 'v1') fail('the draft did not open at v1');
+
+    await panel.locator('[data-testid="artifact-save"]').click();
+    await panel.locator('[data-testid="artifact-save"]', { hasText: 'Update mod' }).waitFor({ timeout: 10_000 });
     const saved = await panel.evaluate(async () => (await chrome.storage.local.get('mods')).mods ?? []);
     if (saved.length !== 1) fail(`expected 1 saved mod, got ${saved.length}`);
     if (!saved[0].source.includes('==UserScript==')) fail('saved mod has no userscript header');
+    if (!saved[0].source.includes('vector-toc-pinned-container')) fail('the saved mod is not the script the card showed');
 
     await assertNoViolations('smoke');
-    console.log('smoke: OK — streamed reply, 3 page-inspection tools, proposal card, save to storage, zero invalid requests');
+    console.log('smoke: OK — streamed reply, 3 page-inspection tools, proposal card, draft at v1, save to storage, zero invalid requests');
   } finally {
     await b.close();
   }
@@ -821,6 +833,257 @@ async function waitFlow() {
     await assertNoViolations('wait');
     console.log(
       `wait: OK — already-true in <100ms, lazy-loaded content, style-only reveal seen in ${revealLatency}ms, page text, pushState route change, DOM settle, a timeout with diagnostics and no error flag, Stop inside ${stopTook}ms, no leftover observers, zero invalid requests`,
+    );
+  } finally {
+    await b.close();
+  }
+}
+
+
+// ---------------------------------------------------------------------------
+// Artifact test: one chat, one draft mod, versioned — and the model is told what it is.
+// ---------------------------------------------------------------------------
+//
+// The feature's whole claim is that a chat has ONE draft, that a request like "make the button blue
+// instead" edits it rather than starting over, and that saving twice updates one mod rather than
+// leaving two running on the page. Three of those four cannot be seen in a transcript at all, so
+// this flow asserts them where they actually live:
+//
+//   1. the panel — the collapsed bar appears after v1 and says v1;
+//   2. /__requests — the SECOND turn's request carries the draft block with v1's code in it. This
+//      is the assertion that matters most: it is the only proof that the model was told what the
+//      draft is, and a feature that silently stopped sending it would still look right on screen;
+//   3. the diff — v2 against v1 shows the line that moved and not the whole file;
+//   4. /__requests again, after a rollback done through the UI — the NEXT turn carries v1's code,
+//      not v2's. A rollback that only moved a highlight would pass every on-screen check and fail
+//      this one;
+//   5. chrome.storage — Save creates exactly one mod, and 'Update mod' after a later proposal
+//      rewrites THAT mod id rather than adding a second;
+//   6. a reload — the draft is still there, because it is storage and not component state;
+//   7. the dashboard — the chat row badges the draft and the mod row links back to the chat.
+
+const ARTIFACT_PROMPTS = ['hide the promo banner on this page', 'make the button blue instead', 'also hide the footer'];
+
+/**
+ * The text of every user message in the FIRST request the mock received for a given script, which
+ * is what the model was handed when that turn opened.
+ *
+ * The first request of a turn is the one that carries the turn's own user message and nothing else
+ * from it; later requests in the same turn repeat that message alongside tool results. Reading the
+ * first is therefore the honest answer to "what was this turn opened with", which is what the draft
+ * assertions are about.
+ */
+async function requestForScript(script) {
+  const requests = await fetchRequests();
+  const hit = requests.find((r) => r.script === script);
+  if (!hit) return null;
+  return (hit.messages ?? [])
+    .filter((m) => m.role === 'user')
+    .map((m) => (typeof m.content === 'string' ? m.content : (m.content ?? []).map((p) => p.text ?? '').join('\n')))
+    .join('\n---\n');
+}
+
+/** Send a message and wait for the draft panel to reach `version`, then for the run to finish. */
+async function sendForVersion(panel, text, version) {
+  await waitForComposer(panel);
+  await panel.locator('textarea').fill(text);
+  await panel.locator('.composer button.btn.primary').click();
+  await panel.locator(`[data-testid="artifact"][data-version="${version}"]`).waitFor({ timeout: 60_000 });
+  // The run is over when the composer offers Send again; asserting on a draft mid-run would race
+  // whatever the turn does next.
+  await panel.waitForFunction(
+    () => ![...document.querySelectorAll('.composer .btn')].some((b) => b.textContent?.trim() === 'Stop'),
+    null,
+    { timeout: 60_000 },
+  );
+  await panel.waitForTimeout(400);
+}
+
+/** The mods in storage, as the background wrote them. */
+function storedMods(page) {
+  return page.evaluate(async () => (await chrome.storage.local.get('mods')).mods ?? []);
+}
+
+async function artifactFlow({ capture = false } = {}) {
+  const b = await launch('light');
+  const fail = (m) => {
+    throw new Error(`artifact: ${m}`);
+  };
+  try {
+    await clearViolations();
+    await fetch(`${CONTROL_BASE}/__requests`, { method: 'DELETE' }).catch(() => {});
+
+    const panel = await openPanel(b.ctx, b.extId);
+    await openSite(b.ctx, 'https://en.wikipedia.org/wiki/Common_kingfisher');
+    await waitForComposer(panel);
+
+    // --- 1. The first proposal becomes v1, and the panel appears saying so.
+    await sendForVersion(panel, ARTIFACT_PROMPTS[0], 1);
+    const bar = panel.locator('[data-testid="artifact"]');
+    if (!(await bar.count())) fail('no draft panel after the first proposal');
+    const barText = (await bar.first().innerText()) ?? '';
+    // The "DRAFT" label is dropped at the side panel's own width so the NAME fits (artifact.css
+    // explains the order); it is asserted at a wider viewport below, along with the line count.
+    if (!/\bv1\b/.test(barText)) fail(`the collapsed bar did not say v1: ${JSON.stringify(barText)}`);
+    // The NAME is what the bar exists to say, so it must be whole rather than ellipsed — at the side
+    // panel's real width, with all three buttons on screen. The bar drops the line count first (and
+    // the "DRAFT" label next) precisely so this holds; a regression that reinstated "DRAFT · W… ·
+    // v1 · 6 lines" would pass every other check in this flow.
+    if (!barText.includes('Wikipedia: hide the promo banner')) {
+      fail(`the collapsed bar did not carry the draft's name at all: ${JSON.stringify(barText)}`);
+    }
+    // …and carrying it in the DOM is not the same as showing it. `text-overflow: ellipsis` leaves
+    // the full string in innerText while the user sees "Wikipedia:…", so the check that matters is
+    // the geometric one: the name element is not scrolling its own content.
+    const nameClipped = await panel.locator('[data-testid="artifact-name"]').evaluate((el) => el.scrollWidth > el.clientWidth + 1);
+    if (nameClipped) {
+      const widths = await panel.locator('[data-testid="artifact"] .artifact-bar').evaluate((bar) => {
+        const out = {};
+        for (const el of bar.querySelectorAll('*')) {
+          const k = el.className?.baseVal ?? String(el.className ?? el.tagName);
+          if (el.children.length) continue;
+          out[`${k}`] = Math.round(el.getBoundingClientRect().width);
+        }
+        out['__bar'] = Math.round(bar.getBoundingClientRect().width);
+        return out;
+      });
+      fail(`the collapsed bar ellipsed the draft name at the side panel’s own width. Widths: ${JSON.stringify(widths)}`);
+    }
+    for (const t of ['artifact-try', 'artifact-save', 'artifact-export']) {
+      if (!(await panel.locator(`[data-testid="${t}"]`).isVisible())) fail(`the collapsed bar pushed ${t} off screen`);
+    }
+    // The size is in the DOM and comes back when the panel is dragged wider; it is only hidden at
+    // this width. Widening the viewport is how that is checked rather than asserted by faith.
+    await panel.setViewportSize({ width: 620, height: PANEL.height });
+    await panel.waitForTimeout(250);
+    const wide = (await bar.first().innerText()) ?? '';
+    if (!/\d+ lines/.test(wide)) fail(`a wider panel did not bring the line count back: ${JSON.stringify(wide)}`);
+    if (!/draft/i.test(wide)) fail(`a wider panel did not bring the "Draft" label back: ${JSON.stringify(wide)}`);
+    if (!/export/i.test(wide)) fail(`a wider panel did not bring Export's word back: ${JSON.stringify(wide)}`);
+    await panel.setViewportSize(PANEL);
+    await panel.waitForTimeout(250);
+    // Collapsed by default: the body is not on screen until the chevron is clicked.
+    if (await panel.locator('[data-testid="artifact-body"]').count()) fail('the draft panel started expanded');
+
+    // The proposal card in the transcript is history now, and says which version it became.
+    const cardVersion = (await panel.locator('[data-testid="card-version"]').first().textContent())?.trim();
+    if (!cardVersion?.includes('v1')) fail(`the proposal card did not say v1 (it said ${JSON.stringify(cardVersion)})`);
+    if (!(await panel.locator('[data-testid="card-open-in-draft"]').count())) {
+      fail('the proposal card still offered its own Save rather than "Open in draft"');
+    }
+
+    if (capture) await shot(panel, '08-artifact-collapsed.png');
+
+    // --- 2. The second turn's request carries the draft. This is the assertion the feature is for.
+    await sendForVersion(panel, ARTIFACT_PROMPTS[1], 2);
+    const turn2 = await requestForScript('artifact-2');
+    if (!turn2) fail('the mock never received the second turn');
+    if (!/\[Current draft mod v1\b/.test(turn2)) {
+      fail(`the second turn did not carry a draft block for v1:\n${turn2.slice(0, 900)}`);
+    }
+    if (!turn2.includes(ARTIFACT_V1)) fail('the second turn carried a draft block but not v1’s actual code');
+    if (turn2.includes(ARTIFACT_V2)) fail('the second turn already carried v2’s code, so the block is not the draft at send time');
+    if (!/not page content/i.test(turn2)) fail('the draft block did not mark itself as user-side context');
+
+    // --- 3. v2 is current, and its diff against v1 shows the line that moved — and only that line.
+    await panel.locator('[data-testid="artifact-toggle"]').click();
+    await panel.locator('[data-testid="artifact-body"]').waitFor({ timeout: 10_000 });
+    const chips = await panel.locator('[data-testid="artifact-version"]').allTextContents();
+    if (chips.join(' ') !== 'v1 v2') fail(`the version strip read ${JSON.stringify(chips.join(' '))} instead of "v1 v2"`);
+    const currentChip = await panel.locator('[data-testid="artifact-version"][data-current="true"]').textContent();
+    if (currentChip?.trim() !== 'v2') fail(`the strip highlighted ${JSON.stringify(currentChip)} as current instead of v2`);
+
+    await panel.locator('[data-testid="artifact-diff-toggle"]').click();
+    await panel.locator('[data-testid="artifact-diff"]').waitFor({ timeout: 10_000 });
+    const diff = (await panel.locator('[data-testid="artifact-diff"]').innerText()) ?? '';
+    const added = diff.split('\n').filter((l) => l.startsWith('+'));
+    const removed = diff.split('\n').filter((l) => l.startsWith('-'));
+    if (added.length !== 1 || removed.length !== 1) {
+      fail(`the diff showed ${removed.length} removed and ${added.length} added lines; v1→v2 moved exactly one:\n${diff}`);
+    }
+    if (!added[0].includes('#1155dd')) fail(`the added line was not the new colour: ${JSON.stringify(added[0])}`);
+    if (!removed[0].includes('#888')) fail(`the removed line was not the old colour: ${JSON.stringify(removed[0])}`);
+
+    if (capture) await shot(panel, '09-artifact-diff.png');
+
+    // --- 4. Rolling back to v1 through the UI makes v1 the draft — as an appended version, and as
+    // what the NEXT request carries.
+    await panel.locator('[data-testid="artifact-diff-toggle"]').click(); // back to the code view
+    await panel.locator('[data-testid="artifact-version"][data-v="1"]').click();
+    await panel.locator('[data-testid="artifact-rollback"]').waitFor({ timeout: 10_000 });
+    await panel.locator('[data-testid="artifact-rollback"]').click();
+    await panel.locator('[data-testid="artifact"][data-version="3"]').waitFor({ timeout: 10_000 });
+
+    const rolled = await panel.evaluate(async () => {
+      const all = await chrome.storage.local.get(null);
+      const key = Object.keys(all).find((k) => k.endsWith(':artifact'));
+      return key ? all[key] : null;
+    });
+    if (!rolled) fail('no artifact in storage after the rollback');
+    if (rolled.versions.length !== 3) fail(`a rollback should APPEND a version: the artifact holds ${rolled.versions.length}`);
+    if (rolled.current !== 3) fail(`the draft is v${rolled.current}, not the rolled-back v3`);
+    if (rolled.versions[2].source !== 'rollback') fail(`v3 was recorded as ${JSON.stringify(rolled.versions[2].source)} rather than a rollback`);
+    if (rolled.versions[2].code !== rolled.versions[0].code) fail('v3 does not carry v1’s code, so the rollback restored the wrong thing');
+    if (rolled.versions[1].code !== ARTIFACT_V2) fail('v2 was lost by the rollback; the history must be append-only');
+
+    // --- 5. Saving creates exactly one mod, and links it to the draft.
+    await panel.locator('[data-testid="artifact-save"]').click();
+    await panel.locator('[data-testid="artifact-save"]', { hasText: 'Update mod' }).waitFor({ timeout: 15_000 });
+    let mods = await storedMods(panel);
+    if (mods.length !== 1) fail(`Save should have created exactly one mod, storage holds ${mods.length}`);
+    const modId = mods[0].id;
+    if (!mods[0].source.includes('==UserScript==')) fail('the saved mod has no userscript header');
+    if (!mods[0].source.includes('#888')) fail('the saved mod is not the rolled-back v1 code the panel was showing');
+
+    // --- 6. A later proposal, then Update: the SAME mod id is rewritten. This is the duplicate bug.
+    await sendForVersion(panel, ARTIFACT_PROMPTS[2], 4);
+    // The next turn was opened with the rolled-back code, not with v2's.
+    const turn3 = await requestForScript('artifact-3');
+    if (!turn3) fail('the mock never received the third turn');
+    if (!turn3.includes(ARTIFACT_V1)) fail('after a rollback, the next turn did not carry v1’s code as the draft');
+    if (turn3.includes(ARTIFACT_V2)) fail('after a rollback, the next turn still carried v2’s code');
+    if (!/\[Current draft mod v3\b/.test(turn3)) fail('the draft block did not name the rolled-back version');
+
+    await panel.locator('[data-testid="artifact-save"]').click();
+    await panel.locator('[data-testid="artifact-status"]', { hasText: 'Updated' }).waitFor({ timeout: 15_000 });
+    mods = await storedMods(panel);
+    if (mods.length !== 1) fail(`Update mod created a duplicate: storage holds ${mods.length} mods`);
+    if (mods[0].id !== modId) fail('Update mod wrote a different mod id, so the link was lost');
+    if (!mods[0].source.includes('promo-footer')) fail('Update mod did not write the newest version over the saved mod');
+
+    // --- 7. The draft is storage, not component state: it survives a reload of the panel.
+    await reloadPanel(panel);
+    await panel.locator('[data-testid="artifact"]').waitFor({ timeout: 25_000 });
+    const afterReload = (await panel.locator('[data-testid="artifact"]').innerText()) ?? '';
+    if (!/\bv4\b/.test(afterReload)) fail(`after a reload the draft did not come back at v4: ${JSON.stringify(afterReload)}`);
+    if (!/update mod/i.test(afterReload)) fail('after a reload the panel forgot that the draft is linked to a mod');
+
+    // --- 8. The dashboard: the chat is badged, and the mod points back at the chat.
+    const dash = await openDashboard(b.ctx, b.extId);
+    const badge = dash.locator('[data-testid="chat-draft"]');
+    if (!(await badge.count())) fail('the dashboard chat row had no "draft" badge');
+    const badgeText = (await badge.first().textContent()) ?? '';
+    if (!/4 versions/.test(badgeText)) fail(`the draft badge read ${JSON.stringify(badgeText)} rather than naming 4 versions`);
+
+    await dash.locator('[data-testid="chat-row"]').first().click();
+    await dash.locator('[data-testid="preview-artifact"]').waitFor({ timeout: 15_000 });
+    const previewCode = (await dash.locator('[data-testid="preview-artifact-code"]').innerText()) ?? '';
+    if (!previewCode.includes('promo-footer')) fail('the dashboard preview did not show the draft’s current code');
+    const previewChips = await dash.locator('[data-testid="preview-artifact-version"]').allTextContents();
+    if (previewChips.join(' ') !== 'v1 v2 v3 v4') fail(`the preview strip read ${JSON.stringify(previewChips.join(' '))}`);
+
+    await dash.locator('.dash-tabs button', { hasText: 'Mods' }).click();
+    await dash.locator('[data-testid="mod-row"]').first().waitFor({ timeout: 15_000 });
+    const origin = dash.locator('[data-testid="mod-origin"]');
+    if (!(await origin.count())) fail('the mod row did not say which chat it came from');
+    const originText = (await origin.first().innerText()) ?? '';
+    if (!/from chat/.test(originText)) fail(`the origin line read ${JSON.stringify(originText)}`);
+    if (!/v4/.test(originText)) fail(`the origin line did not name the draft's version: ${JSON.stringify(originText)}`);
+    if (!(await dash.locator('[data-testid="mod-origin-open"]').count())) fail('the origin line offered no link back to the chat');
+
+    await assertNoViolations('artifact');
+    console.log(
+      'artifact: OK — draft panel at v1, the edit turn carried v1’s code, v2’s diff showed one line, rollback appended v3 and changed what the next turn was told, Save made one mod and Update rewrote it in place, survived a reload, dashboard badge and origin link',
     );
   } finally {
     await b.close();
@@ -2810,6 +3073,10 @@ async function main() {
       await waitFlow();
       return;
     }
+    if (ARTIFACT || ARTIFACT_SHOT) {
+      await artifactFlow({ capture: ARTIFACT_SHOT });
+      return;
+    }
     if (THEME) {
       await themeFlow();
       return;
@@ -2841,6 +3108,7 @@ async function main() {
       await themeFlow();
       await tabbarFlow();
       await waitFlow();
+      await artifactFlow();
       return;
     }
     // The dark set: the design system's own palette, and what the README leads with.

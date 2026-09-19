@@ -575,6 +575,66 @@ button.pill.primary:disabled {
   margin: 0;
 }
 
+/*
+ * The chat's draft mod, at the top of a transcript preview.
+ *
+ * It takes the primary's left rail, exactly as the side panel's draft panel does, so the same thing
+ * looks like the same thing in both places. It is read-only here — no rollback, no rename — because
+ * a draft belongs to the chat that is building it, and that is one Open click away.
+ */
+.preview .prev-artifact {
+  border: var(--border-width) solid var(--border-strong);
+  border-left: 3px solid var(--primary-fill);
+  border-radius: var(--r-field);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-bottom: 4px;
+}
+
+.preview .prev-artifact-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.preview .prev-artifact-head strong {
+  font-size: 13px;
+  color: var(--text-1);
+}
+
+.preview .prev-artifact-versions {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.preview .prev-vchip {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  padding: 2px 7px;
+  background: var(--surface-well);
+  color: var(--text-2);
+  border: var(--border-width) solid var(--border-hair);
+  border-radius: var(--r-field);
+  cursor: pointer;
+}
+
+.preview .prev-vchip:hover,
+.preview .prev-vchip.is-shown {
+  color: var(--text-1);
+  border-color: var(--border-strong);
+}
+
+/* The draft itself: the one filled chip, so "which of these is it now" needs no reading. */
+.preview .prev-vchip.is-current {
+  background: var(--primary-fill);
+  color: var(--primary-on-fill);
+  border-color: var(--primary-fill);
+}
+
 /* ---------- the source editor ---------- */
 
 .editor {

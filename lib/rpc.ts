@@ -1,3 +1,4 @@
+import type { Artifact } from './artifact';
 import type { Chat } from './chats';
 import type { AgentEvent, ChatItem, Mod, ScriptPreview, UserTurn } from './types';
 
@@ -51,6 +52,19 @@ export type RpcRequest =
   | { type: 'chats.bulk'; ids: string[]; action: 'archive' | 'unarchive' | 'delete' }
   /** The dashboard's bulk enable / disable / delete for mods, in a single mods write. */
   | { type: 'mods.bulk'; ids: string[]; action: 'enable' | 'disable' | 'delete' }
+  /** One chat's draft mod, or null when it has none yet. */
+  | { type: 'artifact.get'; chatId: string }
+  /** Roll the draft back to a version, which APPENDS that version's code as the newest one. */
+  | { type: 'artifact.rollback'; chatId: string; version: number }
+  /** The user renaming the draft in the panel: a 'user-edit' version carrying the new name. */
+  | { type: 'artifact.rename'; chatId: string; name: string }
+  /**
+   * Save the draft's current version as a mod. The first save creates one and records its id on the
+   * artifact; every later save rewrites THAT mod in place through the same path the source editor
+   * uses (header re-parsed, dependencies resolved), so a chat never accumulates copies of its own
+   * mod. A linked mod that has since been deleted falls back to creating a new one, and says so.
+   */
+  | { type: 'artifact.save'; chatId: string }
   | { type: 'oauth.status'; kind: OAuthKind }
   | { type: 'oauth.start'; kind: OAuthKind }
   | { type: 'oauth.poll'; kind: OAuthKind }
@@ -81,6 +95,10 @@ interface RpcResults {
   'chats.transcript': ChatItem[];
   'chats.create': Chat;
   'mods.bulk': Mod[];
+  'artifact.get': Artifact | null;
+  'artifact.rollback': Artifact;
+  'artifact.rename': Artifact;
+  'artifact.save': { artifact: Artifact; mod: Mod; created: boolean; relinked: boolean };
 }
 
 export type RpcResponse<T extends RpcRequest['type']> = T extends keyof RpcResults ? RpcResults[T] : { ok: true };

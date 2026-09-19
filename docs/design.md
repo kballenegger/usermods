@@ -421,6 +421,27 @@ panel at 13px/1.6 with no colour, border or decoration. A user message is an out
 right; a queued one is the same block as a dashed outline with no fill. Tool rows are a rail, a dot
 and a mono name.
 
+### The draft panel
+The chat's one draft mod, pinned between the transcript and the composer. Like the activity line it
+is `flex: none` in the chat column, never a row inside `.messages`, so it can appear mid-run without
+moving the transcript or its scroll position.
+
+It takes the **primary** for its 2px inset left rail, its version chips and its `DRAFT` label — not
+the accent, which the hero proposal card owns. A draft and a hero card are on screen together every
+time the model proposes something, and two pink objects in one column is two heroes.
+
+Collapsed it is one line of identity and one of verbs. **The name is the last thing to give up
+width**: the line count goes at 380px, the `DRAFT` label at 460px (where the bar also wraps to two
+rows), the version at 360px, and Export's word becomes a download glyph only at 300px. A bar that
+reads `DRAFT · Wikipedia:… · v1 · 6 lines` names no draft, which is the exact problem the panel
+exists to solve — so it spends its width on the name and drops its own label first. Both flex groups
+carry `min-width: 0`, because a flex item's default `min-width: auto` is its content width and a long
+name will otherwise push the buttons off a 420px panel rather than ellipse.
+
+Diff lines are tinted **and** signed: the `+` and `-` are part of the text, so added and removed
+survive a colour-vision deficiency and a greyscale screenshot, which the live and error tints alone
+would not.
+
 ### Dashboard list / detail / editor
 Header card with the wordmark in the display face, stat tiles whose numbers are big pixel type in
 `--text-1` (not lime — a count of archived chats is not alive), section tabs matching the panel's,

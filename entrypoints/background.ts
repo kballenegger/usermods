@@ -8,8 +8,9 @@ import { scriptIdentity } from '@/lib/installurl';
 import { resyncPlan } from '@/lib/resync';
 import { mapStack, prepareRunScript, renderRunResult, type RunResult } from '@/lib/runscript';
 import { shouldUpdate } from '@/lib/version';
-import { loadMods, modFromSource, parseHeader, previewFromSource, upsertMod, deleteMod, saveMods } from '@/lib/mods';
-import { appendTurn, archiveChat, bulkChats, countTurns, createChat, deleteChat, getChat, listChats, loadItems, loadMessages, markTitleRefreshed, renameChat, saveMessages, setModelTitle, touchChat } from '@/lib/chats';
+import { loadMods, modFromProposal, modFromSource, parseHeader, previewFromSource, upsertMod, deleteMod, saveMods } from '@/lib/mods';
+import { appendTurn, archiveChat, bulkChats, countTurns, createChat, deleteChat, getChat, listChats, loadItems, loadMessages, markTitleRefreshed, renameChat, saveMessages, setChatArtifact, setModelTitle, touchChat } from '@/lib/chats';
+import { addVersion, currentVersion, draftBlock, loadArtifact, recordProposal, rollbackTo, saveArtifact, toProposal, toSource, type Artifact } from '@/lib/artifact';
 import { buildTitleInput, completedTurns, sanitizeTitle, titleDecision, TITLE_SYSTEM_PROMPT } from '@/lib/title';
 import { createProvider } from '@/lib/providers';
 import {
@@ -23,7 +24,7 @@ import type { AgentPortRequest, OAuthLoginState, RpcRequest } from '@/lib/rpc';
 import { SessionMap } from '@/lib/sessions';
 import { loadSettings } from '@/lib/settings';
 import { looksLikeZip, parseTampermonkeyJson, parseTampermonkeyZipEntries, type TmScript } from '@/lib/tampermonkey';
-import type { AgentEvent, AgentEventBody, ContentRequest, Mod, Msg, Part, Settings, UserTurn } from '@/lib/types';
+import type { AgentEvent, AgentEventBody, ContentRequest, Mod, ModProposal, Msg, Part, Settings, UserTurn } from '@/lib/types';
 
 export default defineBackground(() => {
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
@@ -125,6 +126,10 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn): Promise<v
     if (usesKey && !settings.apiKey && !settings.baseUrl) throw new Error('Add an API key in Settings first (or a base URL for a local server or proxy).');
     if (!settings.model) throw new Error('Choose a model in Settings first.');
     history = await loadMessages(chatId);
+    // The chat's draft mod, read once at the top of the turn and kept up to date by the recorder
+    // below. renderTurn asks for it on every user message, including ones queued mid-run, so a
+    // proposal made in step 3 is what a message queued in step 4 is answered against.
+    let artifact = await loadArtifact(chatId);
     // The first message of a chat names it. Every message records the page it was sent from, so
     // the dashboard can reopen the chat on that page rather than the site's front door.
     url = await tabUrl(session.tabId);
@@ -141,10 +146,23 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn): Promise<v
       // deadline: a summariser that hangs must not hold up the user's turn, and compact() falls
       // back to dropping the oldest turns when this rejects.
       complete: (system, user, sig) => completeWithTimeout(settings!, system, user, COMPACT_TIMEOUT_MS, sig),
+      // With a draft, the summary is asked for its history rather than its code: the code itself is
+      // re-attached to every turn, so copying it into a 1500-token summary buys a worse copy of
+      // something the model can already see. See SUMMARY_SYSTEM_PROMPT_WITH_DRAFT.
+      hasDraft: () => artifact != null,
       // A compacted history is written back immediately. The next turn then starts from the small
       // version even if this one later dies mid-run, which is the whole point: the chat that was
       // too big to send must not stay too big to send.
       onCompacted: (msgs) => saveMessages(chatId, msgs),
+      draft: () => (artifact ? draftBlock(artifact) : ''),
+      onProposal: async (proposal) => {
+        artifact = await recordProposal(chatId, proposal);
+        // The index carries only the flag, so the dashboard can badge a chat without reading every
+        // artifact. It is written through setChatArtifact rather than touchChat, because proposing
+        // is not activity the switcher should reorder on.
+        await setChatArtifact(chatId, artifact.id, artifact.versions.length);
+        return artifact.current;
+      },
     });
     await saveMessages(chatId, messages);
     await touchChat(chatId, { url, turns: countTurns(messages) });
@@ -457,7 +475,82 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
       return { ok: true };
     case 'models.list':
       return listModels();
+    case 'artifact.get':
+      return loadArtifact(req.chatId);
+    case 'artifact.rollback': {
+      const a = await requireArtifact(req.chatId);
+      const next = rollbackTo(a, req.version);
+      await saveArtifact(next);
+      await setChatArtifact(req.chatId, next.id, next.versions.length);
+      return next;
+    }
+    case 'artifact.rename': {
+      const a = await requireArtifact(req.chatId);
+      const name = req.name.trim();
+      const v = currentVersion(a);
+      if (!name || !v || name === v.name) return a;
+      // A rename is a version like any other, so the strip shows when the draft was renamed and a
+      // rollback can undo it. addVersion dedupes an identical one, so this cannot make an empty step.
+      const next = addVersion(a, { code: v.code, name, description: v.description, matches: v.matches, source: 'user-edit', untestedReason: a.untestedReason });
+      await saveArtifact(next);
+      await setChatArtifact(req.chatId, next.id, next.versions.length);
+      return next;
+    }
+    case 'artifact.save':
+      return saveArtifactAsMod(req.chatId);
   }
+}
+
+// ---------- the chat's draft mod ----------
+
+async function requireArtifact(chatId: string): Promise<Artifact> {
+  const a = await loadArtifact(chatId);
+  if (!a) throw new Error('This chat has no draft mod yet.');
+  return a;
+}
+
+/**
+ * Save a chat's draft as a mod — the panel's Save, and its Update after the first one.
+ *
+ * The whole point of linkedModId is here. The first save creates a mod and records its id on the
+ * artifact; every later save finds that mod and rewrites it in place. Before drafts, the panel
+ * matched a proposal to a mod BY NAME (findByName), which meant renaming a mod in the dashboard,
+ * or a model that retyped the name differently, quietly minted a second copy — and both copies ran
+ * on the page. An id cannot drift.
+ *
+ * The rewrite goes through saveEditedSource, the same path the dashboard's source editor uses, so
+ * the header is re-parsed from what is being saved (a draft whose matches changed re-registers on
+ * the new ones) and @require/@resource are refetched if and only if the header's dependency lines
+ * moved. A draft written by the model declares none of those, but a mod that was IMPORTED and then
+ * edited in a chat can, and saving it through mods.save would have re-registered it with the
+ * dependency missing.
+ *
+ * `relinked` says the link was broken and remade: the mod this artifact pointed at is gone (deleted
+ * in the dashboard), so a new one was created. The panel tells the user rather than silently
+ * appearing to update something that no longer exists.
+ */
+async function saveArtifactAsMod(chatId: string): Promise<{ artifact: Artifact; mod: Mod; created: boolean; relinked: boolean }> {
+  const artifact = await requireArtifact(chatId);
+  const proposal = toProposal(artifact);
+  if (!proposal) throw new Error('This draft has no versions to save.');
+
+  const linked = artifact.linkedModId ? (await loadMods()).find((m) => m.id === artifact.linkedModId) : undefined;
+  const relinked = !!artifact.linkedModId && !linked;
+
+  let mod: Mod;
+  if (linked) {
+    // In place: same id, same enabled flag, same GM value store, same createdAt.
+    mod = await saveEditedSource(linked.id, toSource(artifact));
+  } else {
+    mod = modFromProposal(proposal as ModProposal);
+    await resolveDependencies(mod);
+  }
+  await upsertMod(mod);
+  await syncRegistrations();
+
+  const next: Artifact = { ...artifact, linkedModId: mod.id };
+  await saveArtifact(next);
+  return { artifact: next, mod, created: !linked, relinked };
 }
 
 // ---------- installing outside userscripts ----------

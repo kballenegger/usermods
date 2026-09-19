@@ -1,3 +1,6 @@
+import { useState } from 'react';
+import { currentVersion, lineCount, toSource, type Artifact } from '@/lib/artifact';
+import { exportFilename } from '@/lib/dashboard';
 import { toolRowTitle } from '@/lib/transcript';
 import type { ChatItem } from '@/lib/types';
 
@@ -18,12 +21,18 @@ import type { ChatItem } from '@/lib/types';
  * ChatItem[], which is exactly the array this renders. Nothing in it renders anything, so there is
  * no shared renderer to import — this page reads items that reducer already wrote to storage.
  */
-export function TranscriptPreview({ items }: { items: ChatItem[] }) {
-  if (!items.length) {
+export function TranscriptPreview({ items, artifact }: { items: ChatItem[]; artifact?: Artifact | null }) {
+  if (!items.length && !artifact) {
     return <div className="prev-note">This chat has no stored transcript.</div>;
   }
   return (
     <div className="preview">
+      {/* What the chat produced, above what it said. A reader opening an old chat almost always
+          wants the script rather than the conversation that arrived at it, and the transcript is
+          the long thing they would otherwise scroll through to reach it. Read-only here: editing
+          a draft is the side panel's job, and editing the SAVED mod is the Mods tab's. */}
+      {artifact && <ArtifactPreview artifact={artifact} />}
+      {!items.length && <div className="prev-note">This chat has no stored transcript.</div>}
       {items.map((it, i) => {
         switch (it.kind) {
           case 'user':
@@ -93,6 +102,69 @@ export function TranscriptPreview({ items }: { items: ChatItem[] }) {
       })}
     </div>
   );
+}
+
+/**
+ * The chat's draft mod at the top of its preview: the current code, the version strip, and the same
+ * Export the side panel offers. The strip is selectable — reading v1 of a draft that is now at v4 is
+ * exactly the sort of thing this page is for — but nothing here writes: no rollback, no rename, no
+ * save. Those all belong to the chat that owns the draft, which is a click away via Open.
+ */
+function ArtifactPreview({ artifact }: { artifact: Artifact }) {
+  const current = currentVersion(artifact);
+  const [selected, setSelected] = useState<number | null>(null);
+  const shown = artifact.versions.find((v) => v.n === selected) ?? current;
+  if (!current || !shown) return null;
+  return (
+    <div className="prev-artifact" data-testid="preview-artifact" data-version={current.n}>
+      <div className="prev-artifact-head">
+        <span className="badge">draft</span>
+        <strong>{current.name}</strong>
+        <span className="muted">
+          v{current.n} · {lineCount(current.code)} lines
+        </span>
+        <span className="row" style={{ flex: 1 }} />
+        <button
+          className="pill"
+          onClick={() => download(new Blob([toSource(artifact)], { type: 'text/javascript' }), exportFilename(artifact.name))}
+          data-testid="preview-artifact-export"
+        >
+          Export
+        </button>
+      </div>
+      {current.description && <div className="muted">{current.description}</div>}
+      <div className="row">
+        {current.matches.map((m) => (
+          <span key={m} className="chip">
+            {m}
+          </span>
+        ))}
+      </div>
+      <div className="prev-artifact-versions">
+        {artifact.versions.map((v) => (
+          <button
+            key={v.n}
+            className={`prev-vchip${v.n === current.n ? ' is-current' : ''}${v.n === shown.n ? ' is-shown' : ''}`}
+            onClick={() => setSelected(v.n)}
+            title={new Date(v.createdAt).toLocaleString()}
+            data-testid="preview-artifact-version"
+            data-v={v.n}
+          >
+            v{v.n}
+          </button>
+        ))}
+      </div>
+      <pre data-testid="preview-artifact-code">{shown.code}</pre>
+    </div>
+  );
+}
+
+function download(blob: Blob, filename: string): void {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 /** The transcript as plain text, for searching a chat's message bodies. */

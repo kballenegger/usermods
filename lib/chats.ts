@@ -1,8 +1,11 @@
 // Persistent chats. A chat is scoped to a site (host) and lives in chrome.storage.local so it
-// survives side-panel reloads and browser restarts. Three keys per chat:
+// survives side-panel reloads and browser restarts. One index plus three keys per chat:
 //   'chats'              — Chat[] metadata index, newest activity first
 //   'chat:<id>:messages' — Msg[] model history, written by the background worker
 //   'chat:<id>:items'    — ChatItem[] panel transcript, written by the side panel
+//   'chat:<id>:artifact' — Artifact draft mod (lib/artifact.ts), written by the background
+// chatKeys() below is the single list of the per-chat keys, so deleting a chat cannot leave one.
+import { artifactKey } from './artifact.ts';
 import type { TitleSource } from './title';
 import type { ChatItem, Msg } from './types';
 
@@ -46,6 +49,20 @@ export interface Chat {
    * the field, where the dashboard simply shows no count rather than guessing one.
    */
   turns?: number;
+  /**
+   * The id of this chat's draft mod, when it has one. The artifact itself lives under its own key
+   * ('chat:<id>:artifact') because it holds whole scripts and the index is read on every panel
+   * open; this is only a flag on the index, so the dashboard can show a "draft" badge without
+   * reading 200 artifacts to find out which chats have one.
+   */
+  artifactId?: string;
+  /**
+   * How many versions that draft has, so the dashboard's badge can say "draft · 3 versions" from
+   * the index alone. Same reasoning as `turns`: a number on the index beats reading every artifact
+   * to render a list. Absent on chats whose draft predates the field, where the badge simply says
+   * "draft" rather than guessing a count.
+   */
+  artifactVersions?: number;
 }
 
 /** A chat's title source, defaulting for records written before the field existed. */
@@ -60,6 +77,17 @@ export function isArchived(chat: Chat): boolean {
 
 export const messagesKey = (id: string) => `chat:${id}:messages`;
 export const itemsKey = (id: string) => `chat:${id}:items`;
+
+/**
+ * Every storage key a chat owns: its model history, its panel transcript and its draft mod. Every
+ * path that removes a chat goes through this rather than listing keys of its own, so a fourth
+ * per-chat key added later cannot be forgotten by one of the three deletion routes and leak
+ * forever in a profile. (It was already two routes plus the cap when the artifact key arrived,
+ * which is exactly how that mistake gets made.)
+ */
+export function chatKeys(id: string): string[] {
+  return [messagesKey(id), itemsKey(id), artifactKey(id)];
+}
 
 /** Hostname of a page URL, without "www.". Empty string for chrome:// and other non-http pages. */
 export function hostFromUrl(url: string): string {
@@ -159,7 +187,7 @@ async function writeIndex(chats: Chat[]): Promise<void> {
 async function writeIndexCapped(chats: Chat[]): Promise<void> {
   const { kept, dropped } = capChats(chats);
   await writeIndex(kept);
-  if (dropped.length) await chrome.storage.local.remove(dropped.flatMap((id) => [messagesKey(id), itemsKey(id)]));
+  if (dropped.length) await chrome.storage.local.remove(dropped.flatMap(chatKeys));
 }
 
 export async function listChats(host?: string): Promise<Chat[]> {
@@ -198,6 +226,7 @@ export async function touchChat(id: string, patch: { title?: string; url?: strin
   }
   if (patch.url && /^https?:\/\//i.test(patch.url)) chat.url = patch.url;
   if (typeof patch.turns === 'number') chat.turns = patch.turns;
+
   await writeIndex(chats);
 }
 
@@ -247,6 +276,20 @@ export function countTurns(messages: Msg[]): number {
   return messages.filter((m) => m.role === 'user' && m.content.some((p) => p.type === 'text')).length;
 }
 
+/**
+ * Note on the index that this chat has a draft mod. Deliberately NOT touchChat: recording an
+ * artifact is bookkeeping, and touchChat bumps updatedAt and unarchives — which would reorder the
+ * switcher and resurrect an archived chat every time the model proposed something in it.
+ */
+export async function setChatArtifact(id: string, artifactId: string, versions: number): Promise<void> {
+  const chats = await readIndex();
+  const chat = chats.find((c) => c.id === id);
+  if (!chat || (chat.artifactId === artifactId && chat.artifactVersions === versions)) return;
+  chat.artifactId = artifactId;
+  chat.artifactVersions = versions;
+  await writeIndex(chats);
+}
+
 /** Archive or unarchive a chat. Reversible, so the UI does not confirm it. */
 export async function archiveChat(id: string, archived: boolean): Promise<void> {
   const chats = await readIndex();
@@ -271,7 +314,7 @@ export async function renameChat(id: string, title: string): Promise<void> {
 
 export async function deleteChat(id: string): Promise<void> {
   await writeIndex((await readIndex()).filter((c) => c.id !== id));
-  await chrome.storage.local.remove([messagesKey(id), itemsKey(id)]);
+  await chrome.storage.local.remove(chatKeys(id));
 }
 
 /**
@@ -286,7 +329,7 @@ export async function bulkChats(ids: string[], action: 'archive' | 'unarchive' |
   const chats = await readIndex();
   if (action === 'delete') {
     await writeIndex(chats.filter((c) => !wanted.has(c.id)));
-    await chrome.storage.local.remove([...wanted].flatMap((id) => [messagesKey(id), itemsKey(id)]));
+    await chrome.storage.local.remove([...wanted].flatMap(chatKeys));
     return;
   }
   // Capped like every other index write. A bulk unarchive is the case that needs it: an index of

@@ -1,0 +1,470 @@
+/*
+ * The draft-mod panel, pinned between the transcript and the composer.
+ *
+ * It is built the way the activity line is built, and for the same reason: `flex: none` in the chat
+ * column, so it takes its height out of the column rather than out of the scrolling transcript.
+ * Appearing must not move the message the user is reading.
+ *
+ * Its collapsed state is the one that matters. A draft is present for most of a chat's life, and a
+ * pinned thing that is present for most of a chat's life has to cost one line — name, version, size
+ * and the three verbs. Everything else is behind the chevron.
+ *
+ * Colour: the accent (pink) is spoken for — the hero proposal card carries it, and this panel must
+ * not compete with the card that just appeared above it. So the draft takes the PRIMARY role for
+ * its left rail and its current-version chip: it is the thing the chat is building, which is the
+ * primary's own meaning, and it leaves the accent to the one card at a time that earns it.
+ * Every colour here is a role token; no hue is named.
+ */
+
+.artifact {
+  container-type: inline-size;
+  container-name: artifact;
+  flex: none;
+  background: var(--surface-1);
+  border-top: var(--border-width) solid var(--border-hair);
+  /* The rail is what makes this read as one object rather than as another strip of chrome. */
+  box-shadow: inset 2px 0 0 var(--primary-fill);
+  font: 400 var(--fs-meta) / 1.4 var(--font-ui);
+  color: var(--text-2);
+  /*
+   * Collapsed, this is two short rows and the cap never bites. Expanded, it is allowed most of the
+   * column — the draft is what the user came to look at — but never all of it: the transcript keeps
+   * a few rows so the conversation the draft came out of is still visible above it. The panel
+   * scrolls inside the cap rather than pushing the composer off the bottom.
+   */
+  max-height: 68%;
+  overflow: auto;
+}
+
+/* --- The collapsed bar ---------------------------------------------------- */
+
+/*
+ * Two groups: the identity (chevron, label, name, version, size) and the actions. The identity
+ * shrinks, the actions do not.
+ *
+ * The `min-width: 0` on the bar and on the identity group is the load-bearing part. A flex item's
+ * default `min-width: auto` is its CONTENT's width, so a long draft name makes the identity group
+ * refuse to shrink and the actions are pushed off the right edge of a 420px panel — which is what
+ * happened the first time the name was allowed to take the slack. With the floor removed, the name
+ * ellipses and the three buttons always land.
+ */
+.artifact-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-4);
+  min-height: 30px;
+  min-width: 0;
+}
+
+.artifact-ident {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.artifact-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex: none;
+}
+
+.artifact-chevron {
+  background: none;
+  border: 0;
+  color: var(--text-3);
+  font: inherit;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.artifact-chevron:hover {
+  color: var(--text-1);
+}
+
+/* "DRAFT": a section label, in the text face at 600 like every other label in the system. */
+.artifact-kind {
+  font-size: var(--fs-label);
+  font-weight: var(--fw-label);
+  text-transform: uppercase;
+  letter-spacing: var(--lbl-tracking);
+  color: var(--primary-text);
+  flex: none;
+}
+
+.artifact-sep {
+  color: var(--text-3);
+  flex: none;
+}
+
+/*
+ * The name is the one part that gives up width first — the three buttons must never be pushed off —
+ * but it is also the only thing on the bar that says WHICH draft this is, so it has to be the part
+ * that gets whatever is left rather than the part that gets nothing.
+ *
+ * `flex: 1` with a `min-width` floor is what does that: the name takes the slack, and when there is
+ * none it still keeps roughly a dozen characters before it ellipses. The first pass left it at
+ * `min-width: 3ch` beside a `.grow` spacer, and the spacer won every time — the bar read
+ * "DRAFT · W… · v1", which names no draft at all.
+ */
+.artifact-name {
+  color: var(--text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.artifact-v {
+  font-family: var(--font-mono);
+  color: var(--primary-text);
+  flex: none;
+}
+
+.artifact-size {
+  color: var(--text-3);
+  flex: none;
+  white-space: nowrap;
+}
+
+
+
+/*
+ * The bar's buttons are the compact variant: the panel is 420px and three full-size buttons plus a
+ * name do not fit. They keep the button vocabulary (outline, primary fill) at a smaller step.
+ */
+.artifact-bar button.btn {
+  flex: none;
+  padding: 3px 8px;
+  font-size: var(--fs-label);
+}
+
+/*
+ * The model's "I could not run this" caveat.
+ *
+ * It sits inside the expanded body rather than under the collapsed bar. Collapsed, this panel is a
+ * one-line promise, and a two-line yellow sentence under it broke that promise in the one state the
+ * panel is in most of the time — it doubled the pinned height and pushed the transcript up. The
+ * caveat still reaches the user twice: on the proposal card in the transcript, which is where they
+ * first meet this version, and here whenever they open the draft.
+ */
+.artifact-untested {
+  margin: 0;
+}
+
+/* --- Expanded ------------------------------------------------------------- */
+
+.artifact-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: 0 var(--sp-4) var(--sp-3);
+  border-top: var(--border-width) solid var(--border-hair);
+  padding-top: var(--sp-3);
+}
+
+.artifact-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+/* The name, editable in place: a heading that happens to be a button, not a form field with a pen. */
+.artifact-title {
+  background: none;
+  border: 0;
+  border-bottom: 1px dashed transparent;
+  padding: 0;
+  font: var(--fw-label) var(--fs-ui) / 1.3 var(--font-ui);
+  color: var(--text-1);
+  cursor: text;
+  text-align: left;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.artifact-title:hover {
+  border-bottom-color: var(--border-strong);
+}
+
+.artifact-rename {
+  flex: 1;
+  font: var(--fw-label) var(--fs-ui) / 1.3 var(--font-ui);
+  background: var(--surface-well);
+  color: var(--text-1);
+  border: var(--border-width) solid var(--border-control);
+  border-radius: var(--r-field);
+  padding: 4px 8px;
+}
+
+.artifact-rename:focus-visible {
+  border-color: var(--focus-ring);
+  outline: none;
+}
+
+.artifact-desc {
+  color: var(--text-2);
+}
+
+/* --- The version strip ---------------------------------------------------- */
+
+.artifact-versions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  flex-wrap: wrap;
+}
+
+.artifact-vchip {
+  font-family: var(--font-mono);
+  font-size: var(--fs-label);
+  line-height: 1.5;
+  padding: 2px 7px;
+  background: var(--surface-well);
+  color: var(--text-2);
+  border: var(--border-width) solid var(--border-hair);
+  border-radius: var(--r-field);
+  cursor: pointer;
+}
+
+.artifact-vchip:hover {
+  color: var(--text-1);
+  border-color: var(--border-strong);
+}
+
+/* The one you are looking at: outlined. */
+.artifact-vchip.is-shown {
+  color: var(--text-1);
+  border-color: var(--border-strong);
+}
+
+/*
+ * The draft itself: filled with the primary. This is the only filled chip in the strip, so "which
+ * of these is the script right now" is answerable at a glance and without reading the numbers.
+ */
+.artifact-vchip.is-current {
+  background: var(--primary-fill);
+  color: var(--primary-on-fill);
+  border-color: var(--primary-fill);
+}
+
+.artifact-difftoggle {
+  font: var(--fw-label) var(--fs-label) / 1.5 var(--font-ui);
+  letter-spacing: var(--lbl-tracking);
+  text-transform: uppercase;
+  padding: 2px 7px;
+  background: none;
+  color: var(--text-3);
+  border: var(--border-width) solid transparent;
+  border-radius: var(--r-field);
+  cursor: pointer;
+}
+
+.artifact-difftoggle:hover:not(:disabled) {
+  color: var(--text-1);
+}
+
+.artifact-difftoggle.on {
+  color: var(--primary-text);
+  border-color: var(--primary-text);
+}
+
+.artifact-difftoggle:disabled {
+  color: var(--btn-disabled-fg);
+  cursor: default;
+}
+
+/* --- Code and diff -------------------------------------------------------- */
+
+.artifact-code,
+.artifact-diff {
+  margin: 0;
+  background: var(--surface-well);
+  border: var(--border-width) solid var(--border-hair);
+  border-radius: var(--r-field);
+  padding: var(--sp-2) var(--sp-3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+  line-height: 1.55;
+  overflow: auto;
+  max-height: 210px;
+  color: var(--text-1);
+  white-space: pre;
+}
+
+/*
+ * The diff. Added and removed lines are tinted AND signed: the '+' and '-' are part of the text, so
+ * the two states survive a colour-vision deficiency and a greyscale screenshot, which a tint alone
+ * would not. The tints are the live and error roles at their usual 10%-ish strength, which is the
+ * same strength every other tinted surface in the system uses.
+ */
+.artifact-diff .d-hunk {
+  color: var(--text-3);
+}
+
+.artifact-diff .d-add {
+  color: var(--live-text);
+  background: var(--live-tint);
+  display: block;
+}
+
+.artifact-diff .d-del {
+  color: var(--error-text);
+  background: var(--error-bg);
+  display: block;
+}
+
+.artifact-diff .d-same {
+  color: var(--text-2);
+  display: block;
+}
+
+/* --- Notes and footer ----------------------------------------------------- */
+
+/* "Viewing v1. The draft is v3." — a statement with its remedy beside it. */
+.artifact-note {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  color: var(--text-2);
+  background: var(--surface-2);
+  border: var(--border-width) solid var(--border-hair);
+  border-radius: var(--r-field);
+  padding: var(--sp-2) var(--sp-3);
+}
+
+.artifact-foot {
+  align-items: center;
+}
+
+.artifact-foot button.btn {
+  padding: 3px 8px;
+  font-size: var(--fs-label);
+}
+
+.artifact-linked {
+  font-size: var(--fs-label);
+  margin-left: auto;
+}
+
+/*
+ * Narrow panels. Below ~360px the size and the separators are the first things to go: the name and
+ * the three verbs are what the bar is for, and "42 lines" is the least of them.
+ */
+/*
+ * What the bar drops as it narrows, in the order it drops it.
+ *
+ * At the side panel's default 420px, "DRAFT · <name> · v1 · 6 lines" plus three buttons does not
+ * fit, and the flex rules above resolve that by ellipsing the name — which leaves "DRAFT · W… · v1
+ * · 6 lines", a bar that names no draft. The name is the whole reason the bar exists, so it is the
+ * LAST thing to go, not the first.
+ *
+ * So the size goes at 520px and the "DRAFT" label at 400px. Losing the label costs nothing: the
+ * panel is pinned, has its own rail, and is the only thing in the product that says "v3 · 42 lines"
+ * — nobody is going to mistake it for something else, and by then the name is on screen instead.
+ * Below 340px the version goes too, and the bar is a name and three verbs, which is the irreducible
+ * thing. The panel is a width the user drags, so all of these are real states.
+ */
+@container artifact (max-width: 380px) {
+  .artifact-size,
+  .artifact-ident .sep-size {
+    display: none;
+  }
+}
+
+/*
+ * Below 460px the bar wraps to two rows: identity above, actions below.
+ *
+ * This is the honest resolution of a fight the one-row bar could not win. A real draft name —
+ * "Wikipedia: hide the promo banner" — wants about 215px. Try, Save and Export want about 160px,
+ * and they cannot shrink, because a button you cannot read is not a button. On the side panel's own
+ * 420px that leaves the name around 164px, so it ellipses, and the bar says "Wikipedia:… · v1" —
+ * which names no draft and is exactly the scrolling-to-find-the-last-card problem this panel exists
+ * to end.
+ *
+ * Two rows costs ~26px of pinned height and gives the name the full width. The panel is still a
+ * one-glance object: one line of identity, one line of verbs, and the transcript above it is
+ * unmoved either way because the whole panel is `flex: none` in the column.
+ *
+ * The "DRAFT" label goes with the second row, since the rail, the version and the verbs already say
+ * what this is, and Export keeps its word — there is room for it once the rows are split.
+ */
+@container artifact (max-width: 460px) {
+  .artifact-bar {
+    flex-wrap: wrap;
+  }
+
+  .artifact-ident {
+    flex: 1 0 100%;
+  }
+
+  /*
+   * On its own row the name hugs its text rather than taking the slack: with `flex: 1` it stretched
+   * and pushed "· v1" to the far right, which reads as two unrelated things on one line rather than
+   * as one label. It still shrinks (min-width: 0 above) if a name is long enough to need it.
+   */
+  .artifact-name {
+    flex: 0 1 auto;
+  }
+
+  .artifact-actions {
+    flex: 1 0 100%;
+  }
+
+  .artifact-kind,
+  .artifact-ident .sep-name {
+    display: none;
+  }
+}
+
+/*
+ * The glyph is for the narrowest state only. Once the actions have a row to themselves they have
+ * room for three words, and a word beats a symbol wherever it fits.
+ */
+.artifact-export-glyph {
+  display: none;
+}
+
+@container artifact (max-width: 300px) {
+  .artifact-export-word {
+    display: none;
+  }
+
+  .artifact-export-glyph {
+    display: inline;
+    font-size: 13px;
+    line-height: 1;
+  }
+}
+
+/*
+ * The version number on a proposal card in the transcript ("proposed mod · v2").
+ *
+ * It rides inside the card's own .label, which is uppercase and tracked, so it only has to say
+ * which version this card became. The card is history; the number is the join to the panel below.
+ */
+.card-version {
+  font-family: var(--font-mono);
+  color: var(--primary-text);
+}
+
+/*
+ * What Save, Update or a rollback just did. A row of the chat column like the panel itself, so it
+ * cannot move the transcript either.
+ */
+.artifact-status {
+  flex: none;
+  padding: var(--sp-1) var(--sp-4) var(--sp-2);
+  background: var(--surface-1);
+  color: var(--text-2);
+  font: 400 var(--fs-meta) / 1.4 var(--font-ui);
+}
