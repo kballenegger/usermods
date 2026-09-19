@@ -22,7 +22,7 @@ Userscripts, userstyles, usermods.
 
 ## Status
 
-Early. The core loop works end to end: chat, page inspection, live testing, propose, save, run on load, import and export. Outside userscripts install from a URL, a `.user.js` link or a file, with the `GM_*` API and `@require`/`@resource` support they expect, and a Tampermonkey backup imports in one step. See [Roadmap](#roadmap).
+Early. The core loop works end to end: chat, page inspection, live testing, propose, save, run on load, edit an installed mod in chat, import and export. Outside userscripts install from a URL, a `.user.js` link or a file, with the `GM_*` API and `@require`/`@resource` support they expect, and a Tampermonkey backup imports in one step. See [Roadmap](#roadmap).
 
 ## Screenshots
 
@@ -223,6 +223,46 @@ For any other subscription, the same rule applies: run a local proxy that expose
 
 **Not in the Chrome Web Store build.** Subscription sign-in ships only in the GitHub build — the one you get from [Install (from source)](#install-from-source) above. `npm run build:store` and `npm run zip:store` produce the Web Store variant, which sets a compile-time flag that removes the two subscription presets, their provider options and the sign-in card, and tree-shakes the OAuth module out of the bundle entirely, so that build contacts no vendor auth endpoint. These logins rely on endpoints neither vendor documents or licenses for third parties, which does not fit a listing that has to declare exactly what it talks to. If you install the Web Store build over a profile that was signed in, Settings falls back to the default provider and tells you why; the GitHub build keeps every feature, this one included.
 
+## Editing a mod you already have
+
+A mod is rarely finished the first time. **Edit in chat** opens any installed mod as the draft of a
+conversation: the script you have is v1, the model is told it is editing something already installed
+rather than writing something new, and **Update mod** writes your changes back over the same mod —
+same id, same on/off state, same `GM_setValue` store, no second copy running beside the first.
+
+<img src="docs/screenshots/11-editing.png" width="420" alt="A chat whose draft is an installed mod. Under the draft bar, a line reads Editing Kingfisher Notes, with Save as a new mod instead beside it; the bar's button says Update mod.">
+
+It works on **any** mod, not only the ones chat wrote: one installed from a URL, imported from a
+file, or brought across in a Tampermonkey backup, enabled or disabled, page-world or isolated. An
+imported script's `==UserScript==` block is kept whole and put back when you save, so its
+`@require` libraries, `@grant` lines, `@connect` hosts, `@run-at` and `@version` all survive an edit
+the model made without ever seeing them. Only the name, the description and the `@match` lines are
+rewritten, because those are the parts the draft owns.
+
+There are three ways in, depending on where you are when you think of it.
+
+**From the mod.** Every row in the Mods tab and in the dashboard has **Edit in chat**. If a chat
+already edits that mod, it opens that one — unarchiving it if you had put it away — so you carry on
+the conversation that built it rather than starting a new one that has to be told everything again.
+
+**From the chat.** A new chat lists the mods that run on the page you are on as one-tap entries
+(*Edit &lt;name&gt;*), and **Edit a mod…** beside the chat switcher opens a picker of everything you
+have, page matches first. If the chat you are in has an unsaved draft of its own, picking a mod
+opens a *new* chat for it and says so — what you were working on is never quietly replaced.
+
+**From the model.** Each turn tells the model which mods already run on the current URL, enabled and
+disabled, with their ids. When you ask for something that belongs with one of them — "also hide the
+sidebar", "and the footer too" — it opens that mod and proposes the whole updated script, instead of
+writing a second mod that fights the first. When the request is unrelated it makes a new mod, and
+when it cannot tell it asks. It will not take over a draft with unsaved changes without saying so
+first.
+
+While a chat is editing a mod it says so, under the draft panel and in the chat switcher, and the
+dashboard's chat list badges it. **Save as a new mod instead** breaks the link: the next save creates
+a separate mod and the original is left installed and running, untouched. And if you save a mod whose
+name and match patterns are the same as one you already have, usermods asks whether you meant to
+update it or to keep both, rather than leaving two scripts quietly fighting over one page.
+
 ## Importing scripts and migrating from Tampermonkey
 
 usermods runs ordinary userscripts, so you can bring in scripts from Greasy Fork, OpenUserJS or your own collection.
@@ -404,7 +444,6 @@ available again from Settings → *Review data notice*. The full policy is in
 ## Roadmap
 
 - Agent mode with proper click, type and scroll tools plus screenshot-driven verification, for tasks the DOM-script approach handles poorly.
-- Edit an existing mod from chat ("make the button blue instead").
 - Mod sharing: export is there; a gallery is not.
 - CSS-only mods via a `@usermods-style` header, so pure restyles need no JavaScript.
 - Firefox, once its side panel story is settled.
