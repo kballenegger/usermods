@@ -268,55 +268,27 @@
    *
    * Three families, and which one is used is a rule, not a preference:
    *
-   *   --font-display  Jersey 10. SHORT LABELS ONLY: the wordmark, tab labels, section labels,
-   *                   button labels, stat numbers, headings. Never a sentence, never below 12px.
-   *
-   *                   It replaced Pixelify Sans, which shipped briefly and had to go: Pixelify's
-   *                   capital C carries an aperture only ONE pixel-unit tall on a seven-unit
-   *                   glyph, so its C is a closed O with a nick in it. That is the face's own
-   *                   drawing, not a rendering artefact — it survives at 96px — so no size,
-   *                   weight, tracking or font-smoothing setting could rescue it, and at label
-   *                   sizes the nick vanished into the stroke entirely: CHAT read as OHAT and
-   *                   ARCHIVE as AROHIVE on the most-clicked controls in the product. Its G, 0/O
-   *                   and 8/B collapse the same way for the same reason.
-   *
-   *                   Jersey 10's C is open across a third of the glyph's height, so the pair is
-   *                   separated by structure rather than by a single pixel that antialiasing can
-   *                   swallow. It also has true lowercase (the brand's own "usermods" needs it),
-   *                   is heavy enough at its single 400 weight to keep the banner's boldness
-   *                   without a bold axis, and is narrower than Pixelify at the same size — which
-   *                   is what gives the chat switcher its width back. See
-   *                   docs/design/explorations/README.md for the specimen and the four faces that
-   *                   lost.
+   *   --font-display  Pixelify Sans. SHORT LABELS ONLY: the wordmark, tab labels, section labels,
+   *                   button labels, stat numbers, headings. Never a sentence, never below 11px.
+   *                   Chosen over Silkscreen and Press Start 2P: Silkscreen is uppercase-only (it
+   *                   cannot set the lowercase "usermods" the brand requires) and tracks so wide
+   *                   that SETTINGS wraps in a 420px panel; Press Start 2P is wider still and only
+   *                   legible above ~20px. Pixelify has true lowercase and stays crisp from 11px.
+   *                   Its C and O are near-identical below 11px, hence the floor.
    *   --font-ui       the system UI face. ALL prose and every long-form reading surface.
    *   --font-mono     IBM Plex Mono. Identifiers, code, and anything the user might copy.
    * ====================================================================== */
-  --font-display: 'Jersey 10', ui-monospace, monospace;
+  --font-display: 'Pixelify Sans', ui-monospace, monospace;
   --font-ui: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 
-  /*
-   * 12px, not 11px. Jersey 10 carries a smaller x-height and cap-height per em than Pixelify, so
-   * the same nominal size renders visibly smaller; one step up holds the labels at the optical
-   * size the layout was drawn for. The floor is a floor for a different reason than before — the
-   * old 11px floor was an attempt to outrun Pixelify's closed C, which no size could do.
-   */
-  --fs-micro: 12px;
-  --fs-label: 12px;
+  --fs-micro: 11px; /* the display face's floor; was 10px, raised because pixel type needs it */
+  --fs-label: 11px;
   --fs-meta: 12px;
   --fs-body: 13px;
   --fs-ui: 14px;
-  --fs-stat: 22px;
-  --fs-title: 28px;
-
-  /*
-   * The button label's own size. It used to share --fs-meta with field help and metadata, which
-   * meant the display face and the prose face could not be sized independently — and they have to
-   * be, because they render at different optical sizes for the same nominal one. 13px of Jersey 10
-   * is the optical match for the 12px of Pixelify it replaces.
-   */
-  --fs-btn: 13px;
-
+  --fs-stat: 20px;
+  --fs-title: 26px;
   --lbl-tracking: 0.08em; /* pixel type needs more air between glyphs than a sans does */
 
   /*

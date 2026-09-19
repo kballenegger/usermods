@@ -107,31 +107,15 @@ function Guide() {
         title="Typography"
         note="Three families, and which one is used is a rule. The pixel display face is for short labels only; anything you read a sentence of is set in the UI or mono text face."
       >
-        <Row title="Display — Jersey 10. Labels, headings, the wordmark. Never a sentence, never below 12px.">
+        <Row title="Display — labels, headings, the wordmark. Never a sentence, never below 11px.">
           <div className="sg-demo col">
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-title)' }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 700 }}>
               usermods
             </div>
-            <div className="label">Section label · 12px</div>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-stat)' }}>
+            <div className="label">Section label · 11px</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700 }}>
               3/3 · stat number
             </div>
-          </div>
-        </Row>
-        <Row title="Display — the glyph pairs that decide the face. Every one must be told apart at a glance, at the smallest size the system uses.">
-          <div className="sg-demo col">
-            {(['--fs-label', '--fs-btn', '--fs-ui', '--fs-stat', '--fs-title'] as const).map((t) => (
-              <div
-                key={t}
-                style={{
-                  fontFamily: 'var(--font-display)',
-                  fontSize: `var(${t})`,
-                  letterSpacing: 'var(--lbl-tracking)',
-                }}
-              >
-                CO GC 0O 8B 1Il 5S EF UV aoe · CHAT ARCHIVE ONCE
-              </div>
-            ))}
           </div>
         </Row>
         <Row title="UI text — all prose, every long-form reading surface. Body 13px / 1.6.">

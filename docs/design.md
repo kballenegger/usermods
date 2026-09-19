@@ -244,59 +244,33 @@ Three families, and which one is used is a **rule**, not a preference.
 
 | Family | Token | For | Never |
 | --- | --- | --- | --- |
-| Jersey 10 | `--font-display` | the wordmark, tab labels, section labels, button labels, headings, stat numbers | a sentence; below 12px; at any weight but 400 |
+| Pixelify Sans | `--font-display` | the wordmark, tab labels, section labels, button labels, headings, stat numbers | a sentence; below 11px |
 | System UI | `--font-ui` | **all prose**, every long-form reading surface, field help | identifiers |
 | IBM Plex Mono | `--font-mono` | identifiers, code, match patterns, model ids, anything copyable | prose |
 
 Both non-system faces are **bundled locally** (`@fontsource/*`). An extension must never fetch a font
 from a remote origin.
 
-**Why Jersey 10, and why the display face changed.** The system first shipped on Pixelify Sans, and
-it had to be replaced, because Pixelify's capital `C` carries an aperture **one pixel-unit tall on a
-seven-unit glyph** — it is a closed O with a nick in it. At label sizes the nick vanishes into the
-stroke, so the product's most-clicked controls read as `OHAT`, `AROHIVE`, `SELEOT ALL`, `RUN ONOE`
-and `OHATGPT SUBSORIPTION`. Its `G`, its unslashed `0` and its `8` collapse against `C`, `O` and `B`
-for the same reason.
+**Why Pixelify Sans.** Silkscreen and Press Start 2P were tried at real label sizes on the real
+surfaces (`docs/design/explorations/typeface-trial.png`). Silkscreen was rejected: it is
+uppercase-only, so it cannot set the lowercase "usermods" the brand requires, and it tracks so wide
+that `SETTINGS` and `INSTALL MOD` wrap to two lines in a 420px panel. Press Start 2P is wider still
+and only comfortable above ~20px. Pixelify has true lowercase, stays crisp from 11px, and is compact
+enough for a tab bar.
 
-**This was the face's drawing, not a rendering artefact, and that is the point.** The earlier trial
-had recorded the collision as a *size* problem and set an 11px floor against it. It is not a size
-problem: the pair was re-rendered from 8px to 96px, at all four weights, across a tracking sweep,
-and under every `-webkit-font-smoothing` setting including `none`. The `C` is still a closed `O` at
-96px. A counter the outline does not have cannot be opened by a size, a weight, a tracking value or
-an antialiasing mode — so the floor bought nothing and the face had to change.
-
-Jersey 10 is OFL, on `@fontsource`, and its `C` is open across about a third of the glyph's height,
-so the pair is separated by structure rather than by one pixel. It keeps true lowercase (the brand's
-own `usermods` needs it), it is heavy enough at its single 400 weight to hold the banner's boldness,
-and it is narrower than Pixelify at the same size. VT323, Silkscreen and DotGothic16 were evaluated
-beside it and lost — the specimen and the full reasoning are in
-[`design/explorations/`](design/explorations/) (`glyph-pairs.png`).
-
-**Never ask the display face for a bold.** Jersey 10 ships one 400 weight. `font-weight: 700` makes
-the engine synthesise a bold by smearing the outline, which thickens the strokes back into the
-counters and undoes the exact property the face was chosen for. The test fails the build if any
-stylesheet does it.
-
-**The 12px floor.** Jersey sets a smaller cap-height per em than Pixelify, so 12px of Jersey is the
-optical size 11px of Pixelify was. `--fs-micro` is therefore 12px, and the test asserts it. It is a
-floor for legibility at small sizes, which is an ordinary reason — unlike the old floor, which was
-an attempt to outrun a defect no floor could reach.
+**The 11px floor is real.** Pixelify's `C` and `O` are nearly identical below 11px — "CHAT" starts to
+read as "OHAT". `--fs-micro` is therefore 11px, and the test asserts it.
 
 ### Scale
 
 | Token | Size | Used for |
 | --- | --- | --- |
-| `--fs-micro` / `--fs-label` | 12px | section labels, tab labels, badges — the display face's floor |
-| `--fs-meta` | 12px | metadata, help text, code |
-| `--fs-btn` | 13px | **button labels** — the display face's own step |
+| `--fs-micro` / `--fs-label` | 11px | section labels, tab labels, badges — the display face's floor |
+| `--fs-meta` | 12px | metadata, help text, code, button labels |
 | `--fs-body` | 13px | **body copy** — the transcript, notices, prose |
 | `--fs-ui` | 14px | card titles |
-| `--fs-stat` | 22px | stat numbers |
-| `--fs-title` | 28px | page titles, the wordmark at page scale |
-
-`--fs-btn` exists because button labels are display type and field help is prose, and they used to
-share `--fs-meta`. The two faces render at different optical sizes for the same nominal one, so they
-have to be sizeable apart.
+| `--fs-stat` | 20px | stat numbers |
+| `--fs-title` | 26px | page titles, the wordmark at page scale |
 
 Body line-height is **1.6** in the transcript and 1.5–1.55 elsewhere. Display type is tracked out by
 `--lbl-tracking` (0.08em) — pixel glyphs need more air between them than a sans does.
@@ -483,10 +457,7 @@ soon as those branches land.
 
 1. Does every piece of long-form text sit on a **solid panel**, in a **text face**, at ≥13px?
 2. Is anything drawn **behind** text? Remove it.
-3. Does the pixel face appear anywhere below 12px, on a sentence, or at a weight other than 400?
-   Fix it.
-   And before you reach for a size: set every label you are adding in the face and read the `C`s. A
-   display face that cannot hold `CHAT` apart from `OHAT` is the wrong face, not the wrong size.
+3. Does the pixel face appear anywhere below 11px, or on a sentence? Fix it.
 4. Does each panel have a **2px border and a hard offset shadow**, and is the border bright in night
    and ink in day?
 5. Is there exactly **one primary action**, with everything else outlined?
