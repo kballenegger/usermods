@@ -36,9 +36,10 @@ export function Consent({ onAccept, onDismiss }: { onAccept: () => void; onDismi
       <div className="card">
         <h4>Where it goes</h4>
         <p style={{ margin: 0 }}>
-          To the model endpoint <b>you</b> configure in Settings, and nowhere else. That is your own API key at
-          Anthropic, OpenAI, OpenRouter or any compatible service
+          To the model provider <b>you</b> connect in Settings and pick for that chat, and nowhere else. That is your
+          own API key at Anthropic, OpenAI, OpenRouter or any compatible service
           {STORE_BUILD ? '' : ', your ChatGPT or SuperGrok subscription'}, or a model running on your own machine.
+          With more than one connected, each message goes only to the one named under the message box.
         </p>
         <span className="muted" style={{ fontSize: 'var(--fs-meta)' }}>
           Nothing is sent to the author of usermods. There is no usermods account, no usermods server, and no
@@ -50,8 +51,8 @@ export function Consent({ onAccept, onDismiss }: { onAccept: () => void; onDismi
         <h4>What stays here</h4>
         <p style={{ margin: 0 }}>
           Your API keys{STORE_BUILD ? '' : ' and subscription tokens'}, your saved mods, their stored values and your
-          chat history all live in this extension's local storage on this device. Credentials are sent only to the
-          endpoint they belong to, to authenticate you.
+          chat history all live in this extension's local storage on this device. Each credential is sent only to the
+          provider it belongs to, to authenticate you.
         </p>
       </div>
 

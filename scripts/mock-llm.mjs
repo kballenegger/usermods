@@ -8,8 +8,15 @@
 //   POST /v1/chat/completions  with {model, stream: true, messages, tools}
 //        -> text/event-stream of `data: {choices:[{delta:{...}, finish_reason}]}` lines,
 //           terminated by `data: [DONE]`.
-//   GET  /v1/models            -> {data: [{id}, ...]}  (Settings' "Fetch models" button)
-//   GET  /__requests           -> {requests: [{at, script, messages, images, hasImages}, ...]} body
+//   GET  /v1/models            -> {data: [{id}, ...]}  (Settings' "Fetch models", and the in-chat
+//                              model picker). The server answers on ANY path prefix, and the prefix
+//                              is what tells two connections apart: /v1 lists demo + demo-mini,
+//                              /alt/v1 lists alt-large + alt-small, /nolist/v1 cannot list (404),
+//                              and /codex answers the way the ChatGPT Codex backend does — 400
+//                              without ?client_version=, a {models:[{slug, visibility, priority}]}
+//                              catalog with it (/codex-down always 400s). See "Endpoints" below.
+//   GET  /__requests           -> {requests: [{at, script, endpoint, model, messages, images,
+//                              hasImages}, ...]} body
 //        DELETE /__requests    received, in order; the isolation flow reads this back to prove that
 //                              one chat's user text never entered another chat's model
 //                              conversation, and the images flow reads `images` — one entry per
@@ -669,6 +676,55 @@ const ARTIFACT_SCRIPTS = [
     ],
   },
 ];
+
+/**
+ * The models flow: one conversation, four turns, the model swapped between and during them. Each
+ * `done` marker appears only in its turn's last step. Turn 3 holds its first byte so the flow has
+ * time to change the model while that run is demonstrably still in flight.
+ */
+export const MODELS = {
+  turns: [
+    { prompt: 'read this page for me MODELSPROMPT-1', done: 'MODELSDONE-1' },
+    { prompt: 'now find its heading MODELSPROMPT-2', done: 'MODELSDONE-2' },
+    { prompt: 'mull this one over slowly MODELSPROMPT-3', done: 'MODELSDONE-3' },
+    { prompt: 'and one last look MODELSPROMPT-4', done: 'MODELSDONE-4' },
+  ],
+  /** How long turn 3 waits before its first byte. */
+  holdMs: 6000,
+};
+
+const escapeRe = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const MODELS_SCRIPTS = [
+  {
+    name: 'models-1',
+    match: new RegExp(escapeRe(MODELS.turns[0].prompt), 'i'),
+    steps: [
+      { text: 'Reading the page.', calls: [{ name: 'get_page', args: { max_chars: 4000 } }] },
+      { text: `${MODELS.turns[0].done} It is a small fixture page.` },
+    ],
+  },
+  {
+    name: 'models-2',
+    match: new RegExp(escapeRe(MODELS.turns[1].prompt), 'i'),
+    steps: [
+      { text: 'Looking for the heading.', calls: [{ name: 'find_elements', args: { selector: 'h1', limit: 3 } }] },
+      { text: `${MODELS.turns[1].done} One heading.` },
+    ],
+  },
+  {
+    name: 'models-3',
+    match: new RegExp(escapeRe(MODELS.turns[2].prompt), 'i'),
+    steps: [{ text: `${MODELS.turns[2].done} Done thinking.`, firstByteDelay: MODELS.holdMs }],
+  },
+  {
+    name: 'models-4',
+    match: new RegExp(escapeRe(MODELS.turns[3].prompt), 'i'),
+    steps: [{ text: `${MODELS.turns[3].done} Nothing new.` }],
+  },
+];
+
+// In front: each of these prompts carries a unique token, and nothing scripted earlier may claim it.
+SCRIPTS.unshift(...MODELS_SCRIPTS);
 
 // ---------------------------------------------------------------------------
 // The edit-a-mod flow (screenshots.mjs --editmod).
@@ -1521,6 +1577,49 @@ function recordViolations(body, messages) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Endpoints
+// ---------------------------------------------------------------------------
+//
+// One port, several "providers". The extension now holds a LIST of connections and picks the model
+// per chat, so the flows need two backends that can be told apart on the wire. They are told apart
+// by path prefix: a connection whose base URL is http://127.0.0.1:<port>/alt/v1 posts to
+// /alt/v1/chat/completions, and every recorded request carries the `endpoint` it arrived on and the
+// `model` it asked for. The scripted conversations are the same on every prefix.
+
+/** What each prefix lists. Deliberately disjoint, so a model id names its endpoint. */
+export const MODEL_LISTS = {
+  '/v1': ['demo', 'demo-mini'],
+  '/alt/v1': ['alt-large', 'alt-small'],
+};
+
+/** A Codex-shaped catalog (codex-rs/protocol ModelsResponse): slugs, a hidden model, priorities out of order. */
+export const CODEX_CATALOG = {
+  models: [
+    { slug: 'mock-gpt-mid', display_name: 'Mock Mid', visibility: 'list', priority: 6, supported_in_api: true },
+    { slug: 'mock-auto-review', display_name: 'Mock Reviewer', visibility: 'hide', priority: 40, supported_in_api: true },
+    { slug: 'mock-gpt-top', display_name: 'Mock Top', visibility: 'list', priority: 1, supported_in_api: true },
+  ],
+};
+
+const modelListings = [];
+
+/** The path in front of a route suffix: '/alt/v1/chat/completions' -> '/alt/v1'. */
+function endpointOf(pathname, suffix) {
+  return pathname.slice(0, pathname.length - suffix.length) || '/';
+}
+
+/** The listing headers a flow may want to assert on. Never the token itself, only that one came. */
+function listingHeaders(req) {
+  const h = req.headers;
+  return {
+    authorization: h.authorization ? 'present' : 'absent',
+    'chatgpt-account-id': h['chatgpt-account-id'] ?? null,
+    originator: h.originator ?? null,
+    'openai-beta': h['openai-beta'] ?? null,
+  };
+}
+
 const server = http.createServer(async (req, res) => {
   // The extension calls this from a page origin, so CORS has to be permissive.
   res.setHeader('access-control-allow-origin', '*');
@@ -1637,8 +1736,38 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (url.pathname.endsWith('/models')) {
+    const prefix = endpointOf(url.pathname, '/models');
+    modelListings.push({ at: Date.now(), endpoint: prefix, query: url.search, headers: listingHeaders(req) });
+    // The ChatGPT Codex backend, as the open-source CLI talks to it: client_version is REQUIRED.
+    if (prefix === '/codex' || prefix === '/codex-down') {
+      if (prefix === '/codex-down' || !url.searchParams.get('client_version')) {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ detail: prefix === '/codex-down' ? 'The catalog is unavailable for this account.' : 'Missing required query parameter: client_version' }));
+        return;
+      }
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(CODEX_CATALOG));
+      return;
+    }
+    if (prefix === '/nolist/v1') {
+      res.writeHead(404, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ error: { message: 'This server does not list its models.', type: 'not_found' } }));
+      return;
+    }
     res.writeHead(200, { 'content-type': 'application/json' });
-    res.end(JSON.stringify({ object: 'list', data: [{ id: 'demo' }, { id: 'demo-mini' }] }));
+    res.end(JSON.stringify({ object: 'list', data: (MODEL_LISTS[prefix] ?? MODEL_LISTS['/v1']).map((id) => ({ id, object: 'model' })) }));
+    return;
+  }
+
+  // What the listings above were asked, so a flow can check the query and headers that were sent.
+  if (url.pathname === '/__models') {
+    if (req.method === 'DELETE') {
+      modelListings.length = 0;
+      res.writeHead(204).end();
+      return;
+    }
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ listings: modelListings }));
     return;
   }
 
@@ -1652,6 +1781,8 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     const messages = body.messages ?? [];
+    // Which "provider" this arrived at, and which model it asked for (see Endpoints).
+    const where = { endpoint: endpointOf(url.pathname, '/chat/completions'), model: body.model ?? null };
     // Validate BEFORE answering, and answer anyway: a mock that refuses an invalid history would
     // stall the flow at the first breakage and hide every later one. The flows read /__violations
     // at the end and fail there, with the whole list.
@@ -1667,6 +1798,7 @@ const server = http.createServer(async (req, res) => {
       requests.push({
         at: Date.now(),
         script: kind,
+        ...where,
         fault: fault.kind,
         messages: stripImageData(messages),
         images: collected.images,
@@ -1700,13 +1832,13 @@ const server = http.createServer(async (req, res) => {
     // is still recorded, because the isolation flow's "no chat's text entered another chat's model
     // conversation" assertion has to hold for the title call too.
     if (isSummaryRequest(body)) {
-      requests.push({ at: Date.now(), script: 'summary', messages: stripImageData(messages), images: collected.images, hasImages: collected.images.length > 0 });
+      requests.push({ at: Date.now(), script: 'summary', ...where, messages: stripImageData(messages), images: collected.images, hasImages: collected.images.length > 0 });
       if (process.env.MOCK_LLM_VERBOSE) console.error('[mock-llm] compaction summary');
       await streamStep(res, { text: SUMMARY_REPLY, calls: [] }, body.model ?? 'demo');
       return;
     }
     if (isTitleRequest(body)) {
-      requests.push({ at: Date.now(), script: 'title', messages: stripImageData(messages), images: collected.images, hasImages: collected.images.length > 0 });
+      requests.push({ at: Date.now(), script: 'title', ...where, messages: stripImageData(messages), images: collected.images, hasImages: collected.images.length > 0 });
       if (process.env.MOCK_LLM_VERBOSE) console.error(`[mock-llm] title -> ${TITLE_REPLY}`);
       await streamStep(res, { text: TITLE_REPLY, calls: [] }, body.model ?? 'demo');
       return;
@@ -1719,6 +1851,7 @@ const server = http.createServer(async (req, res) => {
     requests.push({
       at: Date.now(),
       script: script.name ?? 'fallback',
+      ...where,
       ...(fault ? { fault: fault.kind } : {}),
       messages: stripImageData(messages),
       images: collected.images,

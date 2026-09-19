@@ -4,7 +4,7 @@
 //   npm test
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { RECONNECT_NOTE, looksUnfinished, reduceItems, unqueuedItem } from '../lib/transcript.ts';
+import { GAP_TOOL_SUMMARY, RECONNECT_NOTE, hasRowGap, lastModel, looksUnfinished, modelRowText, reduceItems, repairRowGap, unqueuedItem } from '../lib/transcript.ts';
 import { SessionMap } from '../lib/sessions.ts';
 import type { AgentEventBody, ChatItem, ModProposal, UserTurn } from '../lib/types.ts';
 
@@ -159,7 +159,7 @@ test('two chats reduced from the same events by id stay completely separate', ()
   assert.doesNotMatch(textOf('B'), /AAA|tail A|A page/, "A's output must never appear in B");
 });
 
-// ---------- looksUnfinished, which drives the reconnect note ----------
+// ---------- looksUnfinished: the evidence both settleInterrupted and the row-gap rule read ----------
 
 test('a transcript is unfinished while a tool row has no result or a message is still queued', () => {
   assert.equal(looksUnfinished([{ kind: 'tool', id: 't', name: 'n', input: {} }]), true);
@@ -259,4 +259,120 @@ test('isRunning and ids report per chat', () => {
   assert.equal(s.isRunning('B'), false);
   assert.equal(s.isRunning('C'), false);
   assert.deepEqual(s.ids().sort(), ['A', 'B']);
+});
+
+// ---------- which model produced which turns ----------
+
+test('a run records its model once, and a later run on the same model adds nothing', () => {
+  let items: ChatItem[] = [{ kind: 'user', id: 'u1', text: 'hi' }];
+  const demo: AgentEventBody = { type: 'model', connectionId: 'a', label: 'Local', model: 'demo' };
+  items = reduceItems(items, demo);
+  assert.deepEqual(items[1], { kind: 'model', connectionId: 'a', label: 'Local', model: 'demo' });
+  items = reduceItems(items, { type: 'text', delta: 'hello' });
+  const again = reduceItems(items, demo);
+  assert.equal(again, items, 'the same array comes back, so an offscreen chat schedules no write');
+  assert.deepEqual(lastModel(items), { kind: 'model', connectionId: 'a', label: 'Local', model: 'demo' });
+  assert.equal(lastModel([]), null);
+});
+
+test('a swap adds a row where the model changed: a different model, or the same id on another provider', () => {
+  let items: ChatItem[] = [];
+  items = reduceItems(items, { type: 'model', connectionId: 'a', label: 'Local', model: 'demo' });
+  items = reduceItems(items, { type: 'model', connectionId: 'a', label: 'Local', model: 'demo-mini' });
+  items = reduceItems(items, { type: 'model', connectionId: 'b', label: 'Other', model: 'demo-mini' });
+  items = reduceItems(items, { type: 'model', connectionId: 'b', label: 'Other renamed', model: 'demo-mini' });
+  assert.deepEqual(items.map((i) => (i.kind === 'model' ? `${i.connectionId}/${i.model}` : i.kind)), ['a/demo', 'a/demo-mini', 'b/demo-mini']);
+});
+
+test('the panel says nothing for the model a chat started on, and "switched to" for every change', () => {
+  const items: ChatItem[] = [
+    { kind: 'user', id: 'u1', text: 'hi' },
+    { kind: 'model', connectionId: 'a', label: 'Local', model: 'demo' },
+    { kind: 'assistant', text: 'hello' },
+    { kind: 'model', connectionId: 'b', label: 'Anthropic', model: 'claude-opus-5' },
+    { kind: 'model', connectionId: 'c', label: '', model: 'bare' },
+  ];
+  assert.equal(modelRowText(items, 1), null);
+  assert.equal(modelRowText(items, 1, { showFirst: true }), 'model: demo · Local');
+  assert.equal(modelRowText(items, 3), 'switched to claude-opus-5 · Anthropic');
+  assert.equal(modelRowText(items, 4), 'switched to bare');
+  assert.equal(modelRowText(items, 0), null, 'not a model row');
+});
+
+test('a model row does not break the streaming of the reply that follows it', () => {
+  let items: ChatItem[] = [];
+  items = reduceItems(items, { type: 'model', connectionId: 'a', label: 'L', model: 'm' });
+  items = reduceItems(items, { type: 'text', delta: 'one ' });
+  items = reduceItems(items, { type: 'text', delta: 'two' });
+  items = reduceItems(items, { type: 'text_discard', chars: 3 });
+  assert.deepEqual(items, [{ kind: 'model', connectionId: 'a', label: 'L', model: 'm' }, { kind: 'assistant', text: 'one ' }]);
+});
+
+// ---------- the "rows are missing" note: only when rows really are, and only what is true ----------
+
+const DANGLING: ChatItem[] = [
+  { kind: 'user', id: 'u1', text: 'hide the banner' },
+  { kind: 'assistant', text: 'Reading the page.' },
+  { kind: 'tool', id: 't1', name: 'get_page', input: {} },
+];
+const IDLE = { running: false, interrupted: false };
+
+test('a complete transcript has no gap, whatever the chat is doing', () => {
+  const done: ChatItem[] = [{ kind: 'user', id: 'u', text: 'x' }, { kind: 'tool', id: 't', name: 'get_page', input: {}, summary: 'ok' }, { kind: 'assistant', text: 'done' }];
+  for (const state of [IDLE, { running: true, interrupted: false }, { running: false, interrupted: true }]) {
+    assert.equal(hasRowGap(done, state), false);
+    assert.equal(repairRowGap(done, state), done, 'the same array: nothing to write back');
+  }
+  assert.equal(hasRowGap([], IDLE), false);
+});
+
+test('a tool row with no result is NOT a gap while the chat is running: that tool is running now', () => {
+  // The path the old check got wrong: a chat that started after the panel attached, switched away
+  // from and back to. It was told its output "was not captured" while it was being captured.
+  assert.equal(hasRowGap(DANGLING, { running: true, interrupted: false }), false);
+  assert.equal(repairRowGap(DANGLING, { running: true, interrupted: false }), DANGLING);
+});
+
+test('…and not after an interruption either: that case has its own, truer account', () => {
+  // settleInterrupted closes those rows and the chat says "This run was interrupted." with Resume.
+  assert.equal(hasRowGap(DANGLING, { running: false, interrupted: true }), false);
+  assert.equal(repairRowGap(DANGLING, { running: false, interrupted: true }), DANGLING);
+});
+
+test('a row still claiming to be in progress when nothing is running IS a gap, and is repaired once', () => {
+  assert.equal(hasRowGap(DANGLING, IDLE), true);
+  const repaired = repairRowGap(DANGLING, IDLE);
+  assert.deepEqual(repaired, [
+    DANGLING[0],
+    DANGLING[1],
+    // Closed, and not as an error: the tool ran and the model got its result. Only this row missed it.
+    { kind: 'tool', id: 't1', name: 'get_page', input: {}, summary: GAP_TOOL_SUMMARY },
+    { kind: 'note', text: RECONNECT_NOTE },
+  ]);
+  assert.equal(looksUnfinished(repaired), false);
+  // Once: the repaired transcript is what gets stored, and loading it again adds nothing.
+  assert.equal(repairRowGap(repaired, IDLE), repaired);
+  assert.equal(repaired.filter((i) => i.kind === 'note').length, 1);
+});
+
+test('a bubble left marked queued with nothing running is the same gap, and stops saying queued', () => {
+  const items: ChatItem[] = [{ kind: 'assistant', text: 'done' }, { kind: 'user', id: 'u2', text: 'also the footer', queued: true }];
+  const repaired = repairRowGap(items, IDLE);
+  assert.deepEqual(repaired[1], { kind: 'user', id: 'u2', text: 'also the footer' });
+  assert.deepEqual(repaired[2], { kind: 'note', text: RECONNECT_NOTE });
+  assert.equal(items[1]?.kind === 'user' && items[1].queued, true, 'the input is not mutated');
+});
+
+test('the note claims only what can be missing, and says what is intact', () => {
+  // What can be missing: rows on screen. What cannot: the conversation, the draft, saved mods.
+  assert.match(RECONNECT_NOTE, /rows/);
+  assert.match(RECONNECT_NOTE, /streamed text or tool results/);
+  assert.match(RECONNECT_NOTE, /conversation the model sees/);
+  assert.match(RECONNECT_NOTE, /draft/);
+  assert.match(RECONNECT_NOTE, /saved mods/);
+  assert.match(RECONNECT_NOTE, /intact/);
+  // The old wording said the run's OUTPUT was lost, which has not been true since the background
+  // began keeping the transcript itself.
+  assert.doesNotMatch(RECONNECT_NOTE, /not captured|earlier output/);
+  assert.match(GAP_TOOL_SUMMARY, /the model received it/);
 });

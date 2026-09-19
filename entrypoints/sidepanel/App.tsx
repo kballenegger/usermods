@@ -150,7 +150,7 @@ export function App() {
             onDismiss={consented ? () => setReviewing(false) : undefined}
           />
         ) : (
-          <Chat tabId={tabId} pageUrl={pageUrl} host={host} />
+          <Chat tabId={tabId} pageUrl={pageUrl} host={host} onOpenSettings={() => setTab('settings')} />
         ))}
       {/* "Edit in chat" on a mod row is a move between the two tabs, so the Mods view asks to be
           taken there rather than reaching into the Chat view: the chat it should land on is named

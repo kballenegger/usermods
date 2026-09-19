@@ -31,8 +31,8 @@ never uploads it anywhere.
 
 | What | Where | Why |
 |---|---|---|
-| **Provider settings** — the provider you picked, the base URL, the model name | `chrome.storage.local` | So usermods knows which endpoint to talk to. |
-| **Your API key**, if you use one | `chrome.storage.local` | Sent only to the endpoint you configured, as the authentication header for your own requests. |
+| **Provider settings** — each provider you connected: its name, base URL, the list of model names it offered, and which model each chat uses | `chrome.storage.local` | So usermods knows which endpoints exist and which one a chat talks to. |
+| **Your API keys**, if you use any | `chrome.storage.local` | Each is sent only to the provider it belongs to, as the authentication header for your own requests. Removing a provider deletes its key. |
 | **Subscription tokens** *(GitHub build only)* — OAuth access and refresh tokens for ChatGPT or xAI sign-in, and the account identifier and label (typically your email address and plan name) read out of those tokens | `chrome.storage.local` | Sent only to that vendor, to authenticate your own requests, and refreshed automatically. Removed when you sign out. |
 | **Saved mods** — the full userscript text, its header metadata, its enabled state, and any `@require` libraries and `@resource` files downloaded at install time | `chrome.storage.local` | So your mods can run on matching pages. |
 | **Mod values** — data your scripts save with `GM_setValue`, including values imported from a Tampermonkey backup | `chrome.storage.local` | The storage that userscripts expect. It belongs to the script, not to usermods. |
@@ -44,11 +44,14 @@ You can delete any of it: remove a chat or a mod from the panel, sign out to era
 tokens, clear the API key field, or uninstall the extension, which deletes the extension's storage
 entirely.
 
-## 2. Data sent to the model provider you configure
+## 2. Data sent to the model provider you pick
 
 usermods is useless unless the model can see the page you want changed. When you send a message, the
-extension sends the following **directly from your browser to the endpoint you configured in
-Settings**:
+extension sends the following **directly from your browser to the one provider that chat is using**
+— the model named under the message box, on a provider you connected in Settings. If you have
+connected several, the others receive nothing from that message. If you change the model in the
+middle of a conversation, the conversation so far is sent to the newly picked provider with your
+next message, because a model cannot continue a conversation it has not been shown:
 
 - **Your messages**, and the conversation so far.
 - **The address (URL) and title of the page** in the active tab.
@@ -121,7 +124,7 @@ per-permission justification is published alongside this policy at
 In short: broad host access (`<all_urls>`) exists because usermods works on whatever site you are
 looking at, and cannot know in advance which sites those are — the same access a userscript manager
 has always needed. It is used to read the page you are on while the panel is open, to run the mods
-you saved on the sites their headers match, and to reach the model endpoint you configured.
+you saved on the sites their headers match, and to reach the model endpoints you connected.
 
 ## 6. Children
 
@@ -137,7 +140,7 @@ requirements.
 
 Specifically, and as described above: usermods handles user data only as necessary for its single
 purpose of building and running userscripts at your direction; it transmits data only to the model
-endpoint you configure and to hosts you explicitly ask it to contact; it transfers data to no third
+endpoints you connect and to hosts you explicitly ask it to contact; it transfers data to no third
 party, sells no data, uses no data for advertising or creditworthiness purposes, and permits no
 human access to user data, because no data ever reaches the developer.
 

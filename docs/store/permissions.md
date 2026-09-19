@@ -30,10 +30,10 @@ icon. Used in `entrypoints/background.ts` (`chrome.sidePanel.setPanelBehavior`) 
 ### `storage`
 
 usermods stores the user's saved userscripts, their enabled state, the values those scripts write
-through `GM_setValue`, the chat history, and the user's own provider settings and API key. All of it
+through `GM_setValue`, the chat history, and the user's own provider settings and API keys. All of it
 is local to the device; none of it is transmitted to the developer. Without this permission the user
 would lose every mod they saved whenever the service worker slept. Used throughout, principally in
-`lib/mods.ts`, `lib/chats.ts`, `lib/settings.ts`, `lib/gm.ts` and `lib/consent.ts`.
+`lib/mods.ts`, `lib/chats.ts`, `lib/settings.ts`, `lib/connections.ts`, `lib/gm.ts` and `lib/consent.ts`.
 
 ### `scripting`
 
@@ -90,12 +90,12 @@ the listing:
    extension itself must hold broad host access (`entrypoints/background.ts`).
 3. **Taking a screenshot of the visible tab** when the model asks for one, so it can check a visual
    result (`chrome.tabs.captureVisibleTab` in `entrypoints/background.ts`), and reaching the model
-   endpoint the user configured, which may be any host including `localhost`
+   endpoints the user connected, which may be any host including `localhost`
    (`lib/providers/`).
 
 No narrower set of hosts would work: restricting usermods to a fixed list of sites would mean it
 could not customize the site a given user cares about. Page content is read only while the user is
-using the panel on that tab, and is sent only to the model endpoint that user configured. It is
+using the panel on that tab, and is sent only to the model provider that user picked for that chat. It is
 never sent to the developer, who operates no server.
 
 ---

@@ -12,6 +12,34 @@
 import { parseWaitInput, waitConditionLabel } from './agent/wait.ts';
 import type { AgentEventBody, ChatItem } from './types';
 
+type ModelItem = Extract<ChatItem, { kind: 'model' }>;
+
+/** The model the end of a transcript was produced by, or null when nothing recorded one. */
+export function lastModel(items: ChatItem[]): ModelItem | null {
+  for (let i = items.length - 1; i >= 0; i--) {
+    const it = items[i];
+    if (it?.kind === 'model') return it;
+  }
+  return null;
+}
+
+/**
+ * What a model row says, or null when it should say nothing.
+ *
+ * The first one in a transcript is where the chat STARTED, not a change, so the panel shows nothing
+ * for it (`showFirst: false`) — the composer already names the model. Every later one is a swap and
+ * reads "switched to …". The dashboard's read-only preview has no composer to name the model, so it
+ * shows the first one too.
+ */
+export function modelRowText(items: ChatItem[], index: number, { showFirst = false } = {}): string | null {
+  const it = items[index];
+  if (it?.kind !== 'model') return null;
+  const name = it.label ? `${it.model} · ${it.label}` : it.model;
+  const first = !items.slice(0, index).some((x) => x.kind === 'model');
+  if (first) return showFirst ? `model: ${name}` : null;
+  return `switched to ${name}`;
+}
+
 /**
  * Apply one agent event to a transcript. Returns a new array (never mutates the input), or the
  * same array when the event changes nothing, so a caller can skip a write.
@@ -99,6 +127,13 @@ export function reduceItems(items: ChatItem[], event: AgentEventBody): ChatItem[
       // The run was stopped before this message was sent: its bubble goes away.
       if (!items.some((it) => it.kind === 'user' && it.id === event.id)) return items;
       return items.filter((it) => !(it.kind === 'user' && it.id === event.id));
+    }
+    case 'model': {
+      // Recorded when it CHANGES. The same array comes back for a run on the model the chat was
+      // already on, so an unchanged chat gains no rows and an offscreen one schedules no write.
+      const last = lastModel(items);
+      if (last && last.connectionId === event.connectionId && last.model === event.model) return items;
+      return [...items, { kind: 'model', connectionId: event.connectionId, label: event.label, model: event.model }];
     }
     case 'status':
       // What the run is doing right now drives the activity line, which is not a transcript row:
@@ -232,8 +267,61 @@ export function settleInterrupted(items: ChatItem[]): { items: ChatItem[]; dropp
   return { items: next, dropped };
 }
 
-/** The note shown when a run outlived the panel and we could not capture what it streamed. */
-export const RECONNECT_NOTE = 'reconnected — earlier output from this run was not captured';
+/**
+ * The note for a transcript that is missing rows, and what it is careful NOT to say.
+ *
+ * It used to read "earlier output from this run was not captured", from the days when a run that
+ * outlived the panel streamed into nothing. That stopped being true: the background now keeps the
+ * transcript itself whenever no panel is attached (recordDetached), an open panel keeps every
+ * chat's transcript whether or not it is on screen, the conversation the model sees is
+ * checkpointed after every step, and the draft and saved mods never depended on the panel at all.
+ * What can still go missing is narrow: ROWS ON SCREEN — a stretch of streamed text, a tool row's
+ * result — from the instant between a panel page going away and the background noticing its port
+ * had closed. So the note says exactly that, and says what is intact, because "output was not
+ * captured" reads as "your work is gone".
+ */
+export const RECONNECT_NOTE =
+  'some rows from this run are not shown here (streamed text or tool results from a moment the panel was reconnecting) · the conversation the model sees, the draft and your saved mods are intact';
+
+/** What a tool row says when its result arrived in such a gap: it ran, and only the row missed it. */
+export const GAP_TOOL_SUMMARY = 'result not shown here · the model received it';
+
+/**
+ * Whether a stored transcript is really missing rows, as opposed to merely being mid-run.
+ *
+ * The only evidence of a gap is a row that claims something is still happening when nothing is: a
+ * tool row with no result, or a bubble still marked queued. That is a gap ONLY when
+ *   - the chat is not running — while it runs, a tool row without a result is a tool that is running
+ *     right now, captured the whole time by this panel or by the background; and
+ *   - its run was not interrupted — an interrupted run (the worker died) leaves the same rows, but
+ *     nothing was streamed that anyone failed to keep: settleInterrupted closes them and the chat
+ *     says "This run was interrupted." with Resume, which is the true account of that case.
+ * Everything else — a run that finished while the panel was closed, a chat switched away from and
+ * back to, a failed run waiting on Resume — has a complete transcript and gets no note.
+ */
+export function hasRowGap(items: ChatItem[], state: { running: boolean; interrupted: boolean }): boolean {
+  return !state.running && !state.interrupted && looksUnfinished(items);
+}
+
+/**
+ * Put a transcript with a row gap into a truthful state, once: the rows that would otherwise claim
+ * to be running for ever are closed (the tool did run and the model did get its result — only this
+ * row missed it; a bubble is no longer "queued" when nothing is queued behind anything), and the
+ * note is added after them. The result no longer looks unfinished, so this never repeats, and it
+ * returns the same array when there is no gap.
+ */
+export function repairRowGap(items: ChatItem[], state: { running: boolean; interrupted: boolean }): ChatItem[] {
+  if (!hasRowGap(items, state)) return items;
+  const next: ChatItem[] = items.map((it) => {
+    if (it.kind === 'tool' && it.summary === undefined) return { ...it, summary: GAP_TOOL_SUMMARY };
+    if (it.kind === 'user' && it.queued) {
+      const { queued: _queued, ...rest } = it;
+      return rest;
+    }
+    return it;
+  });
+  return [...next, { kind: 'note', text: RECONNECT_NOTE }];
+}
 
 /**
  * Did this transcript stop mid-turn? A tool row without a result, or a message still marked queued,

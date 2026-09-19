@@ -22,8 +22,9 @@ listing's note if the review is still open near that date.
 
 A note on the field itself: Google does not document this field or its character limit anywhere on
 developer.chrome.com — it exists in the dashboard UI but not in the published docs. The short
-version below is **2,489 characters**, which is under every limit the field has been reported to
-have. Paste the short version. If the field turns out to accept more, the long version underneath
+version below is **about 2,490 characters** with a 51-character key and a 40-character base URL
+substituted (the script prints the exact count), which is under every limit the field has been
+reported to have. Paste the short version. If the field turns out to accept more, the long version underneath
 adds the detail; it is otherwise reference material for answering a reviewer's follow-up email.
 
 ---
@@ -46,15 +47,14 @@ The extension shows a banner with these steps until the toggle is on.
 MODEL API KEY
 The chat needs a model API key the user supplies. None is bundled; there is no account and no
 server of ours. We provide one for your review. In the side panel open Settings (slider icon, top
-right), click the "Custom OpenAI API" preset, then fill in all three fields — the preset selects
-the OpenAI-compatible provider but does not fill these in:
+right), click "Custom OpenAI API" under "Add provider", and in its card set:
 
   Base URL   [reviewer base URL: PASTE HERE]
-  Model      ornith
   API key    [reviewer key: PASTE HERE]
 
-Settings saves itself; there is no Save button. This key expires 2026-10-03 — if it has, please
-request a new one at the support URL on our listing rather than reporting the chat broken.
+(Replace the http://localhost: stub.) It autosaves (no Save button). Back in Chat, click the
+model button under the message box, type ornith, press Enter. This key expires 2026-10-03 — if
+expired, please ask for a new one via our listing's support URL.
 
 5-MINUTE TEST
   1. Open https://en.wikipedia.org/wiki/Common_kingfisher
@@ -71,8 +71,8 @@ https://update.greasyfork.org/scripts/478687/GitHub%20Custom%20Global%20Navigati
 The Mods tab also imports from a file and from a Tampermonkey backup.
 
 PRIVACY
-No data goes to the developer. No account, no server, no telemetry — requests go only to the model
-endpoint the user configured.
+No data goes to the developer. No account, no server, no telemetry — requests go only to the
+model provider the user picked.
 Policy: https://github.com/kballenegger/usermods/blob/main/PRIVACY.md
 
 SINGLE PURPOSE
@@ -92,7 +92,7 @@ usermods is a user script manager in the same category as Tampermonkey, Violentm
 Greasemonkey: it stores userscripts with standard `==UserScript==` headers and registers them
 through `chrome.userScripts` so they run on the pages their `@match` patterns cover. What
 distinguishes it is how a script gets written — the user describes the change they want to a
-language model they configure, and the model writes the script by inspecting the real page, rather
+language model they connect, and the model writes the script by inspecting the real page, rather
 than the user typing the JavaScript themselves.
 
 ### Why "Allow User Scripts" is required
@@ -108,28 +108,37 @@ end: an automated Chrome profile cannot flip that toggle either.
 
 ### About the API key
 
-usermods ships no credentials of any kind. The user chooses a provider and supplies their own key,
-which is stored in `chrome.storage.local` on their device and sent only to that provider's
-endpoint as an `Authorization` header on their own requests. It is never sent to the developer, who
-operates no server.
+usermods ships no credentials of any kind. The user connects one or more providers and supplies
+their own key for each, which is stored in `chrome.storage.local` on their device and sent only to
+that provider's endpoint as an `Authorization` header on their own requests. It is never sent to
+the developer, who operates no server. Removing a provider deletes its key.
 
-The key supplied to the reviewer is for an **OpenAI-compatible** endpoint, not a named vendor, so
-the preset to pick is **"Custom OpenAI API"** — the second of the two buttons on the bottom row of
-the Presets block.
+Settings opens on a **Providers** list (empty on a fresh install, with the line "No provider yet")
+followed by an **Add provider** row of preset buttons. The key supplied to the reviewer is for an
+**OpenAI-compatible** endpoint, not a named vendor, so the preset to click is **"Custom OpenAI
+API"** — the last button in the Add provider row. Clicking it adds a provider card and opens it.
 
-That preset is a starting point, not a complete configuration. It sets the provider to
-*OpenAI-compatible (chat/completions)* and seeds **Base URL** with the stub `http://localhost:`,
-leaving **Model** empty; both have to be typed in by hand, over the stub in the case of Base URL.
-That is the one place a reviewer could get stuck, which is why the short version spells out all
-three values and says explicitly that the preset does not fill them in. The three fields are
-labelled exactly **Base URL**, **API key** and **Model**, in that order, and Settings autosaves
-about 300 ms after the last keystroke — there is no Save button to look for.
+The card's fields are labelled exactly **Name**, **Base URL**, **API key** and **Images**, in that
+order, followed by a **Fetch models** button and a status line. The preset seeds **Base URL** with
+the stub `http://localhost:`, which has to be replaced — that is the one place a reviewer could get
+stuck, which is why the short version says so. Name and Images can be left alone. Settings autosaves
+about 300 ms after the last keystroke — there is no Save button to look for — and once the base URL
+and key are in, the card's summary line reads **Connected**.
+
+There is no Model field in Settings. The model is chosen in the chat: under the message box is a
+button that reads **Pick a model** until one is chosen (or **No provider connected** before a
+provider is added). Clicking it opens a list of the connected provider's models with a text field
+on top; typing `ornith` and pressing Enter selects that model whether or not the endpoint lists its
+models, because a typed id is offered as *Use "ornith" on Custom OpenAI API* when nothing listed
+matches. Until a model is picked, **Send** is disabled and the line under the message box says what
+is missing, so a reviewer who skips this step sees an instruction rather than an error.
 
 The named presets behave differently and are worth knowing about if a reviewer explores: the
 **Anthropic**, **OpenAI**, **xAI Grok** and **OpenRouter** presets each fill in a real base URL and
-a default model, so they need only a key. **Ollama** and **LM Studio** point at `localhost` and
-need no key, but need a model server running on the reviewer's own machine, so they are not usable
-for review.
+offer a default model, so they need only a key. **Ollama** and **LM Studio** point at `localhost`
+and need no key, but need a model server running on the reviewer's own machine, so they are not
+usable for review. Several providers can be connected at once, and the model can be changed in the
+middle of a conversation; none of that is needed for the test above.
 
 The reviewer key is **time-limited and expires 2026-10-03**. After that the endpoint returns an
 auth error, which would look exactly like a broken extension — hence the line in the pasted notes
@@ -140,17 +149,17 @@ The two **subscription** presets visible in the screenshots (ChatGPT, SuperGrok)
 package**. They ship only in the GitHub build. The Chrome Web Store build is compiled with a flag
 that removes that code entirely — see `lib/buildflags.ts` — because signing in with a vendor
 subscription uses endpoints the vendors do not document for third parties, which does not belong in
-a listing that has to state exactly what it talks to. If a preset for one is selected in a profile
-carried over from the GitHub build, the store build falls back to the Anthropic provider and says
-why.
+a listing that has to state exactly what it talks to. If a profile carried over from the GitHub
+build holds a subscription provider, the store build keeps it in the list marked **Not available in
+this build**, leaves it out of the model picker, and says why.
 
 ### What is sent where, during the test above
 
-When the user sends a message with the panel open on a tab, what goes to their configured model
-endpoint is: their message, a pruned snapshot of that page's DOM, details of any elements the model
+When the user sends a message with the panel open on a tab, what goes to the provider that chat is
+using — the one named under the message box, and no other — is: their message, a pruned snapshot of that page's DOM, details of any elements the model
 queries, and — only if the model asks for one — a screenshot of the visible tab. That is the whole
 list, and the first-run data notice states it before the first message leaves. Nothing else is
-transmitted anywhere. Saved mods, chat history, stored `GM_setValue` values and the API key stay in
+transmitted anywhere. Saved mods, chat history, stored `GM_setValue` values and the API keys stay in
 local extension storage.
 
 ### The paths that need no model

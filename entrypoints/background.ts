@@ -10,7 +10,7 @@ import { resyncPlan } from '@/lib/resync';
 import { mapStack, prepareRunScript, renderRunResult, type RunResult } from '@/lib/runscript';
 import { shouldUpdate } from '@/lib/version';
 import { loadMods, modFromProposal, modFromSource, parseHeader, previewFromSource, upsertMod, deleteMod, saveMods } from '@/lib/mods';
-import { appendTurn, archiveChat, bulkChats, countTurns, createChat, deleteChat, getChat, hostFromUrl, isArchived, listChats, loadItems, loadMessages, markTitleRefreshed, renameChat, saveItems, saveMessages, setChatArtifact, setModelTitle, touchChat } from '@/lib/chats';
+import { appendTurn, archiveChat, bulkChats, countTurns, createChat, deleteChat, getChat, hostFromUrl, isArchived, listChats, loadItems, loadMessages, markTitleRefreshed, renameChat, saveItems, saveMessages, setChatArtifact, setChatModel, setModelTitle, touchChat } from '@/lib/chats';
 import { loadRuns, markInterrupted, pruneRuns, resumableRuns, saveRuns, type RunMap, type RunRecord } from '@/lib/runstate';
 import { reduceItems } from '@/lib/transcript';
 import { addVersion, adoptMod, currentVersion, detachFromMod, draftBlock, fromMod, loadArtifact, recordProposal, rollbackTo, saveArtifact, toProposal, toSource, type Artifact } from '@/lib/artifact';
@@ -19,16 +19,25 @@ import { buildTitleInput, completedTurns, sanitizeTitle, titleDecision, TITLE_SY
 import { createProvider } from '@/lib/providers';
 import { VISION_FALLBACK_PANEL_NOTE, createVisionMemory, resolveImagesSetting, visionKeyFor } from '@/lib/providers/vision';
 import { MAX_EDGE, SCREENSHOT_CAPTURE_FORMAT, SCREENSHOT_QUALITY, fitWithin, parseDataUrl } from '@/lib/images';
-import {
-  CHATGPT_CODEX_BASE,
-  STORE_BUILD,
-  XAI_PROXY_BASE,
-  unavailableProviderMessage,
-} from '@/lib/buildflags';
+import { STORE_BUILD, isSubscriptionProvider, unavailableProviderMessage } from '@/lib/buildflags';
+import { listFailureMessage, listWithFallback, modelsRequest, parseModelIds, type ModelListResult, type ModelListTarget } from '@/lib/modellist';
 import type { OAuthKind } from '@/lib/oauth';
 import type { AgentAttachState, AgentPortRequest, OAuthLoginState, RpcRequest } from '@/lib/rpc';
 import { SessionMap } from '@/lib/sessions';
 import { loadSettings } from '@/lib/settings';
+import {
+  effectiveSettings,
+  loadConnections,
+  loadModelChoice,
+  loadSignedIn,
+  mutateConnections,
+  resolveSelection,
+  sameSelection,
+  selectionForChat,
+  updateConnection,
+  type ModelCache,
+  type ModelSelection,
+} from '@/lib/connections';
 import { actionClickPlan, resolveScope, windowPanelPlan } from '@/lib/sidepanel';
 import type { SidePanelScope } from '@/lib/types';
 import { looksLikeZip, parseTampermonkeyJson, parseTampermonkeyZipEntries, type TmScript } from '@/lib/tampermonkey';
@@ -378,10 +387,14 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
   let checkpointed = false;
   try {
     if (!turn) post({ type: 'status', phase: 'model', detail: 'resuming' });
-    settings = await loadSettings();
-    const usesKey = settings.provider === 'anthropic' || settings.provider === 'openai-compatible';
-    if (usesKey && !settings.apiKey && !settings.baseUrl) throw new Error('Add an API key in Settings first (or a base URL for a local server or proxy).');
-    if (!settings.model) throw new Error('Choose a model in Settings first.');
+    // Which model this run talks to: the chat's own selection, resolved NOW. That one read is what
+    // makes a swap in the composer apply to the next turn, a queued message use whatever is selected
+    // when it starts, and a Resume continue on the chat's current model rather than the one that
+    // failed. A selection that cannot be used throws here, before anything is sent anywhere — it is
+    // reported, never replaced with another provider.
+    const resolved = await resolveChatModel(chatId);
+    settings = resolved.settings;
+    post({ type: 'model', connectionId: resolved.selection.connectionId, label: resolved.selection.label ?? '', model: resolved.selection.model });
     history = await loadMessages(chatId);
     if (!turn && !history.length) throw new Error('There is nothing to resume in this chat. Send your message again.');
     const retryPolicy = resolvePolicy((await chrome.storage.local.get(RETRY_POLICY_KEY).catch(() => ({}) as Record<string, unknown>))[RETRY_POLICY_KEY]);
@@ -803,7 +816,10 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
     case 'chats.transcript':
       return loadItems(req.id);
     case 'chats.create':
-      return createChat(req.host);
+      return createChat(req.host, req.model);
+    case 'chats.setModel':
+      await setChatModel(req.id, req.model);
+      return { ok: true };
     case 'agent.attach':
       return attachState();
     case 'chats.delete':
@@ -864,7 +880,7 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
       await (await oauthModule()).saveTokens(req.kind, null);
       return { ok: true };
     case 'models.list':
-      return listModels();
+      return listModels(req.connectionId);
     case 'artifact.get':
       return loadArtifact(req.chatId);
     case 'artifact.rollback': {
@@ -898,7 +914,7 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
       return next;
     }
     case 'mods.edit':
-      return editModInChat(req.modId, req.currentChatId ?? null, req.host);
+      return editModInChat(req.modId, req.currentChatId ?? null, req.host, req.model ?? null);
   }
 }
 
@@ -918,6 +934,13 @@ async function editModInChat(
   modId: string,
   currentChatId: string | null,
   host: string,
+  /**
+   * The model the composer was showing, when the caller has a composer. A chat CREATED here starts
+   * on it, exactly as a chat created by a first message does. Callers without one (the Mods tab, the
+   * dashboard) pass nothing, and the chat takes the new-chat default on its first run
+   * (resolveChatModel). A reused or seeded chat keeps the model it already has.
+   */
+  model: ModelSelection | null = null,
 ): Promise<{ chatId: string; host: string; created: boolean; reused: boolean; unarchived: boolean; mod: Mod; artifact: Artifact; runsHere: boolean; likelyUrl: string }> {
   const mod = (await loadMods()).find((m) => m.id === modId);
   if (!mod) throw new Error('That mod no longer exists.');
@@ -969,7 +992,7 @@ async function editModInChat(
     // where the current page is genuinely the wrong answer: editing a Reddit mod from a Wikipedia
     // tab should not leave its chat filed under Wikipedia forever.
     const derived = runsHere ? hostFromUrl(url) : hostFromUrl(likelyUrl);
-    chatId = (await createChat(derived || host)).id;
+    chatId = (await createChat(derived || host, model)).id;
     created = true;
   }
 
@@ -1420,43 +1443,63 @@ async function startLogin(kind: OAuthKind): Promise<OAuthLoginState> {
   return entry.state;
 }
 
-/** Model ids for the configured provider, where the backend can list them. */
-async function listModels(): Promise<string[]> {
-  const s = await loadSettings();
-  let url: string;
-  let headers: Record<string, string>;
-  switch (s.provider) {
-    case 'chatgpt': {
-      if (STORE_BUILD) throw new Error(unavailableProviderMessage('chatgpt'));
-      const o = await oauthModule();
-      url = `${(s.baseUrl || CHATGPT_CODEX_BASE).replace(/\/+$/, '')}/models`;
-      headers = o.chatgptHeaders(await o.getValidTokens('chatgpt'));
-      break;
-    }
-    case 'xai': {
-      if (STORE_BUILD) throw new Error(unavailableProviderMessage('xai'));
-      const o = await oauthModule();
-      const t = await o.getValidTokens('xai');
-      url = `${(s.baseUrl || XAI_PROXY_BASE).replace(/\/+$/, '')}/models`;
-      const h = o.xaiProxyHeaders('', t.access);
-      delete h['x-grok-model-override'];
-      headers = h;
-      break;
-    }
-    case 'openai-compatible':
-      url = `${(s.baseUrl || 'https://api.openai.com/v1').replace(/\/+$/, '')}/models`;
-      headers = s.apiKey ? { authorization: `Bearer ${s.apiKey}` } : {};
-      break;
-    case 'anthropic':
-      url = `${(s.baseUrl || 'https://api.anthropic.com').replace(/\/+$/, '')}/v1/models?limit=100`;
-      headers = { 'x-api-key': s.apiKey, 'anthropic-version': '2023-06-01' };
-      break;
+/**
+ * The connection and model a chat's next run uses, as the `Settings` every model-facing function
+ * takes (lib/connections.ts effectiveSettings).
+ *
+ * A chat with no selection of its own — one from before connections existed — takes the default a
+ * new chat would, and has it written onto the chat here, so it does not drift with the "last model
+ * picked" from then on. A chat WITH a selection that cannot be used (its provider was removed, signed
+ * out, lost its key, or is not in this build) throws the sentence the composer shows for the same
+ * state. Loading the connections comes first because that is what migrates a legacy profile.
+ */
+async function resolveChatModel(chatId: string): Promise<{ settings: Settings; selection: ModelSelection }> {
+  const connections = await loadConnections();
+  const [prefs, last, signedIn, chat] = await Promise.all([loadSettings(), loadModelChoice(), loadSignedIn(), getChat(chatId)]);
+  const resolved = resolveSelection(selectionForChat(chat, connections, last, signedIn), connections, signedIn);
+  if (!resolved.ok) throw new Error(resolved.message);
+  if (!sameSelection(chat?.model, resolved.selection) || chat?.model?.label !== resolved.selection.label) await setChatModel(chatId, resolved.selection);
+  return { settings: effectiveSettings(prefs, resolved.connection, resolved.model), selection: resolved.selection };
+}
+
+/**
+ * List one connection's models, and cache the answer on the connection.
+ *
+ * The request and the parsing are lib/modellist.ts (pure, unit tested); all that happens here is
+ * fetching the sign-in headers a subscription provider needs, doing the I/O and writing the cache.
+ * A subscription provider whose listing fails answers with a built-in list and the reason, so
+ * signing in never leaves the picker with nothing to offer. A key-based one that fails throws, and
+ * the failure is recorded beside whatever was cached before, so the picker keeps offering those.
+ */
+async function listModels(connectionId: string): Promise<ModelListResult> {
+  const conn = (await loadConnections()).list.find((c) => c.id === connectionId);
+  if (!conn) throw new Error('That provider was removed.');
+  const target: ModelListTarget = { kind: conn.kind, baseUrl: conn.baseUrl, apiKey: conn.apiKey.trim() };
+  // Outside the fallback: "not available in this build" is not a listing failure to paper over.
+  if (STORE_BUILD && isSubscriptionProvider(target.kind)) throw new Error(unavailableProviderMessage(target.kind));
+  const cache = (models: ModelCache) => mutateConnections((state) => updateConnection(state, connectionId, { models }));
+  try {
+    const result = await listWithFallback(target.kind, async () => {
+      let auth: Record<string, string> = {};
+      if (!STORE_BUILD && target.kind === 'chatgpt') {
+        const o = await oauthModule();
+        auth = o.chatgptHeaders(await o.getValidTokens('chatgpt'));
+      } else if (!STORE_BUILD && target.kind === 'xai') {
+        const o = await oauthModule();
+        auth = o.xaiProxyHeaders('', (await o.getValidTokens('xai')).access);
+      }
+      const { url, headers } = modelsRequest(target, auth);
+      const r = await fetch(url, { headers });
+      if (!r.ok) throw new Error(listFailureMessage(r.status, await r.text().catch(() => '')));
+      return parseModelIds(await r.json());
+    });
+    await cache({ ids: result.models, fetchedAt: Date.now(), ...(result.fallback ? { fallback: true } : {}), ...(result.error ? { error: result.error } : {}) });
+    return result;
+  } catch (e) {
+    const error = e instanceof Error ? e.message : String(e);
+    await cache({ ids: conn.models?.ids ?? [], fetchedAt: Date.now(), error }).catch(() => {});
+    throw e;
   }
-  const r = await fetch(url, { headers });
-  if (!r.ok) throw new Error(`Could not list models: ${r.status}`);
-  const body = (await r.json()) as { data?: Array<{ id?: string; slug?: string }>; models?: Array<{ id?: string; slug?: string }> };
-  const entries = body.data ?? body.models ?? [];
-  return entries.map((m) => m.id ?? m.slug ?? '').filter(Boolean).sort();
 }
 
 // ---------- userScripts ----------

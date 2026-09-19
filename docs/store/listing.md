@@ -99,7 +99,7 @@ keep.
 PRIVACY
 
 To change a page, the model has to see it. usermods explains exactly what that means before your
-first message ever goes out, and sends it only to the endpoint you configured. Your messages, the
+first message ever goes out, and sends it only to the provider you picked for that chat. Your messages, the
 page's content and screenshots the model asks for go to your model provider; your API keys, tokens
 and mods stay in local extension storage on your device. Nothing is sent to the author of usermods,
 who runs no server. There is no telemetry and no analytics of any kind.

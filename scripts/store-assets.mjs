@@ -161,7 +161,23 @@ async function launch() {
   };
 }
 
+/**
+ * What a CAPTURE seeds in place of the migrated legacy profile.
+ *
+ * The asserting flows all seed the old single-provider shape and let the extension migrate it,
+ * which is the migration's regression test — but it leaves the composer saying "demo" on a provider
+ * called "127.0.0.1:<port>", and that is not what belongs in the README. A capture is pointed at the
+ * same mock, under the name and model a reader would actually see.
+ */
+function captureProviders() {
+  return {
+    connections: { v: 1, list: [{ id: 'capture', kind: 'openai-compatible', label: 'Anthropic', baseUrl: BASE_URL, apiKey: '', extraModels: ['claude-opus-5'] }] },
+    modelChoice: { connectionId: 'capture', model: 'claude-opus-5', label: 'Anthropic' },
+  };
+}
+
 async function openPanel(ctx, extId, { settings = {}, storage = {} } = {}) {
+  storage = { ...captureProviders(), ...storage };
   const page = await ctx.newPage();
   await page.setViewportSize({ width: PANEL.width, height: PANE_H });
   await page.goto(`chrome-extension://${extId}/sidepanel.html`);
@@ -335,6 +351,13 @@ async function shotChat(b, composer) {
   const site = await openSite(b.ctx, WIKI);
   await waitForComposer(panel);
   await runConversation(panel, 'hide the sidebar and make the article full width');
+  // The draft panel and the model line arrive under the transcript after the proposal has already
+  // been scrolled to, which leaves the card's last row behind them. The picture is of the card.
+  await panel.evaluate(() => {
+    const m = document.querySelector('.messages');
+    if (m) m.scrollTop = m.scrollHeight;
+  });
+  await panel.waitForTimeout(200);
 
   const l = tmp('chat-site');
   const r = tmp('chat-panel');

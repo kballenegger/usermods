@@ -1,25 +1,14 @@
-// The build-variant logic: which providers a build offers, and what happens to a profile saved by
-// a build that offered more. The flag itself is a compile-time define, so every function here takes
-// the build mode as an argument and both variants are exercised without a bundler.
+// The build-variant logic: which providers a build offers. The flag itself is a compile-time
+// define, so every function here takes the build mode as an argument and both variants are
+// exercised without a bundler.
 //   npm test
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {
-  FALLBACK_PROVIDER,
-  STORE_BUILD,
-  isSubscriptionProvider,
-  migrateSettingsForBuild,
-  providerAvailable,
-  unavailableProviderMessage,
-} from '../lib/buildflags.ts';
-import { DEFAULT_SETTINGS, type Settings } from '../lib/types.ts';
+import { STORE_BUILD, isSubscriptionProvider, providerAvailable, unavailableProviderMessage } from '../lib/buildflags.ts';
 
-test('the migration fallback stays in step with DEFAULT_SETTINGS', () => {
-  // buildflags cannot import DEFAULT_SETTINGS for a value (the node runner resolves no
-  // extensionless specifiers), so it restates the fallback. This is the guard against drift.
-  assert.equal(FALLBACK_PROVIDER.provider, DEFAULT_SETTINGS.provider);
-  assert.equal(FALLBACK_PROVIDER.model, DEFAULT_SETTINGS.model);
-});
+// What a store build does with a subscription connection saved by the GitHub build — keeps it,
+// marks it unavailable, leaves it out of the picker — is tested with the rest of the connection
+// rules in test/connections.test.ts.
 
 test('the flag defaults to off where __STORE_BUILD__ was never defined', () => {
   // Node runs the TypeScript directly, with no Vite define. An undefined flag must read as a
@@ -54,38 +43,4 @@ test('the unavailable message names the vendor and both ways out', () => {
     assert.match(m, /API key/);
     assert.match(m, /GitHub build/);
   }
-});
-
-// ---------- upgrading into a store build ----------
-
-const chatgptProfile: Settings = { provider: 'chatgpt', baseUrl: '', apiKey: '', model: 'gpt-5-codex', theme: 'light' };
-
-test('a stored subscription profile is migrated to a usable provider in a store build', () => {
-  const migrated = migrateSettingsForBuild(chatgptProfile, true);
-  assert.ok(migrated, 'a subscription profile must be migrated');
-  assert.equal(migrated.provider, DEFAULT_SETTINGS.provider);
-  assert.ok(providerAvailable(migrated.provider, true), 'the result must be a provider this build can create');
-  // The vendor-only model id and base URL would be nonsense against the new provider.
-  assert.equal(migrated.model, DEFAULT_SETTINGS.model);
-  assert.equal(migrated.baseUrl, '');
-  assert.equal(migrated.apiKey, '');
-  // The theme is a presentation choice, unrelated to the provider that was dropped.
-  assert.equal(migrated.theme, chatgptProfile.theme);
-});
-
-test('migration is a no-op for a profile the build can already use', () => {
-  const keyed: Settings = { provider: 'openai-compatible', baseUrl: 'http://localhost:1234/v1', apiKey: 'sk-local', model: 'qwen', theme: 'dark' };
-  assert.equal(migrateSettingsForBuild(keyed, true), null);
-  assert.equal(migrateSettingsForBuild(keyed, false), null);
-});
-
-test('a default build leaves a subscription profile exactly as it was', () => {
-  assert.equal(migrateSettingsForBuild(chatgptProfile, false), null);
-  assert.equal(migrateSettingsForBuild({ ...chatgptProfile, provider: 'xai' }, false), null);
-});
-
-test('migration does not mutate the settings it was given', () => {
-  const before = { ...chatgptProfile };
-  migrateSettingsForBuild(chatgptProfile, true);
-  assert.deepEqual(chatgptProfile, before);
 });

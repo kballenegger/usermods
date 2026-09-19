@@ -71,7 +71,7 @@
 
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
-import { ARTIFACT_V1, ARTIFACT_V2, ARTIFACT_V3, COMPACT_MARKER, EDITMOD_PROMPTS, editModSource, FAST_MARKER, IMAGES_MARKER, RESUME as RESUME_CONV, SLOW_MARKER, SUMMARY_MARKER, VISION as VISION_CONV, WAIT_MARKER } from './mock-llm.mjs';
+import { ARTIFACT_V1, ARTIFACT_V2, ARTIFACT_V3, COMPACT_MARKER, EDITMOD_PROMPTS, editModSource, FAST_MARKER, IMAGES_MARKER, MODELS, RESUME as RESUME_CONV, SLOW_MARKER, SUMMARY_MARKER, VISION as VISION_CONV, WAIT_MARKER } from './mock-llm.mjs';
 import { extDir } from './build-dir.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -115,6 +115,8 @@ const EDITMOD_SHOT = process.argv.includes('--editmod-capture');
 const ARTIFACT_SHOT = process.argv.includes('--artifact-capture');
 const PANELSCOPE = process.argv.includes('--panelscope');
 const RESUME = process.argv.includes('--resume');
+const COMPOSER = process.argv.includes('--composer');
+const MODELS_FLOW = process.argv.includes('--models');
 
 /**
  * Where the tab bar's captures go when --tabbar is asked to write them (`--tabbar-capture`). These
@@ -133,12 +135,14 @@ const STYLEGUIDE = process.argv.includes('--styleguide');
  * that needs re-shooting on its own after a setting is added.
  */
 const SETTINGS_SHOT = process.argv.includes('--settings-capture');
+/** Rewrite 12-model-picker.png alone, for the same reason. */
+const PICKER_SHOT = process.argv.includes('--picker-capture');
 
 /** True when this run is capturing screenshots rather than asserting behaviour (see MASK below). */
 const CAPTURING =
   !SMOKE && !CHATS && !ISOLATION && !COMPACTION && !DASHBOARD && !DASHBOARD_SHOT && !THEME &&
   !TABBAR && !TABBAR_SHOT && !WAIT && !IMAGES && !VISION && !STYLEGUIDE && !ARTIFACT && !ARTIFACT_SHOT &&
-  !PANELSCOPE && !RESUME && !EDITMOD;
+  !PANELSCOPE && !RESUME && !EDITMOD && !COMPOSER && !MODELS_FLOW;
 // --editmod-capture writes screenshots, so it wears the capture mask (the untested line is an
 // artefact of the automated profile, not of the product; see HIDE_UNTESTED_LINE).
 const CAPTURING_EDITMOD = EDITMOD_SHOT;
@@ -236,7 +240,24 @@ async function launch(colorScheme = 'light') {
  * 'system', so a capture that only set colorScheme would be at the mercy of the default. Pass
  * `settings: { theme: 'light' | 'dark' }` to pin it, or 'system' to exercise the OS path on purpose.
  */
+/**
+ * What a CAPTURE seeds in place of the migrated legacy profile.
+ *
+ * The asserting flows all seed the old single-provider shape and let the extension migrate it,
+ * which is the migration's regression test — but it leaves the composer saying "demo" on a provider
+ * called "127.0.0.1:8791", and that is not what belongs in the README. A capture is pointed at the
+ * same mock, under the name and model a reader would actually see.
+ */
+function captureProviders() {
+  return {
+    connections: { v: 1, list: [{ id: 'capture', kind: 'openai-compatible', label: 'Anthropic', baseUrl: BASE_URL, apiKey: '', extraModels: ['claude-opus-5'] }] },
+    modelChoice: { connectionId: 'capture', model: 'claude-opus-5', label: 'Anthropic' },
+  };
+}
+
 async function openPanel(ctx, extId, { settings = {}, storage = {} } = {}) {
+  // The three --*-capture modes write README images too, from flows that otherwise assert.
+  if (CAPTURING || CAPTURING_EDITMOD || ARTIFACT_SHOT || DASHBOARD_SHOT || TABBAR_SHOT) storage = { ...captureProviders(), ...storage };
   const page = await ctx.newPage();
   await page.goto(`chrome-extension://${extId}/sidepanel.html`);
   await page.evaluate(
@@ -566,12 +587,28 @@ async function editingCapture(theme = 'dark', name = '11-editing.png') {
 async function settings(theme = 'dark', name = '04-settings.png') {
   const b = await launch(theme);
   try {
+    // Three providers, as someone who uses more than one model would have them: a key, a local
+    // server with its list already fetched, and a subscription that is not signed in. The key is a
+    // placeholder in a throwaway profile, and the field masks it anyway.
     const panel = await openPanel(b.ctx, b.extId, {
-      settings: { provider: 'chatgpt', baseUrl: '', apiKey: '', model: '', theme },
+      settings: { theme },
+      storage: {
+        connections: {
+          v: 1,
+          list: [
+            { id: 'cap-anthropic', kind: 'anthropic', label: 'Anthropic', baseUrl: '', apiKey: 'sk-ant-capture-placeholder', extraModels: ['claude-opus-5'], models: { ids: ['claude-haiku-4-5', 'claude-opus-5', 'claude-sonnet-5'], fetchedAt: Date.now() - 4 * 60_000 } },
+            { id: 'cap-ollama', kind: 'openai-compatible', label: 'Ollama', baseUrl: `${CONTROL_BASE}/alt/v1`, apiKey: '', models: { ids: ['qwen3-coder:30b', 'llama3.3:70b'], fetchedAt: Date.now() - 60 * 60_000 } },
+            { id: 'cap-chatgpt', kind: 'chatgpt', label: 'ChatGPT subscription', baseUrl: '', apiKey: '' },
+          ],
+        },
+        modelChoice: { connectionId: 'cap-anthropic', model: 'claude-opus-5', label: 'Anthropic' },
+      },
     });
     await openSite(b.ctx, 'https://en.wikipedia.org/wiki/Common_kingfisher');
     await panel.waitForTimeout(800);
     await panel.locator('[data-action="settings"]').click();
+    // Open the first provider, so the capture shows a provider's form and not only three summaries.
+    await panel.locator('[data-testid="provider-card"][data-connection="cap-anthropic"] [data-testid="provider-toggle"]').click();
     // Assert on the last control in the form rather than waiting a fixed 600ms: it is both the
     // readiness signal and the thing this capture exists to keep in frame.
     await panel.locator('[data-testid="settings-panel-scope"]').waitFor({ timeout: 15_000 });
@@ -585,6 +622,43 @@ async function settings(theme = 'dark', name = '04-settings.png') {
     await panel.setViewportSize({ width: PANEL.width, height: Math.max(PANEL.height, full) });
     // Let the resize settle and the container-query top bar re-lay-out before the shutter.
     await panel.waitForTimeout(400);
+    return await shot(panel, name);
+  } finally {
+    await b.close();
+  }
+}
+
+/**
+ * 12 — the model picker, open over a finished conversation.
+ *
+ * Two providers with their lists already cached (and fresh, so opening the picker fetches nothing):
+ * the capture's "Anthropic", which is the mock, and a second one standing in for a local server,
+ * which is the mock's other prefix. Nothing here can reach a real endpoint.
+ */
+async function modelPickerShot(theme = 'dark', name = '12-model-picker.png') {
+  const b = await launch(theme);
+  try {
+    const now = Date.now();
+    const panel = await openPanel(b.ctx, b.extId, {
+      settings: { theme },
+      storage: {
+        connections: {
+          v: 1,
+          list: [
+            { id: 'capture', kind: 'openai-compatible', label: 'Anthropic', baseUrl: BASE_URL, apiKey: '', extraModels: ['claude-opus-5'], models: { ids: ['claude-haiku-4-5', 'claude-opus-5', 'claude-sonnet-5'], fetchedAt: now } },
+            { id: 'capture-local', kind: 'openai-compatible', label: 'Ollama', baseUrl: `${CONTROL_BASE}/alt/v1`, apiKey: '', models: { ids: ['qwen3-coder:30b', 'llama3.3:70b', 'gemma3:27b'], fetchedAt: now } },
+          ],
+        },
+        modelChoice: { connectionId: 'capture', model: 'claude-opus-5', label: 'Anthropic' },
+      },
+    });
+    await openSite(b.ctx, 'https://en.wikipedia.org/wiki/Common_kingfisher');
+    await runConversation(panel, PROMPT, { refreshTitle: true });
+    await panel.locator('[data-testid="model-button"]').click();
+    await panel.locator('[data-testid="model-option"][data-model="qwen3-coder:30b"]').waitFor({ timeout: 10_000 });
+    // Rest the highlight on a model from the OTHER provider: the picture is about switching.
+    await panel.locator('[data-testid="model-option"][data-model="qwen3-coder:30b"]').hover();
+    await panel.waitForTimeout(300);
     return await shot(panel, name);
   } finally {
     await b.close();
@@ -2498,11 +2572,20 @@ function seedChats() {
     ...over,
   });
   const chats = [
+    // Two of the three carry the model they talk to, as any chat that has run since models became a
+    // per-chat choice does; the third is a chat from before, which shows none.
     mk('chat-wiki-1', 'en.wikipedia.org', 'hide the sidebar and widen the article', now - 5 * 60_000, {
       url: 'https://en.wikipedia.org/wiki/Common_kingfisher',
+      model: { connectionId: 'capture', model: 'claude-opus-5', label: 'Anthropic' },
     }),
     mk('chat-wiki-2', 'en.wikipedia.org', 'dim the infobox images', now - 40 * 60_000, {
       url: 'https://en.wikipedia.org/wiki/Common_kingfisher',
+      model: { connectionId: 'capture-local', model: 'qwen3-coder:30b', label: 'Ollama' },
+      // …and it is a chat that edits an installed mod, so the row shows both of the things the index
+      // says about a chat: the model it talks to, and the mod its draft rewrites. The id points at no
+      // seeded mod on purpose (seedMods mints random ids); the badge reads the mirrored name.
+      editingModId: 'seed-editing-none',
+      editingModName: 'Wikipedia: dim infobox images',
     }),
     mk('chat-hn-1', 'news.ycombinator.com', 'make the comment threads readable', now - 2 * 60 * 60_000, {
       url: 'https://news.ycombinator.com/news',
@@ -2528,6 +2611,8 @@ function seedChats() {
 
 /** Open dashboard.html with chats and mods already in storage. */
 async function openDashboard(ctx, extId, { storage = {}, settings = {} } = {}) {
+  // Same rule as openPanel: a capture names its provider the way a reader would see it.
+  if (CAPTURING || DASHBOARD_SHOT) storage = { ...captureProviders(), ...storage };
   const page = await ctx.newPage();
   await page.setViewportSize({ width: 1280, height: 950 });
   await page.goto(`chrome-extension://${extId}/dashboard.html`);
@@ -3679,7 +3764,9 @@ async function imagesFlow() {
   try {
     await clearViolations();
     await fetch(`${CONTROL_BASE}/__requests`, { method: 'DELETE' }).catch(() => {});
-    const panel = await openPanel(b.ctx, b.extId);
+    // This flow writes 08-images-*.png whenever it runs, so its composer wears the capture's
+    // provider names rather than the migrated mock's "demo · 127.0.0.1:<port>".
+    const panel = await openPanel(b.ctx, b.extId, { storage: captureProviders() });
     await openSite(b.ctx, 'https://en.wikipedia.org/wiki/Common_kingfisher');
     await waitForComposer(panel);
 
@@ -3977,6 +4064,643 @@ async function visionFlow() {
 
   console.log(
     'vision: OK — a screenshot reached the model as an image part in the user message after its tool message, a refusing backend was detected once, re-sent immediately without images, explained in the panel and remembered so no later request carried one, zero invalid requests',
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Connected providers and the in-chat model picker
+// ---------------------------------------------------------------------------
+//
+// The owner's words: "a drop-down with the text box listing any models available from connected
+// providers … we select in the conversation itself and we can swap it mid-conversation no problem",
+// and "400 error listing chatgpt models after login". This flow drives all of it in a real panel
+// against the mock, which serves several "providers" on one port told apart by path prefix (see
+// "Endpoints" in scripts/mock-llm.mjs), and reads back from /__requests which endpoint and which
+// model every request actually went to:
+//
+//   1. a profile in the OLD single-provider shape is migrated into one connection, losslessly and
+//      once — which is also what every other flow in this file relies on, since they all still seed
+//      the old shape;
+//   2. a second provider is added through Settings, and one that cannot list its models;
+//   3. the picker lists both providers' models, grouped, and works from the keyboard alone;
+//   4. turn 1 goes to model A; the model is swapped; turn 2 goes to model B on the OTHER endpoint,
+//      carrying turn 1's history, and the mock found nothing invalid in any request;
+//   5. a reload keeps the chat's model;
+//   6. a swap made DURING a run says it applies from the next turn, the running turn finishes on the
+//      model it started with, and the message queued behind it uses the new one;
+//   7. an id typed by hand is usable on the provider that cannot list;
+//   8. removing the provider a chat is on is reported under the composer, not papered over;
+//   9. the whole thing fits a 320px panel;
+//  10. the dashboard shows each chat's model;
+//  11. a ChatGPT-shaped listing: client_version is sent (the mock answers 400 without it, as the real
+//      backend does), hidden models are left out, and a listing that fails falls back to the
+//      built-in list, marked as such. The "sign-in" is a fake token that only the mock ever sees.
+
+const ALT_URL = `${CONTROL_BASE}/alt/v1`;
+const NOLIST_URL = `${CONTROL_BASE}/nolist/v1`;
+
+async function modelButtonText(panel) {
+  return (await panel.locator('[data-testid="model-button"] .model-name').textContent())?.trim() ?? '';
+}
+
+async function openModelPicker(panel) {
+  if (!(await panel.locator('[data-testid="model-pop"]').count())) await panel.locator('[data-testid="model-button"]').click();
+  await panel.locator('[data-testid="model-pop"]').waitFor({ timeout: 10_000 });
+}
+
+/** Pick a model with the mouse: open, wait for the option (a stale listing is fetched on open), click. */
+async function pickModel(panel, connectionId, model) {
+  await openModelPicker(panel);
+  const option = panel.locator(`[data-testid="model-option"][data-connection="${connectionId}"][data-model="${model}"]`);
+  await option.waitFor({ timeout: 15_000 });
+  await option.click();
+  await panel.locator('[data-testid="model-pop"]').waitFor({ state: 'detached', timeout: 10_000 });
+}
+
+async function waitForSaved(panel) {
+  await panel.locator('[data-testid="settings-saved"]', { hasText: 'all changes saved' }).waitFor({ timeout: 10_000 });
+}
+
+/** Add a provider from a preset in Settings, name it and point it somewhere. Returns its id. */
+async function addProvider(panel, preset, name, baseUrl) {
+  const before = await panel.locator('[data-testid="provider-card"]').count();
+  await panel.locator(`[data-testid="add-provider"][data-preset="${preset}"]`).click();
+  await panel.waitForFunction((n) => document.querySelectorAll('[data-testid="provider-card"]').length === n + 1, before, { timeout: 10_000 });
+  const card = panel.locator('[data-testid="provider-card"].open');
+  await card.waitFor({ timeout: 10_000 });
+  await card.locator('[data-testid="provider-name"]').fill(name);
+  await card.locator('[data-testid="provider-base-url"]').fill(baseUrl);
+  await card.locator('[data-testid="provider-base-url"]').blur();
+  await waitForSaved(panel);
+  return card.getAttribute('data-connection');
+}
+
+async function storedProviders(page) {
+  return page.evaluate(async () => {
+    const r = await chrome.storage.local.get(['connections', 'settings', 'modelChoice', 'chats']);
+    return { connections: r.connections ?? null, settings: r.settings ?? null, modelChoice: r.modelChoice ?? null, chats: r.chats ?? [] };
+  });
+}
+
+async function modelsFlow() {
+  const fail = (m) => {
+    throw new Error(`models: ${m}`);
+  };
+  const b = await launch('dark');
+  try {
+    await clearViolations();
+    await clearFaults();
+    await fetch(`${CONTROL_BASE}/__requests`, { method: 'DELETE' }).catch(() => {});
+    await fetch(`${CONTROL_BASE}/__models`, { method: 'DELETE' }).catch(() => {});
+
+    // --- 1. migration ------------------------------------------------------------
+    // openPanel seeds the legacy shape: { provider, baseUrl, apiKey, model, ...prefs } under 'settings'.
+    const panel = await openPanel(b.ctx, b.extId, { settings: { theme: 'dark', images: 'never', contextBudget: 90_000, autoNameChats: true } });
+    await openSite(b.ctx, FIXTURE_URL);
+    await waitForComposer(panel);
+    await panel.locator('[data-testid="model-button"]').waitFor({ timeout: 15_000 });
+
+    const migrated = await storedProviders(panel);
+    const list = migrated.connections?.list ?? [];
+    if (migrated.connections?.v !== 1 || list.length !== 1) fail(`the legacy profile became ${JSON.stringify(migrated.connections)}, expected one connection`);
+    const legacy = list[0];
+    const expectedLegacy = { id: 'legacy', kind: 'openai-compatible', baseUrl: BASE_URL, apiKey: '', images: 'never' };
+    for (const [k, v] of Object.entries(expectedLegacy)) if (legacy[k] !== v) fail(`migrated connection has ${k}=${JSON.stringify(legacy[k])}, expected ${JSON.stringify(v)}`);
+    if (JSON.stringify(legacy.extraModels) !== '["demo"]') fail(`the legacy model was not carried over: ${JSON.stringify(legacy.extraModels)}`);
+    for (const k of ['provider', 'baseUrl', 'apiKey', 'model', 'images']) {
+      if (migrated.settings && k in migrated.settings) fail(`'settings' still holds the legacy field ${k} after the migration`);
+    }
+    if (migrated.settings?.theme !== 'dark' || migrated.settings?.contextBudget !== 90_000) fail(`the global preferences did not survive: ${JSON.stringify(migrated.settings)}`);
+    if (migrated.modelChoice?.connectionId !== 'legacy' || migrated.modelChoice?.model !== 'demo') fail(`the last choice is ${JSON.stringify(migrated.modelChoice)}, expected the legacy model`);
+    if ((await modelButtonText(panel)) !== 'demo') fail(`the composer shows ${JSON.stringify(await modelButtonText(panel))}; a migrated profile should start on its old model`);
+
+    // Idempotent: a reload changes nothing.
+    await reloadPanel(panel);
+    await waitForComposer(panel);
+    const again = await storedProviders(panel);
+    if (JSON.stringify(again.connections) !== JSON.stringify(migrated.connections)) fail('reloading the panel changed the migrated connections');
+
+    // --- 2. providers in Settings --------------------------------------------------
+    await panel.locator('[data-action="settings"]').click();
+    await panel.locator('[data-testid="providers"]').waitFor({ timeout: 15_000 });
+    const legacyCard = panel.locator('[data-testid="provider-card"][data-connection="legacy"]');
+    if ((await legacyCard.getAttribute('data-status')) !== 'connected') fail('the migrated keyless endpoint does not read as connected');
+    const altId = await addProvider(panel, 'Custom OpenAI API', 'Alt mock', ALT_URL);
+    const altCard = panel.locator(`[data-testid="provider-card"][data-connection="${altId}"]`);
+    await panel.waitForFunction((id) => document.querySelector(`[data-testid="provider-card"][data-connection="${id}"]`)?.getAttribute('data-status') === 'connected', altId, { timeout: 10_000 });
+    await altCard.locator('[data-testid="provider-fetch"]').click();
+    await altCard.locator('[data-testid="provider-models-status"]', { hasText: '2 models listed' }).waitFor({ timeout: 15_000 });
+
+    const nolistId = await addProvider(panel, 'Custom OpenAI API', 'No-list', NOLIST_URL);
+    const nolistCard = panel.locator(`[data-testid="provider-card"][data-connection="${nolistId}"]`);
+    await nolistCard.locator('[data-testid="provider-fetch"]').click();
+    // The server's own words, not a bare status.
+    await nolistCard.locator('[data-testid="provider-models-status"]', { hasText: 'Could not list models (404): This server does not list its models.' }).waitFor({ timeout: 15_000 });
+
+    // Two of the same kind, each with its own name; a second Custom did not overwrite the first.
+    const names = await panel.locator('[data-testid="provider-card"] .provider-name').allTextContents();
+    if (names.length !== 3 || !names.includes('Alt mock') || !names.includes('No-list')) fail(`Settings lists ${JSON.stringify(names)}`);
+
+    // --- 3. the picker, from the keyboard ------------------------------------------
+    await panel.locator('[data-view="chat"]').click();
+    await waitForComposer(panel);
+    const button = panel.locator('[data-testid="model-button"]');
+    await button.focus();
+    if ((await button.getAttribute('aria-expanded')) !== 'false') fail('the closed picker does not say aria-expanded=false');
+    if ((await button.getAttribute('aria-haspopup')) !== 'listbox') fail('the picker button does not announce a listbox');
+    await panel.keyboard.press('Enter');
+    await panel.locator('[data-testid="model-pop"]').waitFor({ timeout: 10_000 });
+    // Opening fetches the legacy endpoint's list for the first time (it had never been listed).
+    await panel.locator('[data-testid="model-option"][data-model="demo-mini"]').waitFor({ timeout: 15_000 });
+    const groups = await panel.locator('[data-testid="model-group"]').evaluateAll((els) => els.map((g) => ({ name: g.getAttribute('aria-label'), models: [...g.querySelectorAll('[data-testid="model-option"]')].map((o) => o.getAttribute('data-model')) })));
+    const byName = Object.fromEntries(groups.map((g) => [g.name, g.models]));
+    if (JSON.stringify(byName['Alt mock']) !== '["alt-large","alt-small"]') fail(`the second provider's models are ${JSON.stringify(byName['Alt mock'])}`);
+    const legacyName = groups[0]?.name;
+    if (JSON.stringify(byName[legacyName]) !== '["demo","demo-mini"]') fail(`the first provider's models are ${JSON.stringify(byName[legacyName])}`);
+    if (!('No-list' in byName) || byName['No-list'].length !== 0) fail('a provider that cannot list should still be a (empty) group, so an id can be typed for it');
+
+    const a11y = await panel.evaluate(() => {
+      const input = document.querySelector('[data-testid="model-filter"]');
+      const active = input?.getAttribute('aria-activedescendant');
+      const el = active ? document.getElementById(active) : null;
+      return {
+        focused: document.activeElement === input,
+        role: input?.getAttribute('role'),
+        controls: !!input && !!document.getElementById(input.getAttribute('aria-controls') ?? ''),
+        listRole: document.getElementById(input?.getAttribute('aria-controls') ?? '')?.getAttribute('role'),
+        activeRole: el?.getAttribute('role'),
+        activeModel: el?.getAttribute('data-model'),
+        selected: document.querySelector('[data-testid="model-option"][aria-selected="true"]')?.getAttribute('data-model'),
+      };
+    });
+    if (!a11y.focused) fail('opening the picker did not move focus into its field');
+    if (a11y.role !== 'combobox' || !a11y.controls || a11y.listRole !== 'listbox') fail(`the picker is not a combobox over a listbox: ${JSON.stringify(a11y)}`);
+    if (a11y.activeRole !== 'option' || a11y.activeModel !== 'demo') fail(`the active option on opening is ${JSON.stringify(a11y.activeModel)}; it should be the model in use`);
+    if (a11y.selected !== 'demo') fail('the model in use is not marked aria-selected');
+
+    // Filter by typing, move with the arrows, choose with Enter, all without the mouse.
+    await panel.keyboard.type('alt');
+    await panel.waitForFunction(() => document.querySelectorAll('[data-testid="model-option"]:not(.typed)').length === 2, null, { timeout: 5_000 });
+    await panel.keyboard.press('ArrowDown');
+    const activeNow = await panel.evaluate(() => document.getElementById(document.querySelector('[data-testid="model-filter"]').getAttribute('aria-activedescendant'))?.getAttribute('data-model'));
+    if (activeNow !== 'alt-small') fail(`ArrowDown moved to ${JSON.stringify(activeNow)}, expected alt-small`);
+    await panel.keyboard.press('Escape');
+    await panel.locator('[data-testid="model-pop"]').waitFor({ state: 'detached', timeout: 5_000 });
+    if (!(await panel.evaluate(() => document.activeElement === document.querySelector('[data-testid="model-button"]')))) fail('Escape did not return focus to the picker button');
+    if ((await modelButtonText(panel)) !== 'demo') fail('Escape changed the model');
+
+    // --- 4. turn 1 on model A, swap, turn 2 on model B --------------------------------
+    await sendPrompt(panel, MODELS.turns[0].prompt);
+    await panel.locator('.messages .msg.assistant', { hasText: MODELS.turns[0].done }).waitFor({ timeout: 60_000 });
+    await panel.locator('.composer button.btn.primary', { hasText: 'Send' }).waitFor({ timeout: 30_000 });
+    if (await panel.locator('[data-testid="model-marker"]').count()) fail('a chat that has not changed model shows a "switched to" marker');
+
+    // The swap, by keyboard this time: open, filter, Enter.
+    await button.focus();
+    await panel.keyboard.press('ArrowDown');
+    await panel.locator('[data-testid="model-pop"]').waitFor({ timeout: 10_000 });
+    await panel.keyboard.type('alt-large');
+    await panel.waitForFunction(() => document.querySelector('[data-testid="model-option"].active')?.getAttribute('data-model') === 'alt-large', null, { timeout: 5_000 });
+    await panel.keyboard.press('Enter');
+    await panel.locator('[data-testid="model-pop"]').waitFor({ state: 'detached', timeout: 5_000 });
+    if ((await modelButtonText(panel)) !== 'alt-large') fail(`after the swap the composer shows ${JSON.stringify(await modelButtonText(panel))}`);
+    if (await panel.locator('[data-testid="model-note"]').count()) fail('a swap made while nothing is running should say nothing about waiting');
+
+    await sendPrompt(panel, MODELS.turns[1].prompt);
+    await panel.locator('.messages .msg.assistant', { hasText: MODELS.turns[1].done }).waitFor({ timeout: 60_000 });
+    await panel.locator('.composer button.btn.primary', { hasText: 'Send' }).waitFor({ timeout: 30_000 });
+
+    const markers = await panel.locator('[data-testid="model-marker"]').allTextContents();
+    if (markers.length !== 1 || !/switched to alt-large · Alt mock/.test(markers[0])) fail(`the transcript's model markers are ${JSON.stringify(markers)}`);
+
+    const turn1 = await requestsFor('models-1');
+    const turn2 = await requestsFor('models-2');
+    if (turn1.length !== 2 || turn2.length !== 2) fail(`expected two requests per turn, saw ${turn1.length} and ${turn2.length}`);
+    for (const r of turn1) if (r.endpoint !== '/v1' || r.model !== 'demo') fail(`a turn-1 request went to ${r.endpoint} as ${r.model}; it should be /v1 as demo`);
+    for (const r of turn2) if (r.endpoint !== '/alt/v1' || r.model !== 'alt-large') fail(`a turn-2 request went to ${r.endpoint} as ${r.model}; it should be /alt/v1 as alt-large`);
+    // Model B got model A's turn: the prompt, the tool call and its result, converted for it.
+    const carried = turn2[0].messages ?? [];
+    if (!carried.some((m) => m.role === 'user' && String(messageTextOf(m)).includes('MODELSPROMPT-1'))) fail('the second model was not sent the first turn');
+    if (!carried.some((m) => m.role === 'assistant' && (m.tool_calls ?? []).some((c) => c.function?.name === 'get_page'))) fail("the first model's tool call was not carried to the second");
+    if (!carried.some((m) => m.role === 'tool')) fail("the first model's tool result was not carried to the second");
+    await assertNoViolations('models (swap between turns)');
+
+    // --- 5. a reload keeps the chat's model -----------------------------------------
+    await reloadPanel(panel);
+    await waitForComposer(panel);
+    await panel.locator('.messages .msg.assistant', { hasText: MODELS.turns[1].done }).waitFor({ timeout: 20_000 });
+    await panel.waitForFunction(() => document.querySelector('[data-testid="model-button"] .model-name')?.textContent?.trim() === 'alt-large', null, { timeout: 10_000 });
+    const afterReload = await storedProviders(panel);
+    const chat = afterReload.chats[0];
+    if (chat?.model?.connectionId !== altId || chat?.model?.model !== 'alt-large') fail(`the chat's stored model is ${JSON.stringify(chat?.model)}`);
+    if (afterReload.modelChoice?.model !== 'alt-large') fail(`the last choice is ${JSON.stringify(afterReload.modelChoice)}; a new chat should default to alt-large`);
+    if ((await panel.locator('[data-testid="model-marker"]').count()) !== 1) fail('the model marker did not survive the reload');
+
+    // --- 6. a swap DURING a run ------------------------------------------------------
+    await sendPrompt(panel, MODELS.turns[2].prompt);
+    await panel.locator('.composer button.btn.primary', { hasText: 'Queue' }).waitFor({ timeout: 10_000 });
+    await waitForRequests('models-3', 1);
+    await pickModel(panel, 'legacy', 'demo-mini');
+    const note = panel.locator('[data-testid="model-note"]');
+    await note.waitFor({ timeout: 5_000 });
+    if (!/next turn/i.test((await note.textContent()) ?? '')) fail(`a mid-run swap says ${JSON.stringify(await note.textContent())}`);
+    // Queued behind the run, after the swap: it must use the model selected when IT starts.
+    await panel.locator('textarea').fill(MODELS.turns[3].prompt);
+    await panel.locator('.composer button.btn.primary').click();
+    await panel.locator('.messages .msg.assistant', { hasText: MODELS.turns[3].done }).waitFor({ timeout: 90_000 });
+    await panel.locator('.composer button.btn.primary', { hasText: 'Send' }).waitFor({ timeout: 30_000 });
+    const turn3 = await requestsFor('models-3');
+    const turn4 = await requestsFor('models-4');
+    if (turn3.length !== 1 || turn3[0].model !== 'alt-large' || turn3[0].endpoint !== '/alt/v1') fail(`the turn that was already running went to ${turn3[0]?.endpoint} as ${turn3[0]?.model}; it should have finished on alt-large`);
+    if (turn4.length !== 1 || turn4[0].model !== 'demo-mini' || turn4[0].endpoint !== '/v1') fail(`the queued turn went to ${turn4[0]?.endpoint} as ${turn4[0]?.model}; it should use the swapped-to demo-mini`);
+    if (await note.count()) fail('the "applies from the next turn" note is still showing after the next turn ran');
+    const markers2 = await panel.locator('[data-testid="model-marker"]').allTextContents();
+    if (markers2.length !== 2 || !/switched to demo-mini/.test(markers2[1])) fail(`after the mid-run swap the markers are ${JSON.stringify(markers2)}`);
+    await assertNoViolations('models (swap during a run)');
+
+    // --- 7. an id typed by hand, on the provider that cannot list ----------------------
+    await openModelPicker(panel);
+    await panel.locator('[data-testid="model-filter"]').fill('my-finetune');
+    const typedOption = panel.locator(`[data-testid="model-option"].typed[data-connection="${nolistId}"]`);
+    await typedOption.waitFor({ timeout: 5_000 });
+    if (!/Use “my-finetune” on No-list/.test((await typedOption.textContent()) ?? '')) fail(`the typed-id option reads ${JSON.stringify(await typedOption.textContent())}`);
+    await typedOption.click();
+    if ((await modelButtonText(panel)) !== 'my-finetune') fail('a typed model id was not selected');
+    await panel.waitForFunction(
+      async (id) => ((await chrome.storage.local.get('connections')).connections?.list ?? []).find((c) => c.id === id)?.extraModels?.includes('my-finetune'),
+      nolistId,
+      { timeout: 10_000 },
+    );
+
+    // --- 8. the chat's provider is removed ---------------------------------------------
+    await pickModel(panel, altId, 'alt-small');
+    await panel.locator('[data-action="settings"]').click();
+    const doomed = panel.locator(`[data-testid="provider-card"][data-connection="${altId}"]`);
+    await doomed.locator('[data-testid="provider-toggle"]').click();
+    await doomed.locator('[data-testid="provider-remove"]').click();
+    await doomed.locator('[data-testid="provider-remove-confirm"]').click();
+    await doomed.waitFor({ state: 'detached', timeout: 10_000 });
+    await panel.locator('[data-view="chat"]').click();
+    await waitForComposer(panel);
+    const problem = panel.locator('[data-testid="model-note"].problem');
+    await problem.waitFor({ timeout: 10_000 });
+    const said = (await problem.textContent()) ?? '';
+    if (!/Alt mock/.test(said) || !/was removed/.test(said) || !/Pick another model/.test(said)) fail(`with its provider removed the composer says ${JSON.stringify(said)}`);
+    if ((await modelButtonText(panel)) !== 'Pick a model') fail(`the picker button says ${JSON.stringify(await modelButtonText(panel))}; it must not show another provider's model`);
+    await panel.locator('textarea').fill('this must not be sent anywhere');
+    if (!(await panel.locator('.composer button.btn.primary').isDisabled())) fail('Send is enabled with no usable model');
+    const beforeCount = (await fetchRequests()).length;
+    await panel.locator('textarea').press('Enter');
+    await panel.waitForTimeout(800);
+    if ((await fetchRequests()).length !== beforeCount) fail('a message was sent although the chat had no usable model — it fell back to another provider');
+    if ((await panel.locator('textarea').inputValue()) !== 'this must not be sent anywhere') fail('the unsent message was lost');
+    await panel.locator('textarea').fill('');
+    await pickModel(panel, 'legacy', 'demo');
+    if (await problem.count()) fail('the problem line did not clear after picking a usable model');
+
+    // --- 9. 320px -----------------------------------------------------------------------
+    await panel.setViewportSize({ width: 320, height: PANEL.height });
+    await panel.waitForTimeout(250);
+    await openModelPicker(panel);
+    const narrow = await panel.evaluate(() => {
+      const rect = (sel) => {
+        const r = document.querySelector(sel)?.getBoundingClientRect();
+        return r ? { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width } : null;
+      };
+      const comp = document.querySelector('.composer');
+      return {
+        pop: rect('[data-testid="model-pop"]'),
+        button: rect('[data-testid="model-button"]'),
+        bar: rect('.tabs'),
+        composerOverflows: comp.scrollWidth > comp.clientWidth + 1,
+        pageOverflows: document.documentElement.scrollWidth > window.innerWidth + 1,
+        popClips: (() => {
+          const list = document.querySelector('.model-list');
+          return list.scrollWidth > list.clientWidth + 1;
+        })(),
+      };
+    });
+    if (!narrow.pop || narrow.pop.left < 0 || narrow.pop.right > 320) fail(`at 320px the popover spans ${narrow.pop?.left}–${narrow.pop?.right}`);
+    if (narrow.pop.top < (narrow.bar?.bottom ?? 0) - 1) fail(`at 320px the popover's top (${narrow.pop.top}) runs under the tab bar (${narrow.bar?.bottom})`);
+    if (narrow.pop.bottom > narrow.button.top + 1) fail('the popover does not open upward from its button');
+    if (narrow.button.right > 320 || narrow.button.left < 0) fail(`at 320px the picker button spans ${narrow.button.left}–${narrow.button.right}`);
+    if (narrow.composerOverflows || narrow.pageOverflows || narrow.popClips) fail(`at 320px something overflows sideways: ${JSON.stringify(narrow)}`);
+    if (Math.round(narrow.bar.top) !== 0) fail('at 320px the tab bar has moved');
+    await panel.keyboard.press('Escape');
+    await panel.setViewportSize(PANEL);
+
+    // --- 10. the dashboard ----------------------------------------------------------------
+    const dash = await b.ctx.newPage();
+    await dash.goto(`chrome-extension://${b.extId}/dashboard.html`);
+    const rowModel = dash.locator('[data-testid="chat-model"]').first();
+    await rowModel.waitFor({ timeout: 20_000 });
+    if (((await rowModel.textContent()) ?? '').trim() !== 'demo') fail(`the dashboard's chat row shows the model as ${JSON.stringify(await rowModel.textContent())}`);
+    const overviewLine = ((await dash.locator('[data-testid="overview-providers"]').textContent()) ?? '').trim();
+    if (!/connected$/.test(overviewLine)) fail(`the dashboard's provider line reads ${JSON.stringify(overviewLine)}`);
+    await dash.locator('[data-testid="chat-title"]').first().click();
+    const prevModels = dash.locator('[data-testid="prev-model"]');
+    await prevModels.first().waitFor({ timeout: 15_000 });
+    const prevTexts = await prevModels.allTextContents();
+    if (prevTexts.length !== 3 || !/^model: demo/.test(prevTexts[0]) || !/switched to alt-large/.test(prevTexts[1]) || !/switched to demo-mini/.test(prevTexts[2])) {
+      fail(`the dashboard's transcript preview shows the models as ${JSON.stringify(prevTexts)}`);
+    }
+    await dash.close();
+
+    // --- 11. a ChatGPT-shaped listing ---------------------------------------------------
+    // A subscription connection pointed at the mock, and a token only the mock will ever see.
+    await panel.evaluate(
+      async ([codex]) => {
+        const r = await chrome.storage.local.get('connections');
+        const list = r.connections.list.filter((c) => c.kind !== 'chatgpt');
+        list.push({ id: 'mock-chatgpt', kind: 'chatgpt', label: 'ChatGPT subscription', baseUrl: codex, apiKey: '' });
+        await chrome.storage.local.set({
+          connections: { v: 1, list },
+          'oauth:chatgpt': { access: 'mock-access-token', refresh: 'mock-refresh-token', expiresAt: Date.now() + 86_400_000, accountId: 'mock-account', label: 'mock@example.test' },
+        });
+      },
+      [`${CONTROL_BASE}/codex`],
+    );
+    await panel.locator('[data-action="settings"]').click();
+    const gptCard = panel.locator('[data-testid="provider-card"][data-connection="mock-chatgpt"]');
+    await gptCard.waitFor({ timeout: 10_000 });
+    await panel.waitForFunction(() => document.querySelector('[data-testid="provider-card"][data-connection="mock-chatgpt"]')?.getAttribute('data-status') === 'connected', null, { timeout: 10_000 });
+    await gptCard.locator('[data-testid="provider-toggle"]').click();
+    await gptCard.locator('[data-testid="provider-fetch"]').click();
+    await gptCard.locator('[data-testid="provider-models-status"]', { hasText: '2 models listed' }).waitFor({ timeout: 15_000 });
+    const listings = (await (await fetch(`${CONTROL_BASE}/__models`)).json()).listings.filter((l) => l.endpoint === '/codex');
+    const asked = listings[listings.length - 1];
+    if (!asked) fail('the ChatGPT listing never reached the mock');
+    if (!/[?&]client_version=\d+\.\d+\.\d+(&|$)/.test(asked.query)) fail(`the ChatGPT listing was sent as ${JSON.stringify(asked.query)}, without client_version — the real backend answers that with a 400`);
+    if (asked.headers.authorization !== 'present' || asked.headers['chatgpt-account-id'] !== 'mock-account') fail(`the ChatGPT listing's headers were ${JSON.stringify(asked.headers)}`);
+    if (asked.headers['openai-beta']) fail('the ChatGPT listing carried the Responses beta header, which the CLI does not send to /models');
+    const cachedGpt = (await storedProviders(panel)).connections.list.find((c) => c.id === 'mock-chatgpt');
+    if (JSON.stringify(cachedGpt.models?.ids) !== '["mock-gpt-top","mock-gpt-mid"]') fail(`the Codex catalog was read as ${JSON.stringify(cachedGpt.models?.ids)}; expected priority order with the hidden model left out`);
+
+    // The listing fails: the built-in list, marked, with the server's reason.
+    await panel.evaluate(
+      async ([down]) => {
+        const r = await chrome.storage.local.get('connections');
+        await chrome.storage.local.set({ connections: { v: 1, list: r.connections.list.map((c) => (c.id === 'mock-chatgpt' ? { ...c, baseUrl: down, models: undefined } : c)) } });
+      },
+      [`${CONTROL_BASE}/codex-down`],
+    );
+    await gptCard.locator('[data-testid="provider-fetch"]').click();
+    const downLine = gptCard.locator('[data-testid="provider-models-status"]', { hasText: 'Could not list models (400): The catalog is unavailable for this account.' });
+    await downLine.waitFor({ timeout: 15_000 });
+    if (!/built-in list/i.test((await downLine.textContent()) ?? '')) fail(`a failed ChatGPT listing says ${JSON.stringify(await downLine.textContent())}, with no word about the built-in list`);
+    await panel.locator('[data-view="chat"]').click();
+    await waitForComposer(panel);
+    await openModelPicker(panel);
+    const gptGroup = panel.locator('[data-testid="model-group"][data-connection="mock-chatgpt"]');
+    await gptGroup.locator('.model-group-meta', { hasText: 'built-in list' }).waitFor({ timeout: 15_000 });
+    if ((await gptGroup.locator('[data-testid="model-option"]').count()) < 3) fail('a failed ChatGPT listing left the picker with nothing to offer');
+    await panel.keyboard.press('Escape');
+  } finally {
+    await clearFaults();
+    await b.close();
+  }
+  console.log(
+    'models: OK — a legacy single-provider profile migrated into one connection (losslessly, once), two more providers were added in Settings and fetched their own lists (one reporting the server\'s own 404 message), the picker listed both providers\' models grouped and worked from the keyboard (combobox/listbox, arrows, Enter, Escape returning focus), turn 1 went to /v1 as demo and turn 2 to /alt/v1 as alt-large with the first turn\'s tool call and result carried over, the selection survived a reload on the chat, a swap during a run said it applies from the next turn while the running turn finished on alt-large and the queued one used demo-mini, a typed id was usable on the provider that cannot list, removing the chat\'s provider was reported and nothing was sent, it all fit 320px, the dashboard showed the models, a ChatGPT-shaped listing sent client_version and dropped the hidden model, a failed one fell back to the marked built-in list, zero invalid requests',
+  );
+}
+
+/** A recorded chat-completions message's text, whichever of the two content shapes it has. */
+function messageTextOf(m) {
+  if (typeof m.content === 'string') return m.content;
+  if (Array.isArray(m.content)) return m.content.map((p) => (p.type === 'text' ? p.text : '')).join('\n');
+  return '';
+}
+
+// ---------------------------------------------------------------------------
+// The composer grows with its text
+// ---------------------------------------------------------------------------
+//
+// The owner's words: "the text box grows instead of overflowing for long messages". The box is
+// sized by CSS alone (`field-sizing: content`, see .composer textarea in styles.css), so this flow
+// is the only thing that would notice a browser, or a stylesheet change, quietly turning it back
+// into a fixed 64px well. It measures the real element in a real panel:
+//
+//   * empty: the minimum height;
+//   * a few lines: taller, and NOT scrolling inside — that is "grows instead of overflowing";
+//   * a very long paste: stops at the cap (about ten lines, or 40% of the panel), scrolls inside,
+//     and the tab bar is still on screen and the page itself has not started scrolling;
+//   * the same with an @element chip and an image chip above the box, and on a short panel, where
+//     the 40% half of the cap is the one that binds;
+//   * a draft left in one chat is as tall as it was when you come back to it;
+//   * Shift+Enter adds a line and Enter sends, and a send puts the box back to the minimum.
+
+const COMPOSER_MIN = 64;
+/** The line half of the cap. The stylesheet computes 10 × line-height + padding + borders. */
+const COMPOSER_LINES_CAP = 10;
+
+async function composerBox(panel) {
+  return panel.evaluate(() => {
+    const ta = document.querySelector('.composer textarea');
+    const cs = getComputedStyle(ta);
+    const bar = document.querySelector('.tabs').getBoundingClientRect();
+    const comp = document.querySelector('.composer').getBoundingClientRect();
+    const msgs = document.querySelector('.messages').getBoundingClientRect();
+    return {
+      height: Math.round(ta.getBoundingClientRect().height),
+      scrolls: ta.scrollHeight > ta.clientHeight + 1,
+      lineHeight: parseFloat(cs.lineHeight),
+      padding: parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth),
+      fieldSizing: cs.fieldSizing,
+      barTop: Math.round(bar.top),
+      composerBottom: Math.round(comp.bottom),
+      messagesHeight: Math.round(msgs.height),
+      viewport: window.innerHeight,
+      pageScrolls: document.documentElement.scrollHeight > window.innerHeight + 1,
+    };
+  });
+}
+
+async function composerFlow() {
+  const fail = (m) => {
+    throw new Error(`composer: ${m}`);
+  };
+  let queuedChecked = false;
+  const b = await launch('dark');
+  try {
+    await clearViolations();
+    const panel = await openPanel(b.ctx, b.extId, { settings: { theme: 'dark' } });
+    const site = await openSite(b.ctx, FIXTURE_URL);
+    await waitForComposer(panel);
+    const ta = panel.locator('.composer textarea');
+
+    /** The shell holds: the tab bar is on screen, the composer ends inside the panel, nothing scrolls the page. */
+    const assertShell = (box, at) => {
+      if (box.barTop !== 0) fail(`${at}: the tab bar's top edge is at ${box.barTop}px, so it has been pushed out of view`);
+      if (box.composerBottom > box.viewport) fail(`${at}: the composer ends at ${box.composerBottom}px in a ${box.viewport}px panel`);
+      if (box.pageScrolls) fail(`${at}: the panel document itself scrolls; the shell is meant to be height:100% / overflow:hidden`);
+    };
+
+    // --- empty ---------------------------------------------------------------
+    const empty = await composerBox(panel);
+    if (empty.fieldSizing !== 'content') fail(`field-sizing computed to ${JSON.stringify(empty.fieldSizing)}; this Chromium does not size the box from its content`);
+    if (empty.height !== COMPOSER_MIN) fail(`the empty composer is ${empty.height}px, expected the ${COMPOSER_MIN}px minimum`);
+    const cap = Math.round(Math.min(0.4 * empty.viewport, COMPOSER_LINES_CAP * empty.lineHeight + empty.padding));
+
+    // --- a few lines: grows, does not scroll ----------------------------------
+    await ta.fill(['first line', 'second line', 'third line', 'fourth line', 'fifth line'].join('\n'));
+    const five = await composerBox(panel);
+    if (five.height <= COMPOSER_MIN) fail(`five lines left the box at ${five.height}px; it did not grow`);
+    if (five.scrolls) fail(`five lines scroll inside a ${five.height}px box; it should have grown to fit them`);
+    if (five.height >= cap) fail(`five lines already reached the ${cap}px cap (${five.height}px)`);
+    assertShell(five, 'five lines');
+
+    // --- one long paragraph: grows by wrapping too ------------------------------
+    await ta.fill('a sentence that goes on for a while and wraps at the edge of the box, '.repeat(4));
+    const wrapped = await composerBox(panel);
+    if (wrapped.height <= COMPOSER_MIN || wrapped.scrolls) fail(`a wrapping paragraph gave a ${wrapped.height}px box (scrolls: ${wrapped.scrolls})`);
+
+    // --- a very long message, pasted: capped, scrolls inside ---------------------
+    const long = Array.from({ length: 80 }, (_, i) => `line ${i + 1} of a very long pasted message`).join('\n');
+    await ta.fill('');
+    await ta.focus();
+    // A real paste: the clipboard path the browser takes, not a value assignment.
+    await b.ctx.grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => {});
+    const pasted = await panel
+      .evaluate(async (text) => {
+        try {
+          await navigator.clipboard.writeText(text);
+          return true;
+        } catch {
+          return false;
+        }
+      }, long)
+      .catch(() => false);
+    if (pasted) await panel.keyboard.press('ControlOrMeta+V');
+    // A background tab is not always allowed the clipboard; the measurement is the same either way.
+    if ((await ta.inputValue()).length < long.length) await ta.fill(long);
+    const capped = await composerBox(panel);
+    if (Math.abs(capped.height - cap) > 1) fail(`80 lines gave a ${capped.height}px box; the cap is ${cap}px`);
+    if (!capped.scrolls) fail('80 lines do not scroll inside the capped box, so some of the message cannot be reached');
+    if (capped.messagesHeight < 120) fail(`the transcript was squeezed to ${capped.messagesHeight}px by the composer`);
+    assertShell(capped, '80 lines');
+
+    // --- with chips above the box ----------------------------------------------
+    await pasteImage(panel, { w: 640, h: 360, bg: '#224', fg: '#446', label: 'mock', name: 'mock.png' });
+    await waitForThumbs(panel, 1);
+    await panel.locator('.composer button.btn', { hasText: 'Point at element' }).click();
+    await panel.waitForTimeout(400);
+    const target = site.locator('h1, p, div').first();
+    const tb = await target.boundingBox();
+    if (!tb) fail('the fixture page has nothing to point at');
+    await site.mouse.move(tb.x + 4, tb.y + 4);
+    await site.waitForTimeout(250);
+    await site.mouse.click(tb.x + 4, tb.y + 4);
+    await panel.locator('.composer .chip.ref').first().waitFor({ timeout: 10_000 });
+    const chips = await composerBox(panel);
+    if (Math.abs(chips.height - cap) > 1) fail(`with chips above it the capped box is ${chips.height}px, expected ${cap}px`);
+    if (!/@[\w.#-]+/.test(await ta.inputValue())) fail('pointing at an element did not put its @token in the message');
+    assertShell(chips, 'chips + 80 lines');
+
+    // --- a short panel: 40% is the binding half of the cap ---------------------
+    await panel.setViewportSize({ width: PANEL.width, height: 420 });
+    await panel.waitForTimeout(200);
+    const short = await composerBox(panel);
+    const shortCap = Math.round(0.4 * 420);
+    if (Math.abs(short.height - shortCap) > 1) fail(`on a 420px panel the box is ${short.height}px; 40% of the panel is ${shortCap}px`);
+    if (short.barTop !== 0) fail(`on a 420px panel the tab bar's top edge is at ${short.barTop}px`);
+    if (short.pageScrolls) fail('on a 420px panel the panel document scrolls');
+
+    // --- and the narrowest panel the tab bar supports --------------------------
+    await panel.setViewportSize({ width: 320, height: PANEL.height });
+    await panel.waitForTimeout(200);
+    const narrow = await composerBox(panel);
+    if (Math.abs(narrow.height - cap) > 1) fail(`at 320px wide the capped box is ${narrow.height}px, expected ${cap}px`);
+    assertShell(narrow, '320px wide');
+    const overflowX = await panel.evaluate(() => {
+      const c = document.querySelector('.composer');
+      return c.scrollWidth > c.clientWidth + 1;
+    });
+    if (overflowX) fail('at 320px wide the composer overflows sideways');
+    await panel.setViewportSize(PANEL);
+    await panel.waitForTimeout(200);
+
+    // --- keyboard: Shift+Enter is a newline, Enter sends ------------------------
+    await panel.locator('.composer .chip.ref .chip-x').click();
+    await panel.locator('.composer .attach button').first().click().catch(() => {});
+    await ta.fill('hide the promo banner on this page');
+    await ta.press('Shift+Enter');
+    await ta.pressSequentially('and keep the footer');
+    const value = await ta.inputValue();
+    if (!/page\nand keep/.test(value)) fail(`Shift+Enter did not add a line: ${JSON.stringify(value)}`);
+    if ((await panel.locator('.messages .msg.user').count()) !== 0) fail('Shift+Enter sent the message');
+    await ta.press('Enter');
+    await panel.locator('.messages .msg.user').first().waitFor({ timeout: 10_000 });
+
+    // --- shrinks back after the send --------------------------------------------
+    const after = await composerBox(panel);
+    if ((await ta.inputValue()) !== '') fail('the composer still holds text after Enter');
+    if (after.height !== COMPOSER_MIN) fail(`after sending, the box is ${after.height}px rather than back at ${COMPOSER_MIN}px`);
+
+    // --- the queued state: a long message queued behind a run shrinks the box too ---
+    // Only while the first turn is still running, which depends on how fast the host is; the OK
+    // line says whether it was.
+    const busy = await panel.locator('.composer button.btn.primary', { hasText: 'Queue' }).count();
+    if (busy) {
+      await ta.fill(['also, while you are there', 'make the heading smaller', 'and the links grey'].join('\n'));
+      await ta.press('Enter');
+      const queuedBox = await composerBox(panel);
+      queuedChecked = true;
+      if (queuedBox.height !== COMPOSER_MIN) fail(`after queueing, the box is ${queuedBox.height}px rather than ${COMPOSER_MIN}px`);
+    }
+    await panel.locator('.composer button.btn.primary', { hasText: 'Send' }).waitFor({ timeout: 90_000 });
+
+    // --- with the draft panel and the EDITING line above the box ----------------------
+    // The first turn proposed a mod, so the draft panel is pinned above the composer; saving it links
+    // the draft to an installed mod, which adds the "Editing <name>" line under it. That is the most
+    // furniture the composer ever has over it, and the cap has to hold under all of it.
+    await panel.locator('[data-testid="artifact-save"]').click();
+    await panel.locator('[data-testid="artifact-editing"]').waitFor({ timeout: 15_000 });
+    await ta.fill(long);
+    const furnished = await composerBox(panel);
+    if (Math.abs(furnished.height - cap) > 1) fail(`under the draft panel and the EDITING line the capped box is ${furnished.height}px, expected ${cap}px`);
+    if (!furnished.scrolls) fail('under the draft panel the long message does not scroll inside the box');
+    assertShell(furnished, 'draft panel + EDITING line + 80 lines');
+    for (const width of [320, 360]) {
+      await panel.setViewportSize({ width, height: PANEL.height });
+      await panel.waitForTimeout(200);
+      const at = await composerBox(panel);
+      if (Math.abs(at.height - cap) > 1) fail(`at ${width}px with the draft panel and the EDITING line the box is ${at.height}px, expected ${cap}px`);
+      assertShell(at, `${width}px with draft panel + EDITING line`);
+      const clipped = await panel.evaluate(() => {
+        const out = [];
+        for (const sel of ['.composer', '[data-testid="model-line"]', '[data-testid="artifact-editing"]', '[data-testid="artifact"]']) {
+          const el = document.querySelector(sel);
+          if (!el) continue;
+          const r = el.getBoundingClientRect();
+          if (r.left < 0 || r.right > window.innerWidth + 0.5 || el.scrollWidth > el.clientWidth + 1) out.push(`${sel} ${Math.round(r.left)}–${Math.round(r.right)} scroll ${el.scrollWidth}/${el.clientWidth}`);
+        }
+        return out;
+      });
+      if (clipped.length) fail(`at ${width}px something is clipped or overflows sideways: ${clipped.join('; ')}`);
+    }
+    await panel.setViewportSize(PANEL);
+    await panel.waitForTimeout(200);
+
+    // --- a draft that comes back at the height it was left -----------------------
+    await ta.fill(long);
+    const draftTall = (await composerBox(panel)).height;
+    await startNewChat(panel);
+    const fresh = await composerBox(panel);
+    if (fresh.height !== COMPOSER_MIN) fail(`a new chat's empty composer is ${fresh.height}px; the previous chat's draft leaked into its size`);
+    // Back to the chat the draft was left in: the first live chat in the switcher.
+    const firstChat = await panel.locator('.chatbar select option').nth(1).getAttribute('value');
+    await panel.locator('.chatbar select').selectOption(firstChat);
+    await panel.waitForFunction((want) => document.querySelector('.composer textarea')?.value.length === want, long.length, { timeout: 10_000 });
+    const restored = await composerBox(panel);
+    if (restored.height !== draftTall) fail(`the restored draft is in a ${restored.height}px box; it was ${draftTall}px when it was left`);
+    assertShell(restored, 'restored draft');
+
+    await assertNoViolations('composer');
+  } finally {
+    await b.close();
+  }
+  console.log(
+    `composer: OK — the box is 64px empty, grows with typed, wrapped and pasted text without scrolling inside, stops at min(10 lines, 40% of the panel) and scrolls from there, holds that cap under reference and image chips, under the draft panel and the EDITING line at 320, 360 and 420px wide, on a 420px-tall panel, never moves the tab bar or scrolls the page, takes Shift+Enter as a newline and Enter as send, returns to 64px after a send${queuedChecked ? ' and after a queue' : ''}, and restores a draft at the height it was left`,
   );
 }
 
@@ -4291,7 +5015,7 @@ async function resumeFlow() {
     await panel.locator('.messages .msg.assistant', { hasText: D.done }).waitFor({ timeout: 45_000 });
     await panel.locator('.activity').waitFor({ state: 'detached', timeout: 20_000 }).catch(() => {});
     const textD = await transcriptText(panel);
-    if (/reconnected/.test(textD)) fail('d. the panel claimed output was not captured, but the background had kept all of it');
+    if (/reconnected|are not shown here/.test(textD)) fail('d. the panel claimed rows were missing, but the background had kept all of them');
     if ((textD.match(/Now the heading\./g) ?? []).length !== 1) fail(`d. the reply streamed while the panel was closed appears ${(textD.match(/Now the heading\./g) ?? []).length} times`);
     if (await panel.locator('[data-testid="resume"]').count()) fail('d. Resume was offered for a run that simply finished');
     const reqD = await requestsFor('resume-close');
@@ -4372,6 +5096,18 @@ async function main() {
       await resumeFlow();
       return;
     }
+    if (COMPOSER) {
+      await composerFlow();
+      return;
+    }
+    if (MODELS_FLOW) {
+      await modelsFlow();
+      return;
+    }
+    if (PICKER_SHOT) {
+      await modelPickerShot('dark', '12-model-picker.png');
+      return;
+    }
     if (SETTINGS_SHOT) {
       await settings('dark', '04-settings.png');
       await settings('light', '04-settings-light.png');
@@ -4414,6 +5150,8 @@ async function main() {
       await artifactFlow();
       await editModFlow();
       await resumeFlow();
+      await composerFlow();
+      await modelsFlow();
       return;
     }
     // The dark set: the design system's own palette, and what the README leads with.
@@ -4430,6 +5168,7 @@ async function main() {
     await chatProposal('light', '01-chat-proposal-light.png');
     await mods('light', '03-mods-light.png');
     await settings('light', '04-settings-light.png');
+    await modelPickerShot('dark', '12-model-picker.png');
 
     const files = fs.readdirSync(OUT_DIR).filter((f) => f.endsWith('.png')).sort();
     log(`wrote ${files.length} screenshots to docs/screenshots/`);

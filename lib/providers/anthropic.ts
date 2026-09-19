@@ -6,32 +6,87 @@ import type { Provider, ProviderResponse } from './types';
 /** Models that accept adaptive thinking. Older ones (Haiku 4.5, 3.x) reject it. */
 const ADAPTIVE_THINKING = /(opus-5|sonnet-5|fable-5|mythos-5|opus-4-[678]|sonnet-4-6)/;
 
-/** Exported for test/compact.test.ts, which asserts that a compacted history still converts cleanly. */
+/** What the Messages API accepts as a tool_use id. */
+const TOOL_ID_OK = /^[a-zA-Z0-9_-]{1,64}$/;
+
+/**
+ * Tool-call ids the Messages API will accept, for a history another backend may have written.
+ *
+ * The model can be swapped mid-conversation, so the ids in the history are whatever the PREVIOUS
+ * backend minted: OpenAI's `call_…` and Anthropic's own `toolu_…` pass as they are, but an
+ * OpenAI-compatible server is free to send `functions.get_page:0` or a bare `0`, and the Messages
+ * API rejects the whole request over one character outside [a-zA-Z0-9_-]. Ids are only ever a join
+ * key between a call and its result, so a bad one is rewritten — the same way at both ends, and
+ * never onto an id that is already taken.
+ */
+function toolIdMapper(messages: Msg[]): (id: string) => string {
+  const taken = new Set<string>();
+  for (const m of messages) for (const p of m.content) if (p.type === 'tool_call' && TOOL_ID_OK.test(p.id)) taken.add(p.id);
+  const mapped = new Map<string, string>();
+  return (id) => {
+    if (TOOL_ID_OK.test(id)) return id;
+    const known = mapped.get(id);
+    if (known) return known;
+    const base = `call_${id.replace(/[^a-zA-Z0-9_-]/g, '_')}`.slice(0, 56);
+    let next = base;
+    for (let n = 2; taken.has(next); n++) next = `${base}_${n}`;
+    taken.add(next);
+    mapped.set(id, next);
+    return next;
+  };
+}
+
+/**
+ * The neutral history as Messages API messages.
+ *
+ * Written to be safe for a history this adapter did not produce (see toolIdMapper): `opaque` parts
+ * belong to the backend that made them and are never sent here; a text block that is empty or only
+ * whitespace — a local model's "\n\n" before its tool call — is dropped, because the API refuses
+ * it; and a message left with nothing is dropped too, since only the final assistant message may be
+ * empty. Two user messages in a row, which that can leave behind, are fine: the API joins them.
+ *
+ * Nothing here can emit a `thinking` block. Thinking is signed for the model that produced it, and
+ * this adapter never stores one (see chat() below), so there is none to replay to anyone.
+ *
+ * Exported for test/compact.test.ts and test/swap.test.ts.
+ */
 export function toAnthropicMessages(messages: Msg[]): Anthropic.MessageParam[] {
-  return messages.map((m) => ({
-    role: m.role,
-    content: m.content.filter((p) => p.type !== 'opaque').map((p): Anthropic.ContentBlockParam => {
+  const toolId = toolIdMapper(messages);
+  const out: Anthropic.MessageParam[] = [];
+  for (const m of messages) {
+    const content: Anthropic.ContentBlockParam[] = [];
+    for (const p of m.content) {
       switch (p.type) {
+        case 'opaque':
+          break;
         case 'text':
-          return { type: 'text', text: p.text };
+          if (p.text.trim()) content.push({ type: 'text', text: p.text });
+          break;
         case 'image':
-          return { type: 'image', source: { type: 'base64', media_type: p.mediaType, data: p.data } };
+          content.push({ type: 'image', source: { type: 'base64', media_type: p.mediaType, data: p.data } });
+          break;
         case 'tool_call':
-          return { type: 'tool_use', id: p.id, name: p.name, input: p.input };
+          content.push({ type: 'tool_use', id: toolId(p.id), name: p.name, input: p.input });
+          break;
         case 'tool_result':
-          return {
+          content.push({
             type: 'tool_result',
-            tool_use_id: p.toolCallId,
+            tool_use_id: toolId(p.toolCallId),
             is_error: p.isError,
-            content: p.content.map((c) =>
-              c.type === 'image'
-                ? ({ type: 'image', source: { type: 'base64', media_type: c.mediaType, data: c.data } } as const)
-                : ({ type: 'text', text: c.type === 'text' ? c.text : JSON.stringify(c) } as const),
-            ),
-          };
+            content: p.content
+              .filter((c) => c.type !== 'text' || c.text.trim())
+              .map((c) =>
+                c.type === 'image'
+                  ? ({ type: 'image', source: { type: 'base64', media_type: c.mediaType, data: c.data } } as const)
+                  : ({ type: 'text', text: c.type === 'text' ? c.text : JSON.stringify(c) } as const),
+              ),
+          });
+          break;
       }
-    }),
-  }));
+    }
+    if (content.length) out.push({ role: m.role, content });
+  }
+  return out;
 }
 
 function toAnthropicTools(tools: ToolDef[]): Anthropic.Tool[] {

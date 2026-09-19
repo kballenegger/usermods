@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { currentVersion, lineCount, toSource, type Artifact } from '@/lib/artifact';
 import { exportFilename } from '@/lib/dashboard';
 import { SentImages } from '../sidepanel/Attachments';
-import { toolRowTitle } from '@/lib/transcript';
+import { modelRowText, toolRowTitle } from '@/lib/transcript';
 import type { ChatItem } from '@/lib/types';
 
 /**
@@ -67,6 +67,16 @@ export function TranscriptPreview({ items, artifact }: { items: ChatItem[]; arti
                 {it.text}
               </div>
             );
+          case 'model': {
+            // Which model the turns below came from. Unlike the panel, the preview shows the first
+            // one too: there is no composer here to say what the chat started on.
+            const label = modelRowText(items, i, { showFirst: true });
+            return label ? (
+              <div key={i} className="prev-note" data-testid="prev-model">
+                {label}
+              </div>
+            ) : null;
+          }
           case 'tool':
             return (
               <details key={i} className={`prev-tool${it.isError ? ' is-error' : ''}`}>
@@ -194,6 +204,10 @@ export function transcriptText(items: ChatItem[]): string {
         break;
       case 'tool':
         parts.push(it.name, it.summary ?? '');
+        break;
+      case 'model':
+        // Searchable: "the chat where I tried the local model".
+        parts.push(it.model, it.label);
         break;
       case 'proposal':
         parts.push(it.proposal.name, it.proposal.description, it.proposal.code);

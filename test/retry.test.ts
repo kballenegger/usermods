@@ -44,7 +44,7 @@ test('the classifier table: what is retried and what is not', () => {
     ['adapter: rejected mid-stream', new ProviderError('invalid prompt', { kind: 'rejected' }), false],
     ['Stop (DOM AbortError)', abort(), false],
     ['Stop (SDK)', Object.assign(new Error('Request was aborted.'), { name: 'APIUserAbortError' }), false],
-    ['invalid settings', new Error('Add an API key in Settings first (or a base URL for a local server or proxy).'), false],
+    ['no usable model', new Error('Connect a provider in Settings to start: an API key, a local server, or a subscription sign-in.'), false],
     ['a plain bug', new TypeError("Cannot read properties of undefined (reading 'x')"), false],
     ['not an error at all', 'nope', false],
   ];

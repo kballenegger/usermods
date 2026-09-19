@@ -43,8 +43,9 @@ In scope, roughly in order of how seriously it will be taken:
 - **The GM API host.** `lib/gm.ts` and `lib/connect.ts`. Bypassing `@connect` so
   `GM_xmlhttpRequest` reaches a host the script never declared; reading or writing values across
   script boundaries; abusing `@require`/`@resource` fetching at install time.
-- **Token and key storage.** `lib/settings.ts`, `lib/oauth.ts`. Anything that sends the user's API
-  key or subscription tokens somewhere other than the endpoint they configured, or exposes them to a
+- **Token and key storage.** `lib/connections.ts`, `lib/oauth.ts`. Anything that sends a provider's
+  API key or subscription tokens somewhere other than that provider's own endpoint, sends a chat to a
+  provider other than the one picked for it, or exposes them to a
   page, a content script or an installed userscript.
 - **The agent loop and its tools.** Page content is untrusted input to a model. A page that talks
   the model into running a script is a prompt-injection problem and is interesting to the extent it

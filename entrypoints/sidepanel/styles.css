@@ -653,7 +653,21 @@ button.pill,
   gap: var(--sp-2);
 }
 
-/* What you type is prose, so the composer is a text surface: UI face, body size, flat well. */
+/*
+ * What you type is prose, so the composer is a text surface: UI face, body size, flat well.
+ *
+ * It grows with what is in it. `field-sizing: content` makes the box as tall as its text — typed,
+ * pasted, or restored from a draft, with no script measuring anything — and it goes back to the
+ * minimum by itself the moment a send empties it. (Chrome 123+; the manifest's minimum is 135, so
+ * there is no JS fallback to keep in step with it.)
+ *
+ * The cap is whichever is smaller: about ten lines, or 40% of the panel's height. Past it the text
+ * scrolls inside the box. The second half is what keeps a long paste from taking the panel over on
+ * a short window: the composer is `flex: none`, so everything it gains comes out of the transcript,
+ * and the shell above is `overflow: hidden` by design — an uncapped box would push the transcript to
+ * nothing and then start clipping itself. `dvh` is the panel's own viewport, since the side panel
+ * is its own document.
+ */
 .composer textarea {
   width: 100%;
   resize: none;
@@ -663,7 +677,11 @@ button.pill,
   border: var(--border-width) solid var(--border-control);
   border-radius: var(--r-field);
   padding: 10px 12px;
+  field-sizing: content;
   min-height: 64px;
+  /* 10 lines of 1.5 line-height, plus the vertical padding and the two borders. */
+  max-height: min(40dvh, calc(10 * 1.5em + 20px + 2 * var(--border-width)));
+  overflow-y: auto;
   transition: border-color 120ms ease;
 }
 

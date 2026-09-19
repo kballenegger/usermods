@@ -405,6 +405,66 @@ The toggle is a rounded track with a knob; on is a lime fill with an ink knob, p
 Its **border carries its boundary** — full lime on white is 1.23:1 — and the knob's travel is a
 second signal that does not depend on colour at all.
 
+### Dropdown menus (the model picker)
+The pattern for choosing one value out of a long, grouped list where a native `<select>` cannot
+filter, group with status, or take a typed value. One instance so far: the model picker under the
+composer (`ModelPicker.tsx`, `modelpicker.css`).
+
+**The trigger reads as a value, not an action.** Mono, sentence case, 12px, a 1px control outline and
+a `▾` — never the uppercase button label, because it is showing an identifier (`claude-opus-5`), not
+asking for a click. The secondary half (the provider) is the text face in `--text-2` and is the first
+thing to truncate; the whole trigger is capped at the line's width, so a 60-character model id
+ellipsises instead of widening a 320px panel. An unset trigger takes the warn edge **and the words**
+"Pick a model" — never the colour alone.
+
+**The popover is a bordered panel with no shadow.** Nothing lifts in this system except the primary
+button and the hero card, so the popover is separated from the transcript it opens over by
+`--border-strong` on `--surface-2`, not by depth. It opens **upward** (the composer is the last thing
+in the panel), spans the composer's width rather than its trigger's, and is capped at
+`min(420px, 55dvh)` with the list scrolling inside, so it can never reach under the tab bar.
+
+**Anatomy, top to bottom:** one field that both filters and accepts a typed value; the list, grouped
+under section labels (text face, 600, uppercase, tracked — the same as a form label) with a quiet
+status beside a group's name when it needs one (`refreshing…`, `built-in list`, `could not list`, in
+the warn tone plus those words); then a footer of `linklike` actions on `--surface-1`
+(*Refresh models*, *Manage providers…*). A typed value is offered **after** every real match, as
+*Use "…" on <provider>*, so that Enter on a filter picks a real model.
+
+**States.** The active option (where ↑/↓ is) takes the well **and a 2px inset `--primary` rail** — the
+rail is not optional, because in day the raised surface and the panel are the same white, and a state
+may not rest on colour or on a transitioned property alone. The selected option (the value in use)
+carries a lime `●` and the label weight, so active and selected stay distinguishable when they are
+different rows. Open is marked on the trigger by an inset ring as well as the border.
+
+**Keyboard and ARIA.** Button with `aria-haspopup="listbox"` / `aria-expanded`; the field is
+`role="combobox"` with `aria-controls` and `aria-activedescendant`; the list is `role="listbox"` with
+`role="group"` + `aria-label` per section and `role="option"` + `aria-selected` rows. Focus never
+leaves the field while arrowing. ↑/↓ wrap across groups, Home/End jump when the field is empty, Enter
+picks, Escape closes and returns focus to the trigger, Tab walks on to the footer and then out, which
+closes it. Options pick on `mousedown`, because the field's blur would otherwise close the list
+before a click landed.
+
+*Don't* reach for this where a native `<select>` does the job — Theme and *Side panel opens* are
+three fixed options and stay native. *Don't* put a blurred shadow on it.
+
+Beside the trigger, one line of prose (`--text-2`, or `--error-text` with `role="alert"` for a
+problem) says what the trigger alone cannot: that a swap waits for the next turn, or why there is no
+usable model. A problem sentence wraps onto its own line under the trigger rather than into a
+two-word column beside it.
+
+**The transcript's model marker** — *switched to claude-sonnet-5 · Anthropic* — is a hairline rule
+with a mono label set into it, in `--text-3`: it is a fact about the rows below it, so it reads as a
+divider, not as a note row.
+
+### Provider cards (Settings)
+A list of `.card`s whose summary row is a full-width button: status dot, name (text face, 600),
+the state **in words** beside it (*Connected*, *Needs an API key*, *Not signed in*, *Not available
+in this build*), and a caret. Open is carried by a `--primary` edge on the card, which is not
+transitioned, as well as by the caret. The form inside is ordinary fields; the one destructive
+action is an outlined `.danger` button that swaps to an inline confirmation in an error-edged box —
+no modal. The **Add provider** row underneath is plain secondary buttons, exactly as the old Presets
+row was, and for the same reason: ten filled buttons is a wall.
+
 ### Notices
 Prose on a panel: UI face, 12px, 1.55. Three tones, each of which also carries a word.
 *Don't* write a bare `.error` selector. The dashboard had one and it matched the 7px `.dot.error` as

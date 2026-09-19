@@ -3,6 +3,8 @@ import { Activity } from './Activity';
 import { openDashboard } from './App';
 import { ArtifactPanel } from './ArtifactPanel';
 import { Lightbox, PendingStrip, SentImages, type PendingImage } from './Attachments';
+import { ModelPicker, NEXT_TURN_NOTE } from './ModelPicker';
+import { useConnections } from './useConnections';
 import { carriesFiles, fileFromDataUrlText, filesFromTransfer, processImageFile } from './images';
 import { proposalCardLabel, proposalCardState, toSource, type Artifact } from '@/lib/artifact';
 import { modsForUrl } from '@/lib/modmatch';
@@ -11,11 +13,12 @@ import { IDLE_ACTIVITY, activityFromEvent, allDisconnected, withActivity, withou
 import { putBlobs } from '@/lib/blobs';
 import { archivedChats, isArchived, liveChats, loadItems, pickChatToShow, relativeTime, saveItems, titleFromText, type Chat as ChatRecord } from '@/lib/chats';
 import { ArchiveIcon, DeleteIcon, EditModIcon, RenameIcon, UnarchiveIcon } from './components/icons';
+import { mutateConnections, rememberModel, resolveSelection, sameSelection, saveModelChoice, selectionForChat, type ModelSelection } from '@/lib/connections';
 import { exportFilename, HANDOFF_KEY, resolveHandoff, type ChatHandoff } from '@/lib/dashboard';
 import { ACCEPT_ATTR, MAX_IMAGES_PER_MESSAGE, capNote, emptyTextFor, type AttachedImage, type ImageThumb } from '@/lib/images';
 import { rpc, type AgentPortRequest } from '@/lib/rpc';
 import { INTERRUPTED_TEXT, RESUME_HINT, RESUME_LABEL, type ResumableRun } from '@/lib/runstate';
-import { RECONNECT_NOTE, looksUnfinished, reduceItems, settleInterrupted, toolDotClass, toolDotState, toolRowTitle, unqueuedItem } from '@/lib/transcript';
+import { lastModel, modelRowText, reduceItems, repairRowGap, settleInterrupted, toolDotClass, toolDotState, toolRowTitle, unqueuedItem } from '@/lib/transcript';
 import type { AgentEvent, ChatItem, ContentEvent, ElementRef, Mod, ModProposal } from '@/lib/types';
 
 const SAVE_DEBOUNCE_MS = 400;
@@ -55,7 +58,7 @@ const EMPTY_DRAFT: Draft = { text: '', refs: [], images: [] };
 /** Where the draft of a chat that does not exist yet lives. A chat id is a UUID, so this is safe. */
 const NEW_CHAT_DRAFT = 'new';
 
-export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: string; host: string }) {
+export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number | null; pageUrl: string; host: string; onOpenSettings?: () => void }) {
   const [chats, setChats] = useState<ChatRecord[]>([]);
   const [chatId, setChatId] = useState<string | null>(null);
   const [items, setItems] = useState<ChatItem[]>([]);
@@ -149,11 +152,6 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
   /** The chat the panel is showing, readable from the port listener, which outlives renders. */
   const chatIdRef = useRef<string | null>(null);
   /**
-   * Chats whose restored transcript looked cut off mid-run, so the next event for each says so
-   * once. Per chat, because two chats can both have been interrupted.
-   */
-  const reconnectRef = useRef<Set<string>>(new Set());
-  /**
    * The debounced save for the visible chat: the id it was scheduled for, and its timer. Held in a
    * ref rather than an effect cleanup so a chat or host switch can FLUSH it — writing A's items
    * under B's id is precisely the bug this whole change is about.
@@ -182,6 +180,48 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
   const itemsRef = useRef<ChatItem[]>(items);
   /** Is the chat currently on screen the one that is running? Never "is the panel busy". */
   const busy = chatId != null && runningChats.has(chatId);
+
+  // ---- which model this chat talks to (ModelPicker, lib/connections.ts) ----
+  const providers = useConnections();
+  /** The model picked for a chat that does not exist yet; it travels with the first send. */
+  const [pendingModel, setPendingModel] = useState<ModelSelection | null>(null);
+  /** Chats whose model was changed while a run was in flight, until that run's chain ends. */
+  const [swappedMidRun, setSwappedMidRun] = useState<ReadonlySet<string>>(() => new Set());
+  /**
+   * The visible chat's selection: its own if it has one, else what a new chat defaults to (the last
+   * model picked). Resolved against the connections as they are now, so a provider removed or
+   * signed out while this chat was open shows up here as a problem, not as a different provider.
+   */
+  const chatRecord = chatId ? chats.find((c) => c.id === chatId) : undefined;
+  const selection = selectionForChat(chatId ? chatRecord : { model: pendingModel ?? undefined }, providers.state, providers.last, providers.signedIn);
+  const modelResolved = resolveSelection(selection, providers.state, providers.signedIn);
+  const modelReady = providers.ready && modelResolved.ok;
+  const modelReadyRef = useRef(modelReady);
+  modelReadyRef.current = modelReady;
+  const selectionRef = useRef(selection);
+  selectionRef.current = selection;
+  /**
+   * A swap made while a run is in flight waits for the next turn: the background reads the chat's
+   * selection when a run STARTS. Said only when it is true — the run really did start on another
+   * model (the transcript's last model row is what it is on) — and only after a mid-run change, so
+   * the moment between pressing Send and the run reporting its model never flashes it.
+   */
+  const runningOn = lastModel(items);
+  const swapWaits = busy && chatId != null && swappedMidRun.has(chatId) && !!runningOn && !sameSelection(runningOn, selection);
+
+  function chooseModel(next: ModelSelection, typed: boolean) {
+    void saveModelChoice(next);
+    // An id typed by hand is remembered on its connection, so it is offered next time.
+    if (typed) void mutateConnections((state) => rememberModel(state, next.connectionId, next.model));
+    const id = chatIdRef.current;
+    if (!id) {
+      setPendingModel(next);
+      return;
+    }
+    setChats((prev) => prev.map((c) => (c.id === id ? { ...c, model: next } : c)));
+    if (runningRef.current.has(id)) setSwappedMidRun((prev) => new Set(prev).add(id));
+    void rpc({ type: 'chats.setModel', id, model: next }).catch(() => {});
+  }
   /**
    * The activity line for the chat on screen, and only that one. A chat with no entry has nothing
    * to say, which is how switching from a running chat to an idle one clears the line instantly.
@@ -275,11 +315,10 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
           setLoaded(true);
           return;
         }
-        const stored = settle(show.id, await readItems(show.id));
+        const stored = loadRepaired(show.id, await readItems(show.id));
         if (!live()) return;
         setChats(list);
         showChat(show.id, stored);
-        markReconnect(show.id, stored);
         setLoaded(true);
         requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ block: 'end' }));
       } catch {
@@ -386,14 +425,9 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
   function applyOffscreen(id: string, e: AgentEvent) {
     const chain = offscreenChain(id);
     const next = chain.then(async (prev) => {
-      let base = prev;
-      if (reconnectRef.current.has(id)) {
-        reconnectRef.current.delete(id);
-        base = [...base, { kind: 'note', text: RECONNECT_NOTE }];
-      }
       // An 'unqueued' for an invisible chat cannot put text back in the composer — that composer
       // belongs to the chat on screen — so the bubble simply goes away.
-      const reduced = reduceItems(base, e);
+      const reduced = reduceItems(prev, e);
       if (reduced !== prev) await saveItems(id, reduced).catch(() => {});
       return reduced;
     });
@@ -447,7 +481,10 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
       // 'done' and is not part of the turn. Treating it as proof of life put the finished chat
       // straight back into runningChats, which left Stop and Queue on screen for a chat that had
       // stopped — with no activity line beside them, since the run really was over.
-      if (e.type === 'done') setRunningChats((prev) => withoutChat(prev, e.chatId));
+      if (e.type === 'done') {
+        setRunningChats((prev) => withoutChat(prev, e.chatId));
+        setSwappedMidRun((prev) => withoutChat(prev, e.chatId));
+      }
       else if (e.type !== 'chat_title') setRunningChats((prev) => (prev.has(e.chatId) ? prev : new Set(prev).add(e.chatId)));
 
       // Whether this chat can be resumed. A failure that kept its progress says so on the event; a
@@ -499,16 +536,11 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
           if (dropped.refs) setRefs((r) => [...r, ...dropped.refs!]);
         }
       }
-      updateItems((prev) => {
-        // A run that outlived the panel keeps streaming into a port we no longer hold. We cannot
-        // recover the text we missed, so the first event back into that chat just says so.
-        let base = prev;
-        if (reconnectRef.current.has(e.chatId)) {
-          reconnectRef.current.delete(e.chatId);
-          base = [...base, { kind: 'note', text: RECONNECT_NOTE }];
-        }
-        return reduceItems(base, e);
-      });
+      // No "reconnected" note here any more. A run that outlives the panel is recorded by the
+      // background while no panel is attached, so an event arriving on this port never follows a
+      // stretch nobody kept; the one gap that can still lose rows is found when a transcript is
+      // LOADED (loadRepaired), which is the only place there is evidence of it.
+      updateItems((prev) => reduceItems(prev, e));
     });
     port.onDisconnect.addListener(() => {
       portRef.current = null;
@@ -745,6 +777,9 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
     const typed = (resend?.text ?? text).trim();
     const t = typed || (attached.length ? emptyTextFor(attached.length) : '');
     if (!t || tabId == null) return;
+    // No usable model: the line under the box already says why and what to do. Nothing is sent, and
+    // what was typed stays where it is.
+    if (!modelReadyRef.current) return;
     // The chat is created lazily, on the first message that actually goes out.
     let id = chatId;
     if (!id) {
@@ -753,12 +788,13 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
       // view would be wrong, so the text goes back in the composer for the user to resend.
       const gen = genRef.current;
       try {
-        const chat = await rpc({ type: 'chats.create', host });
+        const chat = await rpc({ type: 'chats.create', host, model: selectionRef.current });
         if (genRef.current !== gen) {
           setText((cur) => (cur.trim() ? cur : typed));
           return;
         }
         id = chat.id;
+        setPendingModel(null);
         setChats((prev) => [chat, ...prev]);
         // The draft moves with the chat it was composed in, attachments and all, before showChat
         // repoints the composer at the new id.
@@ -948,13 +984,26 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
     }
   }
 
-  /** Remember that this chat's restored transcript stops mid-run, so its next event says so once. */
-  function markReconnect(id: string, stored: ChatItem[]) {
-    // A chat the background says is running has been captured the whole time (by this panel, or by
-    // the background while no panel was open), so a tool row without a result there is a tool that
-    // is running right now, not output that went missing.
-    if (looksUnfinished(stored) && !liveAtAttachRef.current.has(id)) reconnectRef.current.add(id);
-    else reconnectRef.current.delete(id);
+  /**
+   * A stored transcript, made truthful before it is shown: an interrupted run's dangling rows are
+   * closed (settle), and a transcript that is genuinely missing rows says so, once, in words that
+   * claim no more than that (repairRowGap in lib/transcript.ts has the rule and the reasons).
+   *
+   * "Running" is asked of BOTH what the worker reported at attach and what this panel has seen
+   * since. The second half matters: a chat that started running after the panel opened, was
+   * switched away from and is now switched back to has a tool row with no result because the tool
+   * is running — and the old check, which only knew about the moment of attach, called that lost
+   * output. A repaired transcript is written back, so the note is part of the chat from then on
+   * rather than something each reload rediscovers.
+   */
+  function loadRepaired(id: string, raw: ChatItem[]): ChatItem[] {
+    const settled = settle(id, raw);
+    const repaired = repairRowGap(settled, {
+      running: liveAtAttachRef.current.has(id) || runningRef.current.has(id),
+      interrupted: resumableRef.current.get(id)?.state === 'interrupted',
+    });
+    if (repaired !== settled) void saveItems(id, repaired).catch(() => {});
+    return repaired;
   }
 
   /**
@@ -969,9 +1018,8 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
     void readItems(id)
       .then((raw) => {
         if (genRef.current !== gen) return;
-        const stored = settle(id, raw);
+        const stored = loadRepaired(id, raw);
         showChat(id, stored);
-        markReconnect(id, stored);
         setLoaded(true);
         requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ block: 'end' }));
       })
@@ -1162,7 +1210,7 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
   async function editMod(mod: Mod) {
     setPickingMod(false);
     try {
-      const r = await rpc({ type: 'mods.edit', modId: mod.id, host, ...(chatId ? { currentChatId: chatId } : {}) });
+      const r = await rpc({ type: 'mods.edit', modId: mod.id, host, model: selectionRef.current, ...(chatId ? { currentChatId: chatId } : {}) });
       const list = await rpc({ type: 'chats.list', host });
       setChats(list);
       if (r.chatId !== chatIdRef.current) openChat(r.chatId);
@@ -1438,6 +1486,16 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
               return <div key={i} className="msg assistant">{it.text}</div>;
             case 'note':
               return <div key={i} className="label" style={{ textAlign: 'center' }}>{it.text}</div>;
+            case 'model': {
+              // Where the model changed. The first one is where the chat started, which the
+              // composer already says, so it draws nothing (modelRowText returns null for it).
+              const label = modelRowText(items, i);
+              return label ? (
+                <div key={i} className="model-marker" data-testid="model-marker">
+                  <span>{label}</span>
+                </div>
+              ) : null;
+            }
             case 'tool':
               // The dot carries the state the glyphs used to: volt when it came back clean, amber
               // while it is still running, coral when it failed. Only volt glows.
@@ -1627,6 +1685,17 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
           placeholder={unsupported ? 'open a web page first' : 'what should this page do differently? paste or drop an image, or point at elements'}
           disabled={unsupported}
         />
+        {providers.ready && (
+          <ModelPicker
+            state={providers.state}
+            signedIn={providers.signedIn}
+            selection={selection}
+            resolved={modelResolved}
+            note={swapWaits ? NEXT_TURN_NOTE : undefined}
+            onSelect={chooseModel}
+            onManage={() => onOpenSettings?.()}
+          />
+        )}
         <div className="row">
           <button className="btn" onClick={() => void pick()} disabled={picking || unsupported || tabId == null} title="Click an element on the page to reference it in your message">
             {picking ? 'click an element…' : 'Point at element'}
@@ -1654,7 +1723,7 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
           <button className="btn" onClick={newChat} disabled={unsupported || !host || (!chatId && items.length === 0)}>New chat</button>
           <span className="grow" />
           {busy && <button className="btn danger" onClick={abort}>Stop</button>}
-          <button className="btn primary" onClick={() => void send()} disabled={(!text.trim() && !images.length) || unsupported}>{busy ? 'Queue' : 'Send'}</button>
+          <button className="btn primary" onClick={() => void send()} disabled={(!text.trim() && !images.length) || unsupported || !modelReady} title={modelReady || !providers.ready || modelResolved.ok ? undefined : modelResolved.message}>{busy ? 'Queue' : 'Send'}</button>
         </div>
       </div>
       {viewing && <Lightbox chatId={chatId} image={viewing} onClose={() => setViewing(null)} />}

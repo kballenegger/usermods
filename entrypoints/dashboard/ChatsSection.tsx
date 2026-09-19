@@ -511,6 +511,16 @@ function ChatRow({
               </span>
             </>
           )}
+          {/* The model this chat talks to, from the index. Absent on a chat that has not run since
+              models became a per-chat choice, where nothing is shown rather than a guess. */}
+          {chat.model?.model && (
+            <>
+              <span>·</span>
+              <span className="break" data-testid="chat-model" title={chat.model.label ? `${chat.model.model} on ${chat.model.label}` : chat.model.model}>
+                {chat.model.model}
+              </span>
+            </>
+          )}
           {/* A chat that produced a draft mod, and how many versions it took. The count comes from
               the artifact id being present on the index plus the version count the artifact
               carries — the index holds only the flag, so this reads the flag and the preview reads
