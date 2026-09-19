@@ -414,6 +414,28 @@ const PAIRS: Pair[] = [
     on: panels,
     min: 3,
   },
+
+  // --- The model picker and provider cards (modelpicker.css, providers.css) ---
+  //
+  // The trigger sits on the composer's panel; the popover is --surface-2 with options that go to
+  // the well when active and a footer on --surface-1, so every text role below is checked on all
+  // three rather than on the one it happens to rest on today.
+  { what: 'model picker: model ids and option text', fg: '--text-1', on: panels, min: 4.5 },
+  { what: 'model picker: provider name, group labels, notes', fg: '--text-2', on: panels, min: 4.5 },
+  { what: 'model picker: group status (built-in list, could not list) and the unset trigger', fg: '--warn-text', on: panels, min: 4.5 },
+  { what: 'model picker: the "use what I typed" option and the footer links', fg: '--primary-text', on: panels, min: 4.5 },
+  { what: 'model picker: the selected mark', fg: '--live-text', on: panels, min: 4.5 },
+  { what: 'model picker: a problem sentence under the trigger', fg: '--error-text', on: panels, min: 4.5 },
+  { what: 'transcript: the "switched to" model marker', fg: '--text-3', on: (t) => [{ label: 'surface-1', rgb: surface(t, '--surface-1') }], min: 4.5 },
+  {
+    // The active option's rail, the open trigger's ring and an open provider card's edge are each
+    // the non-colour half of their state, so each answers to the 3:1 UI rule.
+    what: 'model picker and provider cards: active rail, open ring, open card edge',
+    fg: '--primary',
+    on: panels,
+    min: 3,
+  },
+  { what: 'model picker: the warn edge of an unset trigger', fg: '--warn', on: panels, min: 3 },
 ];
 
 // ---------------------------------------------------------------------------
