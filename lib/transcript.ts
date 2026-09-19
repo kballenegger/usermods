@@ -31,6 +31,29 @@ export function reduceItems(items: ChatItem[], event: AgentEventBody): ChatItem[
       }
       return [...items, { kind: 'assistant', text: event.delta }];
     }
+    case 'text_discard': {
+      // The attempt that streamed this text failed and is being made again. What it wrote never
+      // became part of the conversation, so it comes back off the transcript: `chars` from the end
+      // of the LAST assistant row, which is the row those deltas were appended to. Counting
+      // characters rather than dropping the row is what keeps this exact when a queued bubble has
+      // landed after it, and harmless when a reconnecting panel saw only part of the stream (it
+      // removes no more than the row holds).
+      if (event.chars <= 0) return items;
+      for (let i = items.length - 1; i >= 0; i--) {
+        const it = items[i];
+        if (it?.kind !== 'assistant') {
+          // A tool row or a proposal means the text before it belongs to a reply that completed.
+          if (it?.kind === 'tool' || it?.kind === 'proposal') return items;
+          continue;
+        }
+        const kept = it.text.slice(0, Math.max(0, it.text.length - event.chars));
+        const next = items.slice();
+        if (kept) next[i] = { ...it, text: kept };
+        else next.splice(i, 1);
+        return next;
+      }
+      return items;
+    }
     case 'tool_call':
       return [...items, { kind: 'tool', id: event.id, name: event.name, input: event.input }];
     case 'tool_result': {
@@ -172,6 +195,33 @@ export function toolDotClass(state: ToolDotState): string {
 /** The queued user bubble an `unqueued` event refers to, so the caller can recover its text. */
 export function unqueuedItem(items: ChatItem[], id: string): Extract<ChatItem, { kind: 'user' }> | undefined {
   return items.find((it) => it.kind === 'user' && it.id === id) as Extract<ChatItem, { kind: 'user' }> | undefined;
+}
+
+/** What a tool row says when the run it belonged to died before the tool answered. */
+export const INTERRUPTED_TOOL_SUMMARY = 'interrupted before it finished';
+
+/**
+ * Tidy a transcript whose run was interrupted (the service worker was evicted, the browser quit).
+ *
+ * Two kinds of row are left claiming something is still happening. A tool row with no result would
+ * show its amber "running" dot for ever: it is closed, as an error, saying what happened. The saved
+ * conversation never includes that call (a checkpoint is only written once every call in a step has
+ * its result), so Resume has the model make it again, in a fresh row. And a message that was still
+ * queued never reached the model and its queue died with the worker: its bubble is removed and
+ * handed back to the caller, which puts the text back in the composer exactly as Stop does.
+ *
+ * Returns the same array when there was nothing to tidy.
+ */
+export function settleInterrupted(items: ChatItem[]): { items: ChatItem[]; dropped: Extract<ChatItem, { kind: 'user' }>[] } {
+  if (!looksUnfinished(items)) return { items, dropped: [] };
+  const dropped: Extract<ChatItem, { kind: 'user' }>[] = [];
+  const next: ChatItem[] = [];
+  for (const it of items) {
+    if (it.kind === 'user' && it.queued) dropped.push(it);
+    else if (it.kind === 'tool' && it.summary === undefined) next.push({ ...it, summary: INTERRUPTED_TOOL_SUMMARY, isError: true });
+    else next.push(it);
+  }
+  return { items: next, dropped };
 }
 
 /** The note shown when a run outlived the panel and we could not capture what it streamed. */

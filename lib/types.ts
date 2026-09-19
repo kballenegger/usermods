@@ -234,7 +234,29 @@ export type AgentEventBody =
       detail?: string;
       /** Agent-loop iteration, 1-based. */
       iteration?: number;
+      /**
+       * Set while the model request is being retried (lib/agent/retry.ts): the request failed for a
+       * reason that will probably pass, and the loop is waiting before it asks again. `until` is a
+       * Date.now() timestamp so the panel can count the wait down on its own clock; `offline` means
+       * no attempt has been spent yet and the loop is waiting for the machine to come back online.
+       * The next ordinary status event (without this field) is what returns the line to normal.
+       */
+      retry?: {
+        reason: 'network' | 'stream' | 'rate_limit' | 'overloaded' | 'server' | 'offline';
+        /** Which retry this is, 1-based, and how many there are. 0 of N while merely offline. */
+        attempt: number;
+        max: number;
+        until: number;
+        status?: number;
+      };
     }
+  /**
+   * The model request failed part-way through its reply and is being made again (or has failed for
+   * good). `chars` of assistant text were streamed to the panel for that attempt and are not part
+   * of the conversation: the panel takes them back off the end of the transcript, so the retry's
+   * own stream does not read as the same sentence twice.
+   */
+  | { type: 'text_discard'; chars: number }
   | { type: 'tool_call'; id: string; name: string; input: Record<string, unknown> }
   | { type: 'tool_result'; id: string; summary: string; isError: boolean }
   | { type: 'proposal'; proposal: ModProposal }
@@ -268,7 +290,11 @@ export type AgentEventBody =
    * transcript the user reads is never rewritten, only the history the model sees.
    */
   | { type: 'compacted'; tier: 'elided' | 'summarised'; before: number; after: number }
-  | { type: 'error'; message: string };
+  /**
+   * `resumable` means the run stopped with its progress saved and can be continued from exactly
+   * where it was, without the user sending anything (the panel's Resume button; see lib/runstate.ts).
+   */
+  | { type: 'error'; message: string; resumable?: boolean };
 
 /** An event as it travels over the port: a body plus the chat it belongs to. */
 export type AgentEvent = AgentEventBody & { chatId: string };

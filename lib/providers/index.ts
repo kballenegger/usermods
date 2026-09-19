@@ -3,11 +3,13 @@ import {
   STORE_BUILD,
   XAI_PROXY_BASE,
   unavailableProviderMessage,
-} from '../buildflags';
+} from '../buildflags.ts';
 import type { Settings } from '../types';
-import { createAnthropicProvider } from './anthropic';
-import { createOpenAIProvider } from './openai';
-import { createResponsesProvider } from './responses';
+// .ts extensions: lib/agent/loop.ts imports this file, and the loop is unit tested under node
+// --experimental-strip-types, whose resolver does not guess them (see lib/transcript.ts).
+import { createAnthropicProvider } from './anthropic.ts';
+import { createOpenAIProvider } from './openai.ts';
+import { createResponsesProvider } from './responses.ts';
 import type { Provider } from './types';
 
 export function createProvider(settings: Settings): Provider {

@@ -1,6 +1,7 @@
 // OpenAI-compatible chat completions adapter. Covers OpenAI, OpenRouter, Ollama, LM Studio,
 // vLLM, mlx_lm.server and anything else that speaks /v1/chat/completions with tools.
 import type { Msg, Part, Settings, ToolDef } from '../types';
+import { fetchOrNetworkError, httpError, readStream, streamIncomplete } from './errors.ts';
 import type { Provider, ProviderResponse } from './types';
 
 export type OAIMessage =
@@ -55,7 +56,7 @@ export function createOpenAIProvider(settings: Settings): Provider {
   const base = (settings.baseUrl || 'https://api.openai.com/v1').replace(/\/+$/, '');
   return {
     async chat({ system, messages, tools, signal, callbacks }): Promise<ProviderResponse> {
-      const res = await fetch(`${base}/chat/completions`, {
+      const res = await fetchOrNetworkError(`${base}/chat/completions`, {
         method: 'POST',
         signal,
         headers: {
@@ -71,29 +72,30 @@ export function createOpenAIProvider(settings: Settings): Provider {
             : {}),
         }),
       });
-      if (!res.ok || !res.body) {
-        const body = await res.text().catch(() => '');
-        throw new Error(`${res.status} ${res.statusText}: ${body.slice(0, 500)}`);
-      }
+      if (!res.ok || !res.body) throw await httpError(res);
 
       let text = '';
       const calls = new Map<number, { id: string; name: string; args: string }>();
       let finish: string | null = null;
+      // Whether the reply actually ended. A chat-completions stream ends with a chunk carrying a
+      // finish_reason and then `[DONE]`; a body that simply stops has been cut off, and treating
+      // the half of a reply we did get as the whole of it would put a truncated tool call (or a
+      // sentence that stops mid-word) into the history as if the model had meant it.
+      let sawDone = false;
 
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
       let buf = '';
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
+      await readStream(res.body, signal, (chunk) => {
+        buf += chunk;
         let nl: number;
         while ((nl = buf.indexOf('\n')) >= 0) {
           const line = buf.slice(0, nl).trim();
           buf = buf.slice(nl + 1);
           if (!line.startsWith('data:')) continue;
           const data = line.slice(5).trim();
-          if (data === '[DONE]') continue;
+          if (data === '[DONE]') {
+            sawDone = true;
+            continue;
+          }
           let json: any;
           try {
             json = JSON.parse(data);
@@ -117,7 +119,8 @@ export function createOpenAIProvider(settings: Settings): Provider {
           }
           if (choice.finish_reason) finish = choice.finish_reason;
         }
-      }
+      });
+      if (!finish && !sawDone) throw streamIncomplete();
 
       const content: Part[] = [];
       if (text) content.push({ type: 'text', text });

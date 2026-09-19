@@ -12,7 +12,8 @@ import { ArchiveIcon, DeleteIcon, RenameIcon, UnarchiveIcon } from './components
 import { exportFilename, HANDOFF_KEY, resolveHandoff, type ChatHandoff } from '@/lib/dashboard';
 import { ACCEPT_ATTR, MAX_IMAGES_PER_MESSAGE, capNote, emptyTextFor, type AttachedImage, type ImageThumb } from '@/lib/images';
 import { rpc, type AgentPortRequest } from '@/lib/rpc';
-import { RECONNECT_NOTE, looksUnfinished, reduceItems, toolDotClass, toolDotState, toolRowTitle, unqueuedItem } from '@/lib/transcript';
+import { INTERRUPTED_TEXT, RESUME_HINT, RESUME_LABEL, type ResumableRun } from '@/lib/runstate';
+import { RECONNECT_NOTE, looksUnfinished, reduceItems, settleInterrupted, toolDotClass, toolDotState, toolRowTitle, unqueuedItem } from '@/lib/transcript';
 import type { AgentEvent, ChatItem, ContentEvent, ElementRef, ModProposal } from '@/lib/types';
 
 const SAVE_DEBOUNCE_MS = 400;
@@ -75,6 +76,28 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
    * switching to a running chat shows that chat's real progress rather than starting from nothing.
    */
   const [activities, setActivities] = useState<ReadonlyMap<string, ChatActivity>>(() => new Map());
+  /**
+   * Chats whose last run stopped short with its progress saved — the model request failed for good,
+   * or the run died with the service worker — and can be carried on with Resume. Per chat, like
+   * everything else here. The background's run records are the source of truth (lib/runstate.ts):
+   * this is filled from 'agent.attach' when the panel opens and kept current by events after that,
+   * so the button survives a panel reload and appears for a run that died while the panel was shut.
+   */
+  const [resumable, setResumable] = useState<ReadonlyMap<string, ResumableRun>>(() => new Map());
+  /** The same, readable from async code that outlives a render. Advanced with the state. */
+  const resumableRef = useRef<ReadonlyMap<string, ResumableRun>>(resumable);
+  /** Chats the background reported as running when we attached, so a row still in flight is not mistaken for a lost one. */
+  const liveAtAttachRef = useRef<ReadonlySet<string>>(new Set());
+  /** `runningChats`, readable from the port's disconnect handler. */
+  const runningRef = useRef<ReadonlySet<string>>(runningChats);
+  runningRef.current = runningChats;
+  /**
+   * Resolves once the background has answered 'agent.attach'. Nothing reads a stored transcript
+   * before it: until then the background may still be writing out rows it kept while no panel was
+   * open, and a read that beat that write would put a stale transcript on screen and then save it
+   * back over the complete one.
+   */
+  const attachedRef = useRef<Promise<void> | null>(null);
   /**
    * The last message sent in each chat, so Retry on a dead port resends into the chat the failed
    * message belonged to and not into whatever happens to be on screen.
@@ -216,7 +239,7 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
     }
     void (async () => {
       try {
-        const [list, handoff] = await Promise.all([rpc({ type: 'chats.list', host }), readHandoff()]);
+        const [list, handoff] = await Promise.all([rpc({ type: 'chats.list', host }), readHandoff(), ensureAttached()]);
         if (!live()) return;
         const { chat: show, clearHandoff } = resolveHandoff(handoff, host, list, pickChatToShow(list));
         if (clearHandoff) void chrome.storage.session.remove(HANDOFF_KEY).catch(() => {});
@@ -226,7 +249,7 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
           setLoaded(true);
           return;
         }
-        const stored = await readItems(show.id);
+        const stored = settle(show.id, await readItems(show.id));
         if (!live()) return;
         setChats(list);
         showChat(show.id, stored);
@@ -344,7 +367,8 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
   function offscreenChain(id: string): Promise<ChatItem[]> {
     const existing = offscreenWritesRef.current.get(id);
     if (existing) return existing;
-    const started = loadItems(id).catch(() => [] as ChatItem[]);
+    // Not before the background has handed the transcript over: see attachedRef.
+    const started = (attachedRef.current ?? Promise.resolve()).then(() => loadItems(id)).catch(() => [] as ChatItem[]);
     offscreenWritesRef.current.set(id, started);
     return started;
   }
@@ -387,6 +411,12 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
       // stopped — with no activity line beside them, since the run really was over.
       if (e.type === 'done') setRunningChats((prev) => withoutChat(prev, e.chatId));
       else if (e.type !== 'chat_title') setRunningChats((prev) => (prev.has(e.chatId) ? prev : new Set(prev).add(e.chatId)));
+
+      // Whether this chat can be resumed. A failure that kept its progress says so on the event; a
+      // run that is demonstrably going again (a fresh status, a message entering the conversation)
+      // means whatever stopped short before is no longer the thing to resume.
+      if (e.type === 'error' && e.resumable) markResumable(e.chatId, { state: 'failed', error: e.message });
+      else if (e.type === 'accepted' || (e.type === 'status' && e.phase !== 'idle')) markResumable(e.chatId, null);
 
       // The background named the chat after its turn finished. This renames a row in the switcher,
       // not a message, so it is patched in place here rather than refetched — and it is done above
@@ -444,16 +474,100 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
     });
     port.onDisconnect.addListener(() => {
       portRef.current = null;
-      // The worker went away (or was restarted): nothing is streaming to us any more. Runs
-      // themselves survive in the background and their transcripts are written there.
+      // An idle worker going to sleep closes the port too, and that is nothing: the next send or
+      // resume opens a new one. It only matters when something was running.
+      const hadRuns = runningRef.current.size > 0;
       setRunningChats(new Set());
-      // The port is the panel's only link to every chat at once, so a dead port marks EVERY chat
-      // that was mid-run as disconnected — not just the visible one. Each such chat then offers
-      // its own Retry, which resends that chat's own last message.
+      if (!hadRuns) return;
+      // The worker died under a run. Runs live in its memory, so they died with it — but their
+      // conversations are checkpointed after every step, so nothing the user saw is lost. The port
+      // is the panel's only link to every chat at once, so EVERY chat that was mid-run is marked
+      // disconnected, and then the worker is asked what it knows: waking it makes it mark those
+      // runs interrupted, and each chat's line is replaced by its own Resume.
       setActivities(allDisconnected);
+      void attachToWorker();
     });
     portRef.current = port;
     return port;
+  }
+
+  /** Record (or clear) a chat's resumable state, ref first so async readers never see it stale. */
+  function markResumable(id: string, run: ResumableRun | null) {
+    const prev = resumableRef.current;
+    if (run ? prev.get(id)?.state === run.state && prev.get(id)?.error === run.error : !prev.has(id)) return;
+    const next = new Map(prev);
+    if (run) next.set(id, run);
+    else next.delete(id);
+    resumableRef.current = next;
+    setResumable(next);
+  }
+
+  /**
+   * Open the port and ask the background where things stand: which chats are running (and what
+   * each is doing), and which can be resumed. This is what makes a panel opened in the middle of a
+   * run show that run — Stop, the activity line, Queue instead of Send — rather than a transcript
+   * that looks finished until the next message is sent.
+   *
+   * Never rejects. If the worker cannot be reached the panel simply knows nothing more than it did.
+   */
+  async function attachToWorker(): Promise<boolean> {
+    try {
+      connect();
+      const state = await rpc({ type: 'agent.attach' });
+      const running = new Set(Object.keys(state.running));
+      liveAtAttachRef.current = running;
+      const nextResumable = new Map(Object.entries(state.resumable));
+      resumableRef.current = nextResumable;
+      setResumable(nextResumable);
+      setRunningChats((prev) => new Set([...prev, ...running]));
+      const now = Date.now();
+      setActivities((prev) => {
+        const next = new Map<string, ChatActivity>();
+        // A chat the worker is not running has no line, whatever this panel believed a moment ago:
+        // that is how a 'disconnected' line gives way to the Resume row.
+        for (const [id, a] of prev) if (running.has(id) && !a.disconnected) next.set(id, a);
+        for (const [id, r] of Object.entries(state.running)) {
+          if (next.has(id)) continue;
+          const base: ChatActivity = { ...IDLE_ACTIVITY, phase: 'model', detail: 'working', startedAt: r.startedAt, lastEventAt: now };
+          next.set(id, r.status ? { ...activityFromEvent(base, r.status, now), startedAt: r.startedAt } : base);
+        }
+        return next;
+      });
+      // The chat on screen may be one whose run just turned out to be dead: tidy what it left.
+      const visible = chatIdRef.current;
+      if (visible) updateItems((prev) => settle(visible, prev));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** attachToWorker(), once per panel. Everything that reads a stored transcript waits on this. */
+  function ensureAttached(): Promise<void> {
+    attachedRef.current ??= attachToWorker().then(() => {});
+    return attachedRef.current;
+  }
+
+  /**
+   * A transcript whose run was INTERRUPTED still claims things are happening: a tool row with no
+   * result, a bubble marked queued. settleInterrupted closes the first and removes the second, and
+   * the removed text goes back in the composer when that chat is the one on screen (or about to
+   * be) — the same thing Stop does with a queued message, for the same reason.
+   */
+  function settle(id: string, stored: ChatItem[]): ChatItem[] {
+    if (resumableRef.current.get(id)?.state !== 'interrupted') return stored;
+    const { items: settled, dropped } = settleInterrupted(stored);
+    if (dropped.length) {
+      const back = dropped.map((d) => d.text).join('\n');
+      setDrafts((prev) => {
+        const cur = prev.get(id) ?? EMPTY_DRAFT;
+        if (cur.text.includes(back)) return prev;
+        const next = new Map(prev);
+        next.set(id, { ...cur, text: cur.text.trim() ? `${cur.text.trim()}\n${back}` : back });
+        return next;
+      });
+    }
+    return settled;
   }
 
   /** Insert text at the caret in the composer and keep focus there. */
@@ -633,6 +747,9 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
     ]);
     clearDraft(id);
     setAttachNote(null);
+    // A new message supersedes whatever stopped short before it: the background starts a fresh
+    // run on top of the saved conversation, so there is nothing left to resume.
+    markResumable(id, null);
     setRunningChats((prev) => (prev.has(id!) ? prev : new Set(prev).add(id!)));
     lastSentRef.current.set(id, { text: t, refs: used.length ? used : undefined, images: attached.length ? attached : undefined });
     // Start THIS chat's line immediately, before any event comes back, so "is it stuck?" is
@@ -694,13 +811,35 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
   }
 
   /**
-   * Retry after the worker died: resend the message the dead port never delivered — into the chat
-   * it belonged to, which is the chat whose line is offering the button, not merely "the current
-   * chat". connect() will open a fresh port, which wakes the service worker back up.
+   * Carry on a run that failed or was interrupted, from the conversation the background saved.
+   *
+   * Nothing is added to the transcript and no text is sent: the request is "continue chat X", and
+   * the model gets the same conversation it had, tool results included. That is the difference
+   * between this and typing the prompt again, which is what the owner was having to do.
    */
-  function retry() {
+  function resume() {
+    const id = chatId;
+    if (!id || tabId == null || runningChats.has(id)) return;
+    markResumable(id, null);
+    setRunningChats((prev) => new Set(prev).add(id));
+    const at = Date.now();
+    setActivities((prev) => withActivity(prev, id, () => ({ phase: 'model', detail: 'resuming', startedAt: at, lastEventAt: at, queued: 0 })));
+    titleFixRef.current = true;
+    connect().postMessage({ type: 'resume', tabId, chatId: id } satisfies AgentPortRequest);
+  }
+
+  /**
+   * Retry after the port died and the automatic re-attach did not get through. Ask the worker
+   * again first: if the run is still going the line simply comes back, and if it died the chat is
+   * now resumable and says so. Only when the worker knows nothing about this chat at all — the
+   * message never reached it — is the message sent again, into the chat it belonged to.
+   */
+  async function retry() {
     const id = chatId;
     if (!id) return;
+    const ok = await attachToWorker();
+    if (!ok) return;
+    if (liveAtAttachRef.current.has(id) || resumableRef.current.has(id)) return;
     const last = lastSentRef.current.get(id);
     setActivities((prev) => withoutActivity(prev, id));
     setRunningChats((prev) => withoutChat(prev, id));
@@ -773,7 +912,10 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
 
   /** Remember that this chat's restored transcript stops mid-run, so its next event says so once. */
   function markReconnect(id: string, stored: ChatItem[]) {
-    if (looksUnfinished(stored)) reconnectRef.current.add(id);
+    // A chat the background says is running has been captured the whole time (by this panel, or by
+    // the background while no panel was open), so a tool row without a result there is a tool that
+    // is running right now, not output that went missing.
+    if (looksUnfinished(stored) && !liveAtAttachRef.current.has(id)) reconnectRef.current.add(id);
     else reconnectRef.current.delete(id);
   }
 
@@ -787,8 +929,9 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
     setLoaded(false);
     showChat(id, []);
     void readItems(id)
-      .then((stored) => {
+      .then((raw) => {
         if (genRef.current !== gen) return;
+        const stored = settle(id, raw);
         showChat(id, stored);
         markReconnect(id, stored);
         setLoaded(true);
@@ -985,6 +1128,22 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
   const archived = archivedChats(chats);
   const current = chatId ? chats.find((c) => c.id === chatId) : undefined;
   const viewingArchived = !!current && isArchived(current);
+  /** The visible chat's stopped-short run, if it has one and is not already going again. */
+  const resumeState = chatId && !busy ? resumable.get(chatId) : undefined;
+  const lastIsError = items[items.length - 1]?.kind === 'error';
+  /**
+   * The Resume affordance. It belongs to the error it follows, so it renders INSIDE the last error
+   * row when there is one (the error text stays exactly where it was, above the button), and as a
+   * row of its own when the run was interrupted and there is no error to attach it to.
+   */
+  const resumeBlock = resumeState ? (
+    <div className="resume" data-testid="resume" data-resume-state={resumeState.state}>
+      <span className="resume-hint">{RESUME_HINT}</span>
+      <button className="btn primary" data-action="resume" onClick={resume} disabled={tabId == null || unsupported}>
+        {RESUME_LABEL}
+      </button>
+    </div>
+  ) : null;
 
   return (
     <div className="chat">
@@ -1206,9 +1365,20 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
               );
             }
             case 'error':
-              return <div key={i} className="error">{it.text}</div>;
+              return (
+                <div key={i} className="error">
+                  {it.text}
+                  {i === items.length - 1 && resumeBlock}
+                </div>
+              );
           }
         })}
+        {resumeState && !lastIsError && (
+          <div className="error" data-testid="resume-row">
+            {resumeState.state === 'interrupted' ? INTERRUPTED_TEXT : (resumeState.error ?? 'The run stopped before it finished.')}
+            {resumeBlock}
+          </div>
+        )}
         <div ref={bottomRef} />
       </div>
       {/* The draft, pinned. It is a row of the chat column — not an item in the transcript — so it
@@ -1244,8 +1414,9 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
         writing={activity.writing}
         queued={activity.queued}
         disconnected={activity.disconnected}
+        retry={activity.retry}
         onStop={abort}
-        onRetry={retry}
+        onRetry={() => void retry()}
       />
       <div className={`composer${dragging ? ' dragging' : ''}`} onPaste={onPaste} onDrop={onDrop} onDragOver={onDragOver} onDragLeave={() => setDragging(false)}>
         {(refs.length > 0 || images.length > 0) && (

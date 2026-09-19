@@ -912,6 +912,27 @@ details > summary::-webkit-details-marker {
   font-size: var(--fs-meta);
 }
 
+/*
+ * Resume, under the error it follows. The hint is ordinary secondary text, not error text: what
+ * went wrong is coral, what to do about it is not. The button is the panel's usual primary.
+ */
+.resume {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-top: var(--sp-2);
+}
+
+.resume-hint {
+  flex: 1;
+  color: var(--text-2);
+  font-size: var(--fs-meta);
+}
+
+.resume .btn {
+  flex: none;
+}
+
 .ok {
   color: var(--live-text);
   font-size: var(--fs-meta);

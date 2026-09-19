@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { Msg, Part, Settings, ToolDef } from '../types';
+import { ProviderError, isAbortError, parseRetryAfter, streamIncomplete } from './errors.ts';
 import type { Provider, ProviderResponse } from './types';
 
 /** Models that accept adaptive thinking. Older ones (Haiku 4.5, 3.x) reject it. */
@@ -49,6 +50,11 @@ export function createAnthropicProvider(settings: Settings): Provider {
     // We run inside an extension service worker, which the SDK treats as a browser.
     // The key never leaves the user's own machine except to the endpoint they configured.
     dangerouslyAllowBrowser: true,
+    // The SDK would otherwise retry 408/409/429/5xx and connection errors twice on its own, under
+    // the agent loop's five: up to eighteen requests for one model call, with the first two
+    // rounds invisible to the activity line. The loop owns the retry policy (lib/agent/retry.ts),
+    // so the SDK makes exactly one attempt and reports what happened.
+    maxRetries: 0,
   });
   const model = settings.model || 'claude-opus-5';
 
@@ -66,7 +72,16 @@ export function createAnthropicProvider(settings: Settings): Provider {
         { signal },
       );
       stream.on('text', (delta) => callbacks.onText(delta));
-      const message = await stream.finalMessage();
+      let message: Anthropic.Message;
+      try {
+        message = await stream.finalMessage();
+      } catch (e) {
+        throw toProviderError(e, signal);
+      }
+      // A stream that closes cleanly but early still resolves, with whatever had accumulated and no
+      // stop_reason: message_delta, which carries it, never arrived. That is a dropped connection,
+      // not a reply.
+      if (message.stop_reason == null) throw streamIncomplete();
 
       const content: Part[] = [];
       for (const block of message.content) {
@@ -82,4 +97,35 @@ export function createAnthropicProvider(settings: Settings): Provider {
       return { content, stopReason };
     },
   };
+}
+
+/** Error types Anthropic reports inside a 200 stream that mean "try again shortly". */
+const TRANSIENT_TYPES = new Set(['overloaded_error', 'api_error', 'rate_limit_error', 'timeout_error']);
+
+/**
+ * The SDK's errors, as the structured error the loop's retry classifier reads. Typed classes, not
+ * message matching: APIError carries the status and the response headers; a connection that never
+ * produced a response is APIConnectionError; an `error` event inside a stream is an APIError with
+ * no status and the error type on it. An abort is handed back untouched.
+ */
+export function toProviderError(e: unknown, signal?: AbortSignal): unknown {
+  if (isAbortError(e) || signal?.aborted) return e;
+  if (e instanceof ProviderError) return e;
+  if (e instanceof Anthropic.APIConnectionError) return new ProviderError(`Could not reach the model provider (${e.message}).`, { kind: 'network', cause: e });
+  if (e instanceof Anthropic.APIError) {
+    if (typeof e.status === 'number') {
+      return new ProviderError(e.message, { kind: 'http', status: e.status, retryAfterMs: parseRetryAfter(e.headers), cause: e });
+    }
+    const type = typeof e.type === 'string' ? e.type : '';
+    return new ProviderError(e.message, { kind: TRANSIENT_TYPES.has(type) ? 'overloaded' : 'rejected', cause: e });
+  }
+  // What is left is the SDK's bare AnthropicError. Two of those are a reply that did not finish: a
+  // body that broke mid-read (MessageStream wraps the reader's TypeError and keeps it as `cause`)
+  // and "request ended without sending any chunks". Anything else of that class is the SDK
+  // refusing to make the request at all (no credentials, say), which retrying cannot fix.
+  if (e instanceof Anthropic.AnthropicError) {
+    const wrapped = (e as { cause?: unknown }).cause instanceof Error;
+    if (wrapped || /ended without/i.test(e.message)) return streamIncomplete(e);
+  }
+  return e;
 }

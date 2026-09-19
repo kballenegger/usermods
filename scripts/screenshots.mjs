@@ -4,8 +4,8 @@
 //
 //   npm run screenshots      capture everything into docs/screenshots/
 //   npm run smoke            headless: the chat, guardrails, activity, chats, isolation,
-//                            compaction, dashboard, panel scope, theme, tab bar, wait, images and
-//                            artifact flows, all asserted
+//                            compaction, dashboard, panel scope, theme, tab bar, wait, images,
+//                            artifact and resume flows, all asserted
 //   npm run smoke:chats      headless: the chats flow alone (restore, New chat, archive/unarchive)
 //   npm run smoke:isolation  headless: the isolation flow alone (two chats running at once, no bleed)
 //   npm run smoke:compaction headless: the compaction flow alone (both tiers, on a shrunken budget)
@@ -13,6 +13,9 @@
 //   npm run smoke:panelscope headless: the panel-scope flow alone (a real side panel opened on one
 //                            tab and on no other, and the setting flipped both ways)
 //   npm run smoke:tabbar     headless: the top bar alone, at 320/360/420/640 in both themes
+//   npm run smoke:resume     headless: the resume flow alone (a dropped stream retried by itself,
+//                            an outage that ends in Resume, a killed service worker, a panel closed
+//                            mid-run), against the mock's fault injection and its fixture page
 //   npm run smoke:wait       headless: the wait flow alone (every wait_for condition, a deliberate
 //                            timeout, Stop mid-wait), against a fixture page the mock server serves
 //   node scripts/screenshots.mjs --dashboard-capture   that flow, also writing 07-dashboard.png
@@ -65,7 +68,7 @@
 
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
-import { ARTIFACT_V1, ARTIFACT_V2, ARTIFACT_V3, COMPACT_MARKER, FAST_MARKER, IMAGES_MARKER, SLOW_MARKER, SUMMARY_MARKER, WAIT_MARKER } from './mock-llm.mjs';
+import { ARTIFACT_V1, ARTIFACT_V2, ARTIFACT_V3, COMPACT_MARKER, FAST_MARKER, IMAGES_MARKER, RESUME as RESUME_CONV, SLOW_MARKER, SUMMARY_MARKER, WAIT_MARKER } from './mock-llm.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -96,6 +99,7 @@ const ARTIFACT = process.argv.includes('--artifact');
 /** The artifact flow, asserted AND capturing the two draft-panel states for the PR. */
 const ARTIFACT_SHOT = process.argv.includes('--artifact-capture');
 const PANELSCOPE = process.argv.includes('--panelscope');
+const RESUME = process.argv.includes('--resume');
 
 /**
  * Where the tab bar's captures go when --tabbar is asked to write them (`--tabbar-capture`). These
@@ -119,7 +123,7 @@ const SETTINGS_SHOT = process.argv.includes('--settings-capture');
 const CAPTURING =
   !SMOKE && !CHATS && !ISOLATION && !COMPACTION && !DASHBOARD && !DASHBOARD_SHOT && !THEME &&
   !TABBAR && !TABBAR_SHOT && !WAIT && !IMAGES && !STYLEGUIDE && !ARTIFACT && !ARTIFACT_SHOT &&
-  !PANELSCOPE;
+  !PANELSCOPE && !RESUME;
 
 /** See note 4: a first-run setup instruction, not the steady state the README should show. */
 const HIDE_SETUP_NOTICE = '.app > .notice, .dash-inner > .notice { display: none !important; }';
@@ -3546,6 +3550,306 @@ async function styleguideFlow() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Resume test: a lost connection costs a pause, a long outage costs one click, never a re-run.
+// ---------------------------------------------------------------------------
+//
+// The owner's report was "lost connections lead to retrying the prompt entirely". Four things can
+// take a run away from its model, and this flow does each of them for real, against the mock's
+// fault injection (POST /__faults) and the fixture page it serves (so the flow needs no network):
+//
+//   a. the stream drops mid-reply, once        -> retried automatically; the text is not doubled
+//   b. the provider is unreachable for longer than the retries last
+//                                              -> an error with Resume; progress kept; one click
+//   c. the service worker is killed mid-run    -> "This run was interrupted." with Resume
+//   d. the panel is closed mid-run, and reopened while the run is still going
+//                                              -> the run carries on, the transcript is complete,
+//                                                 and the reopened panel shows a run in progress
+//
+// What "never a re-run" means is asserted from what the backend received (/__requests): the user's
+// prompt appears in the conversation exactly once, the resumed request carries the earlier tool
+// results, and no earlier tool call is made a second time.
+
+/**
+ * Real backoff is 1s, 2s, 4s, 8s, 16s: thirty-one seconds per outage. The flow shrinks it through
+ * the one mechanism the extension offers, a chrome.storage.local key (lib/agent/retry.ts
+ * RETRY_POLICY_KEY). Only the extension's own contexts can write there; a web page cannot.
+ * 700ms is long enough for the activity line's "retrying in 1s" to be on screen and recorded.
+ */
+const FAST_RETRY = { 'debug:retryPolicy': { baseDelayMs: 700, maxDelayMs: 700, maxRetries: 3, jitter: 0 } };
+
+async function setFaults(plan) {
+  const res = await fetch(`${CONTROL_BASE}/__faults`, { method: 'POST', body: JSON.stringify({ plan }) });
+  if (!res.ok) throw new Error(`resume: the mock refused the fault plan (${res.status})`);
+}
+
+async function clearFaults() {
+  await fetch(`${CONTROL_BASE}/__faults`, { method: 'DELETE' });
+}
+
+/** The chat-completions bodies one scripted conversation produced, in order. */
+async function requestsFor(script) {
+  return (await fetchRequests()).filter((r) => r.script === script);
+}
+
+async function waitForRequests(script, n, timeout = 30_000) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    const seen = await requestsFor(script);
+    if (seen.length >= n) return seen;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  throw new Error(`resume: the backend never received request ${n} of ${script}`);
+}
+
+const bodyText = (m) => (typeof m.content === 'string' ? m.content : Array.isArray(m.content) ? m.content.map((p) => p.text ?? '').join('\n') : '');
+
+/**
+ * The three claims that together mean "the run was continued, not re-run", checked on one request
+ * body: the prompt is in it once, every tool call in it was made once, and the tool results the
+ * run had already earned are in it.
+ */
+function assertContinued(fail, label, request, prompt, toolsSoFar) {
+  const prompts = request.messages.filter((m) => m.role === 'user' && bodyText(m).includes(prompt)).length;
+  if (prompts !== 1) fail(`${label}: the user's prompt appears ${prompts} times in the conversation sent to the model, not once`);
+  const called = request.messages.flatMap((m) => (m.role === 'assistant' ? (m.tool_calls ?? []).map((c) => c.function.name) : []));
+  if (JSON.stringify(called) !== JSON.stringify(toolsSoFar)) fail(`${label}: the conversation holds tool calls ${JSON.stringify(called)}, expected ${JSON.stringify(toolsSoFar)} (a repeat means a tool was run again)`);
+  const results = request.messages.filter((m) => m.role === 'tool').length;
+  if (results !== toolsSoFar.length) fail(`${label}: ${results} tool results travelled with the request, expected ${toolsSoFar.length}`);
+}
+
+async function toolRows(panel) {
+  return panel.locator('.messages .tool').evaluateAll((rows) =>
+    rows.map((r) => ({ title: r.querySelector('summary')?.textContent?.trim() ?? '', running: !!r.querySelector('.dot.running'), error: r.classList.contains('error') })),
+  );
+}
+
+async function startNewChat(panel) {
+  await panel.locator('.composer button.btn', { hasText: 'New chat' }).click();
+  await panel.locator('.messages .empty').waitFor({ timeout: 10_000 });
+}
+
+async function sendPrompt(panel, text) {
+  await waitForComposer(panel);
+  await panel.locator('textarea').fill(text);
+  await panel.locator('.composer button.btn.primary').click();
+}
+
+async function resumeFlow() {
+  const b = await launch('light');
+  const fail = (m) => {
+    throw new Error(`resume: ${m}`);
+  };
+  try {
+    await clearViolations();
+    await clearFaults();
+    await fetch(`${CONTROL_BASE}/__requests`, { method: 'DELETE' }).catch(() => {});
+
+    let panel = await openPanel(b.ctx, b.extId, { storage: FAST_RETRY });
+    const site = await openSite(b.ctx, FIXTURE_URL);
+    await waitForComposer(panel);
+    await installActivityRecorder(panel);
+    const assistantTexts = () => panel.locator('.messages .msg.assistant').allTextContents();
+
+    // ----- a. The stream drops mid-reply, once. Nobody should have to do anything.
+    const A = RESUME_CONV.drop;
+    await setFaults([{ kind: 'drop', afterChunks: 8, script: 'resume-drop' }]);
+    await sendPrompt(panel, A.prompt);
+    await panel.locator('.messages .msg.assistant', { hasText: A.done }).waitFor({ timeout: 45_000 });
+    await panel.locator('.activity').waitFor({ state: 'detached', timeout: 20_000 }).catch(() => {});
+
+    const seenA = await recorded(panel);
+    const notice = seenA.find((t) => /connection lost/.test(t));
+    if (!notice) fail(`a. the activity line never said the connection was lost. It showed: ${JSON.stringify(seenA)}`);
+    if (!/connection lost·retrying (in \d+s|now)·attempt 1 of 3/.test(notice)) fail(`a. the retry notice read ${JSON.stringify(notice)}`);
+    const afterNotice = seenA.slice(seenA.lastIndexOf(notice) + 1);
+    if (!afterNotice.some((t) => /waiting for model|writing|get_page/.test(t))) fail(`a. the line never returned to its normal label after the retry. After the notice it showed: ${JSON.stringify(afterNotice)}`);
+    if (await panel.locator('.activity').count()) fail('a. the activity line was still up after the run finished');
+
+    const textsA = await assistantTexts();
+    const firstA = textsA.filter((t) => t.includes('RESUMEFIRST-a1'));
+    if (firstA.length !== 1) fail(`a. the first reply appears in ${firstA.length} assistant rows, not 1: ${JSON.stringify(textsA)}`);
+    if (firstA[0].trim() !== A.first) fail(`a. the first reply was duplicated or damaged by the retry. It reads ${JSON.stringify(firstA[0])}, the model said ${JSON.stringify(A.first)}`);
+    const rowsA = await toolRows(panel);
+    if (JSON.stringify(rowsA.map((r) => r.title.split(' ')[0])) !== JSON.stringify(['get_page', 'find_elements'])) fail(`a. expected one get_page row and one find_elements row, saw ${JSON.stringify(rowsA)}`);
+    if (await panel.locator('.messages .error').count()) fail(`a. a blip put an error in the chat: ${await panel.locator('.messages .error').first().textContent()}`);
+    if (await panel.locator('[data-testid="resume"]').count()) fail('a. Resume was offered for a failure that was retried successfully');
+
+    const reqA = await requestsFor('resume-drop');
+    if (reqA.length !== 4) fail(`a. expected 4 requests (dropped, retried, second step, final), the backend saw ${reqA.length}`);
+    if (reqA[0].fault !== 'drop' || reqA[1].fault) fail(`a. the fault did not land on the first request: ${JSON.stringify(reqA.map((r) => r.fault ?? 'ok'))}`);
+    if (JSON.stringify(reqA[0].messages) !== JSON.stringify(reqA[1].messages)) fail('a. the retry did not send the same conversation as the attempt it replaced');
+    assertContinued(fail, 'a. final request', reqA[3], A.prompt, ['get_page', 'find_elements']);
+    console.log(`resume: a OK — mid-stream drop retried by itself (${JSON.stringify(notice)}), reply not duplicated, each tool ran once`);
+
+    // ----- b. An outage that outlasts the retries. One click, and never a re-run.
+    const B = RESUME_CONV.outage;
+    await startNewChat(panel);
+    // The first request goes through, so the run makes real progress (get_page) before the network
+    // goes away. Everything after it is refused until the fault is cleared.
+    await setFaults([{ kind: 'refuse', skip: 1, script: 'resume-outage' }]);
+    await sendPrompt(panel, B.prompt);
+    const resumeBox = panel.locator('[data-testid="resume"]');
+    await resumeBox.waitFor({ timeout: 45_000 });
+
+    const errorText = (await panel.locator('.messages .error').first().textContent()) ?? '';
+    if (!/Could not reach the model provider/.test(errorText)) fail(`b. the error row does not say what went wrong: ${JSON.stringify(errorText)}`);
+    // For looking at the row while working on it; not a README asset (see TABBAR_SHOT_DIR).
+    if (process.env.RESUME_SHOT_DIR) await panel.screenshot({ path: path.join(process.env.RESUME_SHOT_DIR, "resume-failed.png") });
+    if ((await resumeBox.getAttribute('data-resume-state')) !== 'failed') fail('b. the resume state was not "failed"');
+    const button = panel.locator('[data-action="resume"]');
+    if (((await button.textContent()) ?? '').trim() !== 'Resume') fail(`b. the button reads ${JSON.stringify(await button.textContent())}`);
+    const seenB = await recorded(panel);
+    if (!seenB.some((t) => /attempt 3 of 3/.test(t))) fail(`b. the retries were not all announced. The line showed: ${JSON.stringify(seenB.filter((t) => /attempt/.test(t)))}`);
+    if (await panel.locator('.activity').count()) fail('b. the activity line was still up after the run gave up');
+    if (((await panel.locator('.composer button.btn.primary').textContent()) ?? '').trim() !== 'Send') fail('b. the composer still thinks the chat is running');
+
+    let rowsB = await toolRows(panel);
+    if (rowsB.length !== 1 || !rowsB[0].title.includes('get_page') || rowsB[0].running) fail(`b. the progress row was lost or left running: ${JSON.stringify(rowsB)}`);
+
+    // Counted as ATTEMPTS, not as sockets. Chrome's network stack quietly re-sends a request once
+    // when the kept-alive connection it reused turns out to be dead, so the first refused attempt
+    // reaches the mock twice, a millisecond apart, without the extension knowing. Requests closer
+    // together than any backoff could put them are one attempt.
+    const refusedAt = (await requestsFor('resume-outage')).filter((r) => r.fault === 'refuse').map((r) => r.at);
+    const attempts = refusedAt.filter((at, i) => i === 0 || at - refusedAt[i - 1] > 200).length;
+    if (process.env.RESUME_VERBOSE) console.log('[resume] refused at', refusedAt.map((at) => at - refusedAt[0]));
+    if (attempts !== 4) fail(`b. expected 4 refused attempts (one, then three retries), the backend saw ${attempts}: ${JSON.stringify(refusedAt.map((at) => at - refusedAt[0]))}`);
+
+    // The saved model history is the progress: prompt, the tool call, and its result.
+    const savedB = Object.values(await storedMessages(panel)).map((s) => JSON.parse(s)).find((h) => JSON.stringify(h).includes('RESUMEPROMPT-b2'));
+    if (!savedB) fail('b. the failed run saved no model history at all');
+    if (savedB.length !== 3 || !savedB[2].content.some((p) => p.type === 'tool_result')) fail(`b. the saved history does not hold the completed tool result: roles ${JSON.stringify(savedB.map((m) => m.role))}`);
+
+    // Reload the panel: the rows and the Resume button both have to survive it.
+    await reloadPanel(panel);
+    await panel.locator('[data-testid="resume"]').waitFor({ timeout: 20_000 });
+    rowsB = await toolRows(panel);
+    if (rowsB.length !== 1 || !rowsB[0].title.includes('get_page')) fail(`b. the progress row did not survive a panel reload: ${JSON.stringify(rowsB)}`);
+    if ((await panel.locator('.messages .msg.user').count()) !== 1) fail('b. the user bubble did not survive a panel reload');
+
+    // The network comes back; one click.
+    await clearFaults();
+    await site.bringToFront();
+    await waitForComposer(panel);
+    await panel.locator('[data-action="resume"]').click();
+    await panel.locator('.messages .msg.assistant', { hasText: B.done }).waitFor({ timeout: 45_000 });
+    await panel.locator('.activity').waitFor({ state: 'detached', timeout: 20_000 }).catch(() => {});
+
+    if (await panel.locator('[data-testid="resume"]').count()) fail('b. Resume was still offered after the run completed');
+    const bubbles = await panel.locator('.messages .msg.user').count();
+    if (bubbles !== 1) fail(`b. resuming added a user bubble: there are ${bubbles}`);
+    rowsB = await toolRows(panel);
+    if (JSON.stringify(rowsB.map((r) => r.title.split(' ')[0])) !== JSON.stringify(['get_page', 'find_elements'])) fail(`b. after resuming the tool rows were ${JSON.stringify(rowsB)}; get_page must not have run again`);
+
+    const okB = (await requestsFor('resume-outage')).filter((r) => !r.fault);
+    if (okB.length !== 3) fail(`b. expected 3 answered requests (before the outage, the resume, the final), saw ${okB.length}`);
+    assertContinued(fail, 'b. the resumed request', okB[1], B.prompt, ['get_page']);
+    assertContinued(fail, 'b. the final request', okB[2], B.prompt, ['get_page', 'find_elements']);
+    for (const r of await requestsFor('resume-outage')) {
+      const n = r.messages.filter((m) => m.role === 'user' && bodyText(m).includes(B.prompt)).length;
+      if (n !== 1) fail(`b. a request carried the prompt ${n} times`);
+    }
+    console.log('resume: b OK — outage exhausted 3 retries, progress kept across a reload, Resume continued from the tool result, prompt sent once');
+
+    // ----- c. The service worker dies mid-run.
+    const C = RESUME_CONV.kill;
+    await startNewChat(panel);
+    await sendPrompt(panel, C.prompt);
+    // The second request is being held by the mock: the run has one completed step behind it and a
+    // model request in flight. That is the moment to take the worker away.
+    await waitForRequests('resume-kill', 2);
+    await panel.waitForTimeout(300);
+    const killed = await stopServiceWorker(b.ctx, panel);
+    if (!killed) {
+      console.log('resume: c SKIPPED — this Chromium would not stop the extension service worker over CDP');
+    } else {
+      const row = panel.locator('[data-testid="resume-row"]');
+      await row.waitFor({ timeout: 30_000 });
+      const rowText = (await row.textContent()) ?? '';
+      if (process.env.RESUME_SHOT_DIR) await panel.screenshot({ path: path.join(process.env.RESUME_SHOT_DIR, "resume-interrupted.png") });
+      if (!rowText.includes('This run was interrupted.')) fail(`c. the interrupted row reads ${JSON.stringify(rowText)}`);
+      if ((await panel.locator('[data-testid="resume"]').getAttribute('data-resume-state')) !== 'interrupted') fail('c. the resume state was not "interrupted"');
+      if (await panel.locator('.activity').count()) fail(`c. the activity line was still up over a dead run: ${JSON.stringify(await panel.locator('.activity').textContent())}`);
+      let rowsC = await toolRows(panel);
+      if (rowsC.length !== 1 || !rowsC[0].title.includes('get_page')) fail(`c. the completed step's row was lost: ${JSON.stringify(rowsC)}`);
+      // It did NOT resume by itself: nothing new reached the backend while we were looking.
+      const before = (await requestsFor('resume-kill')).length;
+      await panel.waitForTimeout(1500);
+      if ((await requestsFor('resume-kill')).length !== before) fail('c. the interrupted run resumed without a click');
+
+      await site.bringToFront();
+      await panel.locator('[data-action="resume"]').click();
+      await panel.locator('.messages .msg.assistant', { hasText: C.done }).waitFor({ timeout: 45_000 });
+      rowsC = await toolRows(panel);
+      if (JSON.stringify(rowsC.map((r) => r.title.split(' ')[0])) !== JSON.stringify(['get_page', 'find_elements'])) fail(`c. after resuming the tool rows were ${JSON.stringify(rowsC)}`);
+      if ((await panel.locator('.messages .msg.user').count()) !== 1) fail('c. resuming added a user bubble');
+      const reqC = await requestsFor('resume-kill');
+      assertContinued(fail, 'c. the final request', reqC[reqC.length - 1], C.prompt, ['get_page', 'find_elements']);
+      // The request the dead worker had in flight and the one Resume made are the same conversation.
+      if (JSON.stringify(reqC[1].messages) !== JSON.stringify(reqC[2].messages)) fail('c. the resumed request was not the conversation the dead worker had been sending');
+      console.log('resume: c OK — worker killed mid-run, "This run was interrupted." with Resume, no auto-resume, continued from the checkpoint');
+    }
+
+    // ----- d. The panel is closed mid-run and reopened while the run is still going.
+    const D = RESUME_CONV.close;
+    await startNewChat(panel);
+    await sendPrompt(panel, D.prompt);
+    await waitForRequests('resume-close', 2); // step 2 is being held: close the panel under it
+    await panel.waitForTimeout(400); // let the debounced transcript write land, as pagehide also does
+    await panel.close();
+    // Step 2's reply, its tool call and the tool's result all happen with no panel anywhere. The
+    // third request proves they did; the mock then holds THAT one, so the run is still going.
+    await waitForRequests('resume-close', 3, 30_000);
+    panel = await openPanel(b.ctx, b.extId, { storage: FAST_RETRY });
+    await site.bringToFront();
+
+    // The reopened panel shows a run in progress, not a finished-looking transcript.
+    await panel.locator('.activity').waitFor({ timeout: 6_000 }).catch(() => {});
+    if (!(await panel.locator('.activity').count())) fail('d. the reopened panel showed no activity line for a run that was still going');
+    if (!(await panel.locator('.composer button.btn.danger', { hasText: 'Stop' }).count())) fail('d. the reopened panel offered no Stop for a run that was still going');
+    if (((await panel.locator('.composer button.btn.primary').textContent()) ?? '').trim() !== 'Queue') fail('d. the reopened panel offered Send, not Queue, for a run that was still going');
+    // …and it already has what happened while it was closed.
+    let rowsD = await toolRows(panel);
+    if (JSON.stringify(rowsD.map((r) => r.title.split(' ')[0])) !== JSON.stringify(['get_page', 'find_elements'])) fail(`d. the step that ran while the panel was closed is missing from the transcript: ${JSON.stringify(rowsD)}`);
+    if (rowsD.some((r) => r.running)) fail(`d. a finished tool row came back still marked running: ${JSON.stringify(rowsD)}`);
+
+    await panel.locator('.messages .msg.assistant', { hasText: D.done }).waitFor({ timeout: 45_000 });
+    await panel.locator('.activity').waitFor({ state: 'detached', timeout: 20_000 }).catch(() => {});
+    const textD = await transcriptText(panel);
+    if (/reconnected/.test(textD)) fail('d. the panel claimed output was not captured, but the background had kept all of it');
+    if ((textD.match(/Now the heading\./g) ?? []).length !== 1) fail(`d. the reply streamed while the panel was closed appears ${(textD.match(/Now the heading\./g) ?? []).length} times`);
+    if (await panel.locator('[data-testid="resume"]').count()) fail('d. Resume was offered for a run that simply finished');
+    const reqD = await requestsFor('resume-close');
+    assertContinued(fail, 'd. the final request', reqD[reqD.length - 1], D.prompt, ['get_page', 'find_elements']);
+    console.log('resume: d OK — panel closed mid-run: the run carried on, the reopened panel showed it running, transcript complete');
+
+    await assertNoViolations('resume');
+    console.log('resume: OK');
+  } finally {
+    await clearFaults().catch(() => {});
+    await b.close();
+  }
+}
+
+/**
+ * Stop the extension's service worker the way chrome://serviceworker-internals' Stop button does,
+ * over CDP from a page on the extension's own origin. Returns false if this browser will not do it,
+ * so the flow can say so rather than fail on the harness.
+ */
+async function stopServiceWorker(ctx, page) {
+  try {
+    const cdp = await ctx.newCDPSession(page);
+    await cdp.send('ServiceWorker.enable');
+    await cdp.send('ServiceWorker.stopAllWorkers');
+    await cdp.detach().catch(() => {});
+    return true;
+  } catch (e) {
+    console.log(`resume: could not stop the worker over CDP: ${e.message}`);
+    return false;
+  }
+}
+
 async function main() {
   fs.mkdirSync(OUT_DIR, { recursive: true });
   const mock = await startMock();
@@ -3572,6 +3876,10 @@ async function main() {
     }
     if (PANELSCOPE) {
       await panelScopeFlow();
+      return;
+    }
+    if (RESUME) {
+      await resumeFlow();
       return;
     }
     if (SETTINGS_SHOT) {
@@ -3613,6 +3921,7 @@ async function main() {
       await waitFlow();
       await imagesFlow();
       await artifactFlow();
+      await resumeFlow();
       return;
     }
     // The dark set: the design system's own palette, and what the README leads with.

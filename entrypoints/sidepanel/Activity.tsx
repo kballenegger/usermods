@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { activityFor, TICK_MS, type Phase } from '@/lib/activity';
+import { activityFor, TICK_MS, type ChatActivity, type Phase } from '@/lib/activity';
 import './activity.css';
 
 /**
@@ -32,6 +32,8 @@ export interface ActivityProps {
   queued?: number;
   /** The port went away mid-run. */
   disconnected?: boolean;
+  /** The model request is being retried; the wait is counted down against this component's clock. */
+  retry?: ChatActivity['retry'];
   onStop: () => void;
   onRetry: () => void;
 }
@@ -62,6 +64,7 @@ export function Activity(props: ActivityProps) {
     writing: props.writing,
     queued: props.queued,
     disconnected,
+    retry: props.retry ? { ...props.retry, remainingMs: props.retry.until - now } : undefined,
   });
   if (!a) return null;
 

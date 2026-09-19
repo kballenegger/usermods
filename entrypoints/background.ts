@@ -1,4 +1,5 @@
 import { runAgent, type AgentEnv } from '@/lib/agent/loop';
+import { RETRY_POLICY_KEY, resolvePolicy } from '@/lib/agent/retry';
 import { isDomCondition, urlMatches, type WaitOutcome, type WaitSpec } from '@/lib/agent/wait';
 import { buildRegisteredCode, gmValuesKey, loadGmValues, type GmMessage } from '@/lib/gm';
 import { checkConnect, connectOf } from '@/lib/connect';
@@ -9,7 +10,9 @@ import { resyncPlan } from '@/lib/resync';
 import { mapStack, prepareRunScript, renderRunResult, type RunResult } from '@/lib/runscript';
 import { shouldUpdate } from '@/lib/version';
 import { loadMods, modFromProposal, modFromSource, parseHeader, previewFromSource, upsertMod, deleteMod, saveMods } from '@/lib/mods';
-import { appendTurn, archiveChat, bulkChats, countTurns, createChat, deleteChat, getChat, listChats, loadItems, loadMessages, markTitleRefreshed, renameChat, saveMessages, setChatArtifact, setModelTitle, touchChat } from '@/lib/chats';
+import { appendTurn, archiveChat, bulkChats, countTurns, createChat, deleteChat, getChat, listChats, loadItems, loadMessages, markTitleRefreshed, renameChat, saveItems, saveMessages, setChatArtifact, setModelTitle, touchChat } from '@/lib/chats';
+import { loadRuns, markInterrupted, pruneRuns, resumableRuns, saveRuns, type RunMap, type RunRecord } from '@/lib/runstate';
+import { reduceItems } from '@/lib/transcript';
 import { addVersion, currentVersion, draftBlock, loadArtifact, recordProposal, rollbackTo, saveArtifact, toProposal, toSource, type Artifact } from '@/lib/artifact';
 import { buildTitleInput, completedTurns, sanitizeTitle, titleDecision, TITLE_SYSTEM_PROMPT } from '@/lib/title';
 import { createProvider } from '@/lib/providers';
@@ -20,18 +23,21 @@ import {
   unavailableProviderMessage,
 } from '@/lib/buildflags';
 import type { OAuthKind } from '@/lib/oauth';
-import type { AgentPortRequest, OAuthLoginState, RpcRequest } from '@/lib/rpc';
+import type { AgentAttachState, AgentPortRequest, OAuthLoginState, RpcRequest } from '@/lib/rpc';
 import { SessionMap } from '@/lib/sessions';
 import { loadSettings } from '@/lib/settings';
 import { actionClickPlan, resolveScope, windowPanelPlan } from '@/lib/sidepanel';
 import type { SidePanelScope } from '@/lib/types';
 import { looksLikeZip, parseTampermonkeyJson, parseTampermonkeyZipEntries, type TmScript } from '@/lib/tampermonkey';
-import type { AgentEvent, AgentEventBody, ContentRequest, Mod, ModProposal, Msg, Part, Settings, UserTurn } from '@/lib/types';
+import type { AgentEvent, AgentEventBody, ChatItem, ContentRequest, Mod, ModProposal, Msg, Part, Settings, UserTurn } from '@/lib/types';
 
 export default defineBackground(() => {
   // The window-level panel is configured from the stored scope, not unconditionally opened on every
   // tab: see applyPanelScope below and lib/sidepanel.ts for the two layers Chrome gives us.
   void applyPanelScope();
+  // Any run the previous worker was in the middle of died with it. Say so in storage now, so the
+  // panel can offer Resume the moment it asks (see recoverRuns and lib/runstate.ts).
+  void recoverRuns();
 
   /**
    * Open the panel on the clicked tab alone.
@@ -94,7 +100,16 @@ export default defineBackground(() => {
     if (port.name.startsWith('gm:')) return registerGmPort(port);
     if (port.name !== 'agent') return;
     agentPorts.add(port);
+    // A panel is listening again, so the transcript is its to write. Whatever was kept on its
+    // behalf while nobody was (see recordDetached) goes to storage now, before it reads.
+    void flushDetached();
     port.onMessage.addListener((req: AgentPortRequest) => {
+      if (req.type === 'resume') {
+        // Nothing to do if this chat is already running: the button was pressed twice, or in two
+        // panels. A second run over the same conversation is exactly what this must never start.
+        if (!sessions.isRunning(req.chatId)) void runChat(req.chatId, req.tabId, null);
+        return;
+      }
       if (req.type === 'abort') {
         // Only this chat. Stop used to abort whatever the port last started, which meant pressing
         // Stop in the chat you were reading killed a run belonging to a different tab.
@@ -108,11 +123,12 @@ export default defineBackground(() => {
       const { start } = sessions.accept(req.chatId, req.tabId, turn);
       if (start) void runChat(req.chatId, req.tabId, turn);
     });
-    // The panel going away does NOT stop a run. History and the transcript are both keyed by chat
-    // id and written by the background, so a run that finishes with no panel attached still lands
-    // in the right chat; killing it instead would throw away work the moment the user switched to
-    // a window without the side panel. Events posted meanwhile go nowhere, and the panel says
-    // "reconnected" when it comes back to a transcript that stops mid-turn.
+    // The panel going away does NOT stop a run. The model history is keyed by chat id and written
+    // here, so a run that finishes with no panel attached still lands in the right chat; killing it
+    // instead would throw away work the moment the user switched to a window without the side
+    // panel. The TRANSCRIPT is normally the panel's to write, so while no panel is attached the
+    // background keeps it instead (recordDetached), and a panel that comes back finds every row the
+    // run produced rather than a conversation that stops where it was closed.
     port.onDisconnect.addListener(() => agentPorts.delete(port));
   });
 });
@@ -135,6 +151,12 @@ const agentPorts = new Set<chrome.runtime.Port>();
  */
 function postAgentEvent(chatId: string, body: AgentEventBody): void {
   const event: AgentEvent = { ...body, chatId };
+  // What this chat's run last said it was doing, for a panel that opens mid-run ('agent.attach').
+  if (body.type === 'status') {
+    if (body.phase === 'idle') lastStatus.delete(chatId);
+    else lastStatus.set(chatId, event as Extract<AgentEvent, { type: 'status' }>);
+  }
+  if (!agentPorts.size) recordDetached(chatId, body);
   for (const port of agentPorts) {
     try {
       port.postMessage(event);
@@ -144,12 +166,190 @@ function postAgentEvent(chatId: string, body: AgentEventBody): void {
   }
 }
 
-async function runChat(chatId: string, tabId: number, turn: UserTurn): Promise<void> {
+// ---------- the transcript, while no panel is open ----------
+
+/** The last status event each running chat posted. Cleared by that chat's 'idle'. */
+const lastStatus = new Map<string, Extract<AgentEvent, { type: 'status' }>>();
+
+/**
+ * Transcripts being kept on the panel's behalf, by chat id: the reduced items, and whether they
+ * have changed since they were last written.
+ *
+ * The panel owns 'chat:<id>:items' whenever one is open — it holds the user's bubbles and applies
+ * every event, for visible and off-screen chats alike. With NO panel open nobody did, and events
+ * "went nowhere": a run that carried on after the panel was closed finished correctly in the model
+ * history and left a transcript that stopped where the panel had been closed, tool rows and the
+ * reply simply missing. This applies the same pure reduction the panel uses (lib/transcript.ts)
+ * to the stored items for exactly that interval, and hands back the moment a port connects.
+ */
+const detached = new Map<string, { items: Promise<ChatItem[]>; latest: ChatItem[] | null; timer: ReturnType<typeof setTimeout> | null }>();
+
+/** Text deltas arrive many times a second; everything else is written at once. */
+const DETACHED_TEXT_DEBOUNCE_MS = 400;
+
+function recordDetached(chatId: string, body: AgentEventBody): void {
+  // These never change a transcript (reduceItems returns its input), so they need not load one.
+  if (body.type === 'status' || body.type === 'chat_title' || body.type === 'done') {
+    if (body.type === 'done') void flushDetachedChat(chatId);
+    return;
+  }
+  let entry = detached.get(chatId);
+  if (!entry) {
+    entry = { items: loadItems(chatId).catch(() => [] as ChatItem[]), latest: null, timer: null };
+    detached.set(chatId, entry);
+  }
+  const e = entry;
+  e.items = e.items.then((items) => {
+    const next = reduceItems(items, body);
+    if (next === items) return items;
+    e.latest = next;
+    // Still the entry of record? A port may have connected and flushed while the load was pending.
+    if (detached.get(chatId) !== e) {
+      void saveItems(chatId, next).catch(() => {});
+      return next;
+    }
+    if (e.timer) clearTimeout(e.timer);
+    if (body.type === 'text') e.timer = setTimeout(() => void writeDetached(chatId, e), DETACHED_TEXT_DEBOUNCE_MS);
+    else void writeDetached(chatId, e);
+    return next;
+  });
+}
+
+async function writeDetached(chatId: string, entry: { latest: ChatItem[] | null; timer: ReturnType<typeof setTimeout> | null }): Promise<void> {
+  if (entry.timer) clearTimeout(entry.timer);
+  entry.timer = null;
+  const items = entry.latest;
+  entry.latest = null;
+  if (items) await saveItems(chatId, items).catch(() => {});
+}
+
+async function flushDetachedChat(chatId: string): Promise<void> {
+  const entry = detached.get(chatId);
+  if (!entry) return;
+  detached.delete(chatId);
+  await entry.items.catch(() => {});
+  await writeDetached(chatId, entry);
+}
+
+/** Write out everything being kept, and stop keeping it. Called when a panel connects. */
+async function flushDetached(): Promise<void> {
+  await Promise.all([...detached.keys()].map((id) => flushDetachedChat(id)));
+}
+
+// ---------- run records (lib/runstate.ts) ----------
+
+/** One writer, one chain: two chats finishing at once must not lose each other's record. */
+let runsChain: Promise<unknown> = Promise.resolve();
+
+function updateRuns(fn: (runs: RunMap) => RunMap): Promise<void> {
+  const next = runsChain
+    .catch(() => {})
+    .then(async () => {
+      const runs = await loadRuns();
+      const updated = fn(runs);
+      if (updated !== runs) await saveRuns(updated);
+    });
+  runsChain = next;
+  return next.catch(() => {});
+}
+
+function setRun(chatId: string, patch: Pick<RunRecord, 'state' | 'tabId'> & { error?: string }): Promise<void> {
+  return updateRuns((runs) => {
+    const now = Date.now();
+    const prev = runs[chatId];
+    const startedAt = patch.state === 'running' || !prev ? now : prev.startedAt;
+    return { ...runs, [chatId]: { state: patch.state, tabId: patch.tabId, startedAt, updatedAt: now, ...(patch.error ? { error: patch.error } : {}) } };
+  });
+}
+
+function clearRuns(ids: string[]): Promise<void> {
+  return updateRuns((runs) => {
+    if (!ids.some((id) => id in runs)) return runs;
+    const next = { ...runs };
+    for (const id of ids) delete next[id];
+    return next;
+  });
+}
+
+/**
+ * Find the runs that died with a previous worker and mark them interrupted; forget records whose
+ * chat is gone. Called at worker start, and again by 'agent.attach' so the panel never reads the
+ * records before this has had its say. It never resumes anything: that takes a click.
+ */
+function recoverRuns(): Promise<void> {
+  return (async () => {
+    // An index that could not be read prunes nothing: a storage hiccup must not forget a run.
+    const chats = await listChats().catch(() => null);
+    const existing = chats ? new Set(chats.map((c) => c.id)) : null;
+    await updateRuns((runs) => markInterrupted(existing ? pruneRuns(runs, existing) : runs, (id) => sessions.isRunning(id)).runs);
+  })().catch((e) => console.warn('[usermods] recoverRuns', e));
+}
+
+/** The answer to 'agent.attach': see lib/rpc.ts. */
+async function attachState(): Promise<AgentAttachState> {
+  // Both must have settled before the panel reads storage on the strength of this answer.
+  await Promise.all([flushDetached(), recoverRuns()]);
+  await runsChain.catch(() => {});
+  const runs = await loadRuns().catch(() => ({}) as RunMap);
+  const running: AgentAttachState['running'] = {};
+  for (const id of sessions.ids()) {
+    if (!sessions.isRunning(id)) continue;
+    const status = lastStatus.get(id);
+    running[id] = { startedAt: runs[id]?.startedAt ?? Date.now(), ...(status ? { status } : {}) };
+  }
+  const resumable = resumableRuns(runs);
+  // A chat that is running in THIS worker is not resumable, whatever an old record says.
+  for (const id of Object.keys(running)) delete resumable[id];
+  return { running, resumable };
+}
+
+/**
+ * Keep the worker alive while a run is in flight.
+ *
+ * Chrome stops an extension service worker after 30 seconds without an extension event or API
+ * call, and an in-flight fetch is neither. A model that thinks for a minute before its first byte
+ * produces no events at all in that time (nothing is streaming to the panel, and with the panel
+ * closed nothing would be posted anyway), so the worker could be stopped under a healthy request.
+ * Calling a trivial extension API on a timer for the duration of the work is the pattern Chrome's
+ * own migration guide gives for exactly this ("keep a service worker alive until a long-running
+ * operation is finished"). It is scoped to running sessions and released when the last one ends.
+ *
+ * This is a reduction in how often a run is interrupted, not a guarantee against it: the browser
+ * can still quit, the extension can be reloaded, the worker can be killed by hand. Those all land
+ * on the interrupted path above.
+ */
+const KEEPALIVE_MS = 20_000;
+let keepAliveHolds = 0;
+let keepAliveTimer: ReturnType<typeof setInterval> | null = null;
+
+function holdWorker(): () => void {
+  if (keepAliveHolds++ === 0) keepAliveTimer = setInterval(() => void chrome.runtime.getPlatformInfo().catch(() => {}), KEEPALIVE_MS);
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    if (--keepAliveHolds === 0 && keepAliveTimer) {
+      clearInterval(keepAliveTimer);
+      keepAliveTimer = null;
+    }
+  };
+}
+
+/**
+ * One run of one chat. `turn` is the message that starts it, or null to RESUME: continue from the
+ * saved conversation without adding anything to it (see AgentInput.turn).
+ */
+async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Promise<void> {
   const session = sessions.ensure(chatId, tabId);
   session.running = true;
   session.controller = new AbortController();
   const signal = session.controller.signal;
   const post = (e: AgentEventBody) => postAgentEvent(chatId, e);
+  const release = holdWorker();
+  // Written before anything else happens, so there is no moment at which a run exists and storage
+  // does not know. It also replaces a 'failed' or 'interrupted' record: whether this is a resume or
+  // a new message, that run is no longer the thing to resume.
+  await setRun(chatId, { state: 'running', tabId: session.tabId });
   // Only a turn that finished cleanly is worth naming: an aborted or failed one has nothing
   // the model could summarise, and the user's own message is already the placeholder title.
   let succeeded = false;
@@ -160,12 +360,19 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn): Promise<v
   let history: Msg[] = [];
   /** The page this turn was sent from, recorded on the chat so the dashboard can reopen it there. */
   let url = '';
+  /** Set when the run stopped short with its conversation saved, which is what Resume needs. */
+  let failed: string | null = null;
+  /** Whether the loop has written the conversation back at least once (see onCheckpoint). */
+  let checkpointed = false;
   try {
+    if (!turn) post({ type: 'status', phase: 'model', detail: 'resuming' });
     settings = await loadSettings();
     const usesKey = settings.provider === 'anthropic' || settings.provider === 'openai-compatible';
     if (usesKey && !settings.apiKey && !settings.baseUrl) throw new Error('Add an API key in Settings first (or a base URL for a local server or proxy).');
     if (!settings.model) throw new Error('Choose a model in Settings first.');
     history = await loadMessages(chatId);
+    if (!turn && !history.length) throw new Error('There is nothing to resume in this chat. Send your message again.');
+    const retryPolicy = resolvePolicy((await chrome.storage.local.get(RETRY_POLICY_KEY).catch(() => ({}) as Record<string, unknown>))[RETRY_POLICY_KEY]);
     // The chat's draft mod, read once at the top of the turn and kept up to date by the recorder
     // below. renderTurn asks for it on every user message, including ones queued mid-run, so a
     // proposal made in step 3 is what a message queued in step 4 is answered against.
@@ -173,8 +380,8 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn): Promise<v
     // The first message of a chat names it. Every message records the page it was sent from, so
     // the dashboard can reopen the chat on that page rather than the site's front door.
     url = await tabUrl(session.tabId);
-    await touchChat(chatId, history.length ? { url } : { title: turn.text, url });
-    const messages = await runAgent({
+    await touchChat(chatId, history.length || !turn ? { url } : { title: turn.text, url });
+    const outcome = await runAgent({
       settings,
       history,
       turn,
@@ -194,6 +401,13 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn): Promise<v
       // version even if this one later dies mid-run, which is the whole point: the chat that was
       // too big to send must not stay too big to send.
       onCompacted: (msgs) => saveMessages(chatId, msgs),
+      // The conversation is written back after every completed step, not only at the end. If the
+      // worker is evicted half-way through a twenty-step run, nineteen steps are on disk.
+      onCheckpoint: async (msgs) => {
+        await saveMessages(chatId, msgs);
+        checkpointed = true;
+      },
+      retry: { policy: retryPolicy },
       draft: () => (artifact ? draftBlock(artifact) : ''),
       onProposal: async (proposal) => {
         artifact = await recordProposal(chatId, proposal);
@@ -204,22 +418,37 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn): Promise<v
         return artifact.current;
       },
     });
+    // Whatever happened, the loop hands back a valid conversation holding everything it completed:
+    // every assistant message, every tool call and every tool result up to the step that failed.
+    const messages = outcome.messages;
     await saveMessages(chatId, messages);
     await touchChat(chatId, { url, turns: countTurns(messages) });
-    succeeded = !signal.aborted;
+    if (outcome.failure) failed = outcome.failure.message;
+    succeeded = !signal.aborted && !outcome.failure;
   } catch (e) {
-    // Keep everything that was already in the chat, plus the turn that failed, so retrying
-    // does not start from nothing. Partial assistant output inside the failed run is lost;
-    // loop.ts should later attach its messages to the thrown error so we can keep those too.
+    // The run never reached the loop (no API key, no model, storage unreadable). The turn is still
+    // recorded, so fixing the setting and pressing Resume continues without retyping anything.
+    failed = e instanceof Error ? e.message : String(e);
     try {
-      const kept = appendTurn(history, turn);
-      await saveMessages(chatId, kept);
+      // Once the loop has checkpointed, what is in storage is at least as complete as anything that
+      // could be rebuilt here, so it is left alone.
+      const kept = checkpointed ? await loadMessages(chatId) : turn ? appendTurn(history, turn) : history;
+      if (turn && !checkpointed) await saveMessages(chatId, kept);
       await touchChat(chatId, { url, turns: countTurns(kept) });
+      if (!kept.length) failed = null;
     } catch {
       /* storage failed too; the error below is still reported */
     }
-    post({ type: 'error', message: e instanceof Error ? e.message : String(e) });
+    if (failed === null) post({ type: 'error', message: e instanceof Error ? e.message : String(e) });
   }
+  if (failed !== null && !signal.aborted) {
+    // The record goes in BEFORE the event, so a panel that reloads on seeing the error finds it.
+    await setRun(chatId, { state: 'failed', tabId: session.tabId, error: failed });
+    post({ type: 'error', message: failed, resumable: true });
+  } else {
+    await clearRuns([chatId]);
+  }
+  release();
   session.running = false;
   // Stop clears the queue; otherwise anything still waiting starts the next turn.
   const next = session.queue.shift();
@@ -494,8 +723,11 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
       return loadItems(req.id);
     case 'chats.create':
       return createChat(req.host);
+    case 'agent.attach':
+      return attachState();
     case 'chats.delete':
       await deleteChat(req.id);
+      await clearRuns([req.id]);
       return { ok: true };
     case 'chats.archive':
       await archiveChat(req.id, req.archived);
@@ -505,6 +737,7 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
       return { ok: true };
     case 'chats.bulk':
       await bulkChats(req.ids, req.action);
+      if (req.action === 'delete') await clearRuns(req.ids);
       return { ok: true };
     case 'mods.bulk': {
       const wanted = new Set(req.ids);
