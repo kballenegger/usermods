@@ -22,6 +22,7 @@
     "smoke:isolation": "wxt build && node scripts/screenshots.mjs --isolation",
     "smoke:compaction": "wxt build && node scripts/screenshots.mjs --compaction",
     "smoke:dashboard": "wxt build && node scripts/screenshots.mjs --dashboard",
+    "smoke:panelscope": "wxt build && node scripts/screenshots.mjs --panelscope",
     "smoke:theme": "wxt build && node scripts/screenshots.mjs --theme",
     "smoke:tabbar": "wxt build && node scripts/screenshots.mjs --tabbar",
     "smoke:wait": "wxt build && node scripts/screenshots.mjs --wait",

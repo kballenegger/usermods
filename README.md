@@ -138,17 +138,40 @@ Then in Chrome:
 
 1. Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked**, and pick `.output/chrome-mv3`.
 2. Click **Details** on usermods and turn on **Allow User Scripts**. Chrome requires this toggle for any extension that runs user scripts, including Tampermonkey.
-3. Click the usermods icon to open the side panel. Go to **Settings**, pick a provider, paste a key (or a local server URL), and save.
+3. Click the usermods icon to open the side panel **on that tab**. Go to **Settings**, pick a provider, paste a key (or a local server URL), and save.
+
+### Where the panel opens
+
+By default the panel belongs to the tab you opened it on. Switch to another tab and it is not
+there; come back and it is, still on the same chat. That matches what the panel actually shows —
+this site's chats, this site's mods — so it is never sitting over an unrelated tab claiming to be
+about it.
+
+*Side panel opens* in **Settings** has the other choice: **On every tab** is Chrome's window-wide
+panel, which follows you from tab to tab until you close it, and is how usermods behaved before
+this setting existed. The change takes effect on the next click of the toolbar icon — no reload.
+
+The toolbar icon only opens the panel; Chrome gives extensions no way to close one, so closing is
+the ✕ in the panel's own header.
 
 For development, `npm run dev` starts WXT with hot reload and opens a Chrome profile with the extension loaded. `npm run typecheck` type-checks, and `npm test` runs the header/backup parser tests (Node's built-in runner, no browser needed).
 
-`npm run screenshots` regenerates the images above, and `npm run smoke` runs the same flow headless as an end-to-end check of the chat loop. Both build the extension, load it into Playwright's Chromium, and drive the real side panel against `scripts/mock-llm.mjs` — a local server that plays scripted conversations over the OpenAI wire protocol, so neither needs an API key or a live model. The page-inspection tools run for real against live pages, and the smoke run asserts that the reply streams, that `get_page`, `find_elements` and `get_styles` all succeed, that the proposal card appears with the expected name and match pattern, and that saving it writes a userscript to storage. A second scripted conversation covers the agent's guardrails: it makes four page reads in a row and then proposes an untested mod, and the smoke reads the mock's recorded requests back from `GET /__requests` to prove the read-budget nudge and the propose-time refusal actually reached the model. A third (`npm run smoke:wait`) drives every `wait_for` condition against a fixture page the mock server serves itself, where content arrives 800ms late, an element is revealed by editing a CSS rule and nothing else, the route changes by `pushState`, and a region mutates for 1.5s and then settles — asserting from the recorded requests that an already-true condition returned in under 100ms, that the style-only reveal was noticed promptly (which only the polling floor can do), that a deliberate timeout carried diagnostics and was not flagged as an error, and that Stop ends a 20-second wait within 500ms leaving no observer behind. See the comments at the top of `scripts/screenshots.mjs` for how the side panel is driven without a real side panel.
+`npm run screenshots` regenerates the images above, and `npm run smoke` runs the same flow headless as an end-to-end check of the chat loop. Both build the extension, load it into Playwright's Chromium, and drive the real side panel against `scripts/mock-llm.mjs` — a local server that plays scripted conversations over the OpenAI wire protocol, so neither needs an API key or a live model. The page-inspection tools run for real against live pages, and the smoke run asserts that the reply streams, that `get_page`, `find_elements` and `get_styles` all succeed, that the proposal card appears with the expected name and match pattern, and that saving it writes a userscript to storage. A second scripted conversation covers the agent's guardrails: it makes four page reads in a row and then proposes an untested mod, and the smoke reads the mock's recorded requests back from `GET /__requests` to prove the read-budget nudge and the propose-time refusal actually reached the model. A third (`npm run smoke:wait`) drives every `wait_for` condition against a fixture page the mock server serves itself, where content arrives 800ms late, an element is revealed by editing a CSS rule and nothing else, the route changes by `pushState`, and a region mutates for 1.5s and then settles — asserting from the recorded requests that an already-true condition returned in under 100ms, that the style-only reveal was noticed promptly (which only the polling floor can do), that a deliberate timeout carried diagnostics and was not flagged as an error, and that Stop ends a 20-second wait within 500ms leaving no observer behind. See the comments at the top of `scripts/screenshots.mjs` for how the panel page is driven in an ordinary tab standing in for the real panel — and, in the panel-scope flow, how the real panel is opened and observed instead.
 
-`npm run smoke` runs three flows: the chat loop above, the chats flow (`npm run smoke:chats` — the
-panel restoring the last chat, archiving, unarchiving on send) and the dashboard flow
+`npm run smoke` runs four flows: the chat loop above, the chats flow (`npm run smoke:chats` — the
+panel restoring the last chat, archiving, unarchiving on send), the dashboard flow
 (`npm run smoke:dashboard` — host grouping and counts, search narrowing on titles, hosts and
 message text, the transcript preview, inline rename, archive, the "open this chat on its page"
-handoff, toggling a mod through to storage, editing a mod's source, and bulk actions).
+handoff, toggling a mod through to storage, editing a mod's source, and bulk actions) and the
+panel-scope flow (`npm run smoke:panelscope`). That last one drives the *real* side panel: a
+Playwright click is a trusted user gesture, which is all `chrome.sidePanel.open` asks for, so
+clicking *Open* genuinely opens a panel. Playwright never lists the panel as a page, so the flow
+observes it through the extension's own APIs — `chrome.runtime.getContexts()` reports a
+`SIDE_PANEL` context, and `chrome.sidePanel.getOptions()` says which tab it is attached to. It
+asserts that under the default scope the window-level panel is disabled, that the clicked tab gets
+tab-specific options while a second tab in the same window still reports the disabled default, that
+those options survive the tab navigating to the chat's page, and that flipping the setting to *on
+every tab* and back reconfigures Chrome both ways.
 
 ## Providers
 
@@ -241,7 +264,7 @@ Regex-style `@include` lines (`/^https?:\/\/…$/`) are not supported; Chrome ma
 
 ## Dashboard
 
-The side panel is scoped to the page you are on: it shows that site's chats and highlights that
+The side panel is scoped to the page you are on — by default to the tab as well: it shows that site's chats and highlights that
 site's mods. The dashboard is the other half — everything, everywhere, in a full tab.
 
 ![The dashboard, showing the overview strip, chats grouped by host, and a transcript preview](docs/screenshots/07-dashboard.png)
@@ -258,11 +281,19 @@ debounced and capped rather than all at once. Each chat can be renamed inline, a
 or opened; clicking one shows its transcript read-only beside the list, so you can re-read an old
 conversation without going back to the site. Select several for a bulk archive or delete.
 
-**Reopening a chat.** *Open* puts you back where the chat was: it opens the page the chat was last
-used on in a new tab, with the side panel showing that chat rather than whatever the panel would
-otherwise have restored. Chats remember their page from the turn they were last used on; chats
-recorded before that existed fall back to the site's front door. Opening an archived chat this way
-does not unarchive it — as in the panel, only sending a message does.
+**Reopening a chat.** *Open* puts you back where the chat was: the page the chat was last used on,
+with the side panel showing that chat rather than whatever the panel would otherwise have restored.
+With the default *on this tab only* scope it goes there in the dashboard's own tab, because that is
+the only way to have the panel open on the right tab — `chrome.sidePanel.open` has to be called
+inside the click that asked for it, before the destination tab could exist, so usermods opens the
+panel on the tab it already has and then navigates that same tab (a tab keeps its id, and its panel,
+across a navigation). *Open in new tab* beside it keeps the dashboard where it is and loads the page
+in a new tab; open the panel there yourself. Under *on every tab* scope, *Open* behaves as it always
+did: a new tab and the window-wide panel.
+
+Chats remember their page from the turn they were last used on; chats recorded before that existed
+fall back to the site's front door. Opening an archived chat this way does not unarchive it — as in
+the panel, only sending a message does.
 
 **Mods.** Every saved script with its version, match patterns, grants, world, size, when it changed
 and where it came from (a download host, *written in chat*, or *imported*). Filter by site or by

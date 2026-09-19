@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { STORE_BUILD, migrateSettingsForBuild } from '@/lib/buildflags';
 import { rpc, type OAuthKind, type OAuthLoginState } from '@/lib/rpc';
 import { loadSettings, saveSettings } from '@/lib/settings';
+import { resolveScope } from '@/lib/sidepanel';
 import { applyTheme } from '@/lib/theme';
-import { DEFAULT_CONTEXT_BUDGET, DEFAULT_SETTINGS, type Settings, type ThemeChoice } from '@/lib/types';
+import { DEFAULT_CONTEXT_BUDGET, DEFAULT_SETTINGS, type Settings, type SidePanelScope, type ThemeChoice } from '@/lib/types';
 
 const THEMES: Array<{ value: ThemeChoice; label: string }> = [
   { value: 'system', label: 'System' },
@@ -177,6 +178,29 @@ export function SettingsView({ onReviewNotice }: { onReviewNotice?: () => void }
           How much conversation to send the model before usermods compacts it: first by trimming old
           page snapshots and tool output, then by summarising the earlier part of the chat. Lower is
           cheaper and faster; higher keeps more of the chat in front of the model.
+        </span>
+      </label>
+
+      {/*
+        Where the panel opens. The background worker watches chrome.storage for this and reconfigures
+        Chrome's window-level panel the moment it lands, so the next toolbar click already obeys it —
+        no reload, and nothing to do here beyond saving it (see lib/sidepanel.ts).
+      */}
+      <label className="field">
+        Side panel opens
+        <select
+          data-testid="settings-panel-scope"
+          value={resolveScope(s)}
+          onChange={(e) => update({ sidePanelScope: e.target.value as SidePanelScope })}
+        >
+          <option value="tab">On this tab only</option>
+          <option value="window">On every tab</option>
+        </select>
+        <span>
+          On this tab only is the default: the panel stays on the tab you opened it from and is
+          hidden on the others, coming back when you return. On every tab is Chrome's window-wide
+          panel, which follows you until you close it. Either way, closing is the ✕ in the panel's
+          own header — the toolbar icon opens it and cannot close it again.
         </span>
       </label>
 

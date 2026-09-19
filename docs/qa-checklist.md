@@ -166,6 +166,73 @@ first-run surfaces still look right — skip deeper testing here.
 
 ---
 
+## 4a. Where the side panel opens: this tab, or every tab
+
+This is the part `npm run smoke:panelscope` **cannot** reach. That flow proves the options behind
+the behaviour — that the window-level panel is disabled, that the clicked tab gets tab-specific
+options and another tab in the same window does not, and that the setting reconfigures Chrome both
+ways — by reading `chrome.sidePanel.getOptions()`. Two things are left to you here:
+
+- **the toolbar icon itself.** `chrome.action.onClicked` cannot be fired from a page and Playwright
+  cannot click browser chrome, so nothing automated has ever clicked the real icon.
+- **seeing the panel appear and disappear as you switch tabs.** Chrome's own show/hide of a
+  tab-specific panel is not reported by any extension API. Only your eyes can check it.
+
+1. Open two ordinary web pages in the same window, on **different sites** — call them **A** and
+   **B**. Make A the active tab and click the usermods toolbar icon.
+   **Expected:** the side panel opens, showing A's host in the tab bar.
+   **If it fails:** service worker console (the click handler logs `sidePanel.open` failures).
+2. Switch to tab **B**.
+   **Expected:** the panel is **gone**. B shows no side panel at all — this is the whole point of
+   the default.
+   **If it fails:** service worker console, and check Settings → *Side panel opens* actually reads
+   *On this tab only*.
+3. Switch back to tab **A**.
+   **Expected:** the panel is back, on the same chat, without re-opening it by hand.
+   **If it fails:** side panel DevTools.
+4. With the panel open on A, click the toolbar icon again.
+   **Expected:** nothing happens — the panel stays open. Chrome gives extensions no way to close a
+   panel, so the icon opens and never closes; the ✕ in the panel's own header is how you close it.
+   This is documented behaviour, not a bug. (If the panel *closes*, that is a Chrome change worth
+   reporting.)
+5. Navigate tab **A** to a different page on the same site, then to a different site entirely.
+   **Expected:** the panel stays open through both, and re-targets to whatever host A is now on.
+   **If it fails:** side panel DevTools.
+6. Open the panel on tab **B** as well (icon click while B is active), then switch A ↔ B a few
+   times.
+   **Expected:** each tab keeps its own panel, each showing that site's chats. Two tabs can both
+   have one; the point is that a tab you never opened it on does not.
+   **If it fails:** side panel DevTools on whichever one is wrong.
+7. Close tab **A** while its panel is open, then open a brand new tab on A's site.
+   **Expected:** the new tab has **no** panel until you click the icon on it. (Chrome does not carry
+   per-tab panel state to a new tab, and it drops it with the closed tab.)
+   **If it fails:** service worker console.
+8. Go to **Settings → Side panel opens** and choose **On every tab**. Close the panel (✕), then
+   click the toolbar icon on tab B.
+   **Expected:** the panel opens, and now it **follows you** — switch to any other tab, including
+   brand new ones, and it is still there. No extension reload was needed.
+   **If it fails:** service worker console.
+9. Set it back to **On this tab only**. Close the panel, click the icon on one tab, switch away.
+   **Expected:** back to the per-tab behaviour from step 2.
+   **If it fails:** service worker console.
+10. **Dashboard handoff, default scope.** With *On this tab only* set, open the dashboard (toolbar
+    icon → Options, or the Dashboard button in the panel), pick a chat that has a recorded page,
+    and click **Open with sidebar**.
+    **Expected:** *that dashboard tab* navigates to the chat's page, and the side panel is open on
+    it showing that chat — not a new tab, and no panel on any other tab.
+    **If it fails:** side panel DevTools and the dashboard tab's own console.
+11. Go back to the dashboard and click **Open in new tab** on the same chat.
+    **Expected:** the dashboard stays where it is and the chat's page loads in a **new** tab. That
+    new tab has no panel yet; clicking the toolbar icon there opens it on the chat (the handoff is
+    good for two minutes).
+    **If it fails:** the dashboard tab's console.
+12. Switch to **On every tab**, return to the dashboard, and click **Open with sidebar**.
+    **Expected:** the old behaviour — a **new** tab on the chat's page, the dashboard still open
+    behind it, and the window-wide panel showing that chat.
+    **If it fails:** the dashboard tab's console.
+
+---
+
 ## 5. Install from a Greasy Fork link (`.user.js` redirect)
 
 1. Find any real userscript on Greasy Fork (greasyfork.org) — open a script's page and click its
@@ -481,6 +548,7 @@ Same flow as section 11, with the **SuperGrok subscription** preset / "xAI subsc
 | 2 | Element references (picker) | | |
 | 3 | Queue mid-run and Stop | | |
 | 4 | Chat persistence: reload, restart, second chat | | |
+| 4a | Side panel: this tab only, every tab, dashboard Open | | |
 | 5 | Install from Greasy Fork `.user.js` link | | |
 | 6 | `@require` + `GM_setValue`/`GM_getValue` sync (2 tabs) | | |
 | 7 | `GM_xmlhttpRequest` with/without matching `@connect` | | |

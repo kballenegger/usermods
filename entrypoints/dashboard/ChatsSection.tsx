@@ -15,7 +15,8 @@ import {
   type ChatHandoff,
 } from '@/lib/dashboard';
 import { rpc } from '@/lib/rpc';
-import type { ChatItem } from '@/lib/types';
+import { openChatPlan, PANEL_PATH, resolveScope } from '@/lib/sidepanel';
+import type { ChatItem, Settings, SidePanelScope } from '@/lib/types';
 import { TranscriptPreview, transcriptText } from './TranscriptPreview';
 
 const SEARCH_DEBOUNCE_MS = 200;
@@ -37,6 +38,16 @@ export function ChatsSection({ chats, loaded, onChanged }: { chats: Chat[]; load
    * effect restart on its own output.
    */
   const stampsRef = useRef<Map<string, number>>(new Map());
+  /**
+   * This dashboard tab's own id, and the panel scope, both read ahead of any click.
+   *
+   * Both are needed INSIDE the Open handler, where nothing may be awaited before sidePanel.open.
+   * Keeping them in state means the click reads two synchronous values instead of two promises.
+   * The scope is kept current so flipping the setting in another tab takes effect here without a
+   * reload, exactly as it does in the background worker.
+   */
+  const [myTabId, setMyTabId] = useState<number | undefined>(undefined);
+  const [scope, setScope] = useState<SidePanelScope>('tab');
 
   // Debounce the search box: every keystroke otherwise re-filters and, worse, queues transcript
   // reads for chats whose metadata did not match.
@@ -44,6 +55,26 @@ export function ChatsSection({ chats, loaded, onChanged }: { chats: Chat[]; load
     const t = setTimeout(() => setQuery(rawQuery), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(t);
   }, [rawQuery]);
+
+  // Learn this tab's id and the scope up front, so the Open click can use both without awaiting.
+  useEffect(() => {
+    chrome.tabs
+      .getCurrent()
+      .then((t) => setMyTabId(t?.id))
+      // No tabs permission or not in a tab: openChatPlan falls back to a new tab, which still works.
+      .catch(() => setMyTabId(undefined));
+    const read = () =>
+      chrome.storage.local
+        .get('settings')
+        .then((r) => setScope(resolveScope(r.settings as Partial<Settings> | undefined)))
+        .catch(() => {});
+    void read();
+    const onChanged = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
+      if (area === 'local' && changes.settings) void read();
+    };
+    chrome.storage.onChanged.addListener(onChanged);
+    return () => chrome.storage.onChanged.removeListener(onChanged);
+  }, []);
 
   // Load the transcripts a search needs, capped and newest-first (transcriptsToSearch decides
   // which). Results render from metadata immediately and gain the message-text matches as these
@@ -147,30 +178,49 @@ export function ChatsSection({ chats, loaded, onChanged }: { chats: Chat[]; load
 
   const fail = (e: unknown) => setError(e instanceof Error ? e.message : String(e));
 
+  /** What Open promises, which differs by scope: this tab, or a new one. */
+  const openTitle =
+    scope === 'tab'
+      ? "Go to this chat's page in this tab, with the side panel on it showing this chat"
+      : "Open this chat's page in a new tab with the side panel on it";
+
   /**
    * Reopen a chat on its page with the side panel showing it.
    *
-   * chrome.sidePanel.open FIRST and synchronously, before any await: the call is only allowed
-   * inside a user gesture, and the gesture is gone by the time a promise resolves. windowId (this
-   * dashboard tab's window) rather than tabId, because the tab the chat is going to live in does
-   * not exist yet — and a windowId-level open is what makes the panel global for the window, so it
-   * is still open when the new tab becomes active.
+   * Every panel call happens FIRST and synchronously, before any await: sidePanel.open "may only be
+   * called in response to a user action" and the gesture is gone by the time a promise resolves.
+   * What is opened depends on the scope setting, and openChatPlan holds that decision with the
+   * reasoning for it (lib/sidepanel.ts) — in short:
+   *
+   *  - 'tab' (the default): a TAB-specific panel on THIS dashboard tab, which is then navigated to
+   *    the chat's page. A tab keeps its id across navigation and its panel options ride along, so
+   *    the panel ends up attached to exactly the tab the site loads in — and to no other tab.
+   *  - 'window', or "Open in new tab": the window-level open the old code did, plus a new tab.
+   *
+   * `tabId` is read from a state the component keeps up to date, not queried here: a query is an
+   * await, and an await before open() risks the gesture.
    *
    * The rejection is caught, not awaited: automation and some Chrome states reject it even from a
-   * real click, and the rest of the flow (handoff + tab) must happen either way.
+   * real click, and the rest of the flow (handoff + navigation) must happen either way.
    */
-  function openChat(chat: Chat) {
+  function openChat(chat: Chat, { newTab = false }: { newTab?: boolean } = {}) {
     const url = chatOpenUrl(chat);
     if (!url) {
       setError(`"${chat.title}" has no page to reopen: its host was not recorded.`);
       return;
     }
-    const windowId = chrome.windows.WINDOW_ID_CURRENT;
+    const plan = openChatPlan(scope, myTabId, newTab);
     try {
-      const p = chrome.sidePanel.open({ windowId });
-      if (p && typeof p.catch === 'function') p.catch(() => {});
+      if (plan.tabPanel) {
+        chrome.sidePanel.setOptions({ tabId: plan.tabPanel.tabId, path: PANEL_PATH, enabled: true }).catch(() => {});
+        const p = chrome.sidePanel.open({ tabId: plan.tabPanel.tabId });
+        if (p && typeof p.catch === 'function') p.catch(() => {});
+      } else if (plan.windowPanel) {
+        const p = chrome.sidePanel.open({ windowId: chrome.windows.WINDOW_ID_CURRENT });
+        if (p && typeof p.catch === 'function') p.catch(() => {});
+      }
     } catch {
-      // Not a gesture any more, or the API is unavailable: the tab still opens, and the panel shows
+      // Not a gesture any more, or the API is unavailable: the page still opens, and the panel shows
       // this chat as soon as the user opens it by hand, because the handoff is written regardless.
     }
     void (async () => {
@@ -181,7 +231,13 @@ export function ChatsSection({ chats, loaded, onChanged }: { chats: Chat[]; load
         // No session storage: the page still opens, the panel just restores its usual chat.
       }
       try {
-        await chrome.tabs.create({ url, active: true });
+        if (plan.navigation === 'navigate' && myTabId != null) {
+          // Same tab, so the panel opened on it a moment ago stays attached. The dashboard is the
+          // options page and one click away again; "Open in new tab" keeps it where it is.
+          await chrome.tabs.update(myTabId, { url });
+        } else {
+          await chrome.tabs.create({ url, active: true });
+        }
       } catch (e) {
         fail(e);
       }
@@ -310,6 +366,7 @@ export function ChatsSection({ chats, loaded, onChanged }: { chats: Chat[]; load
                     onRename={(title) => void rename(c.id, title)}
                     onCancelRename={() => setRenamingId(null)}
                     onOpen={() => openChat(c)}
+                    openTitle={openTitle}
                     onArchive={() => void setArchived(c.id, !isArchived(c))}
                     onDelete={() => void remove(c)}
                   />
@@ -333,11 +390,21 @@ export function ChatsSection({ chats, loaded, onChanged }: { chats: Chat[]; load
                 )}
               </div>
               <div className="row" style={{ marginBottom: 12 }}>
-                <button className="pill primary" onClick={() => openChat(openChatRecord)}>
+                <button className="pill primary" data-testid="chat-open-detail" onClick={() => openChat(openChatRecord)}>
                   Open with sidebar
                 </button>
+                <button
+                  className="pill"
+                  data-testid="chat-open-newtab"
+                  title="Keep the dashboard open and load the page in a new tab. Open the panel there yourself."
+                  onClick={() => openChat(openChatRecord, { newTab: true })}
+                >
+                  Open in new tab
+                </button>
                 <span className="muted" style={{ fontSize: 11 }}>
-                  opens {chatOpenUrl(openChatRecord)} and points the side panel at this chat
+                  {scope === 'tab'
+                    ? `goes to ${chatOpenUrl(openChatRecord)} in this tab, with the side panel on it showing this chat`
+                    : `opens ${chatOpenUrl(openChatRecord)} and points the side panel at this chat`}
                 </span>
               </div>
               {preview?.id === openChatRecord.id ? <TranscriptPreview items={preview.items} /> : <div className="prev-note">Reading transcript…</div>}
@@ -362,6 +429,7 @@ function ChatRow({
   onRename,
   onCancelRename,
   onOpen,
+  openTitle,
   onArchive,
   onDelete,
 }: {
@@ -375,6 +443,7 @@ function ChatRow({
   onRename: (title: string) => void;
   onCancelRename: () => void;
   onOpen: () => void;
+  openTitle: string;
   onArchive: () => void;
   onDelete: () => void;
 }) {
@@ -435,7 +504,7 @@ function ChatRow({
         </div>
       </div>
       <div className="actions">
-        <button className="pill primary" onClick={onOpen} data-testid="chat-open" title="Open this chat's page in a new tab with the side panel on it">
+        <button className="pill primary" onClick={onOpen} data-testid="chat-open" title={openTitle}>
           Open
         </button>
         <button className="pill" onClick={onStartRename} data-testid="chat-rename">
