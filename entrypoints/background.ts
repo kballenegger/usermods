@@ -16,6 +16,8 @@ import { reduceItems } from '@/lib/transcript';
 import { addVersion, currentVersion, draftBlock, loadArtifact, recordProposal, rollbackTo, saveArtifact, toProposal, toSource, type Artifact } from '@/lib/artifact';
 import { buildTitleInput, completedTurns, sanitizeTitle, titleDecision, TITLE_SYSTEM_PROMPT } from '@/lib/title';
 import { createProvider } from '@/lib/providers';
+import { VISION_FALLBACK_PANEL_NOTE, createVisionMemory, resolveImagesSetting, visionKeyFor } from '@/lib/providers/vision';
+import { MAX_EDGE, SCREENSHOT_CAPTURE_FORMAT, SCREENSHOT_QUALITY, fitWithin, parseDataUrl } from '@/lib/images';
 import {
   CHATGPT_CODEX_BASE,
   STORE_BUILD,
@@ -144,6 +146,15 @@ const sessions = new SessionMap();
 
 /** Every open side-panel port. A chat's events go to all of them; each panel routes by chat id. */
 const agentPorts = new Set<chrome.runtime.Port>();
+
+/**
+ * Which OpenAI-compatible endpoints have refused an image (lib/providers/vision.ts).
+ *
+ * One instance for the whole worker, so two chats running against the same endpoint at once share
+ * what either of them learns rather than each paying for its own 400. It is backed by
+ * chrome.storage.local, so the knowledge outlives the worker as well.
+ */
+const visionMemory = createVisionMemory();
 
 /**
  * The single chokepoint where an agent event is stamped with its chat and put on the wire. The
@@ -389,6 +400,23 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
       env: envForTab(session.tabId),
       emit: post,
       signal,
+      // Built here rather than inside the loop so it carries the two things only the background
+      // has: the persistent record of which endpoints refuse images, and a way to tell the user
+      // when one just did. Both are inert for every provider but the OpenAI-compatible one.
+      provider: createProvider(settings, {
+        memory: visionMemory,
+        // Once per run, not once per request: a turn with four screenshots in it against a
+        // text-only endpoint discovers the same fact four times, and the transcript only needs to
+        // say it once. The reducer dedupes consecutive notes as well, which covers the case where
+        // two chats learn it at the same moment.
+        onVisionUnsupported: () => post({ type: 'note', text: VISION_FALLBACK_PANEL_NOTE }),
+      }),
+      // How `screenshot` is described to the model. Only the OpenAI-compatible adapter can ever
+      // answer no, and only once it has learned so — every other backend shows images to every
+      // model it serves, so the question never arises for them.
+      canSeeImages: () =>
+        settings!.provider !== 'openai-compatible' ||
+        (resolveImagesSetting(settings!.images) !== 'never' && !visionMemory.isUnsupportedNow(visionKeyFor(settings!))),
       // The compaction summary is the same one tool-free call the chat titler uses, with its own
       // deadline: a summariser that hangs must not hold up the user's turn, and compact() falls
       // back to dropping the oldest turns when this rejects.
@@ -1560,6 +1588,60 @@ async function waitInTab(tabId: number, spec: WaitSpec, signal: AbortSignal): Pr
   });
 }
 
+/**
+ * A captured tab, brought down to the size a vision model actually reads (lib/images.ts).
+ *
+ * captureVisibleTab hands back the viewport at the display's device pixel ratio, which on any
+ * modern laptop is two or three times what the model will use: everything above MAX_EDGE is
+ * downscaled by the provider on arrival, so sending it buys nothing and costs bandwidth, tokens
+ * and — on a local model with a small window — the conversation itself.
+ *
+ * A capture that is already inside the box is still re-encoded, because the JPEG is what makes it
+ * small: a PNG screenshot of a photo-heavy page is several megabytes at any resolution.
+ *
+ * Never throws. A worker without OffscreenCanvas, or a decode that fails, falls back to the
+ * original bytes — a large screenshot is worse than a small one, and much better than a tool that
+ * errors where it used to work.
+ */
+async function shrinkCapture(dataUrl: string): Promise<{ mediaType: 'image/jpeg' | 'image/png'; data: string }> {
+  const parsed = parseDataUrl(dataUrl);
+  const original: { mediaType: 'image/jpeg' | 'image/png'; data: string } = {
+    mediaType: parsed?.mediaType === 'image/jpeg' ? 'image/jpeg' : 'image/png',
+    data: parsed?.data ?? dataUrl.replace(/^data:image\/[a-z+]+;base64,/, ''),
+  };
+  try {
+    if (typeof createImageBitmap !== 'function' || typeof OffscreenCanvas !== 'function') return original;
+    const res = await fetch(dataUrl);
+    const bitmap = await createImageBitmap(await res.blob());
+    try {
+      const target = fitWithin(bitmap.width, bitmap.height, MAX_EDGE);
+      const canvas = new OffscreenCanvas(target.width, target.height);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return original;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      // A page's own background can be transparent (a PDF viewer, an empty tab), and a JPEG has no
+      // alpha: without this the transparent parts composite onto black.
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, target.width, target.height);
+      ctx.drawImage(bitmap, 0, 0, target.width, target.height);
+      const blob = await canvas.convertToBlob({ type: 'image/jpeg', quality: SCREENSHOT_QUALITY });
+      const buf = new Uint8Array(await blob.arrayBuffer());
+      let binary = '';
+      const CHUNK = 0x8000;
+      for (let i = 0; i < buf.length; i += CHUNK) binary += String.fromCharCode(...buf.subarray(i, i + CHUNK));
+      const data = btoa(binary);
+      // A re-encode that came out bigger than what we started with (a tiny viewport, a flat page
+      // that PNG compresses better than JPEG) is not worth taking.
+      return data.length < original.data.length ? { mediaType: 'image/jpeg', data } : original;
+    } finally {
+      bitmap.close?.();
+    }
+  } catch {
+    return original;
+  }
+}
+
 function envForTab(tabId: number): AgentEnv {
   return {
     sendToContent: (req) => sendToContent(tabId, req as ContentRequest),
@@ -1567,8 +1649,8 @@ function envForTab(tabId: number): AgentEnv {
     wait: (spec, signal) => waitInTab(tabId, spec, signal),
     async screenshot() {
       const tab = await chrome.tabs.get(tabId);
-      const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'jpeg', quality: 60 });
-      return { mediaType: 'image/jpeg', data: dataUrl.replace(/^data:image\/jpeg;base64,/, '') };
+      const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: SCREENSHOT_CAPTURE_FORMAT });
+      return shrinkCapture(dataUrl);
     },
     async pageInfo() {
       const tab = await chrome.tabs.get(tabId);

@@ -9,7 +9,7 @@
 //        -> text/event-stream of `data: {choices:[{delta:{...}, finish_reason}]}` lines,
 //           terminated by `data: [DONE]`.
 //   GET  /v1/models            -> {data: [{id}, ...]}  (Settings' "Fetch models" button)
-//   GET  /__requests           -> {requests: [{at, script, messages, images}, ...]}  every body
+//   GET  /__requests           -> {requests: [{at, script, messages, images, hasImages}, ...]} body
 //        DELETE /__requests    received, in order; the isolation flow reads this back to prove that
 //                              one chat's user text never entered another chat's model
 //                              conversation, and the images flow reads `images` — one entry per
@@ -519,6 +519,39 @@ setTimeout(() => observer.disconnect(), 10000);`,
 
 export const WAIT_MARKER = 'WAITMARKER-3ab7';
 
+// ---------------------------------------------------------------------------
+// The vision flow's two conversations
+// ---------------------------------------------------------------------------
+//
+// One takes a screenshot against a backend that accepts images and one takes a screenshot against
+// a backend that refuses them, which is the pair the whole feature turns on. Both use `screenshot`
+// rather than run_script, for once: unlike chrome.userScripts, chrome.tabs.captureVisibleTab works
+// perfectly in an automated profile, so this is one of the few tool calls the harness can drive for
+// real — and the point of the flow is what the CAPTURE looked like on the wire.
+
+export const VISION = {
+  sighted: {
+    prompt: 'look at the page and tell me what you see VISIONPROMPT-s1',
+    done: 'VISIONDONE-s1',
+  },
+  blind: {
+    prompt: 'look at the page and tell me what you see VISIONPROMPT-b2',
+    done: 'VISIONDONE-b2',
+  },
+};
+
+/** Two steps: take a screenshot, then report. The report is what the flow waits for. */
+function visionScript(name, v) {
+  return {
+    name,
+    match: new RegExp(v.prompt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'),
+    steps: [
+      { text: 'Taking a look at the page.', calls: [{ name: 'screenshot', args: {} }] },
+      { text: `${v.done} I have what I need from the page.` },
+    ],
+  };
+}
+
 const WAIT_SCRIPT = {
   name: 'wait-for',
   match: /test the waiting/i,
@@ -637,7 +670,7 @@ const ARTIFACT_SCRIPTS = [
   },
 ];
 
-SCRIPTS.push(WAIT_SCRIPT, WAIT_STOP_SCRIPT, ...ARTIFACT_SCRIPTS);
+SCRIPTS.push(WAIT_SCRIPT, WAIT_STOP_SCRIPT, ...ARTIFACT_SCRIPTS, visionScript('vision-sighted', VISION.sighted), visionScript('vision-blind', VISION.blind));
 
 /** The fixture page the wait flow drives. Served by this server so the flow needs no live site. */
 const ASYNC_FIXTURE = `<!doctype html>
@@ -808,6 +841,8 @@ const violations = [];
  * The rules are the ones OpenAI, and every compatible backend, enforce:
  *   - every assistant tool_call id is answered by exactly one following `tool` message;
  *   - every `tool` message answers a tool_call that came before it, and only once;
+ *   - the answers to one assistant message are CONTIGUOUS and start immediately after it, with
+ *     nothing wedged in between — see the adjacency check below;
  *   - roles are known, and a message that carries tool_calls is an assistant message;
  *   - content is present where the API forbids omitting it (user, system, and a tool reply);
  *   - a `tools` array is present whenever the history contains tool calls, because a model cannot
@@ -825,6 +860,8 @@ export function validateChatRequest(body) {
   /** tool_call id -> how many `tool` messages answered it. */
   const answers = new Map();
   let sawToolCall = false;
+
+  out.push(...checkToolAdjacency(messages));
 
   messages.forEach((m, i) => {
     const where = `messages[${i}]`;
@@ -892,6 +929,55 @@ export function validateChatRequest(body) {
 
   out.push(...collectImages(messages).problems);
 
+  return out;
+}
+
+/**
+ * The rule that makes "one user message after the tool messages" legal and "one user message
+ * between them" a 400.
+ *
+ * An assistant message carrying N tool_calls must be followed IMMEDIATELY by exactly those N `tool`
+ * messages, one after another, with nothing in between. What comes after the last of them is free —
+ * which is what lets lib/providers/openai.ts put a screenshot in a user message there, the same way
+ * the Responses adapter does, since a `tool` message cannot hold an image itself.
+ *
+ * This is checked separately from the pairing rules above because it is about POSITION, and the
+ * pairing pass only knows about ids. Before the image change nothing in the extension could produce
+ * a message between an assistant's calls and their answers, so the gap never mattered; now that a
+ * user message is deliberately emitted nearby, the mock has to be able to tell the two apart.
+ */
+function checkToolAdjacency(messages) {
+  const out = [];
+  messages.forEach((m, i) => {
+    const wanted = m?.role === 'assistant' ? (m.tool_calls ?? []).length : 0;
+    if (!wanted) return;
+    for (let k = 0; k < wanted; k++) {
+      const next = messages[i + 1 + k];
+      if (!next) {
+        out.push({
+          kind: 'tool-answers-truncated',
+          detail: `messages[${i}] made ${wanted} tool_calls but the history ends after ${k} tool message(s)`,
+        });
+        return;
+      }
+      if (next.role !== 'tool') {
+        out.push({
+          kind: 'tool-answers-not-adjacent',
+          detail: `messages[${i}] made ${wanted} tool_calls, but messages[${i + 1 + k}] is a ${next.role} message — every answer must follow immediately, with nothing in between`,
+        });
+        return;
+      }
+    }
+    // …and the run of tool messages must STOP there: an extra one answers a call from somewhere
+    // else, which the pairing pass reports separately but which is also a position error.
+    const after = messages[i + 1 + wanted];
+    if (after?.role === 'tool') {
+      out.push({
+        kind: 'tool-answers-overrun',
+        detail: `messages[${i}] made ${wanted} tool_calls but messages[${i + 1 + wanted}] is another tool message`,
+      });
+    }
+  });
   return out;
 }
 
@@ -1127,6 +1213,15 @@ function sse(res, obj) {
 //                                                answer with that status (and Retry-After, seconds).
 //   {kind: 'refuse'}                             kill the socket before answering: what a refused
 //                                                connection or no route looks like to fetch().
+//   {kind: 'no-vision'}                          answer 400 the way a text-only model does, but
+//                                                ONLY when the request actually carried an image
+//                                                part; a request without one is let through
+//                                                untouched. That is how a real text-only backend
+//                                                behaves, and it is what makes the Auto fallback
+//                                                testable: the first request is refused, the
+//                                                extension re-sends without the picture, and the
+//                                                same standing fault lets that one through.
+//                                                Defaults to "until cleared".
 //
 // `times` defaults to 1 for drop and status and to "until cleared" for refuse. `skip: N` lets the
 // first N requests through untouched before the fault starts, which is how a flow lets a run make
@@ -1142,10 +1237,10 @@ let faults = [];
 function parseFaults(plan) {
   if (!Array.isArray(plan)) return [];
   return plan
-    .filter((f) => f && ['drop', 'status', 'refuse'].includes(f.kind))
+    .filter((f) => f && ['drop', 'status', 'refuse', 'no-vision'].includes(f.kind))
     .map((f) => ({
       kind: f.kind,
-      times: Number.isFinite(f.times) ? f.times : f.kind === 'refuse' ? Infinity : 1,
+      times: Number.isFinite(f.times) ? f.times : f.kind === 'refuse' || f.kind === 'no-vision' ? Infinity : 1,
       skip: Number.isFinite(f.skip) ? f.skip : 0,
       afterChunks: Number.isFinite(f.afterChunks) ? f.afterChunks : 3,
       status: Number.isFinite(f.status) ? f.status : 503,
@@ -1154,11 +1249,20 @@ function parseFaults(plan) {
     }));
 }
 
-/** The fault this request should suffer, if any, consuming it from the plan. */
-function takeFault(scriptName) {
+/**
+ * The fault this request should suffer, if any, consuming it from the plan.
+ *
+ * `carriesImages` is what makes a 'no-vision' fault behave like a real text-only backend rather
+ * than like a broken one: such a server answers 400 to a request with a picture in it and answers
+ * normally to the same request without, which is precisely the pair the Auto fallback needs to see.
+ * A 'no-vision' fault therefore does NOT consume a turn on an image-free request; it simply does
+ * not apply, and the next fault in the plan (if any) is considered instead.
+ */
+function takeFault(scriptName, carriesImages = false) {
   for (const f of faults) {
     if (f.times <= 0) continue;
     if (f.script && f.script !== scriptName) continue;
+    if (f.kind === 'no-vision' && !carriesImages) continue;
     if (f.skip > 0) {
       f.skip -= 1;
       return null;
@@ -1168,6 +1272,13 @@ function takeFault(scriptName) {
   }
   return null;
 }
+
+/**
+ * The 400 a text-only model answers an image with. Modelled on what these actually say — the
+ * extension's classifier (lib/providers/vision.ts) has to recognise real wording, not a phrase
+ * invented here to match it.
+ */
+const NO_VISION_BODY = { error: { message: 'Invalid content type. image_url is only supported by certain models.', type: 'invalid_request_error', code: 'unsupported_content' } };
 
 /** Thrown inside streamStep to stop writing once the socket has been killed on purpose. */
 const DROPPED = Symbol('dropped');
@@ -1351,12 +1462,27 @@ const server = http.createServer(async (req, res) => {
 
     // Fault injection, decided before anything is written. The request is recorded either way.
     const kind = isSummaryRequest(body) ? 'summary' : isTitleRequest(body) ? 'title' : (pickScript(messages).script.name ?? 'fallback');
-    const fault = takeFault(kind);
+    // Collected once and reused: the fault decision needs to know whether a picture is on the wire,
+    // and every recorded request carries the same summary so a flow can count what was sent.
+    const collected = collectImages(messages);
+    const fault = takeFault(kind, collected.images.length > 0);
     if (fault && fault.kind !== 'drop') {
-      requests.push({ at: Date.now(), script: kind, fault: fault.kind, messages: stripImageData(messages) });
-      if (process.env.MOCK_LLM_VERBOSE) console.error(`[mock-llm] FAULT ${fault.kind} on ${kind}`);
+      requests.push({
+        at: Date.now(),
+        script: kind,
+        fault: fault.kind,
+        messages: stripImageData(messages),
+        images: collected.images,
+        hasImages: collected.images.length > 0,
+      });
+      if (process.env.MOCK_LLM_VERBOSE) console.error(`[mock-llm] FAULT ${fault.kind} on ${kind} (${collected.images.length} image parts)`);
       if (fault.kind === 'refuse') {
         req.socket.destroy();
+        return;
+      }
+      if (fault.kind === 'no-vision') {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify(NO_VISION_BODY));
         return;
       }
       res.writeHead(fault.status, {
@@ -1377,13 +1503,13 @@ const server = http.createServer(async (req, res) => {
     // is still recorded, because the isolation flow's "no chat's text entered another chat's model
     // conversation" assertion has to hold for the title call too.
     if (isSummaryRequest(body)) {
-      requests.push({ at: Date.now(), script: 'summary', messages: stripImageData(messages) });
+      requests.push({ at: Date.now(), script: 'summary', messages: stripImageData(messages), images: collected.images, hasImages: collected.images.length > 0 });
       if (process.env.MOCK_LLM_VERBOSE) console.error('[mock-llm] compaction summary');
       await streamStep(res, { text: SUMMARY_REPLY, calls: [] }, body.model ?? 'demo');
       return;
     }
     if (isTitleRequest(body)) {
-      requests.push({ at: Date.now(), script: 'title', messages: stripImageData(messages) });
+      requests.push({ at: Date.now(), script: 'title', messages: stripImageData(messages), images: collected.images, hasImages: collected.images.length > 0 });
       if (process.env.MOCK_LLM_VERBOSE) console.error(`[mock-llm] title -> ${TITLE_REPLY}`);
       await streamStep(res, { text: TITLE_REPLY, calls: [] }, body.model ?? 'demo');
       return;
@@ -1398,7 +1524,10 @@ const server = http.createServer(async (req, res) => {
       script: script.name ?? 'fallback',
       ...(fault ? { fault: fault.kind } : {}),
       messages: stripImageData(messages),
-      images: collectImages(messages).images,
+      images: collected.images,
+      // A plain boolean beside the detail, so a flow can assert "this request carried no picture"
+      // without reasoning about an empty array it might have failed to collect.
+      hasImages: collected.images.length > 0,
     });
     if (process.env.MOCK_LLM_VERBOSE) {
       console.error(`[mock-llm] ${script.name ?? 'fallback'} step ${script.steps.indexOf(step)}: ${(step.calls ?? []).map((c) => c.name).join(', ') || 'text only'}`);
