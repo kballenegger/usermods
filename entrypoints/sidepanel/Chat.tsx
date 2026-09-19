@@ -278,6 +278,29 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
   }, [items]);
 
   /**
+   * Write the pending transcript before the panel goes away.
+   *
+   * The save is debounced by 400ms so a streaming turn does not write on every delta, which means
+   * there is always a window where the last thing that happened is in memory and not on disk. A
+   * side panel is closed and reopened constantly — and a reopened panel reads storage and then
+   * renders what it found, so a turn that ended inside that window came back missing its last rows
+   * and, worse, the empty read was written straight back over it.
+   *
+   * pagehide fires on the close, on a reload and on a navigation, and is the last event a page is
+   * guaranteed to get; the storage call it makes is fire-and-forget by necessity, but chrome
+   * .storage.local accepts the write before the context is torn down.
+   */
+  useEffect(() => {
+    const onHide = () => flushSave();
+    window.addEventListener('pagehide', onHide);
+    return () => {
+      window.removeEventListener('pagehide', onHide);
+      // Unmounting is the same situation as a close: whatever is pending belongs on disk.
+      flushSave();
+    };
+  }, []);
+
+  /**
    * Queue the visible chat's transcript for a debounced write under the id it belongs to.
    * Rescheduling replaces the pending write for that same id; a different id flushes first.
    */

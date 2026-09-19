@@ -1310,7 +1310,9 @@ input[type='checkbox']:checked::after {
   border-radius: var(--r-field);
   background: var(--surface-well);
   box-shadow: var(--shadow-press);
-  max-width: 128px;
+  /* Wide enough that "1568×1568 · 168 KB" fits on one line at the default panel width: the size
+     is the only thing on the chip that carries information, and a truncated one carries none. */
+  max-width: 152px;
   cursor: default;
 }
 
