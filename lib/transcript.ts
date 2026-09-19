@@ -117,6 +117,14 @@ export function reduceItems(items: ChatItem[], event: AgentEventBody): ChatItem[
       return [...items, { kind: 'note', text: `stopped after ${event.steps} steps · send a message to continue` }];
     case 'compacted':
       return [...items, { kind: 'note', text: compactedNote(event) }];
+    case 'note':
+      // A fact about the run the user needs but the model did not say. Deduplicated against the
+      // row before it, because the same note can be produced by every request in a turn (a
+      // text-only endpoint refuses the first image of each one) and a column of identical lines
+      // says no more than one of them does.
+      return items[items.length - 1]?.kind === 'note' && (items[items.length - 1] as Extract<ChatItem, { kind: 'note' }>).text === event.text
+        ? items
+        : [...items, { kind: 'note', text: event.text }];
     case 'error':
       return [...items, { kind: 'error', text: event.message }];
     case 'done':

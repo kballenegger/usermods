@@ -1,8 +1,9 @@
 // Shared types used across the background worker, content script and side panel.
 import type { AttachedImage, ImageThumb } from './images';
 import type { WaitCondition } from './agent/wait';
+import type { ImagesSetting } from './providers/vision';
 
-export type { AttachedImage, ImageThumb };
+export type { AttachedImage, ImageThumb, ImagesSetting };
 
 /** A saved userscript. `source` is the canonical full userscript text, header included. */
 export interface Mod {
@@ -92,6 +93,17 @@ export interface Settings {
    * for why this one does NOT pin old profiles to the old behaviour the way the theme does.
    */
   sidePanelScope?: SidePanelScope;
+  /**
+   * Whether screenshots and attachments are sent to an OpenAI-compatible endpoint as pictures.
+   *
+   * Only this one provider needs the setting: the Anthropic and Responses backends accept images
+   * from every model they serve, while "OpenAI-compatible" is whatever the user typed into Base
+   * URL and may be a text-only model that answers a picture with a 400. 'auto' sends and learns
+   * from that 400 (lib/providers/vision.ts); 'send' always sends; 'never' never does.
+   *
+   * Optional so a profile saved before this existed reads as 'auto'.
+   */
+  images?: ImagesSetting;
 }
 
 /**
@@ -132,6 +144,13 @@ export const DEFAULT_SETTINGS: Settings = {
    * everything. 'window' is one setting away for anyone who wants the old behaviour back.
    */
   sidePanelScope: 'tab',
+  /**
+   * Send images, and find out the hard way when the endpoint will not take them — once, and then
+   * remember. The alternative defaults are both worse: 'send' makes a text-only local model fail
+   * every screenshot with a 400 the user has to decode, and 'never' would silently blind a vision
+   * model that works perfectly, which is the bug this setting exists to fix.
+   */
+  images: 'auto',
 };
 
 /** The three choices, in the order the compact ◐ toggle cycles them. */
@@ -290,6 +309,14 @@ export type AgentEventBody =
    * transcript the user reads is never rewritten, only the history the model sees.
    */
   | { type: 'compacted'; tier: 'elided' | 'summarised'; before: number; after: number }
+  /**
+   * Something the user should know that is not an error and not the model talking: so far, that the
+   * configured OpenAI-compatible model turned out not to accept images, so the request was sent
+   * again without them. It lands in the transcript as a muted note row, and is stored like any
+   * other row so it survives a reload — a fact about the endpoint the user needs when they wonder
+   * why the model is describing the page instead of looking at it.
+   */
+  | { type: 'note'; text: string }
   /**
    * `resumable` means the run stopped with its progress saved and can be continued from exactly
    * where it was, without the user sending anything (the panel's Resume button; see lib/runstate.ts).

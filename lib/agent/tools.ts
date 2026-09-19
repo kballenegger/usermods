@@ -33,6 +33,34 @@ const WAIT_CONDITION_PROPERTIES = {
   ms: { type: 'integer', description: `A plain delay, capped at ${MAX_SLEEP_MS}. Last resort: prefer a selector or text condition, which returns as soon as it is true.` },
 } as const;
 
+/** What `screenshot` says when the model can actually see what it returns. */
+export const SCREENSHOT_DESCRIPTION = 'Capture the visible part of the current tab as an image. Useful to check visual results.';
+
+/**
+ * What `screenshot` says when the configured model has turned out not to accept images.
+ *
+ * The tool is still offered rather than removed. Removing a tool mid-conversation would leave
+ * earlier `screenshot` calls in the history referring to a function the model is no longer shown,
+ * which several backends reject outright — and a model that simply loses a tool tends to keep
+ * trying anyway. Telling it the truth in the description is both valid and more effective: the
+ * result would be a sentence, and the useful move is a structural check.
+ */
+export const SCREENSHOT_DESCRIPTION_BLIND =
+  'Unavailable: the model configured in this chat does not accept images, so this returns a note instead of a picture and tells you nothing. Do not call it. Check visual results structurally instead — get_styles for what a rule computed to, find_elements for whether something is present and what box it has, get_page for the surrounding markup.';
+
+/**
+ * The tool list, with `screenshot` described according to whether this backend can show one.
+ *
+ * `canSeeImages` is false only for an OpenAI-compatible endpoint already known to refuse images
+ * (lib/providers/vision.ts) or one the user has set to Never. Every other backend gets the normal
+ * description, so nothing here discourages a screenshot from a model that can read it — which was
+ * the other half of the requirement, and the easier half to get wrong.
+ */
+export function toolsFor(canSeeImages: boolean): ToolDef[] {
+  if (canSeeImages) return TOOLS;
+  return TOOLS.map((t) => (t.name === 'screenshot' ? { ...t, description: SCREENSHOT_DESCRIPTION_BLIND } : t));
+}
+
 export const TOOLS: ToolDef[] = [
   {
     name: 'get_page',
@@ -109,7 +137,7 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: 'screenshot',
-    description: 'Capture the visible part of the current tab as an image. Useful to check visual results.',
+    description: SCREENSHOT_DESCRIPTION,
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
   },
   {

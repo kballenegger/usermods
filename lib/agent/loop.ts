@@ -3,6 +3,7 @@
 // against a fake provider), and node's ESM resolver does not guess extensions or directory indexes.
 import { imageNote } from '../images.ts';
 import { createProvider } from '../providers/index.ts';
+import { ATTACHMENT_DROPPED_PANEL_NOTE } from '../providers/vision.ts';
 import type { Provider } from '../providers/types';
 import { renderRunResult, type RunResult } from '../runscript.ts';
 import { DEFAULT_CONTEXT_BUDGET, type AgentEventBody, type ModProposal, type Msg, type Part, type Settings, type UserTurn } from '../types.ts';
@@ -11,7 +12,7 @@ import { compact, needsCompaction } from './compact.ts';
 import { SYSTEM_PROMPT } from './prompt.ts';
 import { checkProposal, type ProposalContext } from './propose.ts';
 import { withRetry, type RetryDeps, type RetryPolicy } from './retry.ts';
-import { TOOLS } from './tools.ts';
+import { toolsFor } from './tools.ts';
 import {
   EMPTY_TALLY,
   foldWait,
@@ -98,6 +99,18 @@ export interface AgentInput {
   onCheckpoint?: (messages: Msg[]) => void | Promise<void>;
   /** The provider to talk to. Defaults to the one `settings` describes; tests pass a fake. */
   provider?: Provider;
+  /**
+   * Whether the configured backend will actually show the model a picture, which decides how
+   * `screenshot` is described to it (lib/agent/tools.ts toolsFor).
+   *
+   * A function, and re-read before every model call, because the answer can change DURING a turn:
+   * the first screenshot of the run is what discovers a text-only endpoint, and from the step after
+   * that the model should be steered towards get_styles rather than towards another screenshot.
+   *
+   * Omitted means yes, which is right for the three backends that always accept images and for the
+   * unit tests.
+   */
+  canSeeImages?: () => boolean;
   /** The retry policy and its clock, for the model request (lib/agent/retry.ts). */
   retry?: { policy?: RetryPolicy; deps?: Partial<RetryDeps> };
 }
@@ -222,10 +235,29 @@ export async function runAgent(input: AgentInput): Promise<RunOutcome> {
   const draft = () => input.draft?.() ?? '';
   const checkpoint = () => Promise.resolve(input.onCheckpoint?.(trimUnanswered(messages))).catch(() => {});
 
+  /**
+   * Say so, in the transcript, when a picture the user attached will not reach the model.
+   *
+   * The adapter already tells the MODEL (it replaces the image with a sentence), but the person who
+   * dragged a mockup into the panel and watched it become a thumbnail deserves to know it went
+   * nowhere. Without this the only symptom is a reply that ignores the image, which reads as the
+   * model being stupid rather than as the endpoint being text-only.
+   *
+   * This fires only for an endpoint ALREADY known to be blind, or one the user set to Never. The
+   * first attachment sent to an unknown endpoint is not noted here: it really is sent, and if it is
+   * refused the adapter's own fallback note covers it.
+   */
+  function noteDroppedAttachments(turn: UserTurn) {
+    if (!turn.images?.length) return;
+    if (input.canSeeImages?.() ?? true) return;
+    emit({ type: 'note', text: ATTACHMENT_DROPPED_PANEL_NOTE });
+  }
+
   if (input.turn) {
     const page = await env.pageInfo().catch(() => null);
     messages.push({ role: 'user', content: turnParts(input.turn, page, false, draft()) });
     emit({ type: 'accepted', id: input.turn.id });
+    noteDroppedAttachments(input.turn);
   } else {
     // Resuming. The conversation is sent as it stands; see RESUME_NUDGE for the one exception.
     const kept = trimUnanswered(messages);
@@ -319,7 +351,10 @@ export async function runAgent(input: AgentInput): Promise<RunOutcome> {
           return provider.chat({
             system: SYSTEM_PROMPT,
             messages,
-            tools: TOOLS,
+            // Re-read per attempt, not captured once: the request that discovers a blind endpoint
+            // is often the one making this very call, and the next step's tool list should already
+            // say so.
+            tools: toolsFor(input.canSeeImages?.() ?? true),
             signal,
             callbacks: {
               onText: (delta) => {
@@ -414,6 +449,7 @@ export async function runAgent(input: AgentInput): Promise<RunOutcome> {
         // that version.
         results.push(...turnParts(q, null, true, draft()));
         emit({ type: 'accepted', id: q.id });
+        noteDroppedAttachments(q);
       }
       messages.push({ role: 'user', content: results });
       // Every call in this step has its result, so the conversation is whole again: keep it.

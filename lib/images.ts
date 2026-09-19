@@ -51,6 +51,39 @@ export const PNG_KEEP_MAX_BYTES = 400_000;
 /** How many images one message may carry. */
 export const MAX_IMAGES_PER_MESSAGE = 4;
 
+// ---------------------------------------------------------------------------
+// The screenshot tool
+// ---------------------------------------------------------------------------
+//
+// A tool screenshot and a user attachment end up in the same place — an `image` Part on its way to
+// a vision model — so they are held to the same policy, and for the same reason: past MAX_EDGE the
+// model downscales it anyway, and every byte above that is paid for in bandwidth, in tokens, and
+// in whether a 32k-context local model can hold the conversation at all.
+//
+// Before this, `chrome.tabs.captureVisibleTab` was sent as it came: on a HiDPI display that is the
+// viewport times the device pixel ratio, so a 1512-point-wide window returns a 3024px image, and a
+// 1600x1000 CSS viewport on a 2x screen is a 3200x2000 JPEG of roughly 1.1 MB — 1.5 MB of base64,
+// resent on every request for the rest of the turn.
+
+/**
+ * JPEG quality for a tool screenshot.
+ *
+ * Higher than the 60 captureVisibleTab was asked for, because the downscale now does the work the
+ * quality setting used to: a 1568px image at q0.8 is both smaller and considerably more legible
+ * than a 3024px one at q0.6, and legibility is the entire point — a model reading a screenshot is
+ * reading UI text in it.
+ */
+export const SCREENSHOT_QUALITY = 0.8;
+
+/**
+ * What captureVisibleTab is asked to produce before we resize it.
+ *
+ * PNG, not JPEG: this is an intermediate, and asking Chrome for a lossy encode only to decode it,
+ * resize it and encode it lossily again would stack two generations of artefacts on the text the
+ * model is trying to read. The re-encode below is the only lossy step.
+ */
+export const SCREENSHOT_CAPTURE_FORMAT = 'png' as const;
+
 /**
  * One attached image, as it travels from the composer to the model.
  *

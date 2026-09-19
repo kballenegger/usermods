@@ -4,7 +4,8 @@ import { rpc, type OAuthKind, type OAuthLoginState } from '@/lib/rpc';
 import { loadSettings, saveSettings } from '@/lib/settings';
 import { resolveScope } from '@/lib/sidepanel';
 import { applyTheme } from '@/lib/theme';
-import { DEFAULT_CONTEXT_BUDGET, DEFAULT_SETTINGS, type Settings, type SidePanelScope, type ThemeChoice } from '@/lib/types';
+import { resolveImagesSetting } from '@/lib/providers/vision';
+import { DEFAULT_CONTEXT_BUDGET, DEFAULT_SETTINGS, type ImagesSetting, type Settings, type SidePanelScope, type ThemeChoice } from '@/lib/types';
 
 const THEMES: Array<{ value: ThemeChoice; label: string }> = [
   { value: 'system', label: 'System' },
@@ -180,6 +181,34 @@ export function SettingsView({ onReviewNotice }: { onReviewNotice?: () => void }
           cheaper and faster; higher keeps more of the chat in front of the model.
         </span>
       </label>
+
+      {/*
+        Whether a picture is actually sent, which only the OpenAI-compatible adapter has to ask:
+        "OpenAI-compatible" is whatever endpoint the user typed in, and half of what speaks that
+        protocol is a text-only model that answers an image with a 400. The Anthropic and
+        subscription backends take images from every model they serve, so the control would be a
+        question with one answer there — hence it is only rendered for the one provider it governs.
+      */}
+      {s.provider === 'openai-compatible' && (
+        <label className="field">
+          Images
+          <select
+            data-testid="settings-images"
+            value={resolveImagesSetting(s.images)}
+            onChange={(e) => update({ images: e.target.value as ImagesSetting })}
+          >
+            <option value="auto">Auto — send, and stop if the model refuses</option>
+            <option value="send">Always send</option>
+            <option value="never">Never send</option>
+          </select>
+          <span>
+            Whether screenshots and your attachments are sent to this endpoint as pictures. Auto is
+            the default: it sends them, and if the model answers that it cannot accept images,
+            usermods sends that request again without them and leaves them out for this endpoint
+            from then on. Choose Never for a text-only model to skip the first refusal.
+          </span>
+        </label>
+      )}
 
       {/*
         Where the panel opens. The background worker watches chrome.storage for this and reconfigures
