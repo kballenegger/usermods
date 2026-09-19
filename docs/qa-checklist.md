@@ -590,6 +590,79 @@ Same flow as section 11, with the **SuperGrok subscription** preset / "xAI subsc
    **Expected:** same effect as it has under usermods.
    **If it fails:** page console.
 
+## 15. Screenshots on a custom OpenAI endpoint: a vision model, then a text-only one
+
+The one thing the smoke run cannot do: it proves the picture leaves the extension in the right
+shape, but only a real model can prove it *arrived somewhere that understood it*. This section
+needs two models behind an OpenAI-compatible endpoint — one with vision, one without. A local
+server hosting both (Ollama, LM Studio, `mlx_lm`) is the easiest way; two presets pointed at the
+same base URL with different model ids also works.
+
+**Part A — a vision model sees the screenshot.**
+
+1. Settings → **Custom OpenAI API** preset, base URL and model set to your vision model. Leave
+   **Images** on **Auto**.
+2. Open the panel on a page with something visually distinctive above the fold — a coloured
+   banner, a large hero image, a chart. Ask something that can only be answered by looking, and
+   that is not in the DOM text: *"take a screenshot and tell me what colour the header is"*, or
+   *"take a screenshot — roughly what shape is the logo?"*.
+   **Expected:** a `screenshot` tool row, then an answer that is actually about the picture. The
+   giveaway that it worked is a detail the model could not have read out of the HTML.
+   **Expected NOT:** any wording along the lines of "the image came back empty", "this backend
+   can't attach images to tool results", or "I'll verify structurally instead". That sentence is
+   the bug this section exists to catch, and it is the model honestly reporting what it was sent.
+   **If it fails:** side panel DevTools, and the service worker console — then check in the
+   service worker console what actually went out:
+   ```js
+   // paste in the service worker console, then take a screenshot in the panel
+   const _f = fetch; self.fetch = (u, i) => { try { const b = JSON.parse(i.body);
+     console.log('image parts:', JSON.stringify(b.messages).match(/image_url/g)?.length ?? 0); } catch {}
+     return _f(u, i); };
+   ```
+   One or more `image_url` parts means the extension sent it and the backend or model dropped it;
+   zero means the extension did not, which is a bug worth reporting with the model id.
+3. Ask a follow-up that needs the *same* screenshot again (*"and the text on it — is it centred?"*).
+   **Expected:** it answers from what it already has, or takes a fresh screenshot and answers.
+   Either is fine; what matters is that it is still seeing pictures on the second turn.
+
+**Part B — a text-only model falls back, once.**
+
+4. Settings → same base URL, model switched to a text-only one (a plain 7B/8B instruct model with
+   no vision). **Images** still on **Auto**. Start a **new chat** — the memory is per endpoint and
+   model, so the vision model's success does not carry over, and a fresh chat keeps the two
+   transcripts readable.
+5. Ask the same "take a screenshot and tell me…" question.
+   **Expected:** the turn **completes** rather than ending in a red error. A muted note appears in
+   the transcript saying the model does not accept images, that the request was sent again without
+   them, and that usermods will leave them out for this endpoint from now on. The model's own
+   reply should say it cannot see the page visually and offer to check structurally — it is being
+   told that in the tool result.
+   **Expected NOT:** a red `400` row, a run that stops, or a silent reply that answers as if it
+   had seen something.
+   **If it fails:** service worker console, and note the exact 400 body your endpoint returned —
+   the classifier in `lib/providers/vision.ts` is deliberately conservative, and a refusal worded
+   in a way it does not recognise is a one-line fix there.
+6. Ask a second question in the same chat that would normally prompt a screenshot.
+   **Expected:** no note the second time (it is already known), and — the point of this step — the
+   model does **not** keep calling `screenshot`. Its tool description now tells it the call is
+   useless here and names `get_styles` / `find_elements` instead. A model that takes three more
+   screenshots anyway is burning the step budget and worth reporting.
+7. Attach an image to a message in this same chat and send it.
+   **Expected:** the message sends, and a note says plainly that the attachment was not sent
+   because the model does not accept images. The thumbnail still shows in your own bubble — you
+   attached it, and the transcript should not lie about that.
+8. Settings → set **Images** to **Never**, start a new chat on the *vision* model, and ask for a
+   screenshot.
+   **Expected:** no picture is sent even though the model could take one — the setting wins. Set it
+   back to **Auto** afterwards.
+9. Finally, switch back to the vision model preset from step 1 and ask for a screenshot again.
+   **Expected:** it sees it. The text-only model being remembered as blind must not have blinded
+   the vision model at the same base URL — the memory is per endpoint **and** model, and this is
+   the step that proves it.
+   **If it fails:** this is the worst failure mode in the feature (a working vision model silently
+   degraded); service worker console, plus `chrome.storage.local.get('vision:unsupported')` run
+   there, which lists exactly which endpoint+model pairs have been remembered.
+
 ---
 
 ## Pass/fail table
@@ -614,6 +687,8 @@ Same flow as section 11, with the **SuperGrok subscription** preset / "xAI subsc
 | 12 | SuperGrok subscription sign-in + turn | | |
 | 13 | `npm run build:store` — no subscription options | | |
 | 14 | Export a mod → import into Tampermonkey | | |
+| 15 | Screenshot to a vision model on a custom OpenAI endpoint | | |
+| 15 | Text-only model: one fallback, note, no repeat screenshots | | |
 
 For any **Fail** row, file an issue (or note here) with: the step number, the exact error text
 copied from the console named in that step, the Chrome version (`chrome://version`), and whether
