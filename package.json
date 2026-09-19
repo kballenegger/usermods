@@ -29,6 +29,7 @@
     "smoke:images": "wxt build && node scripts/screenshots.mjs --images",
     "smoke:artifact": "wxt build && node scripts/screenshots.mjs --artifact",
     "styleguide": "wxt build && node scripts/screenshots.mjs --styleguide",
+    "screenshots:settings": "wxt build && node scripts/screenshots.mjs --settings-capture",
     "store-assets": "wxt build && node scripts/store-assets.mjs"
   },
   "dependencies": {

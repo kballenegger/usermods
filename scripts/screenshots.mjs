@@ -108,6 +108,13 @@ const TABBAR_SHOT = process.argv.includes('--tabbar-capture');
 /** Capture the living specimen (entrypoints/styleguide) into docs/design/ for docs/design.md. */
 const STYLEGUIDE = process.argv.includes('--styleguide');
 
+/**
+ * Rewrite 04-settings.png and 04-settings-light.png alone, without disturbing the other captures.
+ * Settings is the one screen whose height tracks how many settings there are, so it is the one
+ * that needs re-shooting on its own after a setting is added.
+ */
+const SETTINGS_SHOT = process.argv.includes('--settings-capture');
+
 /** True when this run is capturing screenshots rather than asserting behaviour (see MASK below). */
 const CAPTURING =
   !SMOKE && !CHATS && !ISOLATION && !COMPACTION && !DASHBOARD && !DASHBOARD_SHOT && !THEME &&
@@ -476,7 +483,20 @@ async function mods(theme = 'dark', name = '03-mods.png') {
   }
 }
 
-/** 04 — Settings, provider presets and the ChatGPT subscription card, not signed in. */
+/**
+ * 04 — Settings, provider presets and the ChatGPT subscription card, not signed in.
+ *
+ * The only capture that does not use the fixed 420x820 panel viewport. Settings is a form that is
+ * taller than a side panel and scrolls inside `.view`, so a fixed-height shot ends mid-form: it
+ * used to cut "Side panel opens" and the theme control off below the frame, and every setting
+ * added at the bottom would silently fall out of the picture. The width stays at the panel's 420px
+ * — that is the convention, and the form's layout depends on it — but the height grows to the
+ * form's own scroll height so the whole thing is in one frame.
+ *
+ * Playwright's `fullPage: true` would not do it: the panel's shell is `height: 100%` with
+ * `overflow: hidden`, so the document never exceeds the viewport however long the form is. The
+ * height has to come from the scroll container itself.
+ */
 async function settings(theme = 'dark', name = '04-settings.png') {
   const b = await launch(theme);
   try {
@@ -486,7 +506,19 @@ async function settings(theme = 'dark', name = '04-settings.png') {
     await openSite(b.ctx, 'https://en.wikipedia.org/wiki/Common_kingfisher');
     await panel.waitForTimeout(800);
     await panel.locator('[data-action="settings"]').click();
+    // Assert on the last control in the form rather than waiting a fixed 600ms: it is both the
+    // readiness signal and the thing this capture exists to keep in frame.
+    await panel.locator('[data-testid="settings-panel-scope"]').waitFor({ timeout: 15_000 });
     await panel.waitForTimeout(600);
+    // Grow the viewport to the form's full height: the top bar plus everything `.view` can scroll.
+    const full = await panel.evaluate(() => {
+      const view = document.querySelector('.view');
+      const bar = document.querySelector('.app > :first-child');
+      return Math.ceil((bar?.getBoundingClientRect().height ?? 0) + view.scrollHeight);
+    });
+    await panel.setViewportSize({ width: PANEL.width, height: Math.max(PANEL.height, full) });
+    // Let the resize settle and the container-query top bar re-lay-out before the shutter.
+    await panel.waitForTimeout(400);
     return await shot(panel, name);
   } finally {
     await b.close();
@@ -3505,6 +3537,11 @@ async function main() {
     }
     if (PANELSCOPE) {
       await panelScopeFlow();
+      return;
+    }
+    if (SETTINGS_SHOT) {
+      await settings('dark', '04-settings.png');
+      await settings('light', '04-settings-light.png');
       return;
     }
     if (THEME) {
