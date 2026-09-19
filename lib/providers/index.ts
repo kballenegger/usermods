@@ -8,16 +8,22 @@ import type { Settings } from '../types';
 // .ts extensions: lib/agent/loop.ts imports this file, and the loop is unit tested under node
 // --experimental-strip-types, whose resolver does not guess them (see lib/transcript.ts).
 import { createAnthropicProvider } from './anthropic.ts';
-import { createOpenAIProvider } from './openai.ts';
+import { createOpenAIProvider, type OpenAIProviderDeps } from './openai.ts';
 import { createResponsesProvider } from './responses.ts';
 import type { Provider } from './types';
 
-export function createProvider(settings: Settings): Provider {
+/**
+ * Extras only the OpenAI-compatible adapter takes: where its "this model has no eyes" memory lives
+ * and who to tell when it learns something. Passed from the background, which owns both storage and
+ * the panel's event stream; a caller that omits them (the unit tests) gets an adapter that still
+ * falls back, but remembers nothing and tells no one.
+ */
+export function createProvider(settings: Settings, deps: OpenAIProviderDeps = {}): Provider {
   switch (settings.provider) {
     case 'anthropic':
       return createAnthropicProvider(settings);
     case 'openai-compatible':
-      return createOpenAIProvider(settings);
+      return createOpenAIProvider(settings, deps);
     case 'chatgpt':
     case 'xai':
       return createSubscriptionProvider(settings, settings.provider);

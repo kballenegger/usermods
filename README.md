@@ -14,7 +14,7 @@ Userscripts, userstyles, usermods.
 
 - **Any backend.** Anthropic's API, OpenAI, OpenRouter, or anything OpenAI-compatible: Ollama, LM Studio, vLLM, mlx_lm. Your key, your machine, no account, no hosted service.
 - **Use the subscription you already pay for.** Sign in with ChatGPT (Plus, Pro, Team) or SuperGrok / X Premium+ straight from Settings. No API key, no local proxy, no per-token bill. [Details](#using-a-subscription-instead-of-an-api-key).
-- **The model actually sees the page.** It has tools to read a pruned DOM, list elements, read computed styles, take screenshots, and run scripts to test its work before proposing anything.
+- **The model actually sees the page.** It has tools to read a pruned DOM, list elements, read computed styles, take screenshots, and run scripts to test its work before proposing anything. Screenshots reach any vision model, whichever protocol its backend speaks; a text-only endpoint is detected once and told to work structurally instead. [Details](#screenshots-and-models-that-cannot-see-them).
 - **Show it what you mean.** Paste or drop a screenshot or a mockup into the composer, or pick one with *Attach image*. Images are shrunk and re-encoded in the panel before they go anywhere, up to four per message. [Details](#attaching-images).
 - **One-off tasks too.** "Scroll to the bottom, open every carousel, and give me download links for all the photos" runs as a script, no mod required.
 - **Portable.** Mods are plain userscripts with a `==UserScript==` header. Nothing proprietary.
@@ -157,7 +157,7 @@ the ✕ in the panel's own header.
 
 For development, `npm run dev` starts WXT with hot reload and opens a Chrome profile with the extension loaded. `npm run typecheck` type-checks, and `npm test` runs the header/backup parser tests (Node's built-in runner, no browser needed).
 
-`npm run screenshots` regenerates the images above, and `npm run smoke` runs the same flow headless as an end-to-end check of the chat loop. Both build the extension, load it into Playwright's Chromium, and drive the real side panel against `scripts/mock-llm.mjs` — a local server that plays scripted conversations over the OpenAI wire protocol, so neither needs an API key or a live model. The page-inspection tools run for real against live pages, and the smoke run asserts that the reply streams, that `get_page`, `find_elements` and `get_styles` all succeed, that the proposal card appears with the expected name and match pattern, and that saving it writes a userscript to storage. A second scripted conversation covers the agent's guardrails: it makes four page reads in a row and then proposes an untested mod, and the smoke reads the mock's recorded requests back from `GET /__requests` to prove the read-budget nudge and the propose-time refusal actually reached the model. A third (`npm run smoke:wait`) drives every `wait_for` condition against a fixture page the mock server serves itself, where content arrives 800ms late, an element is revealed by editing a CSS rule and nothing else, the route changes by `pushState`, and a region mutates for 1.5s and then settles — asserting from the recorded requests that an already-true condition returned in under 100ms, that the style-only reveal was noticed promptly (which only the polling floor can do), that a deliberate timeout carried diagnostics and was not flagged as an error, and that Stop ends a 20-second wait within 500ms leaving no observer behind. A fourth (`npm run smoke:images`) covers attachments end to end: it pastes a generated PNG into the composer through a real `ClipboardEvent` carrying a `File`, drops a 6000×6000 one onto the transcript, checks it was downscaled rather than refused, watches an SVG be turned away with a note, removes one, sends, and then reads the mock's recorded requests to prove that exactly one `image_url` part reached the wire, as JPEG, at 1568×1568, *before* the text of its message and with its caption beside it — then opens the full-size overlay out of the chat's blob store, closes it on Escape and reloads the panel to confirm the thumbnail is still there. See the comments at the top of `scripts/screenshots.mjs` for how the panel page is driven in an ordinary tab standing in for the real panel — and, in the panel-scope flow, how the real panel is opened and observed instead.
+`npm run screenshots` regenerates the images above, and `npm run smoke` runs the same flow headless as an end-to-end check of the chat loop. Both build the extension, load it into Playwright's Chromium, and drive the real side panel against `scripts/mock-llm.mjs` — a local server that plays scripted conversations over the OpenAI wire protocol, so neither needs an API key or a live model. The page-inspection tools run for real against live pages, and the smoke run asserts that the reply streams, that `get_page`, `find_elements` and `get_styles` all succeed, that the proposal card appears with the expected name and match pattern, and that saving it writes a userscript to storage. A second scripted conversation covers the agent's guardrails: it makes four page reads in a row and then proposes an untested mod, and the smoke reads the mock's recorded requests back from `GET /__requests` to prove the read-budget nudge and the propose-time refusal actually reached the model. A third (`npm run smoke:wait`) drives every `wait_for` condition against a fixture page the mock server serves itself, where content arrives 800ms late, an element is revealed by editing a CSS rule and nothing else, the route changes by `pushState`, and a region mutates for 1.5s and then settles — asserting from the recorded requests that an already-true condition returned in under 100ms, that the style-only reveal was noticed promptly (which only the polling floor can do), that a deliberate timeout carried diagnostics and was not flagged as an error, and that Stop ends a 20-second wait within 500ms leaving no observer behind. A fourth (`npm run smoke:images`) covers attachments end to end: it pastes a generated PNG into the composer through a real `ClipboardEvent` carrying a `File`, drops a 6000×6000 one onto the transcript, checks it was downscaled rather than refused, watches an SVG be turned away with a note, removes one, sends, and then reads the mock's recorded requests to prove that exactly one `image_url` part reached the wire, as JPEG, at 1568×1568, *before* the text of its message and with its caption beside it — then opens the full-size overlay out of the chat's blob store, closes it on Escape and reloads the panel to confirm the thumbnail is still there. A fifth (`npm run smoke:vision`) is the only flow that drives the real `screenshot` tool, and reads the wire twice: against an ordinary mock it asserts the capture arrived as an `image_url` part in the user message *after* the `tool` message that answers the call — an arrangement the mock's validator now enforces the adjacency rules for, because only a real backend would otherwise catch it — and against a mock that answers 400 to any request carrying a picture, it asserts the run still finishes, that the refused request was re-sent immediately without the image, that the panel said why, and that not one later request carried an image. See the comments at the top of `scripts/screenshots.mjs` for how the panel page is driven in an ordinary tab standing in for the real panel — and, in the panel-scope flow, how the real panel is opened and observed instead.
 
 `npm run smoke` runs four flows: the chat loop above, the chats flow (`npm run smoke:chats` — the
 panel restoring the last chat, archiving, unarchiving on send), the dashboard flow
@@ -297,6 +297,35 @@ transcript keeps a small thumbnail so a reopened panel shows it instantly; the f
 stored once per chat and deleted with the chat. In the history resent to the model, the two most
 recent turns keep their images and older ones become `[attached image 1 elided]`, exactly as
 screenshots are handled.
+
+### Screenshots, and models that cannot see them
+
+The `screenshot` tool captures the visible part of the tab and hands it to the model as a picture,
+so it can check a visual result rather than infer one. Captures go through the same pipeline as an
+attachment: brought down to 1568px on the longest edge and re-encoded as JPEG, which on a HiDPI
+display is roughly a third of what the raw capture weighs and rather easier to read.
+
+Getting a picture into a `tool` result is a wire-protocol problem, and the answer differs by
+backend. The Anthropic API takes an image inside a tool result directly. Chat completions does not —
+a `tool` message is text-only — so usermods puts a pointer in the tool output and attaches the image
+to the user message immediately after it, which is what the Responses API backends already needed
+and what every vision-capable OpenAI-compatible endpoint reads correctly.
+
+That leaves the question the protocol cannot answer: **OpenAI-compatible** is whatever endpoint you
+typed in, and plenty of what speaks it has no vision at all. The **Images** setting (that provider
+only) decides what to do about it:
+
+| | |
+|---|---|
+| **Auto** (default) | Send images. If the endpoint refuses *specifically because it cannot take a picture*, send that one request again without them, remember this base URL and model, and leave images out from then on. The panel says so once, and the model is told plainly that it will get no pictures here — so it checks results with `get_styles` and `find_elements` instead of taking screenshots that tell it nothing. |
+| **Always send** | Send them regardless. A refusal is surfaced as an error rather than worked around, which is what you want if you know the model has vision and something is misconfigured. |
+| **Never send** | Do not send them at all, and skip the one refused request it would otherwise take to find out. |
+
+Auto only treats a refusal as a vision problem when the endpoint says so — a bad key, a full context
+window or a rejected tool schema all arrive as the same 4xx and none of them mean the model is
+blind. The fallback is one immediate re-send, not a retry: a model that will not take pictures will
+not take them in four seconds either, so it composes with the ordinary retry policy instead of
+competing with it.
 
 ### Migrating from Tampermonkey
 

@@ -1291,14 +1291,14 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
             <select value={chatId ?? ''} onChange={(e) => switchTo(e.target.value || null)} title={`Chats on ${host}`}>
               <option value="">New chat…</option>
               {live.map((c) => (
-                <option key={c.id} value={c.id}>
+                <option key={c.id} value={c.id} title={chatOptionTitle(c)}>
                   {chatOptionLabel(c)}
                 </option>
               ))}
               {archived.length > 0 && (
                 <optgroup label="Archived">
                   {archived.map((c) => (
-                    <option key={c.id} value={c.id}>
+                    <option key={c.id} value={c.id} title={chatOptionTitle(c)}>
                       {chatOptionLabel(c)}
                     </option>
                   ))}
@@ -1674,8 +1674,26 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
  * The name comes off the chat index mirror (Chat.editingModName), so this costs no extra read.
  */
 function chatOptionLabel(c: ChatRecord): string {
+  // The mod comes BEFORE the relative time, and the time is dropped entirely when there is one.
+  //
+  // A <select> cannot ellipse per-part the way the draft bar does — the option is one string and
+  // the browser truncates whatever runs past the box. With the order "title · 3m ago · ✎ <mod>",
+  // the mod name is last and is therefore the part that always dies: at the panel's own 420px the
+  // owner saw it cut to a single letter ("✎ k"), which names no mod and is worse than saying
+  // nothing. So the mod takes the slot the timestamp had.
+  //
+  // Dropping the time is the right trade rather than a reluctant one: "which installed script does
+  // sending a message here rewrite" is a fact about consequences, and "3m ago" is a fact about
+  // ordering that the list is ALREADY sorted by. The full string stays in the option's title
+  // attribute, so the time is one hover away.
+  if (c.editingModName) return `${c.title} · ✎ ${c.editingModName}`;
+  return `${c.title} · ${relativeTime(c.updatedAt)}`;
+}
+
+/** The whole truth for the option's tooltip, including the time the label gives up. */
+function chatOptionTitle(c: ChatRecord): string {
   const base = `${c.title} · ${relativeTime(c.updatedAt)}`;
-  return c.editingModName ? `${base} · ✎ ${c.editingModName}` : base;
+  return c.editingModName ? `${base} · editing the installed mod “${c.editingModName}”` : base;
 }
 
 /**

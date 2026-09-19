@@ -27,6 +27,7 @@
     "smoke:tabbar": "USERMODS_TEST_BUILD=1 wxt build && USERMODS_TEST_BUILD=1 node scripts/screenshots.mjs --tabbar",
     "smoke:wait": "USERMODS_TEST_BUILD=1 wxt build && USERMODS_TEST_BUILD=1 node scripts/screenshots.mjs --wait",
     "smoke:images": "USERMODS_TEST_BUILD=1 wxt build && USERMODS_TEST_BUILD=1 node scripts/screenshots.mjs --images",
+    "smoke:vision": "USERMODS_TEST_BUILD=1 wxt build && USERMODS_TEST_BUILD=1 node scripts/screenshots.mjs --vision",
     "smoke:artifact": "USERMODS_TEST_BUILD=1 wxt build && USERMODS_TEST_BUILD=1 node scripts/screenshots.mjs --artifact",
     "smoke:editmod": "USERMODS_TEST_BUILD=1 wxt build && USERMODS_TEST_BUILD=1 node scripts/screenshots.mjs --editmod",
     "smoke:resume": "USERMODS_TEST_BUILD=1 wxt build && USERMODS_TEST_BUILD=1 node scripts/screenshots.mjs --resume",
