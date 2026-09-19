@@ -61,6 +61,13 @@ export type ProviderKind = 'anthropic' | 'openai-compatible' | 'chatgpt' | 'xai'
 /** Which palette the UI wears. 'system' follows the OS; the other two are deliberate choices. */
 export type ThemeChoice = 'system' | 'dark' | 'light';
 
+/**
+ * Where the side panel opens. 'tab' puts it on the one tab you opened it from — Chrome hides it
+ * again on every other tab; 'window' is Chrome's window-wide panel, which follows you everywhere
+ * until you close it. See lib/sidepanel.ts for how each is configured.
+ */
+export type SidePanelScope = 'tab' | 'window';
+
 export interface Settings {
   provider: ProviderKind;
   /** Optional base URL override. For openai-compatible this is required (e.g. http://localhost:11434/v1). */
@@ -78,6 +85,13 @@ export interface Settings {
    * Optional so a profile saved before this existed reads as the default.
    */
   contextBudget?: number;
+  /**
+   * Where the toolbar icon (and the dashboard's Open button) puts the panel.
+   *
+   * Optional, and a profile that predates it reads as 'tab' — see resolveScope in lib/sidepanel.ts
+   * for why this one does NOT pin old profiles to the old behaviour the way the theme does.
+   */
+  sidePanelScope?: SidePanelScope;
 }
 
 /**
@@ -111,6 +125,13 @@ export const DEFAULT_SETTINGS: Settings = {
    */
   theme: 'system',
   contextBudget: DEFAULT_CONTEXT_BUDGET,
+  /**
+   * On the tab you opened it from, not on every tab. A panel that follows you onto every other tab
+   * is Chrome's default shape, not a considered one: usermods is scoped to the page you are on —
+   * its chats, its mods — so a panel sitting over an unrelated tab is showing you the wrong site's
+   * everything. 'window' is one setting away for anyone who wants the old behaviour back.
+   */
+  sidePanelScope: 'tab',
 };
 
 /** The three choices, in the order the compact ◐ toggle cycles them. */

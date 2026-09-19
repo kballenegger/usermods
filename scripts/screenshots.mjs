@@ -4,11 +4,14 @@
 //
 //   npm run screenshots      capture everything into docs/screenshots/
 //   npm run smoke            headless: the chat, guardrails, activity, chats, isolation,
-//                            compaction, dashboard, theme, tab bar and wait flows, all asserted
+//                            compaction, dashboard, panel scope, theme, tab bar, wait, images and
+//                            artifact flows, all asserted
 //   npm run smoke:chats      headless: the chats flow alone (restore, New chat, archive/unarchive)
 //   npm run smoke:isolation  headless: the isolation flow alone (two chats running at once, no bleed)
 //   npm run smoke:compaction headless: the compaction flow alone (both tiers, on a shrunken budget)
 //   npm run smoke:dashboard  headless: the dashboard flow alone (grouping, search, handoff, mods)
+//   npm run smoke:panelscope headless: the panel-scope flow alone (a real side panel opened on one
+//                            tab and on no other, and the setting flipped both ways)
 //   npm run smoke:tabbar     headless: the top bar alone, at 320/360/420/640 in both themes
 //   npm run smoke:wait       headless: the wait flow alone (every wait_for condition, a deliberate
 //                            timeout, Stop mid-wait), against a fixture page the mock server serves
@@ -29,9 +32,15 @@
 // 1. Branded Chrome 137+ ignores --load-extension, so this uses Playwright's bundled Chromium
 //    via `channel: 'chromium'` and a persistent context.
 //
-// 2. The side panel cannot be opened by automation (chrome.sidePanel.open needs a real user
-//    gesture), but sidepanel.html is an ordinary extension page, so it is loaded in a normal tab
-//    sized to side-panel proportions (420x820). It looks the same because it is the same page.
+// 2. Every flow but one drives sidepanel.html in a NORMAL TAB sized to side-panel proportions
+//    (420x820), because the real panel cannot be screenshotted or located by Playwright. It looks
+//    and behaves the same because it is the same page.
+//
+//    The real panel CAN be opened: Playwright's click is a trusted gesture, which is what
+//    chrome.sidePanel.open requires, and both the dashboard and panel-scope flows rely on that.
+//    What is still impossible is seeing it — it never appears in ctx.pages() — so the panel-scope
+//    flow observes it through chrome.runtime.getContexts() (it lists a SIDE_PANEL context) and
+//    through chrome.sidePanel.getOptions(), rather than by driving its DOM.
 //
 // 3. The panel finds its target through chrome.tabs.query({active: true, currentWindow: true}).
 //    If the panel tab is itself the active tab, it targets itself, reads no host, and the
@@ -86,6 +95,7 @@ const IMAGES = process.argv.includes('--images');
 const ARTIFACT = process.argv.includes('--artifact');
 /** The artifact flow, asserted AND capturing the two draft-panel states for the PR. */
 const ARTIFACT_SHOT = process.argv.includes('--artifact-capture');
+const PANELSCOPE = process.argv.includes('--panelscope');
 
 /**
  * Where the tab bar's captures go when --tabbar is asked to write them (`--tabbar-capture`). These
@@ -101,7 +111,8 @@ const STYLEGUIDE = process.argv.includes('--styleguide');
 /** True when this run is capturing screenshots rather than asserting behaviour (see MASK below). */
 const CAPTURING =
   !SMOKE && !CHATS && !ISOLATION && !COMPACTION && !DASHBOARD && !DASHBOARD_SHOT && !THEME &&
-  !TABBAR && !TABBAR_SHOT && !WAIT && !IMAGES && !STYLEGUIDE && !ARTIFACT && !ARTIFACT_SHOT;
+  !TABBAR && !TABBAR_SHOT && !WAIT && !IMAGES && !STYLEGUIDE && !ARTIFACT && !ARTIFACT_SHOT &&
+  !PANELSCOPE;
 
 /** See note 4: a first-run setup instruction, not the steady state the README should show. */
 const HIDE_SETUP_NOTICE = '.app > .notice, .dash-inner > .notice { display: none !important; }';
@@ -2424,12 +2435,18 @@ async function dashboardFlow({ capture = false } = {}) {
 
     // --- 6. Open: the handoff, then the tab.
     //
-    // Note what actually happens here. chrome.sidePanel.open({windowId}) SUCCEEDS from this
-    // extension page — Playwright's click is a trusted gesture — so the real side panel opens, sees
-    // the handoff for the host it lands on, opens that chat and DELETES the handoff. Measured at
-    // roughly 300ms. So this cannot poll for the handoff after a fixed wait: it has to catch the
-    // write. It watches chrome.storage.onChanged from inside the page, which sees the write whether
-    // or not the panel consumes it a moment later.
+    // This drives the detail pane's "Open in new tab", not the row's "Open". The two write the same
+    // handoff; they differ in where the page lands. Under the default 'tab' scope, "Open" navigates
+    // THIS dashboard tab to the chat's page — correct, and covered by the panel-scope flow — which
+    // would tear this flow's own page out from under steps 7 onwards. "Open in new tab" is the
+    // path that still creates a tab, which is what the rest of this step asserts.
+    //
+    // Note what actually happens here. chrome.sidePanel.open SUCCEEDS from this extension page —
+    // Playwright's click is a trusted gesture — so the real side panel opens, sees the handoff for
+    // the host it lands on, opens that chat and DELETES the handoff. Measured at roughly 300ms. So
+    // this cannot poll for the handoff after a fixed wait: it has to catch the write. It watches
+    // chrome.storage.onChanged from inside the page, which sees the write whether or not the panel
+    // consumes it a moment later.
     //
     // The handoff being consumed is the feature working, not a failure — but a test that asserted
     // on it after the fact would read an empty key and call the feature broken.
@@ -2442,7 +2459,10 @@ async function dashboardFlow({ capture = false } = {}) {
         if (area === 'session' && changes.openChat?.newValue) window.__handoffSeen = changes.openChat.newValue;
       });
     });
-    await openRow.locator('[data-testid="chat-open"]').click();
+    // The detail pane for that chat has to be showing for its buttons to exist.
+    await openRow.locator('[data-testid="chat-title"]').click().catch(() => {});
+    await page.locator('[data-testid="chat-open-newtab"]').waitFor({ timeout: 10_000 });
+    await page.locator('[data-testid="chat-open-newtab"]').click();
     await page.waitForFunction(() => window.__handoffSeen !== null, { timeout: 10_000 }).catch(() => {});
     const handoff = await page.evaluate(() => window.__handoffSeen);
     if (!handoff) fail('clicking Open wrote no handoff to session storage');
@@ -2457,6 +2477,7 @@ async function dashboardFlow({ capture = false } = {}) {
       fail(`Open did not create a tab on the chat's recorded URL (new tabs: ${JSON.stringify(opened)})`);
     }
     // The page must still be usable: whatever sidePanel.open did, it cannot break the view.
+    if (!page.url().endsWith('dashboard.html')) fail(`"Open in new tab" navigated the dashboard away, to ${page.url()}`);
     if ((await page.locator('[data-testid="chat-row"]').count()) !== 3) fail('the dashboard broke after the Open click');
 
     // --- 7. Mods: toggling writes through to storage.
@@ -2757,6 +2778,167 @@ async function dashboardFlow({ capture = false } = {}) {
 
     console.log(
       'dashboard: OK — grouping, search over titles/hosts/message text (incl. under sustained writes), preview (closed by the one derived rule), rename, archive, handoff + tab, mod toggle, source edit with @require resolution and a failed fetch refused, external-change adoption and conflict, bulk disable, zero invalid requests',
+    );
+  } finally {
+    await b.close();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Panel scope: the side panel opens on ONE tab, not on every tab
+// ---------------------------------------------------------------------------
+//
+// This drives the real chrome.sidePanel API through a real trusted click — the dashboard flow
+// already proves Playwright's click counts as a user gesture, which is what sidePanel.open needs.
+//
+// What is asserted, and how each thing is observed:
+//
+//   * After the extension starts under tab scope, the WINDOW-level panel is disabled:
+//     getOptions({}) reports enabled:false. That is the half of the fix that keeps the panel off
+//     tabs the user never opened it on — a tab with no options of its own inherits this default.
+//   * Clicking Open on the dashboard, with scope 'tab', leaves the dashboard's own tab with
+//     tab-specific options enabled (getOptions({tabId}) reports enabled:true AND echoes the tabId,
+//     which a window-level answer never does) while a SECOND tab in the same window still reports
+//     the disabled window default. One tab has a panel; the other has none.
+//   * The panel really opened, not just "was configured": chrome.runtime.getContexts() lists a
+//     SIDE_PANEL context. (ctx.pages() does NOT: Playwright never surfaces the panel as a page, so
+//     the technique the task suggested is not available — getContexts is what replaces it.)
+//   * The per-tab options survive that tab navigating to the chat's page, which is the whole basis
+//     for the dashboard's approach (c): open on the dashboard tab, then navigate that same tab.
+//   * The handoff still lands the right chat, watched the same way the dashboard flow watches it.
+//   * Flipped to 'window', the window-level options come back enabled and openPanelOnActionClick
+//     is restored — read back through getOptions({}).
+//
+// NOT asserted here, and left to docs/qa-checklist.md §11, because automation cannot do it:
+//   * clicking the real toolbar icon (chrome.action.onClicked cannot be triggered from a page, and
+//     Playwright cannot click browser chrome), so the action-click path itself is covered by the
+//     node tests over actionClickPlan plus the manual checklist;
+//   * seeing the panel appear and disappear as tabs are switched — Chrome's own show/hide of a
+//     tab-specific panel is not observable from any extension API. What IS observable is the
+//     options that drive it, which is what this flow reads.
+
+async function panelScopeFlow() {
+  const b = await launch('light');
+  const fail = (m) => {
+    throw new Error(`panelscope: ${m}`);
+  };
+  /** The window-level options, read from an extension page (the API is not on content pages). */
+  const windowOptions = (p) => p.evaluate(() => chrome.sidePanel.getOptions({}));
+  const tabOptions = (p, tabId) => p.evaluate((t) => chrome.sidePanel.getOptions({ tabId: t }), tabId);
+  const sidePanelContexts = (p) =>
+    p.evaluate(async () => (await chrome.runtime.getContexts({})).filter((c) => c.contextType === 'SIDE_PANEL').length);
+
+  try {
+    // --- 1. Tab scope (the default) disables the window-level panel.
+    const page = await openDashboard(b.ctx, b.extId, { storage: seedChats(), settings: { theme: 'light' } });
+    // openDashboard seeds settings without a scope, which is exactly the "existing profile, no
+    // stored value" case: it must read as 'tab'. Give the worker's storage listener a moment.
+    await page.waitForTimeout(1200);
+    const w0 = await windowOptions(page);
+    if (w0.enabled !== false) {
+      fail(`with scope 'tab' the window-level panel was still enabled (${JSON.stringify(w0)}) — it would open on every tab`);
+    }
+
+    const myTabId = await page.evaluate(async () => (await chrome.tabs.getCurrent())?.id);
+    if (myTabId == null) fail('the dashboard tab could not name itself, so the per-tab open has nothing to attach to');
+
+    // A second tab in the same window, to prove the panel does not reach it.
+    const other = await b.ctx.newPage();
+    await other.goto('https://example.org/', { waitUntil: 'domcontentloaded', timeout: 60_000 }).catch(() => {});
+    const otherTabId = await page.evaluate(async () => {
+      const ts = await chrome.tabs.query({ url: 'https://example.org/*' });
+      return ts[0]?.id;
+    });
+    if (otherTabId == null) fail('the second tab never appeared in chrome.tabs.query');
+    await page.bringToFront();
+
+    // A third, long-lived extension page to read per-tab options from and to watch the handoff.
+    // It has to be a SEPARATE page: under tab scope the dashboard navigates ITSELF to the chat's
+    // page, which tears down its JS context — a watcher installed there would die with the click,
+    // which is exactly what a first attempt at this flow did. chrome.storage.session is shared
+    // across the extension's pages, so watching from here sees the same write.
+    const probe = await b.ctx.newPage();
+    await probe.goto(`chrome-extension://${b.extId}/dashboard.html`);
+    await probe.evaluate(() => {
+      window.__handoffSeen = null;
+      chrome.storage.onChanged.addListener((changes, area) => {
+        if (area === 'session' && changes.openChat?.newValue) window.__handoffSeen = changes.openChat.newValue;
+      });
+    });
+    await page.bringToFront();
+
+    // --- 2. Open, from a trusted click.
+    const row = page.locator('[data-testid="chat-row"][data-chat-id="chat-wiki-1"]');
+    await row.waitFor({ timeout: 15_000 });
+    await row.locator('[data-testid="chat-open"]').click();
+    await probe.waitForFunction(() => window.__handoffSeen !== null, { timeout: 10_000 }).catch(() => {});
+    const handoff = await probe.evaluate(() => window.__handoffSeen);
+    if (!handoff) fail('clicking Open wrote no handoff, so the panel cannot know which chat to show');
+    if (handoff.chatId !== 'chat-wiki-1') fail(`the handoff named ${JSON.stringify(handoff.chatId)}`);
+    if (handoff.host !== 'en.wikipedia.org') fail(`the handoff carried host ${JSON.stringify(handoff.host)}`);
+
+    // --- 3. The panel is attached to THIS tab and to no other.
+    // Reading from the second tab's own perspective is impossible (example.org is not an extension
+    // page), so both reads go through the probe page — the answers are per-tab either way.
+    const mine = await tabOptions(probe, myTabId);
+    if (mine.enabled !== true) fail(`the clicked tab got no panel (${JSON.stringify(mine)})`);
+    if (mine.tabId !== myTabId) {
+      fail(`the clicked tab's options were the window default, not tab-specific (${JSON.stringify(mine)})`);
+    }
+    const theirs = await tabOptions(probe, otherTabId);
+    if (theirs.enabled !== false || theirs.tabId != null) {
+      fail(`another tab in the same window got a panel too (${JSON.stringify(theirs)}) — this is the bug being fixed`);
+    }
+
+    // The panel document really opened. Playwright never lists it in ctx.pages(), so this reads the
+    // extension's own context list, where it shows up as SIDE_PANEL.
+    const panels = await sidePanelContexts(probe);
+    if (panels < 1) fail('no SIDE_PANEL context exists, so the trusted click did not actually open a panel');
+    if (b.ctx.pages().some((p) => p.url().endsWith('/sidepanel.html'))) {
+      fail('a sidepanel.html PAGE appeared — this flow assumes the real panel, not a tab standing in for it');
+    }
+
+    // --- 4. Navigating that tab to the chat's page keeps the panel attached to it.
+    await page.waitForTimeout(2500);
+    if (!page.url().startsWith('https://en.wikipedia.org/wiki/Common_kingfisher')) {
+      fail(`Open did not navigate the dashboard tab to the chat's page (it is on ${page.url()})`);
+    }
+    const afterNav = await tabOptions(probe, myTabId);
+    if (afterNav.enabled !== true || afterNav.tabId !== myTabId) {
+      fail(`the per-tab panel did not survive the navigation (${JSON.stringify(afterNav)}) — approach (c) would be unsound`);
+    }
+    if ((await sidePanelContexts(probe)) < 1) fail('the panel closed when its tab navigated');
+    // And the window default is still off: nothing about opening one tab's panel re-enabled it.
+    if ((await windowOptions(probe)).enabled !== false) fail('opening a per-tab panel re-enabled the window-level panel');
+
+    // --- 5. Flip the setting to 'window' and the old behaviour comes back.
+    await probe.evaluate(async () => {
+      const { settings } = await chrome.storage.local.get('settings');
+      await chrome.storage.local.set({ settings: { ...settings, sidePanelScope: 'window' } });
+    });
+    await probe.waitForFunction(async () => (await chrome.sidePanel.getOptions({})).enabled === true, null, { timeout: 10_000 }).catch(
+      () => {},
+    );
+    const w1 = await windowOptions(probe);
+    if (w1.enabled !== true) fail(`flipping to 'window' did not enable the window-level panel (${JSON.stringify(w1)})`);
+    if (w1.path !== 'sidepanel.html') fail(`the window-level panel points at ${JSON.stringify(w1.path)}`);
+    // A tab that never asked for one now inherits the enabled default, which is what window-wide means.
+    const theirsNow = await tabOptions(probe, otherTabId);
+    if (theirsNow.enabled !== true) fail(`under 'window' scope a plain tab still had no panel (${JSON.stringify(theirsNow)})`);
+
+    // --- 6. And back to 'tab', so the setting is not one-way.
+    await probe.evaluate(async () => {
+      const { settings } = await chrome.storage.local.get('settings');
+      await chrome.storage.local.set({ settings: { ...settings, sidePanelScope: 'tab' } });
+    });
+    await probe.waitForFunction(async () => (await chrome.sidePanel.getOptions({})).enabled === false, null, { timeout: 10_000 }).catch(
+      () => {},
+    );
+    if ((await windowOptions(probe)).enabled !== false) fail("flipping back to 'tab' did not disable the window-level panel again");
+
+    await assertNoViolations('panelscope');
+    console.log(
+      'panelscope: OK — tab scope disables the window panel, a trusted Open attaches a real SIDE_PANEL to that one tab and to no other, the per-tab options survive the tab navigating to the chat page, the handoff still names the right chat, and the setting flips both ways',
     );
   } finally {
     await b.close();
@@ -3321,6 +3503,10 @@ async function main() {
       await artifactFlow({ capture: ARTIFACT_SHOT });
       return;
     }
+    if (PANELSCOPE) {
+      await panelScopeFlow();
+      return;
+    }
     if (THEME) {
       await themeFlow();
       return;
@@ -3349,6 +3535,7 @@ async function main() {
       await isolationFlow();
       await compactionFlow();
       await dashboardFlow();
+      await panelScopeFlow();
       await themeFlow();
       await tabbarFlow();
       await waitFlow();

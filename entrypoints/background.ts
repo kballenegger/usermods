@@ -23,11 +23,48 @@ import type { OAuthKind } from '@/lib/oauth';
 import type { AgentPortRequest, OAuthLoginState, RpcRequest } from '@/lib/rpc';
 import { SessionMap } from '@/lib/sessions';
 import { loadSettings } from '@/lib/settings';
+import { actionClickPlan, resolveScope, windowPanelPlan } from '@/lib/sidepanel';
+import type { SidePanelScope } from '@/lib/types';
 import { looksLikeZip, parseTampermonkeyJson, parseTampermonkeyZipEntries, type TmScript } from '@/lib/tampermonkey';
 import type { AgentEvent, AgentEventBody, ContentRequest, Mod, ModProposal, Msg, Part, Settings, UserTurn } from '@/lib/types';
 
 export default defineBackground(() => {
-  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
+  // The window-level panel is configured from the stored scope, not unconditionally opened on every
+  // tab: see applyPanelScope below and lib/sidepanel.ts for the two layers Chrome gives us.
+  void applyPanelScope();
+
+  /**
+   * Open the panel on the clicked tab alone.
+   *
+   * This listener only ever fires under 'tab' scope: under 'window', openPanelOnActionClick is on
+   * and Chrome opens the window panel itself without firing onClicked.
+   *
+   * Everything here runs inside the click's gesture. The scope is read from an in-worker cache
+   * rather than awaited from storage, because `open()` "may only be called in response to a user
+   * action" and an await on chrome.storage is exactly the kind of hop that can cost the gesture.
+   * The cache is filled at startup and kept current by the storage listener below. A click that
+   * beats the first storage read reads the default, 'tab' — and that is safe rather than lucky:
+   * under 'window' scope Chrome would not have fired onClicked at all, because openPanelOnActionClick
+   * is part of Chrome's own persisted state for the extension and survives the worker sleeping. So
+   * a click reaching this listener is already evidence the scope is 'tab'.
+   */
+  chrome.action.onClicked.addListener((tab) => {
+    const plan = actionClickPlan(panelScope, tab.id);
+    if (!plan.setOptions || !plan.open) return;
+    // No await between these two: setOptions is fire-and-forget so open() stays in the gesture.
+    // Chrome queues extension API calls from one context in order, so the options are in place by
+    // the time open() is serviced.
+    chrome.sidePanel.setOptions(plan.setOptions).catch(() => {});
+    chrome.sidePanel.open(plan.open).catch((e: unknown) => {
+      console.warn('[usermods] sidePanel.open', e);
+    });
+  });
+
+  // A scope change takes effect immediately, without a reload: Settings writes the whole settings
+  // object, so any write is worth re-reading the scope from.
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes.settings) void applyPanelScope();
+  });
 
   chrome.runtime.onInstalled.addListener(() => void bootstrap());
   chrome.runtime.onStartup.addListener(() => void bootstrap());
@@ -200,6 +237,42 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn): Promise<v
     // delay, break or fail what the user actually asked for. Errors are swallowed and logged.
     // It posts through this chat's own post(), so the rename lands on this chat and no other.
     if (succeeded && settings) void nameChat(chatId, settings, post);
+  }
+}
+
+/**
+ * The scope the action-click listener reads, cached in the worker.
+ *
+ * Defaulting to 'tab' matches resolveScope's answer for a profile that has stored nothing, so a
+ * click that beats the first storage read behaves the same as one after it.
+ */
+let panelScope: SidePanelScope = 'tab';
+
+/**
+ * Put Chrome's window-level panel into the shape the stored scope asks for.
+ *
+ * Under 'tab' this DISABLES the window panel. That is the half of the fix that stops the panel
+ * appearing on tabs the user never opened it on: a tab with no per-tab options falls back to the
+ * window default, so with the default disabled, every other tab has no panel at all. The per-tab
+ * options the action click sets override it for the one tab that asked.
+ */
+async function applyPanelScope() {
+  try {
+    const r = await chrome.storage.local.get('settings');
+    panelScope = resolveScope(r.settings as Partial<Settings> | undefined);
+  } catch {
+    panelScope = 'tab';
+  }
+  const plan = windowPanelPlan(panelScope);
+  try {
+    await chrome.sidePanel.setOptions(plan.options);
+  } catch (e) {
+    console.warn('[usermods] sidePanel.setOptions', e);
+  }
+  try {
+    await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: plan.openPanelOnActionClick });
+  } catch (e) {
+    console.warn('[usermods] sidePanel.setPanelBehavior', e);
   }
 }
 
