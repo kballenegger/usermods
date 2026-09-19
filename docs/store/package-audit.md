@@ -8,9 +8,9 @@ first submission. Rebuild and re-audit with `npm run zip:store` whenever the pac
 | | |
 |---|---|
 | Artifact | `.output/usermods-0.1.0-chrome.zip` |
-| Size | **375,104 bytes** (366.3 KiB) |
-| SHA-256 | `b7b304c1bfc2a2486e15ceaa19524a8f7a5ec0b1b543898c09ccac382f4b826b` |
-| Unpacked | 973,746 bytes (951 KiB) across **34 files**, 62% compression |
+| Size | **375,303 bytes** (366.5 KiB) |
+| SHA-256 | `5ab0332f5bc9c01f502bd2fdc8610c7456f3caa4dbaae50a1bdea74ae19f4360` |
+| Unpacked | 974,411 bytes (952 KiB) across **34 files**, 62% compression |
 
 The zip is reproducible only up to the bundler's content hashes: rebuilding from the same tree
 yields the same file list, but a changed chunk renames itself, so the checksum above identifies
