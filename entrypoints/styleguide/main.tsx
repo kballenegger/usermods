@@ -105,7 +105,7 @@ function Guide() {
 
       <Section
         title="Typography"
-        note="Three families, and which one is used is a rule. The pixel display face is for short labels only, at its single 400 weight; anything you read a sentence of is set in the UI or mono text face. The glyph-pair row below is the test a display face has to pass: it replaced Pixelify Sans, whose C was a closed O, so CHAT read as OHAT."
+        note="Three families, and which one is used is a rule. The pixel display face is for short labels only; anything you read a sentence of is set in the UI or mono text face."
       >
         <Row title="Display — Jersey 10. Labels, headings, the wordmark. Never a sentence, never below 12px.">
           <div className="sg-demo col">

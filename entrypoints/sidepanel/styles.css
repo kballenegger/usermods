@@ -1104,8 +1104,7 @@ input[type='checkbox']:checked::after {
   letter-spacing: 0.04em;
   text-transform: lowercase;
   color: var(--live-text);
-  /* 1px, not 2px — see the note on .dash-head h1: a 2px offset muddies Jersey's finer strokes. */
-  text-shadow: 1px 1px 0 var(--accent-edge);
+  text-shadow: 2px 2px 0 var(--accent-edge);
 }
 
 /*
