@@ -53,6 +53,37 @@ test('proposal appends a proposal card', () => {
   assert.deepEqual(items, [{ kind: 'proposal', proposal }]);
 });
 
+test('a new proposal card carries no saved-ness of its own: that is read from the draft', () => {
+  // The bug the owner hit was a `saved` flag on the row. Nothing here may write one — the card's
+  // state comes from the artifact (lib/artifact.ts:proposalCardState), fresh on every render.
+  const first = reduceItems([], { type: 'proposal', proposal });
+  const stamped = reduceItems(first, { type: 'artifact', version: 1 });
+  const second = reduceItems(stamped, { type: 'proposal', proposal: { ...proposal, code: 'revised' } });
+  const card = second[second.length - 1] as Extract<ChatItem, { kind: 'proposal' }>;
+  assert.equal(card.proposal.code, 'revised');
+  assert.ok(!('saved' in card), 'the reducer must not put a saved flag on a proposal row');
+});
+
+test('a second proposal is stamped with its OWN version, leaving the first card on its own', () => {
+  let items = reduceItems([], { type: 'proposal', proposal });
+  items = reduceItems(items, { type: 'artifact', version: 1 });
+  items = reduceItems(items, { type: 'proposal', proposal: { ...proposal, code: 'revised' } });
+  items = reduceItems(items, { type: 'artifact', version: 2 });
+  const versions = items.filter((it) => it.kind === 'proposal').map((it) => (it as Extract<ChatItem, { kind: 'proposal' }>).version);
+  assert.deepEqual(versions, [1, 2], 'each card names the version it became');
+});
+
+test('a re-proposal the draft de-duped is stamped with the version it de-duped into', () => {
+  // addVersion collapses an identical consecutive proposal, so the background reports the SAME
+  // number twice. The new row still has to be stamped: an unversioned card cannot join to the panel.
+  let items = reduceItems([], { type: 'proposal', proposal });
+  items = reduceItems(items, { type: 'artifact', version: 1 });
+  items = reduceItems(items, { type: 'proposal', proposal });
+  items = reduceItems(items, { type: 'artifact', version: 1 });
+  const versions = items.filter((it) => it.kind === 'proposal').map((it) => (it as Extract<ChatItem, { kind: 'proposal' }>).version);
+  assert.deepEqual(versions, [1, 1]);
+});
+
 test('accepted clears the queued flag on its own message and leaves the others alone', () => {
   const items: ChatItem[] = [
     { kind: 'user', id: 'a', text: 'first', queued: true },

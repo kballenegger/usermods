@@ -89,7 +89,11 @@ export function TranscriptPreview({ items, artifact }: { items: ChatItem[]; arti
                       {m}
                     </span>
                   ))}
-                  {it.saved && <span className="badge">saved</span>}
+                  {/* The version this proposal became, not whether it was saved. This preview has
+                      no artifact to ask, and "saved" is a fact about the draft's current state that
+                      a frozen transcript row cannot answer — it went on claiming a script was
+                      installed long after the chat had proposed something else. */}
+                  {it.version != null && <span className="badge">v{it.version}</span>}
                 </div>
                 <details>
                   <summary className="muted">Show code</summary>

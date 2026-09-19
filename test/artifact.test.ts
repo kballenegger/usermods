@@ -14,6 +14,8 @@ import {
   draftHeadline,
   fromMod,
   lineCount,
+  proposalCardLabel,
+  proposalCardState,
   rollbackTo,
   toProposal,
   toSource,
@@ -118,6 +120,85 @@ test('addVersion does not mutate the artifact it was given', () => {
   const before = JSON.stringify(a);
   addVersion(a, draft({ code: V2 }), 2000);
   assert.equal(JSON.stringify(a), before);
+});
+
+// ---------- the saved state of a proposal card ----------
+//
+// The owner's report: he saved the mod the model proposed, asked for a change, and the SECOND
+// proposal card came up already reading as saved. The old rule was a `saved` boolean stamped onto
+// every proposal row in the transcript at save time, which answered "did this chat ever save?" and
+// was read as "is this script installed?" — two different questions the moment the model revises
+// the draft. These pin the derived rule down: saved-ness belongs to a VERSION.
+
+test('a proposal card in a chat that has never saved offers a plain save', () => {
+  const a = seed();
+  assert.equal(proposalCardState(a, 1), 'unsaved');
+  assert.equal(proposalCardLabel(proposalCardState(a, 1)), 'Save & enable');
+});
+
+test('after a save, the card for the saved version — and only it — reads as saved', () => {
+  const saved: Artifact = { ...seed(), linkedModId: 'mod-1', savedVersion: 1 };
+  assert.equal(proposalCardState(saved, 1), 'saved');
+  assert.equal(proposalCardLabel(proposalCardState(saved, 1)), 'Saved · enabled');
+});
+
+test("the owner's bug: a SECOND proposal after a save does not inherit the first card's saved state", () => {
+  // v1 proposed and saved…
+  const saved: Artifact = { ...seed(), linkedModId: 'mod-1', savedVersion: 1 };
+  // …then the model revises it: "Updating the mod so those span titles get caught too."
+  const revised = addVersion(saved, draft({ code: V2 }), 2000);
+
+  assert.equal(revised.current, 2, 'the revision is a new version of the SAME draft');
+  assert.equal(revised.linkedModId, 'mod-1', 'it stays linked to the mod the first save created');
+  assert.equal(revised.savedVersion, 1, 'the mod still holds v1: nothing has saved v2 yet');
+
+  // The new card must not claim to be installed.
+  assert.equal(proposalCardState(revised, 2), 'update');
+  assert.equal(proposalCardLabel(proposalCardState(revised, 2)), 'Save & update mod');
+
+  // v1's card goes on reading as saved, and that is correct rather than stale: the mod really does
+  // still hold v1 until the user saves the revision. This is the whole difference from the boolean
+  // it replaced — "saved" now names a version, so it can be true of one card and false of another
+  // at the same time, which is exactly the situation the owner was looking at.
+  assert.equal(proposalCardState(revised, 1), 'saved');
+});
+
+test('a card with no recorded version never claims to be the saved one', () => {
+  const saved: Artifact = { ...seed(), linkedModId: 'mod-1', savedVersion: 1 };
+  assert.equal(proposalCardState(saved, undefined), 'update', 'it offers the update rather than guessing');
+});
+
+test('with no draft at all there is nothing to save from', () => {
+  assert.equal(proposalCardState(null, 1), 'none');
+});
+
+test('saving the revision moves saved-ness to it, and the old card gives the claim up', () => {
+  const saved: Artifact = { ...seed(), linkedModId: 'mod-1', savedVersion: 1 };
+  const revised = addVersion(saved, draft({ code: V2 }), 2000);
+  // What entrypoints/background.ts:saveArtifactAsMod writes after the second save.
+  const resaved: Artifact = { ...revised, linkedModId: 'mod-1', savedVersion: revised.current };
+
+  assert.equal(proposalCardState(resaved, 2), 'saved');
+  assert.equal(proposalCardState(resaved, 1), 'update', 'v1 is no longer what is installed');
+  assert.equal(resaved.linkedModId, 'mod-1', 'still one mod, not two');
+});
+
+test('a chat started from an existing mod opens already saved at v1, not offering to save it again', () => {
+  const mod: Mod = {
+    id: 'mod-9',
+    name: 'Wikipedia: full-width article',
+    description: 'Hides the sidebar.',
+    matches: ['*://*.wikipedia.org/wiki/*'],
+    source: toSource(seed()),
+    enabled: true,
+    version: '1.0.0',
+    createdAt: 1,
+    updatedAt: 1,
+  } as Mod;
+  const a = fromMod('chat-2', mod, 1000, 'art-2');
+  assert.equal(a.linkedModId, 'mod-9');
+  assert.equal(a.savedVersion, a.current);
+  assert.equal(proposalCardState(a, a.current), 'saved');
 });
 
 // ---------- rollback ----------

@@ -61,8 +61,61 @@ export interface Artifact {
   current: number;
   /** The mod a Save created, so a later Save updates that mod rather than making another. */
   linkedModId?: string;
+  /**
+   * The `n` of the version that was written to the linked mod by the last save. This is what makes
+   * "is this saved?" a question about a VERSION rather than about the chat: after the user saves v1
+   * and the model proposes v2, the mod on disk is still v1, so v1's card reads as saved and v2's
+   * does not. Without it, the only saved-ness the panel had was a per-card boolean that a save set
+   * on every card in the transcript at once — which is what made a fresh proposal appear already
+   * saved, and made the version the user was actually running impossible to tell from the one the
+   * model had just written.
+   */
+  savedVersion?: number;
   /** Carried from the proposal that is current, so the panel can repeat the model's caveat. */
   untestedReason?: string;
+}
+
+/**
+ * What a proposal card in the transcript should say about itself, given the chat's draft.
+ *
+ * The card is history: it is the moment one version was proposed, and whether that version is the
+ * one installed is a fact about the artifact, not about the card. Deriving it here — from the
+ * artifact the panel already holds — is what stops a saved flag from surviving the draft moving on
+ * underneath it.
+ *
+ * `version` is the artifact version this card became, or undefined for a card whose version could
+ * not be recorded (a storage failure, or a transcript restored from before drafts existed).
+ */
+export type ProposalCardState =
+  /** This exact version is what the linked mod holds. Nothing to do. */
+  | 'saved'
+  /** Never saved from this chat: saving creates the mod. */
+  | 'unsaved'
+  /** The chat has a saved mod, but this version is not what it holds: saving rewrites it. */
+  | 'update'
+  /** No draft to act on at all (no artifact yet, or it could not be read). */
+  | 'none';
+
+export function proposalCardState(a: Artifact | null, version: number | undefined): ProposalCardState {
+  if (!a) return 'none';
+  if (!a.linkedModId) return 'unsaved';
+  // An unversioned card cannot claim to be the saved one: it has no identity to compare. It offers
+  // the update, which is honest — saving from it saves the CURRENT draft, as it always has.
+  if (version != null && a.savedVersion === version) return 'saved';
+  return 'update';
+}
+
+/** The label the card's primary button wears for each state. */
+export function proposalCardLabel(state: ProposalCardState): string {
+  switch (state) {
+    case 'saved':
+      return 'Saved · enabled';
+    case 'update':
+      return 'Save & update mod';
+    case 'unsaved':
+    case 'none':
+      return 'Save & enable';
+  }
 }
 
 /** The current version, or undefined for an artifact with no versions (which should not exist). */
@@ -231,7 +284,9 @@ export function fromMod(chatId: string, mod: Mod, at = Date.now(), id: string = 
     at,
     id,
   );
-  return { ...a, linkedModId: mod.id };
+  // v1 IS the installed mod, byte for byte, so it is already the saved version. A chat that starts
+  // from an existing mod otherwise opens offering to "save" something that is already saved.
+  return { ...a, linkedModId: mod.id, savedVersion: a.current };
 }
 
 /**

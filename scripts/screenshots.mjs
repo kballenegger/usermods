@@ -1082,8 +1082,35 @@ async function artifactFlow({ capture = false } = {}) {
     if (!mods[0].source.includes('==UserScript==')) fail('the saved mod has no userscript header');
     if (!mods[0].source.includes('#888')) fail('the saved mod is not the rolled-back v1 code the panel was showing');
 
+    // The card for the version that was just saved says so, and it is the only one that does.
+    const savedCards = panel.locator('[data-testid="proposal-card"][data-card-state="saved"]');
+    if ((await savedCards.count()) !== 0) {
+      // v3 is a ROLLBACK, not a proposal, so no card in the transcript carries v3 — the saved
+      // version. Every proposal card therefore offers the update, and none claims to be installed.
+      fail(`${await savedCards.count()} card(s) claimed to be the saved version, but the saved version (v3) has no card`);
+    }
+
     // --- 6. A later proposal, then Update: the SAME mod id is rewritten. This is the duplicate bug.
+    //
+    // This is the owner's report: he saved, asked for a change, and the new proposal card came up
+    // reading as already saved. The card's state is derived from the draft's savedVersion, so a
+    // proposal the mod does not hold must offer to update it — never to do nothing.
     await sendForVersion(panel, ARTIFACT_PROMPTS[2], 4);
+    const newCard = panel.locator('[data-testid="proposal-card"]').last();
+    const newCardState = await newCard.getAttribute('data-card-state');
+    if (newCardState !== 'update') {
+      fail(`the proposal that arrived after a save read as ${JSON.stringify(newCardState)} rather than "update"`);
+    }
+    if (await newCard.locator('[data-testid="card-saved"]').count()) {
+      fail('a freshly proposed, never-saved version was labelled "saved" on its card');
+    }
+    const newCardSave = newCard.locator('[data-testid="card-save"]');
+    if (await newCardSave.isDisabled()) fail('the new proposal card offered no way to save the revision');
+    const newCardLabel = ((await newCardSave.textContent()) ?? '').trim();
+    if (newCardLabel !== 'Save & update mod') {
+      fail(`the new card's button read ${JSON.stringify(newCardLabel)}; a revision updates the linked mod`);
+    }
+
     // The next turn was opened with the rolled-back code, not with v2's.
     const turn3 = await requestForScript('artifact-3');
     if (!turn3) fail('the mock never received the third turn');
@@ -1091,12 +1118,20 @@ async function artifactFlow({ capture = false } = {}) {
     if (turn3.includes(ARTIFACT_V2)) fail('after a rollback, the next turn still carried v2’s code');
     if (!/\[Current draft mod v3\b/.test(turn3)) fail('the draft block did not name the rolled-back version');
 
-    await panel.locator('[data-testid="artifact-save"]').click();
+    // Saved from the CARD, which is where the owner was looking. It is the same save the panel
+    // offers: it writes the current draft over the mod this chat is linked to.
+    await newCardSave.click();
     await panel.locator('[data-testid="artifact-status"]', { hasText: 'Updated' }).waitFor({ timeout: 15_000 });
     mods = await storedMods(panel);
     if (mods.length !== 1) fail(`Update mod created a duplicate: storage holds ${mods.length} mods`);
     if (mods[0].id !== modId) fail('Update mod wrote a different mod id, so the link was lost');
     if (!mods[0].source.includes('promo-footer')) fail('Update mod did not write the newest version over the saved mod');
+
+    // Now — and only now — that card is the installed one, and it says so.
+    await panel.locator('[data-testid="proposal-card"][data-card-state="saved"]').waitFor({ timeout: 10_000 });
+    if ((await panel.locator('[data-testid="proposal-card"][data-card-state="saved"]').count()) !== 1) {
+      fail('saving the revision should mark exactly one card as the installed version');
+    }
 
     // --- 7. The draft is storage, not component state: it survives a reload of the panel.
     await reloadPanel(panel);
