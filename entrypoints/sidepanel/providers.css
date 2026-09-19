@@ -1,0 +1,137 @@
+/*
+ * Settings → Providers (ProvidersSection.tsx).
+ *
+ * A list of cards, each a one-line summary that opens into its form. Role tokens only; listed in
+ * test/contrast.test.ts's SHEETS, so it answers to the same rules as the rest of the panel: no
+ * display face, no hexes, no blurred shadow.
+ */
+
+.providers {
+  margin-bottom: var(--sp-5);
+}
+
+.providers-intro,
+.providers-none {
+  margin: 0 0 var(--sp-3);
+  font: 400 var(--fs-meta) / 1.5 var(--font-ui);
+  color: var(--text-2);
+}
+
+.providers-unavailable {
+  margin-top: 0;
+}
+
+.provider-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-4);
+}
+
+/* The card is the existing .card; the summary row fills it edge to edge, so the padding moves in. */
+.card.provider {
+  padding: 0;
+  margin: 0;
+  gap: 0;
+}
+
+/* Open is marked by the edge, which is not transitioned, as well as by the caret turning. */
+.card.provider.open {
+  border-color: var(--primary);
+}
+
+.provider-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  background: none;
+  border: 0;
+  border-radius: var(--r-card);
+  color: var(--text-1);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.provider-toggle:hover {
+  background: var(--surface-well);
+}
+
+.provider-toggle .dot {
+  flex: none;
+}
+
+.provider-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  column-gap: var(--sp-2);
+}
+
+.provider-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font: var(--fw-label) var(--fs-ui) / 1.4 var(--font-ui);
+}
+
+/* The state, in words, beside the dot that also carries it. */
+.provider-status {
+  font: 400 var(--fs-meta) / 1.4 var(--font-ui);
+  color: var(--text-2);
+}
+
+.provider-caret {
+  flex: none;
+  color: var(--text-2);
+}
+
+.provider-form {
+  padding: 0 var(--sp-3) var(--sp-3);
+  border-top: var(--border-width) solid var(--border-hair);
+}
+
+.provider-kind {
+  padding: var(--sp-2) 0 var(--sp-3);
+  font: 400 var(--fs-meta) / 1.4 var(--font-ui);
+  color: var(--text-2);
+}
+
+.provider-models {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.provider-models-status {
+  font: 400 var(--fs-meta) / 1.5 var(--font-ui);
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+
+.provider-models-status.error {
+  color: var(--error-text);
+}
+
+.provider-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+  padding: var(--sp-3);
+  border: var(--border-width) solid var(--error);
+  border-radius: var(--r-field);
+  font: 400 var(--fs-meta) / 1.5 var(--font-ui);
+  color: var(--text-1);
+}
+
+.providers-add-label {
+  margin-top: var(--sp-2);
+}
+
+.providers-add {
+  margin-bottom: var(--sp-2);
+}

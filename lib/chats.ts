@@ -8,6 +8,7 @@
 // chatKeys() below is the single list of the per-chat keys, so deleting a chat cannot leave one.
 import { artifactKey } from './artifact.ts';
 import { blobsKey, elidedImageNote, type AttachedImage, type ImageThumb } from './images.ts';
+import type { ModelSelection } from './connections.ts';
 import type { TitleSource } from './title';
 import type { ChatItem, Msg, Part } from './types';
 
@@ -65,6 +66,15 @@ export interface Chat {
    * "draft" rather than guessing a count.
    */
   artifactVersions?: number;
+  /**
+   * The model this chat talks to: a connection (lib/connections.ts) and a model id on it. Chosen in
+   * the composer, changeable at any point in the conversation, and read by the background at the
+   * start of every run — so it is what the agent loop, the titler, the compaction summariser and a
+   * Resume all use. On the index, like `turns`, so the dashboard can show it without reading a
+   * transcript. Absent on a chat that has never run under a build with connections; such a chat
+   * takes the default a new chat would (selectionForChat) and has it written here on its next run.
+   */
+  model?: ModelSelection;
 }
 
 /** A chat's title source, defaulting for records written before the field existed. */
@@ -204,9 +214,11 @@ export async function getChat(id: string): Promise<Chat | null> {
   return (await readIndex()).find((c) => c.id === id) ?? null;
 }
 
-export async function createChat(host: string): Promise<Chat> {
+export async function createChat(host: string, model?: ModelSelection | null): Promise<Chat> {
   const now = Date.now();
   const chat: Chat = { id: crypto.randomUUID(), host, title: 'New chat', titleSource: 'auto-first', createdAt: now, updatedAt: now };
+  // The model picked in the composer before the first message, so the first run uses it.
+  if (model?.connectionId && model.model) chat.model = { connectionId: model.connectionId, model: model.model, ...(model.label ? { label: model.label } : {}) };
   await writeIndexCapped([chat, ...(await readIndex())]);
   return chat;
 }
@@ -232,6 +244,19 @@ export async function touchChat(id: string, patch: { title?: string; url?: strin
   if (patch.url && /^https?:\/\//i.test(patch.url)) chat.url = patch.url;
   if (typeof patch.turns === 'number') chat.turns = patch.turns;
 
+  await writeIndex(chats);
+}
+
+/**
+ * Record which model a chat talks to. Not activity: picking a model does not reorder the switcher
+ * or unarchive anything, so this goes round touchChat the same way setChatArtifact does.
+ */
+export async function setChatModel(id: string, model: ModelSelection): Promise<void> {
+  const chats = await readIndex();
+  const chat = chats.find((c) => c.id === id);
+  if (!chat) return;
+  if (chat.model?.connectionId === model.connectionId && chat.model.model === model.model && chat.model.label === model.label) return;
+  chat.model = { connectionId: model.connectionId, model: model.model, ...(model.label ? { label: model.label } : {}) };
   await writeIndex(chats);
 }
 

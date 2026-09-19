@@ -259,6 +259,14 @@ export interface ModProposal {
 export type AgentEventBody =
   | { type: 'text'; delta: string }
   /**
+   * Which connection and model this run talks to, posted once at the start of every run (a fresh
+   * turn, a queued message's turn, a Resume). The panel uses it for two things: the transcript
+   * records it, so a small marker can say where the model changed (lib/transcript.ts), and the
+   * composer compares it with the chat's current selection to say "applies from the next turn"
+   * while a run that started on another model is still going.
+   */
+  | { type: 'model'; connectionId: string; label: string; model: string }
+  /**
    * What the run is doing right now, for the side panel's live activity line. Emitted before each
    * model call and each tool execution, and once with 'idle' when the run is over.
    */
@@ -365,6 +373,12 @@ export type ChatItem =
    */
   | { kind: 'proposal'; proposal: ModProposal; version?: number }
   | { kind: 'note'; text: string }
+  /**
+   * The model the turns after it were produced by, until the next one of these: which connection
+   * and model each assistant turn came from, as a row. Written only when it differs from the row of
+   * this kind before it, so a chat that never changes model holds exactly one, at its first run.
+   */
+  | { kind: 'model'; connectionId: string; label: string; model: string }
   | { kind: 'error'; text: string };
 
 /** A user message travelling from the side panel to the agent. */

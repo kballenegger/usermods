@@ -1,0 +1,297 @@
+/*
+ * The model picker (ModelPicker.tsx): one line under the composer's text box.
+ *
+ * Its own stylesheet, like activity.css and artifact.css, so the component can be read, restyled or
+ * removed in one place. Role tokens only — no hexes, no display face, no blurred shadow; it is in
+ * test/contrast.test.ts's SHEETS list, which holds it to the same rules as the rest of the panel.
+ *
+ * The pattern, for docs/design.md §7 "Menus": a quiet trigger that reads as a VALUE rather than as
+ * an action (mono, sentence case, no uppercase label — it is showing you an identifier), and a
+ * popover that is a bordered panel with no shadow, because nothing in this system lifts except the
+ * primary button and the hero card. The popover's edge is --border-strong, a step up from a card's,
+ * which is what separates it from the transcript it opens over.
+ */
+
+.model-line {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+/*
+ * The trigger. It may take the whole line and no more: a model id like
+ * "anthropic/claude-opus-5-20260401" is longer than a 320px panel, so the name truncates and the
+ * provider — the less important half — gives way first (it shrinks ten times as fast, then hides).
+ */
+.model-button {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  min-height: 28px;
+  padding: var(--sp-1) var(--sp-2);
+  border: var(--border-width) solid var(--border-control);
+  border-radius: var(--r-field);
+  background: none;
+  color: var(--text-1);
+  font: 400 var(--fs-meta) / 1.4 var(--font-mono);
+  cursor: pointer;
+  transition: color 120ms ease, background 120ms ease, border-color 120ms ease;
+}
+
+.model-button:hover:not(:disabled),
+.model-button[aria-expanded='true'] {
+  border-color: var(--primary);
+  background: var(--surface-2);
+}
+
+/* Open is a state, so it must not rest on the transitioned border alone (design.md §5). */
+.model-button[aria-expanded='true'] {
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+
+.model-button:disabled {
+  cursor: default;
+  background: var(--surface-well);
+  color: var(--btn-disabled-fg);
+  border-color: var(--border-hair);
+}
+
+/* Nothing usable is selected: the button is asking for something, so it carries the warn edge and
+   the words "Pick a model" — never the colour alone. */
+.model-button.unset {
+  border-color: var(--warn);
+  color: var(--warn-text);
+}
+
+.model-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.model-provider {
+  flex: 0 10 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-2);
+  font-family: var(--font-ui);
+}
+
+.model-caret {
+  flex: none;
+  color: var(--text-2);
+}
+
+/* What the line says beside the button: prose, so the UI face in sentence case. */
+.model-note {
+  flex: 1 1 0;
+  min-width: 0;
+  font: 400 var(--fs-meta) / 1.4 var(--font-ui);
+  color: var(--text-2);
+}
+
+.model-note.problem {
+  color: var(--error-text);
+}
+
+/* A problem is a sentence and the button is short, so on a narrow panel the sentence gets its own
+   line under the button rather than a two-word column beside it. */
+.model-line:has(.model-note.problem) {
+  flex-wrap: wrap;
+}
+
+.model-line:has(.model-note.problem) .model-note {
+  flex-basis: 100%;
+}
+
+/* ---------------------------------------------------------------------------
+ * The popover
+ * ------------------------------------------------------------------------ */
+
+.model-pop {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + var(--sp-1));
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  /* Tall enough for a real list, never taller than the panel has room for above the composer. */
+  max-height: min(420px, 55dvh);
+  background: var(--surface-2);
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--r-card);
+  overflow: hidden;
+}
+
+.model-filter {
+  flex: none;
+  margin: var(--sp-2);
+  padding: 7px 9px;
+  min-width: 0;
+  font: 400 var(--fs-body) / 1.4 var(--font-mono);
+  color: var(--text-1);
+  background: var(--surface-well);
+  border: var(--border-width) solid var(--border-control);
+  border-radius: var(--r-field);
+}
+
+.model-filter::placeholder {
+  color: var(--text-3);
+}
+
+.model-filter:focus-visible {
+  border-color: var(--focus-ring);
+  outline: none;
+}
+
+.model-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: var(--sp-1);
+}
+
+.model-group + .model-group {
+  border-top: var(--border-width) solid var(--border-hair);
+  margin-top: var(--sp-1);
+  padding-top: var(--sp-1);
+}
+
+.model-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  padding: var(--sp-1) var(--sp-3);
+}
+
+/* The provider's name is a section label: the UI face at --fw-label, uppercase, tracked. */
+.model-group-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: var(--fw-label) var(--fs-label) / 1.4 var(--font-ui);
+  text-transform: uppercase;
+  letter-spacing: var(--lbl-tracking);
+  color: var(--text-2);
+}
+
+.model-group-meta {
+  flex: none;
+  font: 400 var(--fs-meta) / 1.4 var(--font-ui);
+  color: var(--warn-text);
+}
+
+.model-option {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-1);
+  padding: 5px var(--sp-3) 5px var(--sp-2);
+  font: 400 var(--fs-body) / 1.4 var(--font-mono);
+  color: var(--text-1);
+  cursor: pointer;
+}
+
+/*
+ * The active option — where ↑/↓ is — is marked by a rail as well as a surface. The surface alone
+ * would not do: in the day theme the raised surface and the panel are the same white, and a state
+ * may not rest on colour alone in either.
+ */
+.model-option.active {
+  background: var(--surface-well);
+  box-shadow: inset 2px 0 0 var(--primary);
+}
+
+.model-check {
+  flex: none;
+  width: 12px;
+  font-size: 9px;
+  color: var(--live-text);
+}
+
+.model-option.selected .model-option-name {
+  font-weight: var(--fw-label);
+}
+
+.model-option-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.model-option.typed .model-option-name {
+  color: var(--primary-text);
+}
+
+.model-group-none,
+.model-empty {
+  padding: var(--sp-1) var(--sp-3) var(--sp-2);
+  font: 400 var(--fs-meta) / 1.5 var(--font-ui);
+  color: var(--text-2);
+}
+
+.model-empty {
+  padding: var(--sp-2) var(--sp-3) var(--sp-3);
+}
+
+.model-foot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-top: var(--border-width) solid var(--border-hair);
+  background: var(--surface-1);
+  font-size: var(--fs-meta);
+}
+
+.model-foot .grow {
+  flex: 1;
+}
+
+.model-foot button.linklike:disabled {
+  color: var(--text-3);
+  text-decoration: none;
+  cursor: default;
+}
+
+/* ---------------------------------------------------------------------------
+ * The transcript's "switched to …" marker
+ * ------------------------------------------------------------------------ */
+
+/*
+ * A rule with a label set into it, not a note row: it is a fact about the rows BELOW it, so it reads
+ * as a divider. Muted, mono for the identifier, and it is a sentence ("switched to …"), so the state
+ * is in words.
+ */
+.model-marker {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font: 400 var(--fs-meta) / 1.4 var(--font-mono);
+  color: var(--text-3);
+}
+
+.model-marker::before,
+.model-marker::after {
+  content: '';
+  flex: 1;
+  height: 0;
+  border-top: var(--border-width) solid var(--border-hair);
+}
+
+.model-marker span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: center;
+}

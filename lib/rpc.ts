@@ -1,5 +1,6 @@
 import type { Artifact } from './artifact';
 import type { Chat } from './chats';
+import type { ModelSelection } from './connections';
 import type { ModelListResult } from './modellist';
 import type { ResumableRun } from './runstate';
 import type { AgentEvent, ChatItem, Mod, ScriptPreview, UserTurn } from './types';
@@ -45,7 +46,10 @@ export type RpcRequest =
   | { type: 'chats.listAll' }
   /** One chat's stored panel transcript, read-only — the dashboard's preview pane. */
   | { type: 'chats.transcript'; id: string }
-  | { type: 'chats.create'; host: string }
+  /** `model` is what the composer's picker showed when the first message was sent. */
+  | { type: 'chats.create'; host: string; model?: ModelSelection | null }
+  /** Point a chat at another model. Takes effect on the chat's next run; a run in flight keeps its own. */
+  | { type: 'chats.setModel'; id: string; model: ModelSelection }
   | { type: 'chats.delete'; id: string }
   /** Archive (or unarchive) a chat: it leaves the main switcher list but stays readable. */
   | { type: 'chats.archive'; id: string; archived: boolean }
@@ -72,7 +76,8 @@ export type RpcRequest =
   | { type: 'oauth.poll'; kind: OAuthKind }
   | { type: 'oauth.cancel'; kind: OAuthKind }
   | { type: 'oauth.signout'; kind: OAuthKind }
-  | { type: 'models.list' }
+  /** List one connection's models (lib/modellist.ts) and cache the answer on it. */
+  | { type: 'models.list'; connectionId: string }
   /**
    * What the panel asks the moment it has opened its port: which chats are running right now (and
    * what each is doing), and which have a run that stopped short and can be resumed. Answered only

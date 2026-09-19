@@ -82,7 +82,7 @@ export interface ModelSelection {
   label?: string;
 }
 
-/** Which subscription kinds are signed in right now. Asked of the background (lib/oauth storage). */
+/** Which subscription kinds are signed in right now (loadSignedIn, below). */
 export interface SignedIn {
   chatgpt: boolean;
   xai: boolean;
@@ -589,4 +589,25 @@ export async function loadModelChoice(): Promise<ModelSelection | null> {
 
 export async function saveModelChoice(selection: ModelSelection): Promise<void> {
   await chrome.storage.local.set({ [MODEL_CHOICE_KEY]: selection });
+}
+
+/** Where lib/oauth keeps a vendor's tokens. Restated, because importing lib/oauth here would pull
+ *  the vendor auth endpoints into every bundle that lists connections — the store build included. */
+const oauthKey = (kind: 'chatgpt' | 'xai') => `oauth:${kind}`;
+
+/**
+ * Which subscriptions are signed in, read straight from storage: a token record exists or it does
+ * not. Whether the token still WORKS is found out by using it (lib/oauth refreshes on demand and
+ * says "Not signed in" when it cannot), exactly as before. A store build answers no to both without
+ * looking, so tokens left behind by the other build cannot make a subscription look usable.
+ */
+export async function loadSignedIn(): Promise<SignedIn> {
+  if (STORE_BUILD) return NOT_SIGNED_IN;
+  const r = await chrome.storage.local.get([oauthKey('chatgpt'), oauthKey('xai')]);
+  return { chatgpt: !!r[oauthKey('chatgpt')], xai: !!r[oauthKey('xai')] };
+}
+
+/** Whether a storage change could alter what the picker lists or how a selection resolves. */
+export function touchesConnections(changes: Record<string, unknown>): boolean {
+  return CONNECTIONS_KEY in changes || MODEL_CHOICE_KEY in changes || oauthKey('chatgpt') in changes || oauthKey('xai') in changes;
 }

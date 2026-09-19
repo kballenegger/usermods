@@ -516,6 +516,8 @@ test('the error role stays distinct from the accent under colour-vision deficien
 const SHEETS = [
   'entrypoints/sidepanel/styles.css',
   'entrypoints/sidepanel/activity.css',
+  'entrypoints/sidepanel/modelpicker.css',
+  'entrypoints/sidepanel/providers.css',
   'entrypoints/dashboard/dashboard.css',
   'entrypoints/styleguide/styleguide.css',
 ];

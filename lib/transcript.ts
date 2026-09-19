@@ -12,6 +12,34 @@
 import { parseWaitInput, waitConditionLabel } from './agent/wait.ts';
 import type { AgentEventBody, ChatItem } from './types';
 
+type ModelItem = Extract<ChatItem, { kind: 'model' }>;
+
+/** The model the end of a transcript was produced by, or null when nothing recorded one. */
+export function lastModel(items: ChatItem[]): ModelItem | null {
+  for (let i = items.length - 1; i >= 0; i--) {
+    const it = items[i];
+    if (it?.kind === 'model') return it;
+  }
+  return null;
+}
+
+/**
+ * What a model row says, or null when it should say nothing.
+ *
+ * The first one in a transcript is where the chat STARTED, not a change, so the panel shows nothing
+ * for it (`showFirst: false`) — the composer already names the model. Every later one is a swap and
+ * reads "switched to …". The dashboard's read-only preview has no composer to name the model, so it
+ * shows the first one too.
+ */
+export function modelRowText(items: ChatItem[], index: number, { showFirst = false } = {}): string | null {
+  const it = items[index];
+  if (it?.kind !== 'model') return null;
+  const name = it.label ? `${it.model} · ${it.label}` : it.model;
+  const first = !items.slice(0, index).some((x) => x.kind === 'model');
+  if (first) return showFirst ? `model: ${name}` : null;
+  return `switched to ${name}`;
+}
+
 /**
  * Apply one agent event to a transcript. Returns a new array (never mutates the input), or the
  * same array when the event changes nothing, so a caller can skip a write.
@@ -99,6 +127,13 @@ export function reduceItems(items: ChatItem[], event: AgentEventBody): ChatItem[
       // The run was stopped before this message was sent: its bubble goes away.
       if (!items.some((it) => it.kind === 'user' && it.id === event.id)) return items;
       return items.filter((it) => !(it.kind === 'user' && it.id === event.id));
+    }
+    case 'model': {
+      // Recorded when it CHANGES. The same array comes back for a run on the model the chat was
+      // already on, so an unchanged chat gains no rows and an offscreen one schedules no write.
+      const last = lastModel(items);
+      if (last && last.connectionId === event.connectionId && last.model === event.model) return items;
+      return [...items, { kind: 'model', connectionId: event.connectionId, label: event.label, model: event.model }];
     }
     case 'status':
       // What the run is doing right now drives the activity line, which is not a transcript row:

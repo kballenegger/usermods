@@ -2,8 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Chat } from '@/lib/chats';
 import { chatOpenUrl, HANDOFF_KEY, modOrigins, overview, type ChatHandoff } from '@/lib/dashboard';
 import { rpc } from '@/lib/rpc';
-import { loadSettings } from '@/lib/settings';
-import type { Mod, Settings } from '@/lib/types';
+import { isConnected } from '@/lib/connections';
+import type { Mod } from '@/lib/types';
+import { useConnections } from '../sidepanel/useConnections';
 import { SettingsView } from '../sidepanel/SettingsView';
 import { ThemeToggle } from '../sidepanel/components/ThemeToggle';
 import { ChatsSection } from './ChatsSection';
@@ -30,7 +31,7 @@ export function Dashboard() {
    * rather than 200.
    */
   const [origins, setOrigins] = useState<Map<string, { chat: Chat; versions: number }>>(new Map());
-  const [settings, setSettings] = useState<Settings | null>(null);
+  const providers = useConnections();
   const [usStatus, setUsStatus] = useState<{ available: boolean; message: string } | null>(null);
   const [error, setError] = useState('');
   /** False until the first load has landed, so the page does not flash "no chats yet" at someone who has plenty. */
@@ -59,7 +60,6 @@ export function Dashboard() {
 
   useEffect(() => {
     void refresh();
-    void loadSettings().then(setSettings);
     void rpc({ type: 'userScripts.status' }).then(setUsStatus).catch(() => {});
   }, [refresh]);
 
@@ -85,13 +85,12 @@ export function Dashboard() {
   }, []);
 
   // Stay live while the side panel works: anything it changes lands in chrome.storage.local, and
-  // both the chat index and the mod list are single keys there. Settings too, so the overview's
-  // provider line does not go stale after a change in the Settings section.
+  // both the chat index and the mod list are single keys there. (The overview's provider line keeps
+  // itself current: useConnections listens to storage on its own.)
   useEffect(() => {
     const onChanged = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
       if (area !== 'local') return;
       if ('chats' in changes || 'mods' in changes) void refresh();
-      if ('settings' in changes) void loadSettings().then(setSettings);
     };
     chrome.storage.onChanged.addListener(onChanged);
     return () => chrome.storage.onChanged.removeListener(onChanged);
@@ -111,6 +110,7 @@ export function Dashboard() {
   }
 
   const o = overview(mods, chats);
+  const connectedLabels = providers.state.list.filter((c) => isConnected(c, providers.signedIn)).map((c) => c.label);
 
   return (
     <div className="dash">
@@ -138,10 +138,8 @@ export function Dashboard() {
           </span>
           <span className="sep">·</span>
           <span>
-            {settings ? (
-              <>
-                {providerLabel(settings)} · <span className="muted">{settings.model || 'no model set'}</span>
-              </>
+            {providers.ready ? (
+              <span data-testid="overview-providers">{providersLine(connectedLabels)}</span>
             ) : (
               <span className="muted">reading settings</span>
             )}
@@ -210,23 +208,9 @@ function Stat({ n, k }: { n: string; k: string }) {
   );
 }
 
-function providerLabel(s: Settings): string {
-  switch (s.provider) {
-    case 'anthropic':
-      return 'Anthropic';
-    case 'openai-compatible':
-      return s.baseUrl ? hostOf(s.baseUrl) : 'OpenAI-compatible';
-    case 'chatgpt':
-      return 'ChatGPT subscription';
-    case 'xai':
-      return 'xAI subscription';
-  }
-}
-
-function hostOf(url: string): string {
-  try {
-    return new URL(url).host;
-  } catch {
-    return url;
-  }
+/** The overview's provider line: who is connected, by name while that is short enough to read. */
+function providersLine(labels: string[]): string {
+  if (!labels.length) return 'No provider connected';
+  if (labels.length <= 2) return `${labels.join(' and ')} connected`;
+  return `${labels.length} providers connected`;
 }

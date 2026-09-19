@@ -150,7 +150,7 @@ export function App() {
             onDismiss={consented ? () => setReviewing(false) : undefined}
           />
         ) : (
-          <Chat tabId={tabId} pageUrl={pageUrl} host={host} />
+          <Chat tabId={tabId} pageUrl={pageUrl} host={host} onOpenSettings={() => setTab('settings')} />
         ))}
       {tab === 'mods' && <ModsView tabId={tabId} pageUrl={pageUrl} />}
       {tab === 'settings' && (

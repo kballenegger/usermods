@@ -17,8 +17,8 @@ export const STORE_BUILD: boolean = typeof __STORE_BUILD__ === 'undefined' ? fal
 // ---------- pure logic (tested in test/buildflags.test.ts) ----------
 
 // Type-only, so this module stays importable by the node test runner, which resolves no
-// extensionless relative specifiers. The one value it would need is spelled out below.
-import type { ProviderKind, Settings } from './types';
+// extensionless relative specifiers.
+import type { ProviderKind } from './types';
 
 // The subscription backends' default endpoints. They live here rather than in lib/oauth so that
 // callers can name a default base URL without importing the auth module, which must stay out of
@@ -47,24 +47,7 @@ export function unavailableProviderMessage(kind: string): string {
   return `${vendor} subscription sign-in is not available in the Chrome Web Store build of usermods. Choose a provider with an API key in Settings, or install the GitHub build, which includes it.`;
 }
 
-/**
- * The settings a store build should show for a profile saved by a build that had subscriptions.
- * Upgrading must not strand the user on a provider this build cannot talk to, so the provider
- * falls back to the default and the key/model fields are cleared of the subscription's values —
- * a subscription profile has no API key and often a vendor-only model id.
- *
- * Returns null when the stored settings are already usable, so callers can leave them untouched.
- */
-export function migrateSettingsForBuild(s: Settings, storeBuild: boolean = STORE_BUILD): Settings | null {
-  if (providerAvailable(s.provider, storeBuild)) return null;
-  return { ...s, ...FALLBACK_PROVIDER, baseUrl: '', apiKey: '' };
-}
-
-/**
- * Where a dropped provider lands. Kept in step with DEFAULT_SETTINGS in ./types, which cannot be
- * imported for a value here without breaking the node test runner; the test asserts they agree.
- */
-export const FALLBACK_PROVIDER: { provider: ProviderKind; model: string } = {
-  provider: 'anthropic',
-  model: 'claude-opus-5',
-};
+// A profile saved by a build that had subscriptions keeps its subscription connection when it is
+// opened in a store build: nothing is rewritten. The connection simply reads as unavailable
+// (connectionStatus in lib/connections.ts), is left out of the in-chat model picker, and Settings
+// says why — so going back to the GitHub build finds everything as it was.

@@ -4,7 +4,7 @@
 //   npm test
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { RECONNECT_NOTE, looksUnfinished, reduceItems, unqueuedItem } from '../lib/transcript.ts';
+import { RECONNECT_NOTE, lastModel, looksUnfinished, modelRowText, reduceItems, unqueuedItem } from '../lib/transcript.ts';
 import { SessionMap } from '../lib/sessions.ts';
 import type { AgentEventBody, ChatItem, ModProposal, UserTurn } from '../lib/types.ts';
 
@@ -259,4 +259,51 @@ test('isRunning and ids report per chat', () => {
   assert.equal(s.isRunning('B'), false);
   assert.equal(s.isRunning('C'), false);
   assert.deepEqual(s.ids().sort(), ['A', 'B']);
+});
+
+// ---------- which model produced which turns ----------
+
+test('a run records its model once, and a later run on the same model adds nothing', () => {
+  let items: ChatItem[] = [{ kind: 'user', id: 'u1', text: 'hi' }];
+  const demo: AgentEventBody = { type: 'model', connectionId: 'a', label: 'Local', model: 'demo' };
+  items = reduceItems(items, demo);
+  assert.deepEqual(items[1], { kind: 'model', connectionId: 'a', label: 'Local', model: 'demo' });
+  items = reduceItems(items, { type: 'text', delta: 'hello' });
+  const again = reduceItems(items, demo);
+  assert.equal(again, items, 'the same array comes back, so an offscreen chat schedules no write');
+  assert.deepEqual(lastModel(items), { kind: 'model', connectionId: 'a', label: 'Local', model: 'demo' });
+  assert.equal(lastModel([]), null);
+});
+
+test('a swap adds a row where the model changed: a different model, or the same id on another provider', () => {
+  let items: ChatItem[] = [];
+  items = reduceItems(items, { type: 'model', connectionId: 'a', label: 'Local', model: 'demo' });
+  items = reduceItems(items, { type: 'model', connectionId: 'a', label: 'Local', model: 'demo-mini' });
+  items = reduceItems(items, { type: 'model', connectionId: 'b', label: 'Other', model: 'demo-mini' });
+  items = reduceItems(items, { type: 'model', connectionId: 'b', label: 'Other renamed', model: 'demo-mini' });
+  assert.deepEqual(items.map((i) => (i.kind === 'model' ? `${i.connectionId}/${i.model}` : i.kind)), ['a/demo', 'a/demo-mini', 'b/demo-mini']);
+});
+
+test('the panel says nothing for the model a chat started on, and "switched to" for every change', () => {
+  const items: ChatItem[] = [
+    { kind: 'user', id: 'u1', text: 'hi' },
+    { kind: 'model', connectionId: 'a', label: 'Local', model: 'demo' },
+    { kind: 'assistant', text: 'hello' },
+    { kind: 'model', connectionId: 'b', label: 'Anthropic', model: 'claude-opus-5' },
+    { kind: 'model', connectionId: 'c', label: '', model: 'bare' },
+  ];
+  assert.equal(modelRowText(items, 1), null);
+  assert.equal(modelRowText(items, 1, { showFirst: true }), 'model: demo · Local');
+  assert.equal(modelRowText(items, 3), 'switched to claude-opus-5 · Anthropic');
+  assert.equal(modelRowText(items, 4), 'switched to bare');
+  assert.equal(modelRowText(items, 0), null, 'not a model row');
+});
+
+test('a model row does not break the streaming of the reply that follows it', () => {
+  let items: ChatItem[] = [];
+  items = reduceItems(items, { type: 'model', connectionId: 'a', label: 'L', model: 'm' });
+  items = reduceItems(items, { type: 'text', delta: 'one ' });
+  items = reduceItems(items, { type: 'text', delta: 'two' });
+  items = reduceItems(items, { type: 'text_discard', chars: 3 });
+  assert.deepEqual(items, [{ kind: 'model', connectionId: 'a', label: 'L', model: 'm' }, { kind: 'assistant', text: 'one ' }]);
 });
