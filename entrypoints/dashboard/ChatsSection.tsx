@@ -15,6 +15,7 @@ import {
   type ChatHandoff,
 } from '@/lib/dashboard';
 import { rpc } from '@/lib/rpc';
+import type { Artifact } from '@/lib/artifact';
 import type { ChatItem } from '@/lib/types';
 import { TranscriptPreview, transcriptText } from './TranscriptPreview';
 
@@ -29,7 +30,7 @@ export function ChatsSection({ chats, loaded, onChanged }: { chats: Chat[]; load
   const [error, setError] = useState('');
   /** Transcript text by chat id, loaded lazily for search. Never evicted: a profile caps at 200 chats. */
   const [transcripts, setTranscripts] = useState<Map<string, string>>(new Map());
-  const [preview, setPreview] = useState<{ id: string; items: ChatItem[] } | null>(null);
+  const [preview, setPreview] = useState<{ id: string; items: ChatItem[]; artifact: Artifact | null } | null>(null);
   /**
    * The updatedAt each cached transcript was read at, and by its keys the set of chats already
    * fetched (or attempted). A ref rather than state: the sweep writes it as it goes and nothing
@@ -133,12 +134,18 @@ export function ChatsSection({ chats, loaded, onChanged }: { chats: Chat[]; load
       return;
     }
     let cancelled = false;
-    void rpc({ type: 'chats.transcript', id: openRecordId })
-      .then((items) => {
-        if (!cancelled) setPreview({ id: openRecordId, items });
+    // The transcript and the draft together: the pane shows what the chat produced above what it
+    // said, and one render rather than two means the draft never arrives after the reader has
+    // already scrolled.
+    void Promise.all([
+      rpc({ type: 'chats.transcript', id: openRecordId }),
+      rpc({ type: 'artifact.get', chatId: openRecordId }).catch(() => null),
+    ])
+      .then(([items, artifact]) => {
+        if (!cancelled) setPreview({ id: openRecordId, items, artifact });
       })
       .catch(() => {
-        if (!cancelled) setPreview({ id: openRecordId, items: [] });
+        if (!cancelled) setPreview({ id: openRecordId, items: [], artifact: null });
       });
     return () => {
       cancelled = true;
@@ -340,7 +347,11 @@ export function ChatsSection({ chats, loaded, onChanged }: { chats: Chat[]; load
                   opens {chatOpenUrl(openChatRecord)} and points the side panel at this chat
                 </span>
               </div>
-              {preview?.id === openChatRecord.id ? <TranscriptPreview items={preview.items} /> : <div className="prev-note">Reading transcript…</div>}
+              {preview?.id === openChatRecord.id ? (
+                <TranscriptPreview items={preview.items} artifact={preview.artifact} />
+              ) : (
+                <div className="prev-note">Reading transcript…</div>
+              )}
             </div>
           ) : (
             <div className="dash-empty">Select a chat to read it here.</div>
@@ -430,6 +441,15 @@ function ChatRow({
                 {chat.turns} turn{chat.turns === 1 ? '' : 's'}
               </span>
             </>
+          )}
+          {/* A chat that produced a draft mod, and how many versions it took. The count comes from
+              the artifact id being present on the index plus the version count the artifact
+              carries — the index holds only the flag, so this reads the flag and the preview reads
+              the rest. */}
+          {chat.artifactId && (
+            <span className="badge" data-testid="chat-draft" title="This chat has a draft mod. Open it to see its versions.">
+              draft{typeof chat.artifactVersions === 'number' ? ` · ${chat.artifactVersions} version${chat.artifactVersions === 1 ? '' : 's'}` : ''}
+            </span>
           )}
           {archived && <span className="badge" data-testid="chat-archived">archived</span>}
         </div>

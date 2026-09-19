@@ -54,11 +54,44 @@ export interface AgentInput {
    * immediately rather than only at the end of the turn. Failures here are ignored.
    */
   onCompacted?: (messages: Msg[]) => void | Promise<void>;
+  /**
+   * The chat's current draft mod, rendered as the block prepended to each user turn
+   * (lib/artifact.ts draftBlock). Supplied by the background, which owns artifact storage; the loop
+   * only decides where it goes. Empty or absent means this chat has no draft yet, which is the
+   * normal state of a first turn.
+   *
+   * It is a function rather than a string because the draft moves DURING a turn: a propose_mod in
+   * step 3 becomes v2, and a message the user queues afterwards must be answered against v2, not
+   * against the v1 the turn started on.
+   */
+  draft?: () => string;
+  /**
+   * Whether the chat has a draft. Passed through to compaction, which asks for a different summary
+   * when the draft's code is being re-sent every turn anyway. A function, like `draft`, because a
+   * turn that starts with no draft can end with one.
+   */
+  hasDraft?: () => boolean;
+  /**
+   * Record an accepted proposal as a new version of the draft. Returns the version number, which
+   * the loop emits so the panel can select it. The background implements it; a loop running without
+   * one (the unit tests) simply proposes as before.
+   */
+  onProposal?: (p: ModProposal) => Promise<number | null>;
 }
 
-function renderTurn(turn: UserTurn, page: { url: string; title: string } | null, injected: boolean): string {
+/**
+ * One user turn as the model sees it: where the page is, what the draft mod currently is, which
+ * elements the user pointed at, and then their own words.
+ *
+ * The draft leads, because it is the thing most requests are about once one exists — "make the
+ * button blue instead" is an edit to it and nothing else in the message says so. It is re-sent
+ * every turn rather than relied upon from the history, so a compaction that summarised away the
+ * proposal it came from cannot leave the model editing a script it can no longer see.
+ */
+function renderTurn(turn: UserTurn, page: { url: string; title: string } | null, injected: boolean, draft = ''): string {
   const lines: string[] = [];
   if (page) lines.push(`[Current page: ${page.title} — ${page.url}]`);
+  if (draft) lines.push(draft);
   for (const ref of turn.refs ?? []) {
     const html = ref.html.length > 2500 ? ref.html.slice(0, 2500) + '…' : ref.html;
     lines.push(`[@${ref.token} = ${ref.label} — selector: ${ref.selector}]`, html);
@@ -78,10 +111,16 @@ function renderTurn(turn: UserTurn, page: { url: string; title: string } | null,
  * gives better results, the Responses API groups images after text in its own input array anyway,
  * and a chat-completions backend simply reads the parts in order — so image-then-text is the one
  * arrangement all three treat as "here is a picture, and here is what I am asking about it".
+ *
+ * The draft block is not a part of its own: it rides inside the single text part that renderTurn()
+ * builds, ahead of the refs and the image captions. Keeping it there rather than in a part before
+ * the images preserves the one rule the provider adapters care about — images immediately before
+ * the text of the message they are about — while the model still reads the draft first within that
+ * text, which is the only place the ordering matters to it.
  */
-function turnParts(turn: UserTurn, page: { url: string; title: string } | null, injected: boolean): Part[] {
+function turnParts(turn: UserTurn, page: { url: string; title: string } | null, injected: boolean, draft = ''): Part[] {
   const parts: Part[] = (turn.images ?? []).map((img) => ({ type: 'image', mediaType: img.mediaType, data: img.data }));
-  parts.push({ type: 'text', text: renderTurn(turn, page, injected) });
+  parts.push({ type: 'text', text: renderTurn(turn, page, injected, draft) });
   return parts;
 }
 
@@ -98,7 +137,8 @@ export async function runAgent(input: AgentInput): Promise<Msg[]> {
   const messages: Msg[] = [...input.history];
 
   const page = await env.pageInfo().catch(() => null);
-  messages.push({ role: 'user', content: turnParts(input.turn, page, false) });
+  const draft = () => input.draft?.() ?? '';
+  messages.push({ role: 'user', content: turnParts(input.turn, page, false, draft()) });
   emit({ type: 'accepted', id: input.turn.id });
 
   try {
@@ -122,6 +162,7 @@ export async function runAgent(input: AgentInput): Promise<Msg[]> {
       budget,
       signal,
       summarise: input.complete ? (system, user) => input.complete!(system, user, signal) : undefined,
+      hasDraft: input.hasDraft?.() ?? false,
     });
     if (!res.steps.length) return;
     messages.splice(0, messages.length, ...res.messages);
@@ -199,7 +240,7 @@ export async function runAgent(input: AgentInput): Promise<Msg[]> {
       for (const call of calls) {
         emit({ type: 'tool_call', id: call.id, name: call.name, input: call.input });
         emit({ type: 'status', phase: 'tool', tool: call.name, detail: describeCall(call.name, call.input), iteration: i + 1 });
-        const r = await executeTool(call.name, call.input, env, emit, ctx, signal);
+        const r = await executeTool(call.name, call.input, env, emit, ctx, signal, input.onProposal);
         emit({ type: 'tool_result', id: call.id, summary: summarize(r.content), isError: !!r.isError });
         results.push({ type: 'tool_result', toolCallId: call.id, content: r.content, isError: r.isError });
         if (call.name === 'propose_mod' && !r.isError) proposed = true;
@@ -229,7 +270,11 @@ export async function runAgent(input: AgentInput): Promise<Msg[]> {
       for (const q of queued) {
         // A queued message rides back with the tool results, images and all. Its pictures go in
         // before its text for the same reason a fresh turn's do.
-        results.push(...turnParts(q, null, true));
+        //
+        // The draft is read again here, not captured at the top of the turn: a proposal made two
+        // steps ago has already become the current version, and a queued "make it bigger" is about
+        // that version.
+        results.push(...turnParts(q, null, true, draft()));
         emit({ type: 'accepted', id: q.id });
       }
       messages.push({ role: 'user', content: results });
@@ -299,6 +344,7 @@ async function executeTool(
   emit: (e: AgentEventBody) => void,
   ctx: ProposalContext,
   signal: AbortSignal,
+  onProposal?: (p: ModProposal) => Promise<number | null>,
 ): Promise<ToolOutcome> {
   try {
     switch (name) {
@@ -391,10 +437,20 @@ async function executeTool(
           ...(untestedReason ? { untestedReason } : {}),
         };
         // A fresh proposal starts a fresh testing obligation: a revision written after this one has
-        // to be run before it can be proposed in turn.
+        // to be run before it can be proposed in turn. This is unchanged by drafts: an EDIT to the
+        // draft is still a proposal, and still has to have been run.
         ctx.testedSinceProposal = false;
+        // The draft is versioned before the card is shown, so the panel never renders a proposal
+        // whose version does not exist yet. A storage failure here is not the user's problem — the
+        // proposal is still valid and still worth showing — so it degrades to an unversioned card.
+        const version = onProposal ? await onProposal(proposal).catch(() => null) : null;
         emit({ type: 'proposal', proposal });
-        return text('The mod has been shown to the user with Try and Save buttons. Wait for their feedback.');
+        if (version != null) emit({ type: 'artifact', version });
+        return text(
+          version == null
+            ? 'The mod has been shown to the user with Try and Save buttons. Wait for their feedback.'
+            : `The draft mod is now v${version} in the user's artifact panel, where they can try, save or roll it back. Wait for their feedback.`,
+        );
       }
       default:
         return err(`Unknown tool: ${name}`);

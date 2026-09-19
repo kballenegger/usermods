@@ -1,9 +1,12 @@
 // Persistent chats. A chat is scoped to a site (host) and lives in chrome.storage.local so it
-// survives side-panel reloads and browser restarts. Four keys per chat:
+// survives side-panel reloads and browser restarts. One index plus four keys per chat:
 //   'chats'              — Chat[] metadata index, newest activity first
 //   'chat:<id>:messages' — Msg[] model history, written by the background worker
 //   'chat:<id>:items'    — ChatItem[] panel transcript, written by the side panel
 //   'chat:<id>:blobs'    — full-size attached images by content hash (lib/blobs.ts)
+//   'chat:<id>:artifact' — Artifact draft mod (lib/artifact.ts), written by the background
+// chatKeys() below is the single list of the per-chat keys, so deleting a chat cannot leave one.
+import { artifactKey } from './artifact.ts';
 import { blobsKey, elidedImageNote, type AttachedImage, type ImageThumb } from './images.ts';
 import type { TitleSource } from './title';
 import type { ChatItem, Msg, Part } from './types';
@@ -48,6 +51,20 @@ export interface Chat {
    * the field, where the dashboard simply shows no count rather than guessing one.
    */
   turns?: number;
+  /**
+   * The id of this chat's draft mod, when it has one. The artifact itself lives under its own key
+   * ('chat:<id>:artifact') because it holds whole scripts and the index is read on every panel
+   * open; this is only a flag on the index, so the dashboard can show a "draft" badge without
+   * reading 200 artifacts to find out which chats have one.
+   */
+  artifactId?: string;
+  /**
+   * How many versions that draft has, so the dashboard's badge can say "draft · 3 versions" from
+   * the index alone. Same reasoning as `turns`: a number on the index beats reading every artifact
+   * to render a list. Absent on chats whose draft predates the field, where the badge simply says
+   * "draft" rather than guessing a count.
+   */
+  artifactVersions?: number;
 }
 
 /** A chat's title source, defaulting for records written before the field existed. */
@@ -65,13 +82,16 @@ export const itemsKey = (id: string) => `chat:${id}:items`;
 export { blobsKey };
 
 /**
- * Every storage key a chat owns. Deleting a chat — by hand, in bulk, or by falling off the end of
- * the MAX_CHATS index — removes all of them together, so an attached image can never outlive the
- * conversation it was attached to. One list, so a fifth key added later is not forgotten by one of
- * the three call sites.
+ * Every storage key a chat owns: its model history, its panel transcript, its attached images and
+ * its draft mod. Deleting a chat — by hand, in bulk, or by falling off the end of the MAX_CHATS
+ * index — removes all four together, so an attached image or a draft script can never outlive the
+ * conversation it belongs to. Every path that removes a chat goes through this rather than listing
+ * keys of its own, so a fifth per-chat key added later cannot be forgotten by one of the three
+ * deletion routes and leak forever in a profile. (It was already two routes plus the cap when the
+ * blob and artifact keys arrived, which is exactly how that mistake gets made.)
  */
 export function chatKeys(id: string): string[] {
-  return [messagesKey(id), itemsKey(id), blobsKey(id)];
+  return [messagesKey(id), itemsKey(id), blobsKey(id), artifactKey(id)];
 }
 
 /** Hostname of a page URL, without "www.". Empty string for chrome:// and other non-http pages. */
@@ -211,6 +231,7 @@ export async function touchChat(id: string, patch: { title?: string; url?: strin
   }
   if (patch.url && /^https?:\/\//i.test(patch.url)) chat.url = patch.url;
   if (typeof patch.turns === 'number') chat.turns = patch.turns;
+
   await writeIndex(chats);
 }
 
@@ -258,6 +279,20 @@ export async function markTitleRefreshed(id: string): Promise<void> {
  */
 export function countTurns(messages: Msg[]): number {
   return messages.filter((m) => m.role === 'user' && m.content.some((p) => p.type === 'text')).length;
+}
+
+/**
+ * Note on the index that this chat has a draft mod. Deliberately NOT touchChat: recording an
+ * artifact is bookkeeping, and touchChat bumps updatedAt and unarchives — which would reorder the
+ * switcher and resurrect an archived chat every time the model proposed something in it.
+ */
+export async function setChatArtifact(id: string, artifactId: string, versions: number): Promise<void> {
+  const chats = await readIndex();
+  const chat = chats.find((c) => c.id === id);
+  if (!chat || (chat.artifactId === artifactId && chat.artifactVersions === versions)) return;
+  chat.artifactId = artifactId;
+  chat.artifactVersions = versions;
+  await writeIndex(chats);
 }
 
 /** Archive or unarchive a chat. Reversible, so the UI does not confirm it. */

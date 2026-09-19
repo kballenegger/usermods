@@ -1,18 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
 import { Activity } from './Activity';
+import { openDashboard } from './App';
+import { ArtifactPanel } from './ArtifactPanel';
 import { Lightbox, PendingStrip, SentImages, type PendingImage } from './Attachments';
 import { carriesFiles, fileFromDataUrlText, filesFromTransfer, processImageFile } from './images';
+import { toSource, type Artifact } from '@/lib/artifact';
 import { IDLE_ACTIVITY, activityFromEvent, allDisconnected, withActivity, withoutActivity, type ChatActivity } from '@/lib/activity';
 import { putBlobs } from '@/lib/blobs';
 import { archivedChats, isArchived, liveChats, loadItems, pickChatToShow, relativeTime, saveItems, titleFromText, type Chat as ChatRecord } from '@/lib/chats';
 import { ArchiveIcon, DeleteIcon, RenameIcon, UnarchiveIcon } from './components/icons';
-import { HANDOFF_KEY, resolveHandoff, type ChatHandoff } from '@/lib/dashboard';
+import { exportFilename, HANDOFF_KEY, resolveHandoff, type ChatHandoff } from '@/lib/dashboard';
 import { ACCEPT_ATTR, MAX_IMAGES_PER_MESSAGE, capNote, emptyTextFor, type AttachedImage, type ImageThumb } from '@/lib/images';
 import { findByName } from '@/lib/modmatch';
 import { modFromProposal } from '@/lib/mods';
 import { rpc, type AgentPortRequest } from '@/lib/rpc';
 import { RECONNECT_NOTE, looksUnfinished, reduceItems, toolDotClass, toolDotState, toolRowTitle, unqueuedItem } from '@/lib/transcript';
-import type { AgentEvent, ChatItem, ContentEvent, ElementRef, Mod, ModProposal } from '@/lib/types';
+import type { AgentEvent, ChatItem, ContentEvent, ElementRef, ModProposal } from '@/lib/types';
 
 const SAVE_DEBOUNCE_MS = 400;
 
@@ -79,6 +82,16 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
    * message belonged to and not into whatever happens to be on screen.
    */
   const lastSentRef = useRef<Map<string, { text: string; refs?: ElementRef[]; images?: AttachedImage[] }>>(new Map());
+  /**
+   * The visible chat's draft mod, or null when it has none. Per chat, like everything else here: it
+   * is re-read on every chat switch and an 'artifact' event is applied only when it belongs to the
+   * chat on screen, so a run in another tab cannot swap the draft you are looking at.
+   */
+  const [artifact, setArtifact] = useState<Artifact | null>(null);
+  /** The version the strip has selected. Follows the current version unless the user picks one. */
+  const [shownVersion, setShownVersion] = useState<number | null>(null);
+  /** What Save/Update last did, shown under the bar for a moment. */
+  const [artifactNote, setArtifactNote] = useState('');
   const [picking, setPicking] = useState(false);
   /** The draft title while the switcher is in rename mode, or null when it is a select again. */
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -388,6 +401,14 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
       if (e.chatId !== chatIdRef.current) {
         applyOffscreen(e.chatId, e);
         return;
+      }
+
+      // The draft gained a version. The event carries only the number — the artifact itself is in
+      // storage, written by the background before this was posted — so the panel re-reads rather
+      // than reconstructing it, and follows the new version unless the user is reading an old one.
+      if (e.type === 'artifact') {
+        void refreshArtifact(e.chatId);
+        setShownVersion(null);
       }
 
       if (e.type === 'accepted' && !titleFixRef.current) {
@@ -728,6 +749,28 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
     if (id) offscreenWritesRef.current.delete(id);
     setChatId(id);
     setItems(next);
+    // The draft belongs to the chat, so it goes with it. It is cleared rather than kept until the
+    // new one loads: showing chat A's draft over chat B's transcript, even for one frame, is the
+    // same class of mistake as showing A's messages there.
+    setArtifact(null);
+    setShownVersion(null);
+    setArtifactNote('');
+    if (id) void refreshArtifact(id);
+  }
+
+  /**
+   * Re-read a chat's draft from storage. Generation-guarded like every other async read here, so a
+   * slow load for the chat you just left cannot land on the one you are now looking at.
+   */
+  async function refreshArtifact(id: string) {
+    const gen = genRef.current;
+    try {
+      const a = await rpc({ type: 'artifact.get', chatId: id });
+      if (genRef.current !== gen || chatIdRef.current !== id) return;
+      setArtifact(a);
+    } catch {
+      /* no draft is the same as a draft we could not read: the panel simply does not appear */
+    }
   }
 
   /** Remember that this chat's restored transcript stops mid-run, so its next event says so once. */
@@ -866,14 +909,75 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
   }
 
   /**
-   * Save a proposal, updating the mod it revises rather than minting a new id. Asking the model to
-   * change a mod produces a fresh proposal under the same name; without this, each save left another
-   * copy behind and every copy ran on the page.
+   * Save the draft, which is what the proposal card's Save became.
+   *
+   * The mod a chat produces is now identified by the artifact's linkedModId, not by matching the
+   * proposal's NAME against the installed mods. The old rule guessed: rename a mod in the dashboard
+   * — or let the model retype its name with a different capital — and the next save minted a second
+   * copy, with both of them running on the page. An id cannot drift, so the second save updates the
+   * first save's mod and the count stays at one.
    */
-  async function saveProposal(p: ModProposal, idx: number) {
-    const existing = await findModByName(p.name);
-    await rpc({ type: 'mods.save', mod: modFromProposal(p, existing) });
-    updateItems((prev) => prev.map((it, i) => (i === idx && it.kind === 'proposal' ? { ...it, saved: true } : it)));
+  async function saveArtifact() {
+    if (!chatId || !artifact) return;
+    try {
+      const r = await rpc({ type: 'artifact.save', chatId });
+      setArtifact(r.artifact);
+      setArtifactNote(
+        r.relinked
+          ? `The mod this chat saved was deleted, so “${r.mod.name}” was created again.`
+          : r.created
+            ? `Saved “${r.mod.name}” · enabled`
+            : `Updated “${r.mod.name}” in place`,
+      );
+      // Every proposal card in the transcript is history of this same draft, so a save marks them
+      // all rather than leaving earlier cards offering a Save that would do the same thing.
+      updateItems((prev) => prev.map((it) => (it.kind === 'proposal' ? { ...it, saved: true } : it)));
+    } catch (e) {
+      updateItems((prev) => [...prev, { kind: 'error', text: `Could not save the draft: ${e instanceof Error ? e.message : String(e)}` }]);
+    }
+  }
+
+  /** Run the draft's current version once, the way Try on a proposal card always has. */
+  async function tryArtifact() {
+    if (!artifact) return;
+    const v = artifact.versions.find((x) => x.n === artifact.current);
+    if (v) await tryProposal({ name: v.name, description: v.description, matches: v.matches, code: v.code });
+  }
+
+  /** Download the current version as a .user.js, header and all. */
+  function exportArtifact() {
+    if (!artifact) return;
+    const blob = new Blob([toSource(artifact)], { type: 'text/javascript' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = exportFilename(artifact.name);
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  async function renameArtifact(name: string) {
+    if (!chatId) return;
+    try {
+      setArtifact(await rpc({ type: 'artifact.rename', chatId, name }));
+      setShownVersion(null);
+    } catch (e) {
+      updateItems((prev) => [...prev, { kind: 'error', text: `Could not rename the draft: ${e instanceof Error ? e.message : String(e)}` }]);
+    }
+  }
+
+  /**
+   * Roll the draft back. The version is APPENDED, not restored over the top (lib/artifact.ts), so
+   * the versions after it are still there and the rollback is itself undoable.
+   */
+  async function rollbackArtifact(version: number) {
+    if (!chatId) return;
+    try {
+      setArtifact(await rpc({ type: 'artifact.rollback', chatId, version }));
+      setShownVersion(null);
+      setArtifactNote(`Rolled back to v${version}, kept as a new version.`);
+    } catch (e) {
+      updateItems((prev) => [...prev, { kind: 'error', text: `Could not roll back: ${e instanceof Error ? e.message : String(e)}` }]);
+    }
   }
 
   const unsupported = !pageUrl || /^(chrome|edge|about|chrome-extension|devtools):/.test(pageUrl);
@@ -1031,12 +1135,22 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
                   {it.summary && <pre>{it.summary}</pre>}
                 </details>
               );
-            case 'proposal':
+            case 'proposal': {
               // The hero of this screen: the one card that takes the glow.
+              //
+              // What changed when drafts arrived is what the card MEANS. It used to be the live
+              // thing — the only place the script existed, with the buttons that acted on it. Now
+              // the draft panel below is the live thing and this is the moment it changed: the card
+              // says which version it became, and its button takes you there rather than acting on
+              // its own frozen copy. That is what stops the transcript and the panel disagreeing
+              // about what "the mod" is after four proposals.
+              const version = it.version;
               return (
                 <div key={i} className="card hero">
                   <div>
-                    <div className="label">proposed mod</div>
+                    <div className="label">
+                      proposed mod{version ? <span className="card-version" data-testid="card-version"> · v{version}</span> : null}
+                    </div>
                     <h4>{it.proposal.name}</h4>
                   </div>
                   <div className="desc">{it.proposal.description}</div>
@@ -1051,18 +1165,55 @@ export function Chat({ tabId, pageUrl, host }: { tabId: number | null; pageUrl: 
                   </details>
                   <div className="row">
                     <button className="btn" onClick={() => void tryProposal(it.proposal)} disabled={tabId == null}>Run once</button>
-                    <button className="btn primary" onClick={() => void saveProposal(it.proposal, i)} disabled={it.saved}>
-                      {it.saved ? 'Saved · enabled' : 'Save & enable'}
-                    </button>
+                    {version && artifact ? (
+                      <button
+                        className="btn primary"
+                        onClick={() => setShownVersion(version)}
+                        title="Select this version in the draft panel below"
+                        data-testid="card-open-in-draft"
+                      >
+                        Open in draft
+                      </button>
+                    ) : (
+                      // A card from before drafts existed, or one whose version could not be
+                      // recorded: it keeps the save it has always offered.
+                      <button className="btn primary" onClick={() => void saveArtifact()} disabled={it.saved || !artifact}>
+                        {it.saved ? 'Saved · enabled' : 'Save & enable'}
+                      </button>
+                    )}
                   </div>
                 </div>
               );
+            }
             case 'error':
               return <div key={i} className="error">{it.text}</div>;
           }
         })}
         <div ref={bottomRef} />
       </div>
+      {/* The draft, pinned. It is a row of the chat column — not an item in the transcript — so it
+          appears and disappears without moving the messages or their scroll position, exactly as
+          the activity line does. */}
+      {artifact && chatId && (
+        <ArtifactPanel
+          artifact={artifact}
+          busy={busy}
+          canTry={tabId != null}
+          selected={shownVersion ?? artifact.current}
+          onSelect={setShownVersion}
+          onTry={tryArtifact}
+          onSave={saveArtifact}
+          onExport={exportArtifact}
+          onRename={renameArtifact}
+          onRollback={rollbackArtifact}
+          openDashboard={() => void openDashboard()}
+        />
+      )}
+      {artifact && artifactNote && (
+        <div className="artifact-status" data-testid="artifact-status">
+          {artifactNote}
+        </div>
+      )}
       <Activity
         phase={activity.phase}
         tool={activity.tool}
@@ -1151,15 +1302,6 @@ async function readHandoff(): Promise<ChatHandoff | null> {
       : null;
   } catch {
     return null;
-  }
-}
-
-/** The saved mod a proposal of this name would revise, or undefined to save a new one. */
-async function findModByName(name: string): Promise<Mod | undefined> {
-  try {
-    return findByName(await rpc({ type: 'mods.list' }), name);
-  } catch {
-    return undefined; // could not check; saving a new mod is better than failing the save
   }
 }
 

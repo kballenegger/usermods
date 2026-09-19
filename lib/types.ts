@@ -217,6 +217,13 @@ export type AgentEventBody =
   | { type: 'tool_call'; id: string; name: string; input: Record<string, unknown> }
   | { type: 'tool_result'; id: string; summary: string; isError: boolean }
   | { type: 'proposal'; proposal: ModProposal }
+  /**
+   * The chat's draft mod gained a version. Emitted after the background has stored it, so the panel
+   * can re-read the artifact and show the new version as current. Like every other body it carries
+   * no chatId: postAgentEvent() stamps the chat this belongs to, and the panel routes on that, so a
+   * draft can never be applied to the chat that happens to be on screen.
+   */
+  | { type: 'artifact'; version: number }
   /** A sent message has entered the conversation (started a turn, or was injected mid-run). */
   | { type: 'accepted'; id: string }
   /** A queued message was dropped because the run was stopped; the panel gets its text back. */
@@ -253,7 +260,12 @@ export type ChatItem =
   | { kind: 'user'; id: string; text: string; refs?: ElementRef[]; images?: ImageThumb[]; queued?: boolean }
   | { kind: 'assistant'; text: string }
   | { kind: 'tool'; id: string; name: string; input: Record<string, unknown>; summary?: string; isError?: boolean }
-  | { kind: 'proposal'; proposal: ModProposal; saved?: boolean }
+  /**
+   * A proposal, as history. `version` is the artifact version this proposal became, so a card in
+   * the transcript can say "v2" and its button can select that version in the artifact panel
+   * rather than acting on its own copy of the code. Absent on cards written before drafts existed.
+   */
+  | { kind: 'proposal'; proposal: ModProposal; saved?: boolean; version?: number }
   | { kind: 'note'; text: string }
   | { kind: 'error'; text: string };
 

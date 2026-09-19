@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Chat } from '@/lib/chats';
-import { overview } from '@/lib/dashboard';
+import { chatOpenUrl, HANDOFF_KEY, modOrigins, overview, type ChatHandoff } from '@/lib/dashboard';
 import { rpc } from '@/lib/rpc';
 import { loadSettings } from '@/lib/settings';
 import type { Mod, Settings } from '@/lib/types';
@@ -21,6 +21,15 @@ export function Dashboard() {
   const [section, setSection] = useState<Section>(sectionFromHash);
   const [chats, setChats] = useState<Chat[]>([]);
   const [mods, setMods] = useState<Mod[]>([]);
+  /**
+   * Which chat each saved mod came from, for the Mods list's "from chat" line.
+   *
+   * It is built here rather than in ModsSection because it needs both halves — the chat index and
+   * the artifacts — and this is the component that already holds the chats. Only chats carrying an
+   * artifactId are read, so a profile of 200 chats with three drafts costs three storage reads
+   * rather than 200.
+   */
+  const [origins, setOrigins] = useState<Map<string, { chat: Chat; versions: number }>>(new Map());
   const [settings, setSettings] = useState<Settings | null>(null);
   const [usStatus, setUsStatus] = useState<{ available: boolean; message: string } | null>(null);
   const [error, setError] = useState('');
@@ -33,6 +42,15 @@ export function Dashboard() {
       setChats(c);
       setMods(m);
       setError('');
+      const withDrafts = c.filter((chat) => chat.artifactId);
+      const artifacts = await Promise.all(
+        withDrafts.map(async (chat) => ({
+          chat,
+          // A draft that will not load is simply a mod with no origin line, not a failed refresh.
+          artifact: await rpc({ type: 'artifact.get', chatId: chat.id }).catch(() => null),
+        })),
+      );
+      setOrigins(modOrigins(artifacts.map(({ chat, artifact }) => ({ chat, linkedModId: artifact?.linkedModId, versions: artifact?.versions.length ?? 0 }))));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -44,6 +62,27 @@ export function Dashboard() {
     void loadSettings().then(setSettings);
     void rpc({ type: 'userScripts.status' }).then(setUsStatus).catch(() => {});
   }, [refresh]);
+
+  /**
+   * Open a chat on its page with the side panel pointed at it — the same handoff the Chats list's
+   * Open uses, lifted here so the Mods list's "from chat" link can do it too.
+   *
+   * sidePanel.open must be called synchronously inside the gesture, before any await, or the
+   * gesture is gone by the time the promise resolves. See the longer note on ChatsSection.openChat.
+   */
+  const openChat = useCallback((chat: Chat) => {
+    try {
+      const p = chrome.sidePanel.open({ windowId: chrome.windows.WINDOW_ID_CURRENT });
+      if (p && typeof p.catch === 'function') p.catch(() => {});
+    } catch {
+      /* not a gesture any more: the tab still opens and the panel restores this chat when opened */
+    }
+    void (async () => {
+      const handoff: ChatHandoff = { chatId: chat.id, host: chat.host, at: Date.now() };
+      await chrome.storage.session.set({ [HANDOFF_KEY]: handoff }).catch(() => {});
+      await chrome.tabs.create({ url: chatOpenUrl(chat), active: true }).catch(() => {});
+    })();
+  }, []);
 
   // Stay live while the side panel works: anything it changes lands in chrome.storage.local, and
   // both the chat index and the mod list are single keys there. Settings too, so the overview's
@@ -129,7 +168,7 @@ export function Dashboard() {
         </nav>
 
         {section === 'chats' && <ChatsSection chats={chats} loaded={loaded} onChanged={refresh} />}
-        {section === 'mods' && <ModsSection mods={mods} loaded={loaded} onChanged={refresh} />}
+        {section === 'mods' && <ModsSection mods={mods} loaded={loaded} onChanged={refresh} origins={origins} onOpenChat={openChat} />}
         {/* The panel's own Settings view, unchanged: it reads and writes lib/settings, which is the
             same storage this page reads, so the overview above follows a change made here. */}
         {section === 'settings' && (

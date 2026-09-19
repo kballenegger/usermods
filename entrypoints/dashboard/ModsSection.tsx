@@ -13,12 +13,26 @@ import {
   toggleSelectAll,
   type ModFilter,
 } from '@/lib/dashboard';
+import type { Chat } from '@/lib/chats';
 import { previewFromSource } from '@/lib/mods';
 import { rpc } from '@/lib/rpc';
 import type { Mod } from '@/lib/types';
 import { InstallPanel } from './InstallPanel';
 
-export function ModsSection({ mods, loaded, onChanged }: { mods: Mod[]; loaded: boolean; onChanged: () => void }) {
+export function ModsSection({
+  mods,
+  loaded,
+  onChanged,
+  origins = new Map(),
+  onOpenChat,
+}: {
+  mods: Mod[];
+  loaded: boolean;
+  onChanged: () => void;
+  /** Which chat each mod came from, by mod id (lib/dashboard modOrigins). */
+  origins?: Map<string, { chat: Chat; versions: number }>;
+  onOpenChat?: (chat: Chat) => void;
+}) {
   const [filter, setFilter] = useState<ModFilter>({ site: '', enabled: 'all', query: '' });
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [openId, setOpenId] = useState<string | null>(null);
@@ -174,6 +188,8 @@ export function ModsSection({ mods, loaded, onChanged }: { mods: Mod[]; loaded: 
               <ModRow
                 key={m.id}
                 mod={m}
+                origin={origins.get(m.id)}
+                onOpenChat={onOpenChat}
                 open={openId === m.id}
                 selected={selected.has(m.id)}
                 onOpen={() => setOpenId((prev) => (prev === m.id ? null : m.id))}
@@ -215,6 +231,8 @@ export function ModsSection({ mods, loaded, onChanged }: { mods: Mod[]; loaded: 
 
 function ModRow({
   mod,
+  origin,
+  onOpenChat,
   open,
   selected,
   onOpen,
@@ -225,6 +243,9 @@ function ModRow({
   onDelete,
 }: {
   mod: Mod;
+  /** The chat whose draft this mod is, when it has one. */
+  origin?: { chat: Chat; versions: number };
+  onOpenChat?: (chat: Chat) => void;
   open: boolean;
   selected: boolean;
   onOpen: () => void;
@@ -260,6 +281,28 @@ function ModRow({
         </div>
         <div className="meta">
           <span>{modSource(mod)}</span>
+          {/* A mod that is a chat's saved draft says so, and says which version it is at. It is the
+              inverse of the draft panel's "saved · updates in place": from here you can get back to
+              the conversation that wrote it and ask for the next change, rather than editing the
+              source by hand and losing the thread. */}
+          {origin && (
+            <>
+              <span>·</span>
+              <span data-testid="mod-origin">
+                from chat{' '}
+                <button
+                  className="linklike"
+                  onClick={() => onOpenChat?.(origin.chat)}
+                  disabled={!onOpenChat}
+                  title={`Open "${origin.chat.title}" on its page with the side panel`}
+                  data-testid="mod-origin-open"
+                >
+                  “{origin.chat.title}”
+                </button>
+                {origin.versions > 0 ? ` · v${origin.versions}` : ''}
+              </span>
+            </>
+          )}
           <span>·</span>
           <span title={t.absolute}>{t.relative}</span>
           <span>·</span>

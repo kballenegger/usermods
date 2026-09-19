@@ -340,7 +340,7 @@ function lastResultOf(messages: Msg[], names: Map<string, string>, name: string)
 // Tier 2 — summarisation
 // ---------------------------------------------------------------------------
 
-export const SUMMARY_SYSTEM_PROMPT = [
+const SUMMARY_HEAD = [
   'You compress the earlier part of a conversation between a user and a browser-automation agent that writes userscripts ("mods") for web pages.',
   'The conversation continues after your summary, so write everything the agent needs to carry on without re-reading what you were given.',
   'Reply with the summary only. No preamble, no sign-off, no markdown headings beyond simple labels.',
@@ -349,11 +349,36 @@ export const SUMMARY_SYSTEM_PROMPT = [
   "1. GOALS AND PREFERENCES — what the user is trying to achieve on this site, and every stated preference (style, wording, what they do not want).",
   '2. DECISIONS — what was decided, and which approaches were tried and REJECTED, with the reason. The agent must not retry a dead end.',
   '3. SELECTORS — every CSS selector discovered, verbatim, each labelled with whether it proved stable, was wrong, or was never verified.',
+];
+
+const SUMMARY_TAIL = ['5. OPEN PROBLEMS — what is still broken or unknown.', '6. LATEST REQUEST — what the user asked for most recently.', ''];
+
+/**
+ * The summary prompt when the chat has no draft mod: section 4 has to reproduce the latest proposed
+ * code verbatim, because the summary is the only thing that will still be carrying it.
+ */
+export const SUMMARY_SYSTEM_PROMPT = [
+  ...SUMMARY_HEAD,
   '4. CURRENT PROPOSAL — the FULL text of the latest proposed mod code, character for character, inside a fenced code block, with its name and match patterns. If there is no proposal yet, say so.',
-  '5. OPEN PROBLEMS — what is still broken or unknown.',
-  '6. LATEST REQUEST — what the user asked for most recently.',
-  '',
+  ...SUMMARY_TAIL,
   'Be terse everywhere except section 4, which is copied exactly and never abbreviated.',
+].join('\n');
+
+/**
+ * The summary prompt when the chat HAS a draft mod.
+ *
+ * Section 4 stops asking for the code. The draft is re-sent in full on every user turn
+ * (lib/artifact.ts draftBlock, prepended by the loop's renderTurn), so asking a summariser to copy
+ * a 200-line script "character for character" into a 1500-token budget is paying twice for the one
+ * thing that cannot go missing — and paying for it in the lossy copy, since a model asked to
+ * reproduce code exactly sometimes does not. What the summary owes here is the part the draft
+ * block cannot say: how the script got to be what it is.
+ */
+export const SUMMARY_SYSTEM_PROMPT_WITH_DRAFT = [
+  ...SUMMARY_HEAD,
+  '4. THE DRAFT SO FAR — how the current draft mod came to be what it is: what each revision changed and why, and anything the user asked for that it does NOT yet do. Do NOT copy the code: the current draft is attached in full to every turn, so reproducing it here would only risk a worse copy of something the agent can already see.',
+  ...SUMMARY_TAIL,
+  'Be terse throughout.',
 ].join('\n');
 
 /** The header the synthetic summary message wears, so the model knows what it is reading. */
@@ -468,6 +493,11 @@ export interface CompactOptions {
   summarise?: (system: string, user: string) => Promise<string>;
   signal?: AbortSignal;
   keepTurns?: number;
+  /**
+   * Whether the chat has a draft mod that is re-sent on every turn. When it does, the summary is
+   * asked for the draft's HISTORY rather than its code — see SUMMARY_SYSTEM_PROMPT_WITH_DRAFT.
+   */
+  hasDraft?: boolean;
 }
 
 /** Is this history worth compacting at all? Cheap enough to call before every provider request. */
@@ -514,7 +544,8 @@ export async function compact(messages: Msg[], opts: CompactOptions): Promise<Co
       let summary: string | null = null;
       if (opts.summarise && !opts.signal?.aborted) {
         try {
-          const raw = await opts.summarise(SUMMARY_SYSTEM_PROMPT, renderForSummary(older));
+          const system = opts.hasDraft ? SUMMARY_SYSTEM_PROMPT_WITH_DRAFT : SUMMARY_SYSTEM_PROMPT;
+          const raw = await opts.summarise(system, renderForSummary(older));
           const text = raw.trim();
           if (text) summary = text;
         } catch {

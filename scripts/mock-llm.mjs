@@ -60,6 +60,55 @@ export const COMPACT_MARKER = 'COMPACTMARKER-9d4e';
 /** The images flow's marker, so its reply is identifiable in the transcript. */
 export const IMAGES_MARKER = 'IMAGESMARKER-4c7b';
 
+/** The artifact (draft mod) flow's marker. */
+export const ARTIFACT_MARKER = 'ARTIFACTMARKER-7e21';
+
+/**
+ * The three versions the artifact flow's draft passes through, as the mock streams them.
+ *
+ * They are exported so scripts/screenshots.mjs asserts against the exact text the server sent
+ * rather than against a second copy that could drift from it — the same rule the isolation markers
+ * follow. v1 and v2 differ by two lines in the middle, which is what makes the diff assertion
+ * meaningful: a diff that reported the whole file as changed would pass a weaker check.
+ */
+export const ARTIFACT_V1 = `const style = document.createElement('style');
+style.textContent = \`
+  #promo-banner { display: none !important; }
+  .promo-button { background: #888; }
+\`;
+document.head.appendChild(style);`;
+
+export const ARTIFACT_V2 = `const style = document.createElement('style');
+style.textContent = \`
+  #promo-banner { display: none !important; }
+  .promo-button { background: #1155dd; color: #fff; }
+\`;
+document.head.appendChild(style);`;
+
+/** The third proposal, after the rollback, so 'Update mod' has something new to write. */
+export const ARTIFACT_V3 = `const style = document.createElement('style');
+style.textContent = \`
+  #promo-banner { display: none !important; }
+  .promo-button { background: #888; }
+  .promo-footer { display: none !important; }
+\`;
+document.head.appendChild(style);`;
+
+const ARTIFACT_NAME = 'Wikipedia: hide the promo banner';
+const ARTIFACT_MATCHES = ['*://*.wikipedia.org/wiki/*'];
+const ARTIFACT_DESC = 'Hides the promotional banner and tones down its button.';
+
+/** propose_mod arguments for one version of the artifact flow's draft. */
+function artifactProposal(code) {
+  return {
+    name: ARTIFACT_NAME,
+    description: ARTIFACT_DESC,
+    matches: ARTIFACT_MATCHES,
+    untested_reason: 'chrome.userScripts is unavailable in this automated profile',
+    code,
+  };
+}
+
 /** How long the slow conversation holds its first byte, so a run is demonstrably still in flight. */
 const FIRST_BYTE_MS = Number(process.env.MOCK_LLM_SLOW_MS ?? 4000);
 
@@ -491,7 +540,56 @@ const WAIT_STOP_SCRIPT = {
   ],
 };
 
-SCRIPTS.push(WAIT_SCRIPT, WAIT_STOP_SCRIPT);
+// ---------------------------------------------------------------------------
+// The artifact flow (screenshots.mjs --artifact). One chat, one draft, three turns.
+//
+// Turn 1 proposes v1. Turn 2 is "make the button blue instead" — the request the whole feature
+// exists for — and the reply proposes a COMPLETE updated script that differs from v1 by two lines,
+// which is what the panel's diff has to show. Between turns 2 and 3 the flow rolls back to v1
+// through the UI, so turn 3's request carries v1's code in its draft block rather than v2's: that
+// is the assertion that proves the model is being told what the draft actually is, not merely what
+// it last said.
+//
+// Each turn is its own script, matched on its own words, because pickScript takes the LAST matching
+// user message — the same shape the compaction flow uses for its four turns.
+const ARTIFACT_SCRIPTS = [
+  {
+    name: 'artifact-1',
+    match: /hide the promo banner on this page/i,
+    steps: [
+      { text: `${ARTIFACT_MARKER} reading the page to find the banner.`, calls: [{ name: 'get_page', args: { max_chars: 8000 } }] },
+      {
+        text: `${ARTIFACT_MARKER} found it. Here is the first version.`,
+        calls: [{ name: 'propose_mod', args: artifactProposal(ARTIFACT_V1) }],
+      },
+    ],
+  },
+  {
+    name: 'artifact-2',
+    match: /make the button blue instead/i,
+    steps: [
+      {
+        // No page read: the draft is attached to this turn, so an edit needs nothing else. That is
+        // the behaviour the prompt asks for, and scripting it this way means the flow's assertion
+        // about what the request carried is about the FIRST request of the turn.
+        text: `${ARTIFACT_MARKER} changing the button's colour on the draft. One line moved.`,
+        calls: [{ name: 'propose_mod', args: artifactProposal(ARTIFACT_V2) }],
+      },
+    ],
+  },
+  {
+    name: 'artifact-3',
+    match: /also hide the footer/i,
+    steps: [
+      {
+        text: `${ARTIFACT_MARKER} added the footer rule to the draft.`,
+        calls: [{ name: 'propose_mod', args: artifactProposal(ARTIFACT_V3) }],
+      },
+    ],
+  },
+];
+
+SCRIPTS.push(WAIT_SCRIPT, WAIT_STOP_SCRIPT, ...ARTIFACT_SCRIPTS);
 
 /** The fixture page the wait flow drives. Served by this server so the flow needs no live site. */
 const ASYNC_FIXTURE = `<!doctype html>
