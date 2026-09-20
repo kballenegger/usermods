@@ -133,8 +133,7 @@ pairings to 7:1, which `test/contrast.test.ts` enforces against the token file.
 
 ## Install (from source)
 
-Requires Node 22+ and Chrome 135+. For Safari on iPhone and iPad, see
-[Safari and iOS](#safari-and-ios).
+Requires Node 22+ and Chrome 135+. For Safari on iOS, see [Safari and iOS](#safari-and-ios).
 
 ```sh
 npm install
@@ -149,9 +148,10 @@ Then in Chrome:
 
 ### Safari and iOS
 
-usermods also runs in Safari on iPhone and iPad. The execution layer there is different, because
-Safari has no `chrome.userScripts`, and the UI is a toolbar popup built for a thumb rather than a
-side panel. Building it needs a full Xcode:
+usermods also runs in Safari on iOS: built, installed and watched running saved mods in Mobile
+Safari on the iPhone 15 simulator (iOS 17.5). No physical iPhone or iPad has run it yet. The
+execution layer there is different, because Safari has no `chrome.userScripts`, and the UI is a
+toolbar popup built for a thumb rather than a side panel. Building it needs a full Xcode:
 
 ```sh
 npm install
@@ -161,8 +161,9 @@ node scripts/safari-xcode.mjs simulator   # build, boot a simulator, install, la
 
 Then turn the extension on in **Settings > Apps > Safari > Extensions > usermods** and allow it on
 the sites you want. [docs/safari.md](docs/safari.md) has the device build, the isolation guarantees,
-the limitations (page-world mods and site CSP, API-key providers only, what `localhost` means on a
-phone) and what was verified on a real Safari.
+the limitations (page-world mods and site CSP, the ignored install redirect rule, API-key providers
+only, what `localhost` means on a phone) and a row-by-row account of what was seen running on iOS
+and what was not.
 
 ### Where the panel opens
 

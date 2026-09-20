@@ -1,8 +1,12 @@
 # Safari and iOS
 
-usermods runs in Safari on iPhone and iPad. This page covers what the Safari build does differently,
-what its isolation guarantees actually are, what it cannot do, how to build and install it, and what
-was verified on a real Safari against what was not.
+usermods runs in Safari on iOS. This page covers what the Safari build does differently, what its
+isolation guarantees actually are, what it cannot do, how to build and install it, and what was
+watched happening on iOS against what was not.
+
+It has been built, installed, enabled and seen running saved mods in Mobile Safari on the iPhone 15
+simulator (iOS 17.5). No physical iPhone or iPad has run it.
+[What was verified](#what-was-verified-and-how) draws that line row by row.
 
 Read [docs/browsers.md](browsers.md) first if you want the API-by-API research this port came out of.
 That page is the survey; this one is the implementation.
@@ -136,6 +140,14 @@ synchronously right after append. Attribute present means the script ran. Absent
 refused it, and the mod is reported blocked rather than silently skipped. Isolated-world mods (the
 default) are unaffected.
 
+**Safari ignores the install redirect rule.** Chrome and Firefox catch a `.user.js` navigation with a
+`declarativeNetRequest` redirect, before the page is fetched. iOS Safari 17.5 stores that rule, keeps
+it in the extension's own rule database, records no error against it, and renders the raw script text
+anyway. Safari builds fall back to watching navigations through the tabs API
+(`watchUserJsNavigations` in `entrypoints/background.ts`), which reaches the same install page. It
+works and it is late: the navigation is already under way, so script source can flash up before the
+install page replaces it.
+
 **No sidebar.** Safari has no side-panel surface for extensions. The popup is the only UI, which on
 iPhone means a sheet covering the page it is about. That is why the popup header names the target tab
 at all times (`lib/mobile.ts`, `targetChip`): once the popup is open there is nothing else on screen
@@ -257,9 +269,25 @@ Installing the app is not enough. On the simulator or the device:
 
 ## Screenshots
 
-iPhone 15 (iOS 17.5) in the simulator. The three popup views come from the built popup document
-loaded in Mobile Safari with the extension APIs stubbed, which is why they are listed as layout
-evidence below rather than as the extension running.
+iPhone 15 (iOS 17.5) in the simulator, throughout.
+
+### The extension running
+
+The installed app extension, enabled in Safari, running mods held in its own `storage.local`.
+
+| | |
+|---|---|
+| ![A saved mod running on an ordinary page](screenshots/ios-mod-running.png) | ![The same mod under a strict CSP](screenshots/ios-mod-strict-csp.png) |
+| **A saved mod running.** Read from the extension's storage, matched by the background, evaluated by the runner in the page. `GM_addStyle` painted the dashed box and the mod wrote the timestamp at `document-idle`. | **Under `script-src 'none'`.** The mod's logic still runs, because an isolated world is not the page's script context. `default-src 'self'` blocks every inline style, the page's own and `GM_addStyle`'s alike, which is the site's policy holding rather than being rewritten. |
+| ![A @connect refusal and an allowed request](screenshots/ios-connect-refused.png) | ![The install page at the extension's own origin](screenshots/ios-install-page.png) |
+| **`@connect` enforced on iOS.** The allowed host got its request: HTTP 200 in the page and a matching line in the fixture server's log. The denied host got the refusal, and the server log has no line for it, so nothing left the device. | **The install page,** at the extension's own origin, reached by opening a `.user.js` link. The preview is the fetched script: name, version, match patterns, GM grants, run-at, full source, INSTALL and CANCEL. |
+
+### The popup, as layout only
+
+The three popup views below are the built popup document served over HTTP and loaded in Mobile
+Safari with the extension APIs stubbed (`scripts/safari-preview.mjs`, which says so in its header).
+That is layout and interaction evidence on real WebKit. It is not the extension's own popup, for the
+reason in [the two gaps](#the-two-gaps-and-why).
 
 | | |
 |---|---|
@@ -270,43 +298,70 @@ evidence below rather than as the extension running.
 
 ## What was verified, and how
 
-Tiers kept apart on purpose. Emulating a phone viewport in Chromium is not Safari validation, and
-this section does not pretend otherwise.
+Tiers kept apart on purpose. Emulating a phone viewport in Chromium is not Safari validation, and a
+preview page with stubbed extension APIs is not the extension running.
 
 | Tier | What ran | Result |
 |---|---|---|
-| Automated, node | `npm test`, including `test/exec-engine`, `exec-plan`, `exec-protocol`, `exec-grants`, `exec-evaluate`, `exec-wrap`, `exec-adapter`, `gm-bridge`, `manifest`, `mobile` | pass |
-| Automated, types | `npx tsc --noEmit -p .` | pass |
+| Automated, node | `npm test`, including `test/exec-engine`, `exec-plan`, `exec-protocol`, `exec-grants`, `exec-evaluate`, `exec-wrap`, `exec-adapter`, `gm-bridge`, `manifest`, `mobile` | pass, 799 tests |
+| Automated, types | `npx tsc --noEmit` | pass |
 | Chromium build | `npm run build`, manifest compared byte for byte against the shipped one | unchanged |
 | Safari build | `npm run build:safari` | pass, MV3 manifest as pinned |
 | Native build | `node scripts/safari-xcode.mjs build` on Xcode 15.4, simulator SDK | `** BUILD SUCCEEDED **` |
-| iOS simulator | installed and launched on iPhone 15 (iOS 17.5); `pluginkit -m -v -p com.apple.Safari.web-extension` lists `io.github.kballenegger.usermods.extension(0.1.0)`; Mobile Safari's `Library/Safari/WebExtensions/Extensions.plist` records it with `AccessibleOrigins: ["<all_urls>"]` and `Permissions: [storage, tabs, scripting, declarativeNetRequest]` | pass, nothing in the manifest refused |
-| Mobile Safari layout | the built popup served over HTTP and loaded in Mobile Safari on the simulator (`scripts/safari-preview.mjs`), captured in `docs/screenshots/ios-*.png` | pass |
+| iOS simulator, install | installed and launched on iPhone 15 (iOS 17.5); `pluginkit -m -v -p com.apple.Safari.web-extension` lists `io.github.kballenegger.usermods.extension(0.1.0)`; `Library/Safari/WebExtensions/Extensions.plist` records it with `AccessibleOrigins: ["<all_urls>"]` and `Permissions: [storage, tabs, scripting, declarativeNetRequest]` | pass, nothing in the manifest refused |
+| iOS simulator, execution | the matrix below | pass, with the gaps named below |
+| Mobile Safari layout | the built popup served over HTTP with stubbed extension APIs (`scripts/safari-preview.mjs`) | pass, layout only |
 | Real device | not run | no device authorized for this work |
-| Mod execution on Safari | not run end to end in Mobile Safari | see below |
 
-Two honest gaps.
+### What was seen running in Mobile Safari
 
-Enabling a Safari extension is a Settings toggle a person flips; there is no supported way to flip it
-from a script. So the popup **inside the installed extension** could not be opened automatically, and
-the screenshots come from the same built document served over HTTP with the extension APIs stubbed
-(`scripts/safari-preview.mjs`, which says so in its header). That is layout and interaction evidence
-on real WebKit, not evidence that the extension's own popup renders identically in the extension
-context.
+Every row is the installed extension on the iPhone 15 simulator, against pages from a local fixture
+server. The mods were put into the extension's `storage.local` directly, by writing its backing
+database inside the app container, because saving one through the UI needs a tap on INSTALL.
+Everything after that is the product's own path: the background read them, matched them against the
+document, minted a grant each and handed them to the runner.
 
-For the same reason, stored-mod execution on Safari is covered by node tests of every pure piece
-(engine choice, document matching, run-once ledger, protocol validation, grant issue and resolve,
-isolated and page evaluation, CSP refusal detection, the GM bridge, including rejection of another
-mod's value changes) and adapter-level tests for sender identity, replay, revocation and runner
-injection, plus proof that iOS accepted the extension and its permissions, rather than by a mod
-observed changing a page in Mobile Safari. The next person with a device and two minutes in Settings
-can close that gap; the build and install path above is all it takes.
+| Check | What was seen | Result |
+|---|---|---|
+| A saved mod runs on a matching page | DOM text replaced and a `GM_addStyle` rule applied, with a timestamp the mod wrote itself (`ios-mod-running.png`) | pass |
+| Reloading runs it again | a later timestamp on every load | pass |
+| Two mods on one page | both ran in one document, each against its own grant | pass |
+| Disabling a saved mod | `enabled: false`, reload, no marks on the page at all | pass |
+| Re-enabling it | marks back, with a timestamp later than the disabled load | pass |
+| A mod that throws | the throwing mod ran first; the other two mods on the page still finished | pass |
+| Ordinary page, no CSP | isolated-world mod ran, styles applied | pass |
+| Strict CSP, `default-src 'self'; script-src 'none'` | the mod ran, inline styles were blocked, and the page's policy was not touched (`ios-mod-strict-csp.png`) | pass |
+| `@connect` allowed host | `GM_xmlhttpRequest` reached the server, HTTP 200 in the page and in the server log | pass |
+| `@connect` denied host | refused with the reason string, and no request in the server log | pass |
+| `.user.js` navigation | Safari showed raw script source: the redirect rule is stored, is error free, and does nothing. Fixed by the tabs-API fallback, after which the real install page renders at the extension's origin with the fetched preview (`ios-install-page.png`) | defect found, fixed, pass |
+| The extension's own popup | not run, needs a tap on the toolbar | gap |
+| The INSTALL button, and the target tab picker, dismissal and recovery | not run, all need a tap | gap |
+
+### The two gaps, and why
+
+**Nothing can tap.** `simctl` boots a simulator, installs an app, opens a URL and takes a screenshot.
+It has no tap. The GUI that would, Simulator.app, does not launch on the machine this was built on:
+it dies in dyld looking for `_OBJC_CLASS_$__GCControllerManager`, an Xcode 15.4 against macOS 26
+mismatch, before a window ever appears. So everything reachable by opening a URL was exercised, and
+everything behind a finger was not: the toolbar popup, the INSTALL button, the target tab picker,
+and dismissing the popup and coming back. Those paths have node tests and the HTTP preview behind
+them, which is evidence about layout and logic, not about the extension's own popup. A person with a
+device closes it in about two minutes: enable the extension, open a fixture page, tap the puzzle
+piece.
+
+**Enabling was written, not tapped,** for the same reason. Safari keeps extension state in the host
+app's container, in `Library/Safari/WebExtensions/Extensions.plist`. The harness set `Enabled` there
+along with `GrantedPermissions` and `GrantedPermissionOrigins`, which is what the "All Websites >
+Allow" step writes. That pair is easy to miss and decides everything: enabled with no granted
+origins, Safari loads the extension, applies its declarative rules, and injects no content script
+anywhere, so no mod ever runs. Nothing in the extension was patched to reach that state, and the
+build that ran is the committed one.
 
 ## Distribution
 
 Nothing here is an App Store submission and nothing here is signed for release. Apple's App Review
 guideline 2.5.2 covers executing code that changes an app's features, which is a fair description of
 what usermods does with model-written scripts, so App Store distribution is an open question that
-this port does not answer. See the Safari section of [docs/browsers.md](browsers.md). Building and
-installing on your own device with your own team works today and is what the instructions above
-describe.
+this port does not answer. See the Safari section of [docs/browsers.md](browsers.md). The device path in
+[Install](#install) is written down but has not been run: nothing here is signed, and no physical
+iPhone or iPad has run this build.

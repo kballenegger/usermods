@@ -257,8 +257,9 @@ integration harness for `chrome.userScripts` and none is planned by this doc).
 
 **Updated after the port.** This section originally read "not feasible without rearchitecting the
 mod-execution layer". The first half of that was right and the rearchitecture has since been done:
-usermods ships on Safari for iPhone and iPad, and [docs/safari.md](safari.md) documents the build, the
-isolation guarantees and the limitations. The API research below is unchanged and still accurate,
+usermods has a Safari build that runs mods in Mobile Safari, verified on the iOS 17.5 simulator and
+not yet on a physical device. [docs/safari.md](safari.md) documents the build, the isolation
+guarantees, the limitations and exactly what was observed. The API research below is unchanged and still accurate,
 because none of it was wrong. What changed is the conclusion drawn from it.
 
 Two separate problems were identified. The first is solved. The second is still open, and it is a
