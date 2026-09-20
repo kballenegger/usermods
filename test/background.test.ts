@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { appendTurn } from '../lib/chats.ts';
 import { checkConnect, connectFromSource, connectOf, hostsFromMatchPatterns } from '../lib/connect.ts';
-import { isInstallableUrl, isUserScriptUrl, scriptIdentity, scriptUrlFromLocation } from '../lib/installurl.ts';
+import { installPageUrl, isInstallableUrl, isUserScriptUrl, scriptIdentity, scriptUrlFromLocation } from '../lib/installurl.ts';
 import { findByName, sameModName } from '../lib/modmatch.ts';
 import { resyncPlan } from '../lib/resync.ts';
 import { compareVersions, shouldUpdate } from '../lib/version.ts';
@@ -41,6 +41,14 @@ test('finding 1: only http(s) URLs are installable', () => {
   assert.equal(isInstallableUrl('data:text/javascript,alert(1)'), false);
   assert.equal(isInstallableUrl('file:///tmp/a.user.js'), false);
   assert.equal(isInstallableUrl('not a url'), false);
+});
+
+test('finding 1: the Safari navigation target preserves the whole script URL', () => {
+  const script = 'https://evil.example/pwn.user.js?x=1&url=https://good.example/a.user.js#section';
+  assert.equal(
+    installPageUrl('safari-web-extension://extension/install.html', script),
+    `safari-web-extension://extension/install.html#${script}`,
+  );
 });
 
 test('finding 1: the Safari navigation watcher matches what the redirect rule would have matched', () => {

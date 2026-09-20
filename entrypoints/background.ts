@@ -7,7 +7,7 @@ import { wrapForExecution } from '@/lib/exec/wrap';
 import { checkConnect, connectOf } from '@/lib/connect';
 import { dependenciesChanged, fetchText, previewFromUrl, reparseEditedSource, resolveDependencies, toBase64 } from '@/lib/install';
 import { UPDATED_MARK } from '@/lib/importreport';
-import { isUserScriptUrl, scriptIdentity } from '@/lib/installurl';
+import { installPageUrl, isUserScriptUrl, scriptIdentity } from '@/lib/installurl';
 import { resyncPlan } from '@/lib/resync';
 import { mapStack, prepareRunScript, renderRunResult, type RunResult } from '@/lib/runscript';
 import { shouldUpdate } from '@/lib/version';
@@ -695,7 +695,7 @@ function watchUserJsNavigations(): void {
     }
     if (handledUserJs.get(tabId) === url) return;
     handledUserJs.set(tabId, url);
-    const target = `${chrome.runtime.getURL('install.html')}#${url}`;
+    const target = installPageUrl(chrome.runtime.getURL('install.html'), url);
     void Promise.resolve(chrome.tabs.update(tabId, { url: target })).catch((e: unknown) => {
       handledUserJs.delete(tabId);
       console.warn('[usermods] .user.js navigation', e);
