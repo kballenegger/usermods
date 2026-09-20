@@ -173,6 +173,19 @@ test('a deletion from another frame removes the value rather than storing undefi
   assert.equal((world.globals.window as Record<string, any>).after(), 'gone');
 });
 
+test('a value change for another mod is not delivered to this mod', async () => {
+  const m = mod(
+    HEADER +
+      `window.seen = []; window.read = () => GM_getValue('k'); GM_addValueChangeListener('k', (...a) => window.seen.push(a));`,
+  );
+  const other = mod(HEADER + `GM_setValue('k', 9);`);
+  const world = run(buildRegisteredCode(m, { k: 1 }, { transport: 'bridge', token: 't' }));
+  world.emit({ type: 'gm.valueChanged', modId: other.id, key: 'k', oldValue: 1, newValue: 9 });
+  await nextTick();
+  assert.deepEqual((world.globals.window as Record<string, any>).seen, []);
+  assert.equal((world.globals.window as Record<string, any>).read(), 1);
+});
+
 test('the bridge ignores traffic that is not a value change', async () => {
   const m = mod(HEADER + `window.seen = []; GM_addValueChangeListener('k', (...a) => window.seen.push(a));`);
   const world = run(buildRegisteredCode(m, {}, { transport: 'bridge', token: 't' }));
