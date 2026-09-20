@@ -1,0 +1,17 @@
+#include "Shared.xcconfig"
+
+// The host app. On iOS a Safari web extension cannot be installed on its own: it ships inside an
+// app, and the app's only job is to tell you where the switch is. See safari/App/ViewController.swift.
+PRODUCT_NAME = usermods
+PRODUCT_BUNDLE_IDENTIFIER = $(USERMODS_BUNDLE_ID)
+INFOPLIST_FILE = App/Info.plist
+
+// No app icon: the host app ships with the system placeholder on the home screen.
+//
+// The icon itself is not the problem: assets/icon.svg renders at 1024 through the same verified
+// path as the toolbar icons. An iOS home-screen icon has to go through an asset catalog, and
+// compiling one needs actool's AssetCatalogSimulatorAgent, which cannot be spawned on the toolchain
+// this was built with (Xcode 15.4 on macOS 26: "Failed to launch AssetCatalogSimulatorAgent via
+// CoreSimulator spawn"). Rather than commit a catalog that breaks `node scripts/safari-xcode.mjs
+// build` on the machine the build was verified on, there is no catalog. See docs/safari.md.
+ASSETCATALOG_COMPILER_APPICON_NAME =

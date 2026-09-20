@@ -1,6 +1,6 @@
 import {
   CHATGPT_CODEX_BASE,
-  STORE_BUILD,
+  SUBSCRIPTIONS_OFF,
   XAI_PROXY_BASE,
   unavailableProviderMessage,
 } from '../buildflags.ts';
@@ -39,7 +39,7 @@ export function createProvider(settings: Settings, deps: OpenAIProviderDeps = {}
  * pull the auth module into every bundle that reaches createProvider.
  */
 function createSubscriptionProvider(settings: Settings, kind: 'chatgpt' | 'xai'): Provider {
-  if (STORE_BUILD) throw new Error(unavailableProviderMessage(kind));
+  if (SUBSCRIPTIONS_OFF) throw new Error(unavailableProviderMessage(kind));
   const oauth = () => import('../oauth');
 
   if (kind === 'chatgpt') {

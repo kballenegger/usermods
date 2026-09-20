@@ -1,0 +1,38 @@
+// Settings both the app and its extension share.
+//
+// These live in xcconfig files rather than in project.pbxproj so they can be read, diffed and
+// overridden without opening Xcode. To build under your own identity, override the two settings
+// below on the command line instead of editing this file:
+//
+//   xcodebuild ... USERMODS_BUNDLE_ID=com.yourname.usermods DEVELOPMENT_TEAM=ABCDE12345
+//
+// scripts/safari-xcode.mjs passes both through when you give it --bundle-id and --team.
+
+// Reverse-DNS from the public repository, so a clone builds without editing anything. Override it
+// for a real device install: two apps cannot share a bundle identifier on one Apple ID.
+USERMODS_BUNDLE_ID = io.github.kballenegger.usermods
+
+USERMODS_MARKETING_VERSION = 0.1.0
+USERMODS_BUILD_NUMBER = 1
+
+// 16.4 is where WebKit got MV3 web extensions, and it is the floor lib/manifest.ts writes into
+// browser_specific_settings.safari.strict_min_version. Keep the two in step.
+IPHONEOS_DEPLOYMENT_TARGET = 16.4
+SDKROOT = iphoneos
+TARGETED_DEVICE_FAMILY = 1,2
+SUPPORTED_PLATFORMS = iphoneos iphonesimulator
+
+SWIFT_VERSION = 5.0
+MARKETING_VERSION = $(USERMODS_MARKETING_VERSION)
+CURRENT_PROJECT_VERSION = $(USERMODS_BUILD_NUMBER)
+CODE_SIGN_STYLE = Automatic
+GENERATE_INFOPLIST_FILE = NO
+ALWAYS_SEARCH_USER_PATHS = NO
+CLANG_ENABLE_OBJC_ARC = YES
+ENABLE_BITCODE = NO
+SWIFT_EMIT_LOC_STRINGS = NO
+
+// The extension target has a shell phase that copies the web extension into the .appex bundle. Its
+// inputs are a whole directory tree produced by the npm build, which cannot be declared as a fixed
+// file list, so the sandbox has to be off for that phase to read $SRCROOT at all.
+ENABLE_USER_SCRIPT_SANDBOXING = NO

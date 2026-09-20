@@ -133,7 +133,8 @@ pairings to 7:1, which `test/contrast.test.ts` enforces against the token file.
 
 ## Install (from source)
 
-Requires Node 22+ and Chrome 135+.
+Requires Node 22+ and Chrome 135+. For Safari on iPhone and iPad, see
+[Safari and iOS](#safari-and-ios).
 
 ```sh
 npm install
@@ -145,6 +146,23 @@ Then in Chrome:
 1. Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked**, and pick `.output/chrome-mv3`.
 2. Click **Details** on usermods and turn on **Allow User Scripts**. Chrome requires this toggle for any extension that runs user scripts, including Tampermonkey.
 3. Click the usermods icon to open the side panel **on that tab**. Go to **Settings**, click a preset under **Add provider**, and paste a key (or a local server URL). It saves as you type. Back in **Chat**, the model is the dropdown under the message box.
+
+### Safari and iOS
+
+usermods also runs in Safari on iPhone and iPad. The execution layer there is different, because
+Safari has no `chrome.userScripts`, and the UI is a toolbar popup built for a thumb rather than a
+side panel. Building it needs a full Xcode:
+
+```sh
+npm install
+node scripts/safari-xcode.mjs doctor      # what is installed, and what that allows
+node scripts/safari-xcode.mjs simulator   # build, boot a simulator, install, launch
+```
+
+Then turn the extension on in **Settings > Apps > Safari > Extensions > usermods** and allow it on
+the sites you want. [docs/safari.md](docs/safari.md) has the device build, the isolation guarantees,
+the limitations (page-world mods and site CSP, API-key providers only, what `localhost` means on a
+phone) and what was verified on a real Safari.
 
 ### Where the panel opens
 
@@ -529,6 +547,7 @@ available again from Settings → *Review data notice*. The full policy is in
 - Mod sharing: export is there; a gallery is not.
 - CSS-only mods via a `@usermods-style` header, so pure restyles need no JavaScript.
 - Firefox, once its side panel story is settled.
+- Safari on macOS. The iOS build is here; the desktop popup and its notarization are not.
 
 ## Contributing
 

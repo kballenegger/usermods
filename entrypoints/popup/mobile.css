@@ -1,0 +1,332 @@
+/*
+ * The popup shell: what changes when the surface is a phone screen and the pointer is a thumb.
+ *
+ * Layered on top of sidepanel/styles.css rather than replacing it, and every rule in here is scoped
+ * to `[data-surface='popup']`. The panel cannot be affected by this file, which is the point: the
+ * brand, the palette and every view are shared, and only the shell around them differs.
+ *
+ * Four things drive the whole file:
+ *
+ *  1. Reach. The bottom of the screen is the only part a thumb gets to without a grip change, so
+ *     navigation lives there and everything else goes up top.
+ *  2. Target size. Apple asks for 44px and the panel's controls are 28px, because a mouse is exact
+ *     and a thumb is about 9mm wide. Every control you are expected to hit in here is raised.
+ *  3. The keyboard. iOS does not resize the window when the keyboard opens, it shrinks the visual
+ *     viewport, so without help the composer ends up underneath it. App.tsx measures the overlap
+ *     and writes --keyboard-inset; this file spends it.
+ *  4. Safe areas. The document asked for viewport-fit=cover, so the notch and the home indicator
+ *     are ours to avoid.
+ */
+
+/*
+ * dvh, not vh or 100%.
+ *
+ * On iOS the popup is a sheet the user can drag, and Safari's URL bar and toolbars come and go
+ * underneath it. `vh` is frozen at the largest viewport, so it would run the bottom navigation off
+ * the screen; `dvh` tracks what is actually visible.
+ */
+html:has(.app[data-surface='popup']),
+html:has(.app[data-surface='popup']) body,
+html:has(.app[data-surface='popup']) #root {
+  height: 100dvh;
+  /* Belt and braces with the min-height below: the popup has a floor as well as a ceiling, so a very
+     short sheet still lays out rather than collapsing the transcript to nothing. */
+  min-height: 0;
+}
+
+/*
+ * No rubber-band behind the sheet. `contain` keeps a scroll gesture that reaches the end of the
+ * transcript from turning into a scroll of the document behind it, which on iOS is what makes an
+ * in-app scroller feel like it is fighting you. `none` would also kill pull-to-dismiss, which is a
+ * gesture people expect from a sheet, so `contain` is the right one of the two.
+ */
+.app[data-surface='popup'] {
+  overscroll-behavior: contain;
+  /* 480px is a phone in portrait with room to spare; on an iPad popover the sheet is narrower than
+     the screen and this simply never binds. */
+  min-height: 100%;
+}
+
+/* ---------------------------------------------------------------------------
+ * Header: the target tab's identity
+ * ------------------------------------------------------------------------ */
+
+/*
+ * A popup on a phone covers the page it acts on, so the page has to be named on screen the whole
+ * time. This is not decoration: "which tab am I editing" is unanswerable once the sheet is up, and
+ * getting it wrong means running a mod against the wrong site.
+ */
+.app[data-surface='popup'] .popup-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  /* The notch, plus the normal padding. max() rather than a sum, so a device with no inset does not
+     get a header twice as tall as it needs. */
+  padding-top: max(var(--sp-2), env(safe-area-inset-top));
+  padding-left: max(var(--sp-3), env(safe-area-inset-left));
+  padding-right: max(var(--sp-3), env(safe-area-inset-right));
+  background: var(--surface-1);
+  border-bottom: var(--border-width) solid var(--border-hair);
+}
+
+.app[data-surface='popup'] .popup-target {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+.app[data-surface='popup'] .popup-target-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+/* The host is the part that identifies the page, so it is the part that stays legible. */
+.app[data-surface='popup'] .popup-host {
+  font-family: var(--font-mono);
+  font-size: var(--fs-body);
+  font-weight: 500;
+  color: var(--text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * The path, one line, truncating from the END so the beginning stays readable.
+ *
+ * Two hosts' pages are told apart by what comes first in the path, not by the query string that
+ * trails off it, so a middle-out truncation would hide the useful half.
+ */
+.app[data-surface='popup'] .popup-path {
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: ltr;
+}
+
+.app[data-surface='popup'] .popup-head-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+/* 44px, and the label hidden: at this size two icons and a chip are all the header has room for. */
+.app[data-surface='popup'] .popup-head-actions .tab-action,
+.app[data-surface='popup'] .popup-head-actions button {
+  min-width: 44px;
+  min-height: 44px;
+  justify-content: center;
+}
+
+.app[data-surface='popup'] .popup-head-actions .tab-action-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------------------
+ * Body
+ * ------------------------------------------------------------------------ */
+
+/*
+ * One scrolling region, not two.
+ *
+ * The body is the fixed middle of a three-part column: header, body, navigation. It does not scroll
+ * itself. Each view's own `.view` (or the transcript inside Chat) does, so the header and the
+ * navigation stay put while content moves, and a nested scroller never steals a gesture meant for
+ * the one below it.
+ */
+.app[data-surface='popup'] .popup-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  /* The keyboard's overlap, measured by App.tsx from visualViewport. Zero when it is closed, so this
+     is inert the rest of the time. Here rather than on the navigation because the navigation goes
+     under the keyboard willingly. What must stay visible is what you are typing into. */
+  padding-bottom: var(--keyboard-inset, 0px);
+}
+
+.app[data-surface='popup'] .popup-body > .view,
+.app[data-surface='popup'] .popup-body > .chat {
+  flex: 1;
+  min-height: 0;
+}
+
+/* Momentum scrolling, and no rubber-band into the sheet behind. */
+.app[data-surface='popup'] .view,
+.app[data-surface='popup'] .messages {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ---------------------------------------------------------------------------
+ * Bottom navigation
+ * ------------------------------------------------------------------------ */
+
+/*
+ * Three destinations across the bottom, the platform convention and the reachable part of the
+ * screen. Text labels, not icons: Chat, Mods and Settings have no icons anybody would guess, and
+ * three unlabelled glyphs would be a quiz.
+ */
+.app[data-surface='popup'] .popup-nav {
+  flex: none;
+  container-type: normal;
+  display: flex;
+  gap: 0;
+  padding: 0;
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  background: var(--surface-1);
+  border-bottom: 0;
+  border-top: var(--border-width) solid var(--border-hair);
+}
+
+/*
+ * Full-width targets: a third of the screen each, 48px tall, which clears Apple's 44px with the
+ * margin a moving thumb needs. `border-radius: 0` because a pill inside a bar at this size reads as
+ * a floating button rather than a tab.
+ */
+.app[data-surface='popup'] .popup-nav button {
+  flex: 1 1 0;
+  min-height: 48px;
+  padding: var(--sp-2) var(--sp-1);
+  border-radius: 0;
+  font-size: var(--fs-label);
+}
+
+/* The active destination is the same solid primary block the panel's tabs use, so the two surfaces
+   answer "where am I" the same way. Lime still means alive and never means selected. */
+.app[data-surface='popup'] .popup-nav button.active,
+.app[data-surface='popup'] .popup-nav button.active:hover {
+  color: var(--primary-on-fill);
+  background: var(--primary-fill);
+}
+
+/* ---------------------------------------------------------------------------
+ * Touch targets and typing, inside the shared views
+ * ------------------------------------------------------------------------ */
+
+/*
+ * The views were laid out for a mouse: 28px controls, hover for the secondary state. These raise the
+ * things you are meant to press without touching the layout of anything you only read.
+ */
+.app[data-surface='popup'] .btn,
+.app[data-surface='popup'] .chatbar .btn,
+.app[data-surface='popup'] select,
+.app[data-surface='popup'] .chip-x {
+  min-height: 44px;
+}
+
+/*
+ * The on/off switch on a mod card, grown for a thumb.
+ *
+ * It is not a checkbox glyph: styles.css builds it out of a 32x18 track and a 10px knob that slides
+ * (appearance: none), so it cannot be scaled by setting one dimension. Stretch the track alone and
+ * the switch becomes a lime slab with the knob stranded in a corner. Every number below is the
+ * desktop one at about 1.5x, in the same proportions, which lands the track at 48x28: past the 44px
+ * Apple asks for in the direction a thumb actually misses, and still unmistakably a switch.
+ */
+.app[data-surface='popup'] input[type='checkbox'] {
+  width: 48px;
+  height: 28px;
+}
+
+.app[data-surface='popup'] input[type='checkbox']::after {
+  top: 4px;
+  left: 4px;
+  width: 16px;
+  height: 16px;
+}
+
+.app[data-surface='popup'] input[type='checkbox']:checked::after {
+  transform: translateX(20px);
+}
+
+/* Tapping the word toggles the switch as well as tapping the switch does, so the label is the
+   target that has to clear 44px, not the control inside it. */
+.app[data-surface='popup'] .toggle {
+  min-height: 44px;
+}
+
+/* The row of small actions in the chat bar: square 44px, since they are icon-only at this width. */
+.app[data-surface='popup'] .chatbar .btn.action {
+  min-width: 44px;
+}
+
+/*
+ * 16px minimum on every field, which is what stops iOS zooming the page in when one takes focus.
+ * The alternative fix is user-scalable=no in the viewport tag, which also takes pinch-to-zoom away
+ * from everyone. This costs a point of type size in two places; that one costs accessibility.
+ */
+.app[data-surface='popup'] input,
+.app[data-surface='popup'] textarea,
+.app[data-surface='popup'] select {
+  font-size: max(16px, var(--fs-body));
+}
+
+/*
+ * The composer, with room to read what you wrote.
+ *
+ * `field-sizing: content` grows the box with its text on Chrome; Safari 16-18 does not have it, so
+ * on iOS the box is whatever min-height says and scrolls past it. 96px is about four lines, which is
+ * enough to review a prompt before sending it rather than typing into a letterbox. The 40dvh cap
+ * from styles.css still applies, so a long paste cannot take the sheet over.
+ */
+.app[data-surface='popup'] .composer {
+  padding: var(--sp-2) var(--sp-3) var(--sp-3);
+  padding-left: max(var(--sp-3), env(safe-area-inset-left));
+  padding-right: max(var(--sp-3), env(safe-area-inset-right));
+}
+
+.app[data-surface='popup'] .composer textarea {
+  min-height: 96px;
+  padding: 12px;
+}
+
+/* Code you are reviewing on a phone: wrap it. A horizontal scroller inside a vertical one is a
+   gesture fight, and a diff you have to swipe sideways through does not get read. */
+.app[data-surface='popup'] pre,
+.app[data-surface='popup'] code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/*
+ * Hover does not exist on a touch screen, and Safari fakes it: the first tap applies :hover and
+ * leaves it applied until you tap elsewhere, so a button you pressed stays lit as though focused.
+ * On a device with no hover at all, drop the hover states and let :active carry the feedback.
+ */
+@media (hover: none) {
+  .app[data-surface='popup'] .tabs button:hover,
+  .app[data-surface='popup'] .popup-nav button:hover {
+    color: var(--text-2);
+    background: none;
+  }
+
+  .app[data-surface='popup'] .popup-nav button.active:hover {
+    color: var(--primary-on-fill);
+    background: var(--primary-fill);
+  }
+
+  .app[data-surface='popup'] .popup-nav button:active {
+    background: var(--surface-well);
+  }
+}

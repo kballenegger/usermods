@@ -1,0 +1,8 @@
+#include "Shared.xcconfig"
+
+// The extension itself: a thin native wrapper whose bundle holds the built web extension. The
+// identifier has to be prefixed by the app's, which is why it reads from the same variable.
+PRODUCT_NAME = usermods-extension
+PRODUCT_BUNDLE_IDENTIFIER = $(USERMODS_BUNDLE_ID).extension
+INFOPLIST_FILE = Extension/Info.plist
+SKIP_INSTALL = YES

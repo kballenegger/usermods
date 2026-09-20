@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { hostFromUrl } from '@/lib/chats';
 import { hasConsented } from '@/lib/consent';
+import { keyboardInset, targetChip } from '@/lib/mobile';
 import { rpc } from '@/lib/rpc';
 import { Chat } from './Chat';
 import { DashboardIcon, SettingsIcon } from './components/icons';
@@ -10,6 +11,21 @@ import { ModsView } from './ModsView';
 import { SettingsView } from './SettingsView';
 
 type Tab = 'chat' | 'mods' | 'settings';
+
+/**
+ * Which shell the same three views are wearing.
+ *
+ * 'panel' is Chrome's side panel: a tall column beside a page you can still see, driven by a mouse.
+ * 'popup' is Safari's toolbar popup, which on iPhone is a sheet covering the whole screen, driven
+ * by a thumb. They share every view and all the provider logic; what differs is the chrome around
+ * them, and that difference is real enough that faking one with the other would be worse than
+ * having two.
+ */
+export type Surface = 'panel' | 'popup';
+
+export interface AppProps {
+  surface?: Surface;
+}
 
 /**
  * Show the dashboard, reusing the tab it is already in rather than stacking up copies of a page
@@ -32,7 +48,7 @@ export async function openDashboard(): Promise<void> {
   await chrome.tabs.create({ url });
 }
 
-export function App() {
+export function App({ surface = 'panel' }: AppProps = {}) {
   const [tab, setTab] = useState<Tab>('chat');
   const [tabId, setTabId] = useState<number | null>(null);
   const [pageUrl, setPageUrl] = useState('');
@@ -68,6 +84,32 @@ export function App() {
     void hasConsented().then(setConsented);
   }, []);
 
+  /**
+   * Keep the popup out from under the on-screen keyboard.
+   *
+   * iOS shrinks the visual viewport instead of resizing the window, so without this the composer
+   * and the bottom navigation sit behind the keyboard the moment a field takes focus. The measured
+   * inset goes on the root as a custom property; mobile.css adds it to the popup's bottom padding.
+   * lib/mobile.ts holds the arithmetic, and test/mobile.test.ts holds the cases.
+   */
+  useEffect(() => {
+    if (surface !== 'popup') return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const apply = () => {
+      const inset = keyboardInset({ height: vv.height, offsetTop: vv.offsetTop }, window.innerHeight);
+      document.documentElement.style.setProperty('--keyboard-inset', `${inset}px`);
+    };
+    apply();
+    vv.addEventListener('resize', apply);
+    vv.addEventListener('scroll', apply);
+    return () => {
+      vv.removeEventListener('resize', apply);
+      vv.removeEventListener('scroll', apply);
+      document.documentElement.style.removeProperty('--keyboard-inset');
+    };
+  }, [surface]);
+
   useEffect(() => {
     const check = () => rpc({ type: 'userScripts.status' }).then(setUsStatus).catch(() => {});
     void check();
@@ -77,12 +119,93 @@ export function App() {
   }, []);
 
   const host = hostFromUrl(pageUrl);
+  const target = targetChip(pageUrl);
   // The notice stands in for the chat until it is acknowledged, so no message can be sent before it
   // has been read. Mods and Settings stay reachable: neither sends anything to a model.
   const gateChat = consented === false || reviewing;
 
+  const views = (
+    <>
+      {usStatus && !usStatus.available && <div className="notice">{usStatus.message}</div>}
+      {tab === 'chat' &&
+        (consented === null ? (
+          <div className="view muted">loading…</div>
+        ) : gateChat ? (
+          <Consent
+            onAccept={() => {
+              setConsented(true);
+              setReviewing(false);
+            }}
+            onDismiss={consented ? () => setReviewing(false) : undefined}
+          />
+        ) : (
+          <Chat tabId={tabId} pageUrl={pageUrl} host={host} onOpenSettings={() => setTab('settings')} />
+        ))}
+      {/* "Edit in chat" on a mod row is a move between the two tabs, so the Mods view asks to be
+          taken there rather than reaching into the Chat view: the chat it should land on is named
+          by a session-storage handoff (the same one the dashboard writes), which Chat reads when it
+          mounts on that host. */}
+      {tab === 'mods' && <ModsView tabId={tabId} pageUrl={pageUrl} host={host} onEditInChat={() => setTab('chat')} />}
+      {tab === 'settings' && (
+        <SettingsView
+          onReviewNotice={() => {
+            setReviewing(true);
+            setTab('chat');
+          }}
+        />
+      )}
+    </>
+  );
+
+  if (surface === 'popup') {
+    return (
+      <div className="app" data-surface="popup">
+        {/*
+          On a phone the popup covers the page it is about, so the page has to be named on screen at
+          all times: the header is the target tab's identity, not a decoration. Everything that is
+          not one of the three views lives up here, out of thumb reach, because the bottom of the
+          screen belongs to navigation.
+        */}
+        <header className="popup-head">
+          <div className="popup-target" title={pageUrl}>
+            {target.live && <span className="dot" aria-hidden="true" />}
+            <span className="popup-target-text">
+              <span className="popup-host">{target.live ? target.host : target.fallback}</span>
+              {target.path && <span className="popup-path">{target.path}</span>}
+            </span>
+          </div>
+          <div className="popup-head-actions">
+            <button
+              type="button"
+              className="tab-action"
+              data-action="dashboard"
+              aria-label="Dashboard"
+              title="Open the dashboard: every chat and every mod, in a full tab"
+              onClick={() => void openDashboard()}
+            >
+              <DashboardIcon />
+              <span className="tab-action-label">Dashboard</span>
+            </button>
+            <ThemeToggle />
+          </div>
+        </header>
+        <div className="popup-body">{views}</div>
+        {/*
+          Bottom navigation, the platform convention on a phone and the only part of the screen a
+          thumb reaches without a grip change. Three destinations, each a full-width target well over
+          the 44px Apple asks for, labelled in text because three icons would be a guessing game.
+        */}
+        <nav className="tabs popup-nav" aria-label="usermods">
+          <button type="button" data-view="chat" aria-current={tab === 'chat' ? 'page' : undefined} className={tab === 'chat' ? 'active' : ''} onClick={() => setTab('chat')}>Chat</button>
+          <button type="button" data-view="mods" aria-current={tab === 'mods' ? 'page' : undefined} className={tab === 'mods' ? 'active' : ''} onClick={() => setTab('mods')}>Mods</button>
+          <button type="button" data-view="settings" aria-current={tab === 'settings' ? 'page' : undefined} className={tab === 'settings' ? 'active' : ''} onClick={() => setTab('settings')}>Settings</button>
+        </nav>
+      </div>
+    );
+  }
+
   return (
-    <div className="app">
+    <div className="app" data-surface="panel">
       {/*
         The bar is two groups with the host between them.
 
@@ -137,34 +260,7 @@ export function App() {
           <ThemeToggle />
         </div>
       </nav>
-      {usStatus && !usStatus.available && <div className="notice">{usStatus.message}</div>}
-      {tab === 'chat' &&
-        (consented === null ? (
-          <div className="view muted">loading…</div>
-        ) : gateChat ? (
-          <Consent
-            onAccept={() => {
-              setConsented(true);
-              setReviewing(false);
-            }}
-            onDismiss={consented ? () => setReviewing(false) : undefined}
-          />
-        ) : (
-          <Chat tabId={tabId} pageUrl={pageUrl} host={host} onOpenSettings={() => setTab('settings')} />
-        ))}
-      {/* "Edit in chat" on a mod row is a move between the two tabs, so the Mods view asks to be
-          taken there rather than reaching into the Chat view: the chat it should land on is named
-          by a session-storage handoff (the same one the dashboard writes), which Chat reads when it
-          mounts on that host. */}
-      {tab === 'mods' && <ModsView tabId={tabId} pageUrl={pageUrl} host={host} onEditInChat={() => setTab('chat')} />}
-      {tab === 'settings' && (
-        <SettingsView
-          onReviewNotice={() => {
-            setReviewing(true);
-            setTab('chat');
-          }}
-        />
-      )}
+      {views}
     </div>
   );
 }

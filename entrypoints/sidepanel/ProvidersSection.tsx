@@ -9,7 +9,8 @@
 // (mutateConnections re-reads the list before writing), because the background writes model
 // listings into the same list while a key is being typed.
 import { useEffect, useRef, useState } from 'react';
-import { STORE_BUILD, isSubscriptionProvider } from '@/lib/buildflags';
+import { SAFARI_BUILD, SUBSCRIPTIONS_OFF, isSubscriptionProvider } from '@/lib/buildflags';
+import { isLocalBaseUrl, localBaseUrlNote } from '@/lib/mobile';
 import { relativeTime } from '@/lib/chats';
 import {
   addConnection,
@@ -90,7 +91,7 @@ export function ProvidersSection({ view, onSaving }: { view: ConnectionsView; on
 
       {view.ready && state.list.length === 0 && (
         <p className="providers-none" data-testid="providers-none">
-          No provider yet. Pick one below: an API key, a server on your own machine{STORE_BUILD ? '' : ', or a ChatGPT or SuperGrok subscription'}.
+          No provider yet. Pick one below: an API key, a server on your own machine{SUBSCRIPTIONS_OFF ? '' : ', or a ChatGPT or SuperGrok subscription'}.
         </p>
       )}
 
@@ -152,7 +153,7 @@ function ConnectionCard({
   const [fetchError, setFetchError] = useState('');
   const pending = useRef<ConnectionPatch>({});
   const timer = useRef<number | null>(null);
-  const subscription = !STORE_BUILD && isSubscriptionProvider(conn.kind);
+  const subscription = !SUBSCRIPTIONS_OFF && isSubscriptionProvider(conn.kind);
   const formId = `provider-${conn.id}`;
 
   /** Write whatever is waiting, now. Returns the stored connection, which may have a de-duplicated label. */
@@ -268,6 +269,13 @@ function ConnectionCard({
                   Any endpoint that speaks the {conn.kind === 'anthropic' ? 'Anthropic Messages' : 'OpenAI chat completions'} API works here,
                   including a local proxy in front of a subscription.
                 </span>
+                {/*
+                  On iPhone and iPad, "localhost" is the phone. Typing the address off a desktop
+                  setup is the obvious thing to do and it fails in a way that looks like the server
+                  is down rather than like the address is wrong, so the correction is shown at the
+                  moment the address is typed, and only then, since a working URL needs no note.
+                */}
+                {SAFARI_BUILD && isLocalBaseUrl(baseUrl) && <span className="warn">{localBaseUrlNote()}</span>}
               </label>
               <label className="field">
                 API key

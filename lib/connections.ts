@@ -22,7 +22,7 @@
 // The top half of this file is pure and unit tested (test/connections.test.ts); the storage half at
 // the bottom is the only part that touches chrome. `.ts` extensions and type-only imports of
 // ./types, because the node test runner resolves neither extensionless specifiers nor WXT aliases.
-import { isSubscriptionProvider, providerAvailable, STORE_BUILD } from './buildflags.ts';
+import { isSubscriptionProvider, providerAvailable, SUBSCRIPTIONS_OFF } from './buildflags.ts';
 import type { ImagesSetting, ProviderKind, Settings } from './types';
 
 // ---------------------------------------------------------------------------
@@ -125,7 +125,7 @@ export const CUSTOM_PRESETS: readonly ProviderPreset[] = [
  * The subscription presets, behind the compile-time flag so a store bundle carries neither the
  * entries nor their labels — a filter at runtime would leave both in the file.
  */
-export const SUBSCRIPTION_PRESETS: readonly ProviderPreset[] = STORE_BUILD
+export const SUBSCRIPTION_PRESETS: readonly ProviderPreset[] = SUBSCRIPTIONS_OFF
   ? []
   : [
       { label: 'ChatGPT subscription', kind: 'chatgpt', baseUrl: '', model: '' },
@@ -133,8 +133,8 @@ export const SUBSCRIPTION_PRESETS: readonly ProviderPreset[] = STORE_BUILD
     ];
 
 /** The presets a build offers, in the order the Add provider row shows them. */
-export function presetsFor(storeBuild: boolean = STORE_BUILD): ProviderPreset[] {
-  const subs = storeBuild ? [] : SUBSCRIPTION_PRESETS;
+export function presetsFor(subscriptionsOff: boolean = SUBSCRIPTIONS_OFF): ProviderPreset[] {
+  const subs = subscriptionsOff ? [] : SUBSCRIPTION_PRESETS;
   return [...KEY_PRESETS, ...subs, ...CUSTOM_PRESETS];
 }
 
@@ -143,8 +143,8 @@ export function presetsFor(storeBuild: boolean = STORE_BUILD): ProviderPreset[] 
  * OpenAI endpoints is the normal case. Subscription kinds: one each, because the sign-in is stored
  * per vendor (`oauth:chatgpt`), so a second "ChatGPT" row would be the same account twice.
  */
-export function canAdd(kind: ProviderKind, list: readonly Connection[], storeBuild: boolean = STORE_BUILD): boolean {
-  if (!providerAvailable(kind, storeBuild)) return false;
+export function canAdd(kind: ProviderKind, list: readonly Connection[], subscriptionsOff: boolean = SUBSCRIPTIONS_OFF): boolean {
+  if (!providerAvailable(kind, subscriptionsOff)) return false;
   return !(isSubscriptionProvider(kind) && list.some((c) => c.kind === kind));
 }
 
@@ -259,16 +259,16 @@ export type ConnectionStatus = 'connected' | 'needs-key' | 'signed-out' | 'unava
  * A key-based connection with neither a key nor a base URL points at the vendor's hosted default,
  * which needs a key.
  */
-export function connectionStatus(conn: Connection, signedIn: SignedIn, storeBuild: boolean = STORE_BUILD): ConnectionStatus {
-  if (!providerAvailable(conn.kind, storeBuild)) return 'unavailable';
+export function connectionStatus(conn: Connection, signedIn: SignedIn, subscriptionsOff: boolean = SUBSCRIPTIONS_OFF): ConnectionStatus {
+  if (!providerAvailable(conn.kind, subscriptionsOff)) return 'unavailable';
   if (isSubscriptionProvider(conn.kind)) return signedIn[conn.kind] ? 'connected' : 'signed-out';
   if (conn.apiKey.trim()) return 'connected';
   const host = hostOf(conn.baseUrl);
   return host && !KEY_REQUIRED_HOSTS.has(host) ? 'connected' : 'needs-key';
 }
 
-export function isConnected(conn: Connection, signedIn: SignedIn, storeBuild: boolean = STORE_BUILD): boolean {
-  return connectionStatus(conn, signedIn, storeBuild) === 'connected';
+export function isConnected(conn: Connection, signedIn: SignedIn, subscriptionsOff: boolean = SUBSCRIPTIONS_OFF): boolean {
+  return connectionStatus(conn, signedIn, subscriptionsOff) === 'connected';
 }
 
 /** The status line under a connection in Settings. */
@@ -316,10 +316,10 @@ export interface PickerGroup {
  * the model id or the connection label). A connection that is not connected is not listed at all —
  * not greyed out — which is also what keeps the subscription kinds out of a store build's picker.
  */
-export function pickerGroups(state: ConnectionsState, signedIn: SignedIn, filter = '', storeBuild: boolean = STORE_BUILD): PickerGroup[] {
+export function pickerGroups(state: ConnectionsState, signedIn: SignedIn, filter = '', subscriptionsOff: boolean = SUBSCRIPTIONS_OFF): PickerGroup[] {
   const terms = filter.toLowerCase().split(/\s+/).filter(Boolean);
   return state.list
-    .filter((c) => isConnected(c, signedIn, storeBuild))
+    .filter((c) => isConnected(c, signedIn, subscriptionsOff))
     .map((connection) => {
       const all = offeredModels(connection);
       const label = connection.label.toLowerCase();
@@ -374,16 +374,16 @@ export function resolveSelection(
   selection: ModelSelection | null | undefined,
   state: ConnectionsState,
   signedIn: SignedIn,
-  storeBuild: boolean = STORE_BUILD,
+  subscriptionsOff: boolean = SUBSCRIPTIONS_OFF,
 ): ResolvedSelection {
   if (!selection || !selection.connectionId) {
-    const anyConnected = state.list.some((c) => isConnected(c, signedIn, storeBuild));
+    const anyConnected = state.list.some((c) => isConnected(c, signedIn, subscriptionsOff));
     const problem: SelectionProblem = anyConnected ? 'none' : 'no-providers';
     return { ok: false, problem, message: problemMessage(problem) };
   }
   const connection = state.list.find((c) => c.id === selection.connectionId);
   if (!connection) return { ok: false, problem: 'removed', message: problemMessage('removed', selection.label) };
-  const status = connectionStatus(connection, signedIn, storeBuild);
+  const status = connectionStatus(connection, signedIn, subscriptionsOff);
   if (status !== 'connected') return { ok: false, problem: status, message: problemMessage(status, connection.label) };
   const model = selection.model.trim();
   if (!model) return { ok: false, problem: 'no-model', message: problemMessage('no-model', connection.label) };
@@ -399,12 +399,12 @@ export function defaultSelection(
   state: ConnectionsState,
   last: ModelSelection | null | undefined,
   signedIn: SignedIn,
-  storeBuild: boolean = STORE_BUILD,
+  subscriptionsOff: boolean = SUBSCRIPTIONS_OFF,
 ): ModelSelection | null {
-  const lastResolved = resolveSelection(last, state, signedIn, storeBuild);
+  const lastResolved = resolveSelection(last, state, signedIn, subscriptionsOff);
   if (lastResolved.ok) return lastResolved.selection;
   for (const c of state.list) {
-    if (!isConnected(c, signedIn, storeBuild)) continue;
+    if (!isConnected(c, signedIn, subscriptionsOff)) continue;
     const first = offeredModels(c)[0];
     if (first) return { connectionId: c.id, model: first, label: c.label };
   }
@@ -417,9 +417,9 @@ export function selectionForChat(
   state: ConnectionsState,
   last: ModelSelection | null | undefined,
   signedIn: SignedIn,
-  storeBuild: boolean = STORE_BUILD,
+  subscriptionsOff: boolean = SUBSCRIPTIONS_OFF,
 ): ModelSelection | null {
-  return chat?.model?.connectionId ? chat.model : defaultSelection(state, last, signedIn, storeBuild);
+  return chat?.model?.connectionId ? chat.model : defaultSelection(state, last, signedIn, subscriptionsOff);
 }
 
 export function sameSelection(a: ModelSelection | null | undefined, b: ModelSelection | null | undefined): boolean {
@@ -602,7 +602,7 @@ const oauthKey = (kind: 'chatgpt' | 'xai') => `oauth:${kind}`;
  * looking, so tokens left behind by the other build cannot make a subscription look usable.
  */
 export async function loadSignedIn(): Promise<SignedIn> {
-  if (STORE_BUILD) return NOT_SIGNED_IN;
+  if (SUBSCRIPTIONS_OFF) return NOT_SIGNED_IN;
   const r = await chrome.storage.local.get([oauthKey('chatgpt'), oauthKey('xai')]);
   return { chatgpt: !!r[oauthKey('chatgpt')], xai: !!r[oauthKey('xai')] };
 }

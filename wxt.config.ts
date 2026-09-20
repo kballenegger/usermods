@@ -1,4 +1,5 @@
 import { defineConfig } from 'wxt';
+import { buildManifest } from './lib/manifest';
 
 /**
  * The Chrome Web Store build drops subscription sign-in; see lib/buildflags.ts. Set by
@@ -32,35 +33,19 @@ const outDirTemplate = testBuild
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   outDirTemplate,
-  vite: () => ({
-    define: { __STORE_BUILD__: JSON.stringify(storeBuild) },
-  }),
-  manifest: {
-    name: 'usermods',
-    description:
-      'Vibe-code userscripts in place. Customize any website by chatting with any LLM.',
-    // No activeTab: host_permissions <all_urls> already covers everything it would grant
-    // (captureVisibleTab, content-script injection), and nothing in the code depends on it.
-    permissions: ['sidePanel', 'storage', 'scripting', 'tabs', 'userScripts', 'declarativeNetRequest'],
-    host_permissions: ['<all_urls>'],
-    // default_icon is spelled out rather than left to the top-level `icons` fallback: Chrome does
-    // fall back, but the toolbar is where the mark is seen most, and naming the sizes here keeps
-    // the 16/32 pixel-art renders (not a downscale of 128) the ones it picks at 1x and 2x.
-    action: {
-      default_title: 'Open usermods',
-      default_icon: {
-        16: 'icon/16.png',
-        32: 'icon/32.png',
-        48: 'icon/48.png',
-        128: 'icon/128.png',
-      },
+  vite: (env) => ({
+    define: {
+      __STORE_BUILD__: JSON.stringify(storeBuild),
+      // Safari ships API-key providers only for now; see lib/buildflags.ts for why. A literal
+      // define, so the bundler folds the flag and drops lib/oauth from that build too.
+      __SAFARI_BUILD__: JSON.stringify(env.browser === 'safari'),
     },
-    // The dashboard doubles as the options page, which is what puts it behind "Extension options"
-    // in chrome://extensions and in the toolbar icon's context menu. open_in_tab because it is a
-    // full page — every chat and every mod — not a popup-sized settings dialog.
-    options_ui: { page: 'dashboard.html', open_in_tab: true },
-    minimum_chrome_version: '135',
-    // The .user.js redirect rule sends navigations to this page, so it must be web accessible.
-    web_accessible_resources: [{ resources: ['install.html'], matches: ['<all_urls>'] }],
-  },
+  }),
+  // Safari's own default in WXT is MV2. usermods is an MV3 extension throughout, with a service-worker
+  // background, `action` and `host_permissions`, and Safari has supported MV3 since 16.4, which is the
+  // floor lib/manifest.ts sets for that target anyway.
+  manifestVersion: 3,
+  // The manifest differs by target; lib/manifest.ts holds the differences and test/manifest.test.ts
+  // pins them.
+  manifest: ({ browser }) => buildManifest(browser),
 });

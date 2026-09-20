@@ -1,0 +1,50 @@
+<!doctype html>
+<!--
+  The Safari toolbar popup, and on iPhone the whole app.
+
+  Built for Safari only (`wxt.include`). Chrome has the side panel, which can sit open beside the
+  page while you work; a popup that closes the moment you touch the page would be a downgrade there.
+  iOS has no side panel and no separate window, so this is the surface, and it is built for a thumb
+  rather than shrunk down from the panel. Same React app, same provider logic. See
+  sidepanel/App.tsx, which takes a `surface` prop and wears a different shell for each.
+
+  No data-theme attribute here: see the note in sidepanel/index.html.
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!--
+      viewport-fit=cover, so the sheet paints under the home indicator and the notch rather than
+      letterboxing itself inside them. What that costs is that safe areas are now this document's
+      problem: mobile.css pays for it with env(safe-area-inset-*) on the header and the navigation.
+
+      No user-scalable=no and no maximum-scale. Locking zoom is the usual reflex for a native-feeling
+      sheet and it takes pinch-to-zoom away from anyone who needs it. What zoom is normally locked to
+      prevent is iOS zooming in by itself when a small-text field takes focus, and mobile.css fixes
+      that at the cause: every field in the popup is at least 16px.
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="wxt.include" content="['safari']" />
+    <!--
+      This title is also the toolbar button's tooltip, so it reads as a button rather than as a page.
+      WXT copies a popup entrypoint's <title> straight into action.default_title (getPopupEntrypoint
+      in find-entrypoints.mjs does `defaultTitle: title` after spreading the meta options, so a
+      manifest.default_title meta tag here would be overwritten), and the popup's action options are
+      merged over the manifest from wxt.config.ts. The <title> is the only lever, and nothing on iOS
+      ever displays a popup document's title, so spending it on the tooltip costs nothing and keeps
+      the Safari and Chrome toolbar buttons named the same thing.
+    -->
+    <title>Open usermods</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="/icon/32.png" />
+    <link rel="icon" type="image/png" sizes="128x128" href="/icon/128.png" />
+    <!-- Classic, non-deferred, ahead of the stylesheet, so the saved theme is on <html> before the
+         first paint. See public/theme-boot.js and the longer note in sidepanel/index.html. -->
+    <script src="/theme-boot.js"></script>
+    <link rel="stylesheet" href="../sidepanel/styles.css" />
+    <link rel="stylesheet" href="./mobile.css" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>

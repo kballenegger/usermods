@@ -15,6 +15,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      Chrome and Firefox only. Safari has no side panel of any kind, and WXT's reading of a sidepanel
+      entrypoint is to write side_panel into the manifest and add the sidePanel permission with it,
+      a key and a permission Safari does not know, in a package that has to load cleanly. Safari gets
+      entrypoints/popup instead, which renders the same App with surface="popup".
+    -->
+    <meta name="wxt.exclude" content="['safari']" />
     <title>usermods</title>
     <!-- The packaged pixel icon, so the tab/favicon carries the mark too. 32 and 128 are
          both whole multiples of the 16-unit grid, so neither is resampled into mush. -->

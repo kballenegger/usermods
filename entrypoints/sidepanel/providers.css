@@ -135,3 +135,17 @@
 .providers-add {
   margin-bottom: var(--sp-2);
 }
+
+/*
+ * The note under a field that points at a mistake rather than explaining the field.
+ *
+ * The warn tone, not the error tone: what is typed is a valid address, it just means a different
+ * machine here than it did where it was copied from. So it is a correction, not a failure, and it
+ * reads as one.
+ */
+label.field > span.warn {
+  color: var(--warn-text);
+  background: var(--warn-bg);
+  border-radius: var(--r-field);
+  padding: var(--sp-1) var(--sp-2);
+}

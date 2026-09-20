@@ -1,7 +1,7 @@
 // The first-run data notice. Shown over the whole panel before the first message is ever sent, and
 // again from Settings → "Review data notice". Plain words, no dark patterns: the only way past it
 // is the button that says the user understands.
-import { STORE_BUILD } from '@/lib/buildflags';
+import { SUBSCRIPTIONS_OFF } from '@/lib/buildflags';
 import { acceptConsent } from '@/lib/consent';
 
 export function Consent({ onAccept, onDismiss }: { onAccept: () => void; onDismiss?: () => void }) {
@@ -38,7 +38,7 @@ export function Consent({ onAccept, onDismiss }: { onAccept: () => void; onDismi
         <p style={{ margin: 0 }}>
           To the model provider <b>you</b> connect in Settings and pick for that chat, and nowhere else. That is your
           own API key at Anthropic, OpenAI, OpenRouter or any compatible service
-          {STORE_BUILD ? '' : ', your ChatGPT or SuperGrok subscription'}, or a model running on your own machine.
+          {SUBSCRIPTIONS_OFF ? '' : ', your ChatGPT or SuperGrok subscription'}, or a model running on your own machine.
           With more than one connected, each message goes only to the one named under the message box.
         </p>
         <span className="muted" style={{ fontSize: 'var(--fs-meta)' }}>
@@ -50,7 +50,7 @@ export function Consent({ onAccept, onDismiss }: { onAccept: () => void; onDismi
       <div className="card">
         <h4>What stays here</h4>
         <p style={{ margin: 0 }}>
-          Your API keys{STORE_BUILD ? '' : ' and subscription tokens'}, your saved mods, their stored values and your
+          Your API keys{SUBSCRIPTIONS_OFF ? '' : ' and subscription tokens'}, your saved mods, their stored values and your
           chat history all live in this extension's local storage on this device. Each credential is sent only to the
           provider it belongs to, to authenticate you.
         </p>

@@ -59,7 +59,37 @@ function scriptInfo(mod: Mod) {
  * A script that wants strict mode still gets it from its own leading directive, because the body
  * is evaluated as its own function.
  */
-export function buildRegisteredCode(mod: Mod, values: Record<string, unknown>): string {
+export type GmTransport = 'chrome' | 'bridge';
+
+export interface BuildOptions {
+  /**
+   * How the shim reaches the background.
+   *
+   * 'chrome' (the default, and what Chrome/Firefox use) calls `chrome.runtime.sendMessage` and
+   * `chrome.runtime.connect` directly from inside the registered code. That works because
+   * `chrome.userScripts.configureWorld({messaging: true})` puts those two functions, and only those
+   * two, into the USER_SCRIPT world.
+   *
+   * 'bridge' is the content-script engine (Safari). There is no userScripts world to configure, so
+   * the mod is evaluated inside a function that receives a `__usermodsBridge` closure and the code
+   * talks to that instead. Three things follow, and they are the reason this option exists rather
+   * than the Safari runner injecting `chrome` into scope:
+   *
+   *  - `chrome` and `browser` are shadowed to undefined for the mod's own scope, so a mod cannot
+   *    reach the extension API surface by the obvious route. (`window.chrome` is still reachable in
+   *    an isolated world. See docs/safari.md. The boundary that actually holds is the capability
+   *    grant in lib/exec/grants.ts, which no amount of reaching gets around.)
+   *  - every call carries an opaque token the background mints per document, so the background never
+   *    has to believe a `modId` the code sent;
+   *  - value changes from other frames arrive through the same closure, so `GM_addValueChangeListener`
+   *    keeps working without the mod holding a port.
+   */
+  transport?: GmTransport;
+  /** The capability token for 'bridge'. Baked into the code the runner evaluates. */
+  token?: string;
+}
+
+export function buildRegisteredCode(mod: Mod, values: Record<string, unknown>, opts: BuildOptions = {}): string {
   const body = mod.source; // header lines are comments; keeping them keeps line numbers close to the original
   // Each @require gets its own function scope, evaluated in order, sharing globals the way
   // Tampermonkey does: libraries assign to window/globalThis, which in the USER_SCRIPT world is the
@@ -72,13 +102,31 @@ export function buildRegisteredCode(mod: Mod, values: Record<string, unknown>): 
         `__evaluate(${JSON.stringify(u.url ? `@require ${u.url}` : 'script')}, function (${GM_PARAMS.join(', ')}) {\n${u.code}\n})(${GM_PARAMS.join(', ')});`,
     )
     .join('\n');
-  return `(function () {
-const __meta = ${JSON.stringify(scriptInfo(mod))};
-let __values = ${JSON.stringify(values)};
-const __menu = [];
-const __listeners = new Map();
-let __listenerId = 0;
-const __send = (msg) => new Promise((resolve, reject) => {
+  const bridge = opts.transport === 'bridge';
+  // Both transports expose exactly the same two capabilities to the shim below, a request/response
+  // `__send` and a live value-change subscription, so nothing after this point knows which engine
+  // it is running under.
+  const transport = bridge
+    ? `const __send = (msg) => new Promise((resolve, reject) => {
+  try {
+    if (typeof __usermodsBridge === 'undefined' || !__usermodsBridge) return reject(new Error('GM API unavailable: usermods did not attach its bridge to this script.'));
+    __usermodsBridge.send({ ...msg, token: ${JSON.stringify(opts.token ?? '')} }).then(resolve, (e) => reject(e instanceof Error ? e : new Error(String(e))));
+  } catch (e) { reject(e); }
+});
+// Value changes made by this mod in another tab or frame. The runner owns the one connection to the
+// background per document and fans changes out, so a mod holds no port of its own.
+let __port = null;
+try {
+  if (typeof __usermodsBridge !== 'undefined' && __usermodsBridge && __usermodsBridge.subscribe) {
+    __usermodsBridge.subscribe((m) => {
+      if (!m || m.type !== 'gm.valueChanged') return;
+      if (Object.prototype.hasOwnProperty.call(m, 'newValue') && m.newValue !== undefined) __values[m.key] = m.newValue;
+      else delete __values[m.key];
+      __fireValueChange(m.key, m.oldValue, m.newValue, true);
+    });
+  }
+} catch (e) {}`
+    : `const __send = (msg) => new Promise((resolve, reject) => {
   try {
     if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.sendMessage) return reject(new Error('GM API unavailable in the page world'));
     chrome.runtime.sendMessage({ ...msg, __usermods: true, modId: __meta.id }, (r) => {
@@ -103,7 +151,15 @@ try {
     });
     if (__port.onDisconnect) __port.onDisconnect.addListener(() => { __port = null; });
   }
-} catch (e) { __port = null; }
+} catch (e) { __port = null; }`;
+
+  return `(function () {
+const __meta = ${JSON.stringify(scriptInfo(mod))};
+let __values = ${JSON.stringify(values)};
+const __menu = [];
+const __listeners = new Map();
+let __listenerId = 0;
+${transport}
 function __fireValueChange(key, oldValue, newValue, remote) {
   for (const l of Array.from(__listeners.values())) {
     if (l.name !== key) continue;

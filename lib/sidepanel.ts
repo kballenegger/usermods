@@ -27,6 +27,21 @@ import type { Settings, SidePanelScope } from './types';
 export const PANEL_PATH = 'sidepanel.html';
 
 /**
+ * Does this browser have a side panel at all?
+ *
+ * Safari has none, and the extension is built for both: sidepanel.html is not even packaged in the
+ * Safari build (see the note in entrypoints/sidepanel/index.html). Every side-panel call therefore
+ * has to ask first. `chrome.sidePanel` is simply absent there, so reading a method off it throws a
+ * TypeError, and a TypeError at the top of a user gesture takes the rest of the handler with it.
+ *
+ * What replaces the panel on Safari is the popup, and the chat handoff both surfaces read is written
+ * either way, so the calls this guards are skipped, not substituted for.
+ */
+export function sidePanelAvailable(): boolean {
+  return typeof chrome !== 'undefined' && typeof (chrome as { sidePanel?: unknown }).sidePanel !== 'undefined';
+}
+
+/**
  * Which scope a stored profile runs under.
  *
  * Unlike the theme, an existing profile is NOT pinned to the old behaviour: per-tab is what the

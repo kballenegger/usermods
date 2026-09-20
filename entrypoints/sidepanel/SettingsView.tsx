@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { STORE_BUILD } from '@/lib/buildflags';
+import { SUBSCRIPTIONS_OFF } from '@/lib/buildflags';
 import { loadSettings, savePrefs } from '@/lib/settings';
 import { resolveScope } from '@/lib/sidepanel';
 import { applyTheme } from '@/lib/theme';
@@ -144,8 +144,8 @@ export function SettingsView({ onReviewNotice }: { onReviewNotice?: () => void }
         <span className="label" style={{ marginBottom: 0 }} data-testid="settings-saved">{saved ? 'all changes saved' : 'saving…'}</span>
       </div>
       <p className="muted" style={{ marginTop: 'var(--sp-5)', fontSize: 'var(--fs-meta)' }}>
-        API keys{STORE_BUILD ? '' : ' and sign-in tokens'} are stored in this extension's local storage on this device, and
-        each is sent only to the provider it belongs to.{STORE_BUILD ? '' : ' Subscription usage counts against your plan limits.'}
+        API keys{SUBSCRIPTIONS_OFF ? '' : ' and sign-in tokens'} are stored in this extension's local storage on this device, and
+        each is sent only to the provider it belongs to.{SUBSCRIPTIONS_OFF ? '' : ' Subscription usage counts against your plan limits.'}
         {onReviewNotice && (
           <>
             {' '}
