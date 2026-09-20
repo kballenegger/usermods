@@ -127,8 +127,11 @@ class UserScriptsAdapter implements ExecAdapter {
   /** A registered mod's GM shim connects as "gm:<modId>" to hear about writes in other frames. */
   private readonly gmPorts = new Map<string, Set<chrome.runtime.Port>>();
   private installed = false;
+  private readonly env: AdapterEnv;
 
-  constructor(private readonly env: AdapterEnv) {}
+  constructor(env: AdapterEnv) {
+    this.env = env;
+  }
 
   status(): ExecStatus {
     return execStatus(probeRuntime());
@@ -275,8 +278,11 @@ class ContentScriptAdapter implements ExecAdapter {
   /** Mods a grant has ever been minted for, so sync() knows whose capability to take back. */
   private readonly issuedModIds = new Set<string>();
   private wired = false;
+  private readonly env: AdapterEnv;
 
-  constructor(private readonly env: AdapterEnv) {}
+  constructor(env: AdapterEnv) {
+    this.env = env;
+  }
 
   status(): ExecStatus {
     return execStatus(probeRuntime());
