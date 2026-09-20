@@ -59,6 +59,16 @@ test('the Mac popup has a window size, because there is no viewport to fill', ()
   assert.match(roomy, /height: \d+px/);
 });
 
+test('the Mac navigation is shorter than the phone navigation', () => {
+  const compact = /\.app\[data-surface='popup'\]\[data-layout='compact'\] \.popup-nav button \{([\s\S]*?)\}/.exec(css)?.[1] ?? '';
+  const roomy = /\.app\[data-surface='popup'\]\[data-layout='roomy'\] \.popup-nav button \{([\s\S]*?)\}/.exec(css)?.[1] ?? '';
+  // The roomy row is for a mouse in a 560px window. If it inherits the phone's 48px target, the
+  // content loses space and the desktop popup reads like a shrunk sheet.
+  assert.match(compact, /min-height: 48px/);
+  assert.match(roomy, /min-height: 34px/);
+  assert.ok(!/min-height: 48px/.test(roomy), 'phone navigation height leaked into roomy layout');
+});
+
 test('the two navigation positions each carry their own hairline', () => {
   // A bar at the bottom is separated by its top edge and one under the header by its bottom edge.
   // Both borders at once is a boxed-in strip; neither is a row of buttons floating in the body.

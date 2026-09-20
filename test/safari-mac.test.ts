@@ -137,3 +137,33 @@ test('the build script has a Mac command and says what Safari still needs', () =
   assert.match(script, /Show features for web developers/);
   assert.match(script, /Allow unsigned extensions/i);
 });
+
+test('the Mac build preserves entitlements and never changes global Xcode selection', () => {
+  const script = read('scripts/safari-xcode.mjs');
+  // The app must be signed, even ad hoc, or the sandbox entitlements disappear and Safari has no
+  // extension bundle to inspect. DEVELOPER_DIR must stay scoped to child processes as well.
+  assert.match(script, /CODE_SIGNING_REQUIRED=YES/);
+  assert.match(script, /CODE_SIGNING_ALLOWED=YES/);
+  assert.match(script, /CODE_SIGN_IDENTITY=-/);
+  assert.match(script, /DEVELOPER_DIR: developerDir/);
+  assert.doesNotMatch(script, /xcode-select['\"], \['--switch'/);
+});
+
+test('the Mac host app opens its own extension row and reports failure', () => {
+  const mac = read('safari/App/MacViewController.swift');
+  // A custom bundle id is supported by the build script, so the settings button must derive the
+  // extension id from the installed app rather than opening the public build's hard-coded row.
+  assert.match(mac, /Bundle\.main\.bundleIdentifier/);
+  assert.match(mac, /SFSafariApplication\.showPreferencesForExtension\(withIdentifier: extensionBundleIdentifier\)/);
+  assert.match(mac, /Safari did not open its extension settings/);
+  assert.match(mac, /Open Safari, then Settings, then Extensions by hand/);
+});
+
+test('the Mac extension receives network access but the host app does not', () => {
+  const app = read('safari/App/usermods-macOS.entitlements');
+  const ext = read('safari/Extension/usermods-extension-macOS.entitlements');
+  // GM_xmlhttpRequest runs from the extension process. Granting the same entitlement to the host
+  // app would widen the native app's sandbox for no reason.
+  assert.doesNotMatch(app, /com\.apple\.security\.network\.client/);
+  assert.match(ext, /com\.apple\.security\.network\.client/);
+});
