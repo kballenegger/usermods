@@ -275,7 +275,7 @@ this section does not pretend otherwise.
 
 | Tier | What ran | Result |
 |---|---|---|
-| Automated, node | `npm test`, including `test/exec-engine`, `exec-plan`, `exec-protocol`, `exec-grants`, `exec-evaluate`, `exec-wrap`, `gm-bridge`, `manifest`, `mobile` | pass |
+| Automated, node | `npm test`, including `test/exec-engine`, `exec-plan`, `exec-protocol`, `exec-grants`, `exec-evaluate`, `exec-wrap`, `exec-adapter`, `gm-bridge`, `manifest`, `mobile` | pass |
 | Automated, types | `npx tsc --noEmit -p .` | pass |
 | Chromium build | `npm run build`, manifest compared byte for byte against the shipped one | unchanged |
 | Safari build | `npm run build:safari` | pass, MV3 manifest as pinned |
@@ -294,12 +294,13 @@ the screenshots come from the same built document served over HTTP with the exte
 on real WebKit, not evidence that the extension's own popup renders identically in the extension
 context.
 
-For the same reason, stored-mod execution on Safari is covered by the node tests of every pure piece
+For the same reason, stored-mod execution on Safari is covered by node tests of every pure piece
 (engine choice, document matching, run-once ledger, protocol validation, grant issue and resolve,
-isolated and page evaluation, CSP refusal detection, the GM bridge) plus proof that iOS accepted the
-extension and its permissions, rather than by a mod observed changing a page in Mobile Safari. The
-next person with a device and two minutes in Settings can close that gap; the build and install path
-above is all it takes.
+isolated and page evaluation, CSP refusal detection, the GM bridge) and adapter-level tests for sender
+identity, replay, revocation and runner injection, plus proof that iOS accepted the extension and its
+permissions, rather than by a mod observed changing a page in Mobile Safari. The next person with a
+device and two minutes in Settings can close that gap; the build and install path above is all it
+takes.
 
 ## Distribution
 
