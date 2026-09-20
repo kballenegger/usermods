@@ -133,7 +133,7 @@ pairings to 7:1, which `test/contrast.test.ts` enforces against the token file.
 
 ## Install (from source)
 
-Requires Node 22+ and Chrome 135+. For Safari on iOS, see [Safari and iOS](#safari-and-ios).
+Requires Node 22+ and Chrome 135+. For Safari, see [Safari on iOS and macOS](#safari-on-ios-and-macos).
 
 ```sh
 npm install
@@ -146,24 +146,37 @@ Then in Chrome:
 2. Click **Details** on usermods and turn on **Allow User Scripts**. Chrome requires this toggle for any extension that runs user scripts, including Tampermonkey.
 3. Click the usermods icon to open the side panel **on that tab**. Go to **Settings**, click a preset under **Add provider**, and paste a key (or a local server URL). It saves as you type. Back in **Chat**, the model is the dropdown under the message box.
 
-### Safari and iOS
+### Safari on iOS and macOS
 
-The Safari iOS build has been built, installed and seen running saved mods in Mobile Safari on the iPhone
-15 simulator (iOS 17.5). No physical iPhone or iPad has run it yet. The execution layer there is
-different, because Safari has no `chrome.userScripts`, and the UI is a toolbar popup built for a thumb
-rather than a side panel. Building it needs a full Xcode:
+One app, one extension, two platforms. The execution layer differs from Chrome's, because Safari has
+no `chrome.userScripts`, and the UI is a toolbar popup rather than a side panel: a full-screen sheet
+with bottom navigation on a phone, a small window with tabs under the header on a Mac. Building
+either needs a full Xcode.
 
 ```sh
 npm install
 node scripts/safari-xcode.mjs doctor      # what is installed, and what that allows
-node scripts/safari-xcode.mjs simulator   # build, boot a simulator, install, launch
+node scripts/safari-xcode.mjs simulator   # iOS: build, boot a simulator, install, launch
+node scripts/safari-xcode.mjs mac         # macOS: build the app with the extension inside it
 ```
 
-Then turn the extension on in **Settings > Apps > Safari > Extensions > usermods** and allow it on
-the sites you want. [docs/safari.md](docs/safari.md) has the device build, the isolation guarantees,
-the limitations (page-world mods and site CSP, the ignored install redirect rule, API-key providers
-only, what `localhost` means on a phone) and a row-by-row account of what was seen running on iOS
-and what was not.
+On iOS, turn the extension on in **Settings > Apps > Safari > Extensions > usermods** and allow it
+on the sites you want. This has been built, installed and seen running saved mods in Mobile Safari
+on the iPhone 15 simulator (iOS 17.5). No physical iPhone or iPad has run it yet.
+
+On macOS, copy the built `usermods.app` somewhere permanent (Safari finds the extension through the
+app, so a build directory is not good enough), open it, then turn usermods on in **Safari >
+Settings > Extensions**. A build signed locally rather than with a Developer ID does not appear in
+that list until Safari is told to show unsigned extensions, which is two Safari-wide developer
+settings a person has to turn on themselves: **Safari > Settings > Advanced > Show features for web
+developers**, then **Develop > Allow unsigned extensions**. The Mac app builds, signs, sandboxes and
+launches, and the popup lays out correctly in Safari 26.6; it has not been seen running as a loaded
+extension, because that needs those two settings.
+
+[docs/safari.md](docs/safari.md) has the device build, the isolation guarantees, the limitations
+(page-world mods and site CSP, the ignored install redirect rule, API-key providers only, what
+`localhost` means on each platform) and a row-by-row account of what was seen running and what was
+not.
 
 ### Where the panel opens
 
@@ -548,7 +561,7 @@ available again from Settings → *Review data notice*. The full policy is in
 - Mod sharing: export is there; a gallery is not.
 - CSS-only mods via a `@usermods-style` header, so pure restyles need no JavaScript.
 - Firefox, once its side panel story is settled.
-- Safari on macOS. The iOS build is here; the desktop popup and its notarization are not.
+- A signed and notarized Safari build, so neither platform needs a developer toggle to install it.
 
 ## Contributing
 

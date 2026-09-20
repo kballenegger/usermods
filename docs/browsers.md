@@ -1,9 +1,10 @@
 # Browser support: Firefox and Safari
 
 usermods ships on Chrome (manifest requires **Chrome 135+**, for the "Allow User Scripts" toggle
-`chrome.userScripts` needs) and has an iOS Safari build. The Safari build has been run in an iPhone 15
-iOS 17.5 simulator; no physical iPhone or iPad run is claimed here. This is a from-primary-sources look at
-what shipping on Firefox and Safari takes, API by API, plus effort estimates and a verdict for each.
+`chrome.userScripts` needs) and has a Safari build for iOS and macOS. That build has been run in an
+iPhone 15 iOS 17.5 simulator; no physical iPhone or iPad run is claimed here, and no run as a loaded
+Safari extension on macOS is claimed either. This is a from-primary-sources look at what shipping on
+Firefox and Safari takes, API by API, plus effort estimates and a verdict for each.
 
 The Safari port is built. Read [docs/safari.md](safari.md) for how it works, how to build and install
 it, what its isolation guarantees are and what it cannot do. This page is the research the port came
@@ -260,7 +261,7 @@ integration harness for `chrome.userScripts` and none is planned by this doc).
 **Updated after the port.** This section originally read "not feasible without rearchitecting the
 mod-execution layer". The first half of that was right and the rearchitecture has since been done:
 usermods has a Safari build that runs mods in Mobile Safari, verified on the iOS 17.5 simulator and
-not yet on a physical device. [docs/safari.md](safari.md) documents the build, the isolation
+not yet on a physical device. The same app and extension build for macOS from the same sources. [docs/safari.md](safari.md) documents the build, the isolation
 guarantees, the limitations and exactly what was observed. The API research below is unchanged and still accurate,
 because none of it was wrong. What changed is the conclusion drawn from it.
 
@@ -301,6 +302,15 @@ distribution has not been attempted. A physical-device build still needs a team 
 real-device validation before anyone can claim it works there. Apple's format is close to Chrome's (a
 WebExtension bundled as an `.appex` inside a host app) and the repository carries a hand-written Xcode
 project that builds it.
+
+**3. The Mac has the same signing problem in a smaller shape.** macOS will run an ad-hoc signed app,
+so `node scripts/safari-xcode.mjs mac` produces a sandboxed, hardened, launchable `usermods.app` with
+the extension inside it. Safari will not *list* that extension until two Safari-wide developer
+settings are on: **Settings > Advanced > Show features for web developers**, then **Develop > Allow
+unsigned extensions**, which resets when Safari quits. That is a person's decision about their whole
+browser, not something a build script should make for them, so the Mac evidence stops at build,
+signature, launch and popup layout. A Developer ID signature removes the requirement; App Store
+distribution runs into guideline 2.5.2 above, which is the same wall on both platforms.
 
 ---
 

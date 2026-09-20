@@ -1,12 +1,17 @@
-# Safari and iOS
+# Safari: iOS and macOS
 
-The Safari iOS build has been verified in an iPhone 15 simulator. This page covers what the Safari build
-does differently, what its isolation guarantees actually are, what it cannot do, how to build and install
-it, and what was watched happening there against what was not.
+One app and one extension, built from one pair of Xcode targets for both platforms. This page covers
+what the Safari build does differently, what its isolation guarantees actually are, what it cannot
+do, how to build and install it on each platform, and what was watched happening against what was
+not.
 
-It has been built, installed, enabled and seen running saved mods in Mobile Safari on the iPhone 15
-simulator (iOS 17.5). No physical iPhone or iPad has run it.
-[What was verified](#what-was-verified-and-how) draws that line row by row.
+On iOS it has been built, installed, enabled and seen running saved mods in Mobile Safari on the
+iPhone 15 simulator (iOS 17.5). No physical iPhone or iPad has run it.
+
+On macOS it has been built, signed, sandboxed and launched, and its popup document has been laid out
+by the real Safari on a Mac. It has **not** been seen running as a loaded Safari extension, because
+a locally signed extension stays out of Safari's list until two Safari-wide developer settings are
+turned on by hand. [What was verified](#what-was-verified-and-how) draws both lines row by row.
 
 Read [docs/browsers.md](browsers.md) first if you want the API-by-API research this port came out of.
 That page is the survey; this one is the implementation.
@@ -22,7 +27,7 @@ absences are the whole port:
 | `userScripts.execute()` for Try | a message to that content script |
 | `runtime.onUserScriptMessage` for GM calls | `runtime.onMessage` plus a capability token |
 | a port per mod for GM value changes | one port per document, delivered only to the mod that owns the change |
-| side panel | toolbar popup, which on iPhone is the whole screen |
+| side panel | toolbar popup: the whole screen on iPhone, a small window on a Mac |
 
 Everything above the execution layer is the same code: the React views, the agent loop, the provider
 adapters, mod header parsing, the GM API surface, Tampermonkey import. The Chrome build is unchanged,
@@ -198,27 +203,54 @@ service worker, and that is 16.4 (iOS 16.4 shipped March 2023).
 Because Safari sets `default_popup`, `action.onClicked` never fires there, which is why
 `entrypoints/background.ts` guards that handler rather than assuming the click is its to handle.
 
-## The mobile UI
+## The popup UI
 
 The popup and the side panel share every view and all the provider logic. `App.tsx` takes a
 `surface` prop (`'panel' | 'popup'`) and wears a different shell for each, because the difference
 between a tall column beside a visible page driven by a mouse and a full-screen sheet driven by a
 thumb is real enough that faking one with the other would be worse than having two.
 
+The popup itself then has two shapes, because a phone sheet and a Mac popover are not the same
+object either. They are one shell with a `data-layout` attribute rather than a third surface, since
+what differs is sizes and where the navigation sits, not what is on screen.
+
+| | compact | roomy |
+|---|---|---|
+| where | iPhone, iPad | Mac |
+| navigation | across the bottom, 48px rows | under the header, 34px rows |
+| controls | 44px, switch 48x28 | the panel's own sizes, switch 32x18 |
+| fields | 16px minimum, which is what stops iOS zooming on focus | the panel's sizes |
+| document | `100dvh`, safe-area insets, keyboard inset measured | a fixed 420x560 window |
+| header actions | icons, labels hidden | icons with their labels |
+
+`popupLayout()` in `lib/mobile.ts` picks between them from `(pointer: coarse)` and the width, and
+`usePointerEnvironment()` in `entrypoints/sidepanel/usePointer.ts` keeps that current as the window
+changes. Not the user agent: an iPad with a trackpad attached still reports a coarse primary pointer
+and still wants the big targets, and a user-agent test would get that backwards. The width is a
+floor, not a signal, so a popover too narrow for a header and three tabs falls back to compact
+rather than overflowing.
+
+The navigation moves in the DOM rather than with CSS `order`, so tabbing through the popup follows
+what is on screen.
+
 What the popup shell does that the panel does not:
 
-- **Bottom navigation.** Three full-width destinations, labelled in text, in the only part of a phone
-  screen a thumb reaches without a grip change. Everything that is not one of the three views sits in
-  the header, out of thumb reach.
+- **Navigation of its own.** Three destinations, labelled in text. On a phone they are full-width
+  rows in the only part of the screen a thumb reaches without a grip change, and everything that is
+  not one of the three views sits in the header, out of thumb reach.
 - **Target tab identity in the header,** always, with the path and a live dot. It says why rather than
   going blank when there is no page it can act on, for example on a `chrome:` or extension page.
-- **Keyboard handling.** iOS shrinks `window.visualViewport` instead of resizing the window, so a
+- **Keyboard handling,** on the phone only. iOS shrinks `window.visualViewport` instead of resizing the window, so a
   composer pinned to the bottom of `100dvh` ends up under the keyboard. `keyboardInset()` in
   `lib/mobile.ts` measures the covered strip, subtracting `offsetTop` because iOS also scrolls within
-  the visual viewport, and the popup pads it off the bottom. Cases in `test/mobile.test.ts`.
+  the visual viewport, and the popup pads it off the bottom. A Mac popup is a fixed window with no
+  on-screen keyboard, so the listener is not attached there at all. Cases in `test/mobile.test.ts`.
 - **Safe areas.** `env(safe-area-inset-*)` on the header and the navigation, so neither lands under
   the notch or the home indicator.
-- **Touch targets.** Buttons, selects and the mod on/off switch are grown to at least 44px.
+- **Touch targets.** On a phone, buttons, selects and the mod on/off switch are grown to at least
+  44px. Every one of those rules is scoped to `[data-layout='compact']`, so the Mac popup keeps the
+  sizes the views were drawn with. `test/popupshell.test.ts` fails if a thumb-sized rule is written
+  without that scope, which is the mistake that renders fine and looks like a shrunken phone.
 - **Chats survive dismissal.** Chats, messages and items already live in `storage.local`
   (`lib/chats.ts`), not in the popup, so a popup the system tears down comes back to the same
   transcript. Dismissal is not a state change.
@@ -233,17 +265,37 @@ Requirements: a full Xcode (not just Command Line Tools), node and npm. The scri
 ```sh
 npm install
 node scripts/safari-xcode.mjs doctor      # what is installed, and what that allows
-node scripts/safari-xcode.mjs simulator   # build, boot a simulator, install, launch
+node scripts/safari-xcode.mjs simulator   # iOS: build, boot a simulator, install, launch
+node scripts/safari-xcode.mjs mac         # macOS: build the app with the extension inside it
 ```
 
 `doctor` prints the toolchain it found and what it can do with it. `simulator` defaults to an iPhone
-15; pass `--device 'iPhone 15 Pro'` for another. The other commands:
+15; pass `--device 'iPhone 15 Pro'` for another. `mac` builds for the macOS SDK and prints where the
+app landed, what the extension was signed with, and what Safari still wants. The other commands:
 
 ```sh
 node scripts/safari-xcode.mjs stage    # npm run build:safari, then copy the output into safari/
 node scripts/safari-xcode.mjs build    # stage, then xcodebuild for the simulator SDK
 node scripts/safari-xcode.mjs build --sdk iphoneos --team ABCDE12345 --bundle-id com.you.usermods
+node scripts/safari-xcode.mjs mac --team ABCDE12345 --launch
 ```
+
+### One pair of targets, two platforms
+
+There is one app target and one extension target, and they build for both platforms. `SDKROOT = auto`
+in `safari/Config/Shared.xcconfig` lets the build pick its SDK from whatever `-sdk` or `-destination`
+it was given, `SUPPORTED_PLATFORMS` lists what it may pick, and the few settings that genuinely
+differ are written with an `[sdk=macosx*]` or `[sdk=iphone*]` condition next to the shared value. The
+alternative, a second pair of targets, would double a hand-written project file and every setting in
+it for two files of AppKit code.
+
+The same split runs through the sources: `App/AppDelegate.swift` and `App/ViewController.swift` are
+wrapped in `#if os(iOS)`, `App/MacAppDelegate.swift` and `App/MacViewController.swift` in
+`#if os(macOS)`, so each SDK compiles exactly one entry point. The extension's `Info.plist` is shared
+without change, because `NSExtensionPointIdentifier = com.apple.Safari.web-extension` means the same
+thing to WebKit on both. Only the entitlements differ, because only macOS has a sandbox to declare.
+`test/safari-mac.test.ts` asserts each of those lines, since all of them fail quietly: a missing
+`NSPrincipalClass` launches a Mac app that draws nothing and reports no error.
 
 `stage` exists because the web resources come out of `wxt build -b safari` with content hashes in
 their file names, which Xcode cannot list in a Copy Bundle Resources phase. They are staged into
@@ -255,7 +307,7 @@ For a real device, override the bundle identifier and pass your team: two apps c
 identifier under one Apple ID, and a device build has to be signed. You can also open
 `safari/usermods.xcodeproj` in Xcode and press run; run `stage` first.
 
-### Then turn it on
+### Then turn it on, on iOS
 
 Installing the app is not enough. On the simulator or the device:
 
@@ -266,6 +318,34 @@ Installing the app is not enough. On the simulator or the device:
    any host.
 4. In Safari, tap the page-settings button in the address bar, then usermods.
 5. Open Settings inside the popup and add a provider API key.
+
+### Then turn it on, on macOS
+
+Safari finds the extension through the app, so the app has to live somewhere permanent. A build
+directory is not that.
+
+1. `cp -R .output/safari-xcode/Build/Products/Debug/usermods.app /Applications/`
+2. Open it once. The window says where the switch is and can open Safari's extension settings for
+   you, which is a deep link macOS has and iOS does not.
+3. **Safari > Settings > Extensions > usermods**, and turn it on.
+4. Give it **Every Website > Always Allow**. Enabled with no allowed sites loads the extension and
+   injects nothing, which looks exactly like a broken build.
+5. Click usermods in Safari's toolbar, then open Settings inside the popup and add a provider.
+
+**A locally signed build needs two Safari settings first.** Without a Developer ID certificate,
+`xcodebuild` signs ad hoc, and Safari does not list an ad-hoc signed extension at all: step 3 shows
+an empty list rather than an error. Two Safari-wide developer settings reveal it:
+
+1. **Safari > Settings > Advanced > Show features for web developers**
+2. **Develop > Allow unsigned extensions**, which resets every time Safari quits
+
+Both change how Safari treats every extension you have, not just this one, so no script in this
+repository turns them on. `node scripts/safari-xcode.mjs mac` prints them and stops there. A
+Developer ID signature removes the requirement, which is why `--team` exists.
+
+Ad-hoc is also why the Mac build cannot simply skip signing the way a simulator build can:
+entitlements are applied at signing, so an unsigned app is an unsandboxed one, and Safari will not
+load an extension out of it.
 
 ## Screenshots
 
@@ -287,7 +367,7 @@ The installed app extension, enabled in Safari, running mods held in its own `st
 The three popup views below are the built popup document served over HTTP and loaded in Mobile
 Safari with the extension APIs stubbed (`scripts/safari-preview.mjs`, which says so in its header).
 That is layout and interaction evidence on real WebKit. It is not the extension's own popup, for the
-reason in [the two gaps](#the-two-gaps-and-why).
+reason in [the gaps](#the-gaps-and-why).
 
 | | |
 |---|---|
@@ -296,6 +376,20 @@ reason in [the two gaps](#the-two-gaps-and-why).
 | ![Settings](screenshots/ios-popup-settings.png) | ![The host app](screenshots/ios-host-app.png) |
 | **Settings.** Connected providers, then the presets you can add, all of them API-key providers in this build. The address bar showing 127.0.0.1 is the preview route, not the extension. | **The host app.** One screen, whose only job is to say where the switch is, because no app can deep link into that Settings pane. |
 
+### No macOS screenshots
+
+There are none, and the reason is the machine rather than the build. Taking a screenshot on macOS
+needs Screen Recording permission, which the shell this was built from does not have:
+`screencapture` fails with "could not create image from display". Granting it is a system privacy
+setting, and changing one of those on someone's Mac to make a nicer document is not a trade worth
+making.
+
+What stands in for them is text that came out of the same windows: the host app's accessibility tree
+read back after launch, and the popup's own report of the layout it produced in Safari 26.6.2, which
+`scripts/safari-preview.mjs --probe` prints. Both are in the table below. On a Mac with that
+permission, `node scripts/safari-preview.mjs --webkit-shots out/` renders both popup layouts in
+Playwright's WebKit and checks each one drew the layout its size is supposed to get.
+
 ## What was verified, and how
 
 Tiers kept apart on purpose. Emulating a phone viewport in Chromium is not Safari validation, and a
@@ -303,14 +397,21 @@ preview page with stubbed extension APIs is not the extension running.
 
 | Tier | What ran | Result |
 |---|---|---|
-| Automated, node | `npm test`, including `test/exec-engine`, `exec-plan`, `exec-protocol`, `exec-grants`, `exec-evaluate`, `exec-wrap`, `exec-adapter`, `gm-bridge`, `manifest`, `mobile` | pass, 799 tests |
+| Automated, node | `npm test`, including `test/exec-engine`, `exec-plan`, `exec-protocol`, `exec-grants`, `exec-evaluate`, `exec-wrap`, `exec-adapter`, `gm-bridge`, `manifest`, `mobile`, `popupshell`, `safari-mac` | pass, 820 tests |
 | Automated, types | `npx tsc --noEmit` | pass |
 | Chromium build | `npm run build`, manifest compared byte for byte against the shipped one | unchanged |
 | Safari build | `npm run build:safari` | pass, MV3 manifest as pinned |
-| Native build | `node scripts/safari-xcode.mjs build` on Xcode 15.4, simulator SDK | `** BUILD SUCCEEDED **` |
+| Native build, iOS | `node scripts/safari-xcode.mjs build` on Xcode 15.4, simulator SDK | `** BUILD SUCCEEDED **` |
+| Native build, macOS | `node scripts/safari-xcode.mjs mac` on Xcode 15.4, macOS SDK 14.5 | `** BUILD SUCCEEDED **`, `usermods.app` with `Contents/PlugIns/usermods-extension.appex` inside it |
 | iOS simulator, install | installed and launched on iPhone 15 (iOS 17.5); `pluginkit -m -v -p com.apple.Safari.web-extension` lists `io.github.kballenegger.usermods.extension(0.1.0)`; `Library/Safari/WebExtensions/Extensions.plist` records it with `AccessibleOrigins: ["<all_urls>"]` and `Permissions: [storage, tabs, scripting, declarativeNetRequest]` | pass, nothing in the manifest refused |
 | iOS simulator, execution | the matrix below | pass, with the gaps named below |
 | Mobile Safari layout | the built popup served over HTTP with stubbed extension APIs (`scripts/safari-preview.mjs`) | pass, layout only |
+| macOS signature | `codesign --verify --deep --strict` on the built app | valid on disk, satisfies its designated requirement; `Signature=adhoc`, `TeamIdentifier=not set` |
+| macOS entitlements | `codesign -d --entitlements` on both bundles | app: `app-sandbox`; extension: `app-sandbox` and `network.client` |
+| macOS host app | launched, window drawn, accessibility tree read back | the four enabling steps, both notes and the settings button all present |
+| macOS deep link | clicked "Open Safari extension settings" | Safari opened its Extensions pane; the app's failure note stayed hidden |
+| Desktop Safari layout | the built popup served over HTTP and opened in Safari 26.6.2, which reported back what it laid out (`scripts/safari-preview.mjs --probe`) | `coarsePointer: false`, `layout: "roomy"`, navigation above the body, switch 18px, so no phone rule leaked |
+| macOS extension, loaded | not run | Safari lists no ad-hoc signed extension until two developer settings are on; see [the gaps](#the-gaps-and-why) |
 | Real device | not run | no device authorized for this work |
 
 ### What was seen running in Mobile Safari
@@ -337,7 +438,7 @@ document, minted a grant each and handed them to the runner.
 | The extension's own popup | not run, needs a tap on the toolbar | gap |
 | The INSTALL button, and the target tab picker, dismissal and recovery | not run, all need a tap | gap |
 
-### The two gaps, and why
+### The gaps, and why
 
 **Nothing can tap.** `simctl` boots a simulator, installs an app, opens a URL and takes a screenshot.
 It has no tap. The GUI that would, Simulator.app, does not launch on the machine this was built on:
@@ -349,7 +450,19 @@ them, which is evidence about layout and logic, not about the extension's own po
 device closes it in about two minutes: enable the extension, open a fixture page, tap the puzzle
 piece.
 
-**Enabling was written, not tapped,** for the same reason. Safari keeps extension state in the host
+**On macOS, Safari never listed the extension.** The app builds, signs, sandboxes, launches and
+opens Safari's Extensions pane for you. That pane then shows its empty-state placeholder and no
+usermods row, because the build is ad-hoc signed and Safari hides ad-hoc signed extensions until
+**Show features for web developers** and **Develop > Allow unsigned extensions** are both on. Those
+are settings about the whole browser, and turning them on for someone is not a build script's
+decision, so this stops there and names them. Everything downstream of listing the extension is
+therefore unverified on macOS: enabling it, granting origins, the toolbar popup as the extension's
+own document, installing a mod, running one, GM grants, tab context and dismissal. What is verified
+on the Mac is the build, the signature, the entitlements, the host app, the deep link, and the popup
+document's layout in real Safari. A person with a Developer ID, or two minutes and those two
+settings, closes the rest.
+
+**Enabling on iOS was written, not tapped,** for the same tapping reason. Safari keeps extension state in the host
 app's container, in `Library/Safari/WebExtensions/Extensions.plist`. The harness set `Enabled` there
 along with `GrantedPermissions` and `GrantedPermissionOrigins`, which is what the "All Websites >
 Allow" step writes. That pair is easy to miss and decides everything: enabled with no granted
@@ -359,7 +472,9 @@ build that ran is the committed one.
 
 ## Distribution
 
-Nothing here is an App Store submission and nothing here is signed for release. Apple's App Review
+Nothing here is an App Store submission and nothing here is signed for release. On macOS that is the
+difference between an extension Safari lists and one it hides: a Developer ID signature is what makes
+the two developer settings in [Install](#then-turn-it-on-on-macos) unnecessary. Apple's App Review
 guideline 2.5.2 covers executing code that changes an app's features, which is a fair description of
 what usermods does with model-written scripts, so App Store distribution is an open question that
 this port does not answer. See the Safari section of [docs/browsers.md](browsers.md). The device path in
