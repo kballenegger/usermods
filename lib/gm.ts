@@ -120,6 +120,10 @@ try {
   if (typeof __usermodsBridge !== 'undefined' && __usermodsBridge && __usermodsBridge.subscribe) {
     __usermodsBridge.subscribe((m) => {
       if (!m || m.type !== 'gm.valueChanged') return;
+      // Whose change this is. The runner delivers per mod, and this checks it again, because
+      // applying another mod's change would write that value into this mod's snapshot and fire
+      // this mod's listeners for a key it never wrote.
+      if (m.modId !== __meta.id) return;
       if (Object.prototype.hasOwnProperty.call(m, 'newValue') && m.newValue !== undefined) __values[m.key] = m.newValue;
       else delete __values[m.key];
       __fireValueChange(m.key, m.oldValue, m.newValue, true);

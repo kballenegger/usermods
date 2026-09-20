@@ -160,7 +160,7 @@ test('a value change from another frame arrives through the bridge subscription'
   const world = run(buildRegisteredCode(m, { k: 1 }, { transport: 'bridge', token: 't' }));
   // The mod holds no port of its own: the runner owns one connection per document and fans out.
   assert.equal(world.subscribed, 1);
-  world.emit({ type: 'gm.valueChanged', key: 'k', oldValue: 1, newValue: 9 });
+  world.emit({ type: 'gm.valueChanged', modId: m.id, key: 'k', oldValue: 1, newValue: 9 });
   await nextTick();
   assert.deepEqual((world.globals.window as Record<string, any>).seen, [['k', 1, 9, true]]);
 });
@@ -168,7 +168,7 @@ test('a value change from another frame arrives through the bridge subscription'
 test('a deletion from another frame removes the value rather than storing undefined', async () => {
   const m = mod(HEADER + `window.after = () => GM_getValue('k', 'gone');`);
   const world = run(buildRegisteredCode(m, { k: 1 }, { transport: 'bridge', token: 't' }));
-  world.emit({ type: 'gm.valueChanged', key: 'k', oldValue: 1, newValue: undefined });
+  world.emit({ type: 'gm.valueChanged', modId: m.id, key: 'k', oldValue: 1, newValue: undefined });
   await nextTick();
   assert.equal((world.globals.window as Record<string, any>).after(), 'gone');
 });

@@ -58,7 +58,15 @@ export default defineContentScript({
 
 function start(): void {
   const docKey = newDocKey();
-  const subscribers = new Set<(msg: unknown) => void>();
+  /**
+   * Value-change subscribers, kept per mod.
+   *
+   * One document has one port and many mods on it, so a change has to be delivered to the mod it
+   * belongs to and to nobody else. Fanning every change to every mod let mod A's write land in mod
+   * B's value snapshot and fire mod B's listeners, which is a write into another mod's storage by
+   * the back door.
+   */
+  const subscribers = new Map<string, Set<(msg: unknown) => void>>();
   let port: chrome.runtime.Port | null = null;
 
   /**
@@ -74,7 +82,12 @@ function start(): void {
     try {
       port = chrome.runtime.connect({ name: EXEC_PORT });
       port.onMessage.addListener((m: unknown) => {
-        for (const fn of subscribers) {
+        // The mod a change belongs to is named by the background, which derived it from its own
+        // grant table rather than from anything a mod said. A message that names no mod is not
+        // deliverable to one, so it is dropped: this port carries value changes and nothing else.
+        const modId = (m as { modId?: unknown } | null)?.modId;
+        if (typeof modId !== 'string') return;
+        for (const fn of subscribers.get(modId) ?? []) {
           try {
             fn(m);
           } catch {
@@ -91,41 +104,51 @@ function start(): void {
   }
 
   /**
-   * The GM transport handed to every mod (lib/gm.ts, transport 'bridge').
+   * The GM transport handed to one mod (lib/gm.ts, transport 'bridge').
    *
    * The translation into the wire shape happens here, not in the mod's code, so the message the
    * background validates has exactly the fields lib/exec/protocol.ts allows. The token comes from
    * the mod's own baked-in copy; the runner neither reads it nor keeps a table of them, so one mod
    * cannot borrow another's by asking the runner nicely.
+   *
+   * Each mod gets its own transport, bound here to the mod the background said this code is, so
+   * which mod a subscription belongs to is not something the subscribing code gets to say.
+   * `modId` is null for a one-off Try, which the engine interface injects by code alone: it has no
+   * mod to be delivered changes for, so it hears its own writes and no remote ones.
    */
-  const bridge = {
-    send(msg: Record<string, unknown>): Promise<unknown> {
-      return new Promise((resolve, reject) => {
-        const wire: Record<string, unknown> = {
-          [EXEC_TAG]: 'gm',
-          call: msg.type,
-          token: msg.token,
-        };
-        for (const field of ['key', 'value', 'url', 'active', 'details', 'args']) {
-          if (field in msg) wire[field] = msg[field];
-        }
-        try {
-          chrome.runtime.sendMessage(wire, (r: { result?: unknown; error?: string } | undefined) => {
-            const err = chrome.runtime.lastError;
-            if (err) reject(new Error(err.message));
-            else if (r && r.error) reject(new Error(r.error));
-            else resolve(r?.result);
-          });
-        } catch (e) {
-          reject(e instanceof Error ? e : new Error(String(e)));
-        }
-      });
-    },
-    subscribe(fn: (msg: unknown) => void): void {
-      subscribers.add(fn);
-      ensurePort();
-    },
-  };
+  function bridgeFor(modId: string | null) {
+    return {
+      send(msg: Record<string, unknown>): Promise<unknown> {
+        return new Promise((resolve, reject) => {
+          const wire: Record<string, unknown> = {
+            [EXEC_TAG]: 'gm',
+            call: msg.type,
+            token: msg.token,
+          };
+          for (const field of ['key', 'value', 'url', 'active', 'details', 'args']) {
+            if (field in msg) wire[field] = msg[field];
+          }
+          try {
+            chrome.runtime.sendMessage(wire, (r: { result?: unknown; error?: string } | undefined) => {
+              const err = chrome.runtime.lastError;
+              if (err) reject(new Error(err.message));
+              else if (r && r.error) reject(new Error(r.error));
+              else resolve(r?.result);
+            });
+          } catch (e) {
+            reject(e instanceof Error ? e : new Error(String(e)));
+          }
+        });
+      },
+      subscribe(fn: (msg: unknown) => void): void {
+        if (modId === null) return;
+        let forMod = subscribers.get(modId);
+        if (!forMod) subscribers.set(modId, (forMod = new Set()));
+        forMod.add(fn);
+        ensurePort();
+      },
+    };
+  }
 
   /** Where a one-off run's result goes, standing in for the `chrome` the mod cannot see. */
   const report = (out: unknown): void => {
@@ -146,7 +169,7 @@ function start(): void {
         const ran = injectIntoPage(msg.code, nonce, document);
         sendResponse(ran ? { ok: true } : { ok: false, error: pageBlockedMessage() });
       } else {
-        void evaluateIsolated(msg.code, { bridge, report });
+        void evaluateIsolated(msg.code, { bridge: bridgeFor(null), report });
         sendResponse({ ok: true });
       }
     } catch (e) {
@@ -157,7 +180,7 @@ function start(): void {
 
   void claim(docKey).then((response) => {
     if (!response || response.replayed) return;
-    for (const script of response.scripts) schedule(script, bridge, report);
+    for (const script of response.scripts) schedule(script, bridgeFor(script.modId), report);
   });
 }
 
