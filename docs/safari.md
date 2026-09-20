@@ -347,6 +347,23 @@ Ad-hoc is also why the Mac build cannot simply skip signing the way a simulator 
 entitlements are applied at signing, so an unsigned app is an unsandboxed one, and Safari will not
 load an extension out of it.
 
+**The signature is taken after the last step that writes into the bundle.** Xcode re-signs a target
+when that target's own inputs change. The phase that copies the built web extension into the `.appex`
+is not one of them, so a build where only the web side changed copies the new files in and skips the
+signature: the build log carries no CodeSign line for the extension at all. The bundle is then sealed
+against the files it held one build ago, and `codesign --verify --deep --strict` on the app fails
+with "a sealed resource is missing or invalid" in the extension. Nothing in the build output says so,
+and the app around it verifies fine, because the app really was signed after the extension was
+embedded in it.
+
+So `safari-xcode.mjs mac` signs both bundles itself once `xcodebuild` returns, extension first
+because signing it invalidates the app's seal over it, and then verifies the result. It reads the
+identity, the entitlements and the hardened runtime flag off the bundle rather than out of the
+repository: a Debug build carries `get-task-allow`, which no `.entitlements` file here mentions, and
+signing from those files would quietly drop it. If verification fails the command fails, rather than
+printing "built". The staging phase also removes what the previous build staged before copying, so a
+chunk whose content hash changed does not leave its older twin behind inside the bundle.
+
 ## Screenshots
 
 iPhone 15 (iOS 17.5) in the simulator, throughout.
@@ -397,7 +414,7 @@ preview page with stubbed extension APIs is not the extension running.
 
 | Tier | What ran | Result |
 |---|---|---|
-| Automated, node | `npm test`, including `test/exec-engine`, `exec-plan`, `exec-protocol`, `exec-grants`, `exec-evaluate`, `exec-wrap`, `exec-adapter`, `gm-bridge`, `manifest`, `mobile`, `popupshell`, `safari-mac` | pass, 824 tests |
+| Automated, node | `npm test`, including `test/exec-engine`, `exec-plan`, `exec-protocol`, `exec-grants`, `exec-evaluate`, `exec-wrap`, `exec-adapter`, `gm-bridge`, `manifest`, `mobile`, `popupshell`, `safari-mac` | pass, 828 tests |
 | Automated, types | `npx tsc --noEmit` | pass |
 | Chromium build | `npm run build`, manifest compared byte for byte against the shipped one | unchanged |
 | Safari build | `npm run build:safari` | pass, MV3 manifest as pinned |
@@ -406,7 +423,9 @@ preview page with stubbed extension APIs is not the extension running.
 | iOS simulator, install | installed and launched on iPhone 15 (iOS 17.5); `pluginkit -m -v -p com.apple.Safari.web-extension` lists `io.github.kballenegger.usermods.extension(0.1.0)`; `Library/Safari/WebExtensions/Extensions.plist` records it with `AccessibleOrigins: ["<all_urls>"]` and `Permissions: [storage, tabs, scripting, declarativeNetRequest]` | pass, nothing in the manifest refused |
 | iOS simulator, execution | the matrix below | pass, with the gaps named below |
 | Mobile Safari layout | the built popup served over HTTP with stubbed extension APIs (`scripts/safari-preview.mjs`) | pass, layout only |
-| macOS signature | `codesign --verify --deep --strict` on the built app | valid on disk, satisfies its designated requirement; `Signature=adhoc`, `TeamIdentifier=not set` |
+| macOS signature | `codesign --verify --deep --strict` on the built app, which `safari-xcode.mjs mac` now runs itself | valid on disk, satisfies its designated requirement; extension `Signature=adhoc`, `flags=0x10002(adhoc,runtime)`, `TeamIdentifier=not set` |
+| macOS signature, after a web-only change | changed a popup stylesheet, rebuilt, verified again | pass. The same sequence before this branch's fix failed with "a sealed resource is missing or invalid" |
+| macOS bundle contents | the `.appex` resource list compared against the staged build output | identical, 36 files, no stale content-hashed chunks left over |
 | macOS entitlements | `codesign -d --entitlements` on both bundles | app: `app-sandbox`; extension: `app-sandbox` and `network.client` |
 | macOS host app | launched, window drawn, accessibility tree read back | the four enabling steps, both notes and the settings button all present |
 | macOS deep link | clicked "Open Safari extension settings" | Safari opened its Extensions pane; the app's failure note stayed hidden |
