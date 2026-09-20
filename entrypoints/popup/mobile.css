@@ -1,11 +1,23 @@
 /*
- * The popup shell: what changes when the surface is a phone screen and the pointer is a thumb.
+ * The popup shell: what changes when the surface is Safari's toolbar popup rather than Chrome's
+ * side panel.
  *
  * Layered on top of sidepanel/styles.css rather than replacing it, and every rule in here is scoped
  * to `[data-surface='popup']`. The panel cannot be affected by this file, which is the point: the
  * brand, the palette and every view are shared, and only the shell around them differs.
  *
- * Four things drive the whole file:
+ * The popup has two shapes, written as `[data-layout='compact']` and `[data-layout='roomy']`:
+ *
+ *  - compact is a phone. The sheet covers the page, the pointer is a thumb, and an on-screen
+ *    keyboard eats the bottom of the screen.
+ *  - roomy is a Mac. The popup is a small window hanging off the toolbar, the pointer is exact, and
+ *    nothing covers anything.
+ *
+ * App.tsx picks between them from `(pointer: coarse)` and the width (popupLayout in lib/mobile.ts),
+ * not from the user agent. Rules that hold for both are left unqualified; the phone ones carry
+ * `[data-layout='compact']` so that a Mac does not inherit a thumb's worth of padding.
+ *
+ * Four things drive the compact half:
  *
  *  1. Reach. The bottom of the screen is the only part a thumb gets to without a grip change, so
  *     navigation lives there and everything else goes up top.
@@ -25,12 +37,27 @@
  * underneath it. `vh` is frozen at the largest viewport, so it would run the bottom navigation off
  * the screen; `dvh` tracks what is actually visible.
  */
-html:has(.app[data-surface='popup']),
-html:has(.app[data-surface='popup']) body,
-html:has(.app[data-surface='popup']) #root {
+html:has(.app[data-surface='popup'][data-layout='compact']),
+html:has(.app[data-surface='popup'][data-layout='compact']) body,
+html:has(.app[data-surface='popup'][data-layout='compact']) #root {
   height: 100dvh;
   /* Belt and braces with the min-height below: the popup has a floor as well as a ceiling, so a very
      short sheet still lays out rather than collapsing the transcript to nothing. */
+  min-height: 0;
+}
+
+/*
+ * The Mac popup's window, in pixels, because on the desktop there is no viewport to fill.
+ *
+ * Safari sizes the popover to the document and caps it at 800x600. A document with no size of its
+ * own collapses to its content, so the window would jump every time you changed tab. These are the
+ * size, and 560 leaves the transcript most of it.
+ */
+html:has(.app[data-surface='popup'][data-layout='roomy']),
+html:has(.app[data-surface='popup'][data-layout='roomy']) body,
+html:has(.app[data-surface='popup'][data-layout='roomy']) #root {
+  width: 420px;
+  height: 560px;
   min-height: 0;
 }
 
@@ -121,14 +148,14 @@ html:has(.app[data-surface='popup']) #root {
 }
 
 /* 44px, and the label hidden: at this size two icons and a chip are all the header has room for. */
-.app[data-surface='popup'] .popup-head-actions .tab-action,
-.app[data-surface='popup'] .popup-head-actions button {
+.app[data-surface='popup'][data-layout='compact'] .popup-head-actions .tab-action,
+.app[data-surface='popup'][data-layout='compact'] .popup-head-actions button {
   min-width: 44px;
   min-height: 44px;
   justify-content: center;
 }
 
-.app[data-surface='popup'] .popup-head-actions .tab-action-label {
+.app[data-surface='popup'][data-layout='compact'] .popup-head-actions .tab-action-label {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -177,13 +204,16 @@ html:has(.app[data-surface='popup']) #root {
 }
 
 /* ---------------------------------------------------------------------------
- * Bottom navigation
+ * Navigation
  * ------------------------------------------------------------------------ */
 
 /*
- * Three destinations across the bottom, the platform convention and the reachable part of the
- * screen. Text labels, not icons: Chat, Mods and Settings have no icons anybody would guess, and
- * three unlabelled glyphs would be a quiz.
+ * Three destinations in a bar of equal thirds, text labels rather than icons: Chat, Mods and
+ * Settings have no icons anybody would guess, and three unlabelled glyphs would be a quiz.
+ *
+ * Where the bar sits is the layouts' business. App.tsx puts it after the body on a phone and before
+ * it on a Mac, so the two rules below only have to agree with the DOM about which edge carries the
+ * hairline.
  */
 .app[data-surface='popup'] .popup-nav {
   flex: none;
@@ -191,25 +221,46 @@ html:has(.app[data-surface='popup']) #root {
   display: flex;
   gap: 0;
   padding: 0;
+  background: var(--surface-1);
+}
+
+.app[data-surface='popup'] .popup-nav button {
+  flex: 1 1 0;
+  border-radius: 0;
+  font-size: var(--fs-label);
+}
+
+/*
+ * The phone: across the bottom, the platform convention and the reachable part of the screen.
+ * Full-width targets a third of the screen each, 48px tall, which clears Apple's 44px with the
+ * margin a moving thumb needs. `border-radius: 0` above because a pill inside a bar at this size
+ * reads as a floating button rather than a tab.
+ */
+.app[data-surface='popup'][data-layout='compact'] .popup-nav {
   padding-bottom: env(safe-area-inset-bottom);
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
-  background: var(--surface-1);
   border-bottom: 0;
   border-top: var(--border-width) solid var(--border-hair);
 }
 
-/*
- * Full-width targets: a third of the screen each, 48px tall, which clears Apple's 44px with the
- * margin a moving thumb needs. `border-radius: 0` because a pill inside a bar at this size reads as
- * a floating button rather than a tab.
- */
-.app[data-surface='popup'] .popup-nav button {
-  flex: 1 1 0;
+.app[data-surface='popup'][data-layout='compact'] .popup-nav button {
   min-height: 48px;
   padding: var(--sp-2) var(--sp-1);
-  border-radius: 0;
-  font-size: var(--fs-label);
+}
+
+/*
+ * The Mac: under the header, where the panel's tabs are, reading down the window as header, tabs,
+ * content. A row of buttons welded to the bottom edge of a 420px window is a phone someone shrank.
+ */
+.app[data-surface='popup'][data-layout='roomy'] .popup-nav {
+  border-top: 0;
+  border-bottom: var(--border-width) solid var(--border-hair);
+}
+
+.app[data-surface='popup'][data-layout='roomy'] .popup-nav button {
+  min-height: 34px;
+  padding: var(--sp-1) var(--sp-2);
 }
 
 /* The active destination is the same solid primary block the panel's tabs use, so the two surfaces
@@ -222,16 +273,18 @@ html:has(.app[data-surface='popup']) #root {
 
 /* ---------------------------------------------------------------------------
  * Touch targets and typing, inside the shared views
+ *
+ * Compact only. A Mac has the panel's own sizes, which were drawn for a mouse.
  * ------------------------------------------------------------------------ */
 
 /*
  * The views were laid out for a mouse: 28px controls, hover for the secondary state. These raise the
  * things you are meant to press without touching the layout of anything you only read.
  */
-.app[data-surface='popup'] .btn,
-.app[data-surface='popup'] .chatbar .btn,
-.app[data-surface='popup'] select,
-.app[data-surface='popup'] .chip-x {
+.app[data-surface='popup'][data-layout='compact'] .btn,
+.app[data-surface='popup'][data-layout='compact'] .chatbar .btn,
+.app[data-surface='popup'][data-layout='compact'] select,
+.app[data-surface='popup'][data-layout='compact'] .chip-x {
   min-height: 44px;
 }
 
@@ -244,30 +297,30 @@ html:has(.app[data-surface='popup']) #root {
  * desktop one at about 1.5x, in the same proportions, which lands the track at 48x28: past the 44px
  * Apple asks for in the direction a thumb actually misses, and still unmistakably a switch.
  */
-.app[data-surface='popup'] input[type='checkbox'] {
+.app[data-surface='popup'][data-layout='compact'] input[type='checkbox'] {
   width: 48px;
   height: 28px;
 }
 
-.app[data-surface='popup'] input[type='checkbox']::after {
+.app[data-surface='popup'][data-layout='compact'] input[type='checkbox']::after {
   top: 4px;
   left: 4px;
   width: 16px;
   height: 16px;
 }
 
-.app[data-surface='popup'] input[type='checkbox']:checked::after {
+.app[data-surface='popup'][data-layout='compact'] input[type='checkbox']:checked::after {
   transform: translateX(20px);
 }
 
 /* Tapping the word toggles the switch as well as tapping the switch does, so the label is the
    target that has to clear 44px, not the control inside it. */
-.app[data-surface='popup'] .toggle {
+.app[data-surface='popup'][data-layout='compact'] .toggle {
   min-height: 44px;
 }
 
 /* The row of small actions in the chat bar: square 44px, since they are icon-only at this width. */
-.app[data-surface='popup'] .chatbar .btn.action {
+.app[data-surface='popup'][data-layout='compact'] .chatbar .btn.action {
   min-width: 44px;
 }
 
@@ -276,9 +329,9 @@ html:has(.app[data-surface='popup']) #root {
  * The alternative fix is user-scalable=no in the viewport tag, which also takes pinch-to-zoom away
  * from everyone. This costs a point of type size in two places; that one costs accessibility.
  */
-.app[data-surface='popup'] input,
-.app[data-surface='popup'] textarea,
-.app[data-surface='popup'] select {
+.app[data-surface='popup'][data-layout='compact'] input,
+.app[data-surface='popup'][data-layout='compact'] textarea,
+.app[data-surface='popup'][data-layout='compact'] select {
   font-size: max(16px, var(--fs-body));
 }
 
@@ -290,13 +343,13 @@ html:has(.app[data-surface='popup']) #root {
  * enough to review a prompt before sending it rather than typing into a letterbox. The 40dvh cap
  * from styles.css still applies, so a long paste cannot take the sheet over.
  */
-.app[data-surface='popup'] .composer {
+.app[data-surface='popup'][data-layout='compact'] .composer {
   padding: var(--sp-2) var(--sp-3) var(--sp-3);
   padding-left: max(var(--sp-3), env(safe-area-inset-left));
   padding-right: max(var(--sp-3), env(safe-area-inset-right));
 }
 
-.app[data-surface='popup'] .composer textarea {
+.app[data-surface='popup'][data-layout='compact'] .composer textarea {
   min-height: 96px;
   padding: 12px;
 }

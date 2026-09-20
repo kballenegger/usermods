@@ -1,10 +1,11 @@
 /**
- * The decisions the mobile popup makes, as pure functions.
+ * The decisions the Safari popup makes, as pure functions.
  *
- * The popup is the whole of usermods on iOS: there is no side panel, no second window, and no
- * pointer. That changes three things enough to be worth reasoning about rather than styling around,
- * and all three are here so they can be tested in node (test/mobile.test.ts) instead of only being
- * looked at in a screenshot.
+ * The popup is the whole of usermods in Safari: there is no side panel there on either platform.
+ * On iPhone it is a sheet covering the screen, driven by a thumb. On a Mac it is a small window
+ * hanging off the toolbar, driven by a mouse. Those are different enough to be worth reasoning
+ * about rather than styling around, and the reasoning is here so it can be tested in node
+ * (test/mobile.test.ts) instead of only being looked at in a screenshot.
  */
 
 /**
@@ -84,14 +85,48 @@ export function isLocalBaseUrl(url: string): boolean {
 }
 
 /**
- * Why a local provider URL usually does not work on a phone.
+ * What a local provider URL means, which is not the same thing on both platforms.
  *
- * On a desktop, "run a model on your own machine" and "point usermods at localhost" are the same
- * sentence. On iOS they are not: the extension runs inside Safari on the phone, so `localhost` is
- * the phone, and the model on the laptop across the room is not reachable at that name. This is the
- * kind of thing that looks like a bug in the extension for half an hour before it looks like what
- * it is, so the popup says it next to the field rather than leaving it to be discovered.
+ * On a Mac, "run a model on your own machine" and "point usermods at localhost" are the same
+ * sentence, and the note is a one-line confirmation. On iPhone and iPad they are not: the extension
+ * runs inside Safari on the phone, so `localhost` is the phone, and the model on the laptop across
+ * the room is not reachable at that name. That one looks like a bug in the extension for half an
+ * hour before it looks like what it is, so the popup says it next to the field rather than leaving
+ * it to be discovered.
+ *
+ * Which note to show is decided by the pointer rather than by sniffing the user agent. The two
+ * answers differ because one device runs the browser and the model and the other does not, and
+ * "the primary pointer is a finger" is the closest honest proxy the page has for that. A Mac with
+ * a touchscreen would be told the wrong thing; Apple does not sell one.
  */
-export function localBaseUrlNote(): string {
+export function localBaseUrlNote(coarsePointer: boolean): string {
+  if (!coarsePointer) {
+    return 'localhost is this Mac, which is usually what you want. A model running on another machine needs that machine\'s address instead, for example http://192.168.1.10:1234/v1.';
+  }
   return "On iPhone and iPad, localhost is this device. A model running on your computer needs that computer's address on your network instead, for example http://192.168.1.10:1234/v1.";
+}
+
+/**
+ * Which shell the popup wears.
+ *
+ * 'compact' is the phone sheet: navigation along the bottom where a thumb reaches, controls at
+ * 44px, type at 16px so iOS does not zoom the page when a field takes focus. 'roomy' is the Mac
+ * popup: a fixed 420px window, navigation under the header where a mouse expects tabs, and the
+ * same control sizes the side panel uses.
+ *
+ * The pointer decides, not the width. Safari sizes a Mac popup to whatever the document asks for,
+ * so its width is an output of this function and cannot also be its input; the width only appears
+ * here as a floor, for the case of a pointer-driven window too narrow to lay the roomy shell out
+ * at all. iPadOS reports a coarse primary pointer even with a trackpad attached, which is the
+ * answer we want: the popup there is still a popover on a touch screen.
+ */
+export type PopupLayout = 'compact' | 'roomy';
+
+/** Below this, the roomy shell has nowhere to put three tabs and a header. */
+export const ROOMY_MIN_WIDTH_PX = 360;
+
+export function popupLayout(env: { coarsePointer: boolean; width: number }): PopupLayout {
+  if (env.coarsePointer) return 'compact';
+  if (!Number.isFinite(env.width) || env.width < ROOMY_MIN_WIDTH_PX) return 'compact';
+  return 'roomy';
 }

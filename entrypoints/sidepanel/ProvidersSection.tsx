@@ -11,6 +11,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { SAFARI_BUILD, SUBSCRIPTIONS_OFF, isSubscriptionProvider } from '@/lib/buildflags';
 import { isLocalBaseUrl, localBaseUrlNote } from '@/lib/mobile';
+import { usePointerEnvironment } from './usePointer';
 import { relativeTime } from '@/lib/chats';
 import {
   addConnection,
@@ -153,6 +154,9 @@ function ConnectionCard({
   const [fetchError, setFetchError] = useState('');
   const pending = useRef<ConnectionPatch>({});
   const timer = useRef<number | null>(null);
+  // Which localhost note to show. Settings is reachable from the popup and from the dashboard, and
+  // on iOS both of those are the phone, so this is asked of the device rather than of the surface.
+  const { coarsePointer } = usePointerEnvironment();
   const subscription = !SUBSCRIPTIONS_OFF && isSubscriptionProvider(conn.kind);
   const formId = `provider-${conn.id}`;
 
@@ -273,9 +277,13 @@ function ConnectionCard({
                   On iPhone and iPad, "localhost" is the phone. Typing the address off a desktop
                   setup is the obvious thing to do and it fails in a way that looks like the server
                   is down rather than like the address is wrong, so the correction is shown at the
-                  moment the address is typed, and only then, since a working URL needs no note.
+                  moment the address is typed, and only then, since a working URL needs no note. On
+                  a Mac the same address is right, and the note says so in one line instead of
+                  warning about a problem that platform does not have.
                 */}
-                {SAFARI_BUILD && isLocalBaseUrl(baseUrl) && <span className="warn">{localBaseUrlNote()}</span>}
+                {SAFARI_BUILD && isLocalBaseUrl(baseUrl) && (
+                  <span className={coarsePointer ? 'warn' : 'muted'}>{localBaseUrlNote(coarsePointer)}</span>
+                )}
               </label>
               <label className="field">
                 API key

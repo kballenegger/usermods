@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { hostFromUrl } from '@/lib/chats';
 import { hasConsented } from '@/lib/consent';
-import { keyboardInset, targetChip } from '@/lib/mobile';
+import { keyboardInset, popupLayout, targetChip } from '@/lib/mobile';
 import { rpc } from '@/lib/rpc';
 import { Chat } from './Chat';
 import { DashboardIcon, SettingsIcon } from './components/icons';
@@ -9,6 +9,7 @@ import { ThemeToggle } from './components/ThemeToggle';
 import { Consent } from './Consent';
 import { ModsView } from './ModsView';
 import { SettingsView } from './SettingsView';
+import { usePointerEnvironment } from './usePointer';
 
 type Tab = 'chat' | 'mods' | 'settings';
 
@@ -16,10 +17,14 @@ type Tab = 'chat' | 'mods' | 'settings';
  * Which shell the same three views are wearing.
  *
  * 'panel' is Chrome's side panel: a tall column beside a page you can still see, driven by a mouse.
- * 'popup' is Safari's toolbar popup, which on iPhone is a sheet covering the whole screen, driven
- * by a thumb. They share every view and all the provider logic; what differs is the chrome around
- * them, and that difference is real enough that faking one with the other would be worse than
- * having two.
+ * 'popup' is Safari's toolbar popup, which on iPhone is a sheet covering the whole screen driven by
+ * a thumb, and on a Mac a small window hanging off the toolbar driven by a mouse. They share every
+ * view and all the provider logic; what differs is the chrome around them, and that difference is
+ * real enough that faking one with the other would be worse than having two.
+ *
+ * The popup's own two shapes are one shell with a `data-layout` of 'compact' or 'roomy' (see
+ * popupLayout in lib/mobile.ts), because there the difference really is only sizes and where the
+ * navigation sits.
  */
 export type Surface = 'panel' | 'popup';
 
@@ -57,6 +62,8 @@ export function App({ surface = 'panel' }: AppProps = {}) {
   const [consented, setConsented] = useState<boolean | null>(null);
   /** Set when Settings asks to show the notice again, for someone who has already accepted it. */
   const [reviewing, setReviewing] = useState(false);
+  const pointer = usePointerEnvironment();
+  const layout = popupLayout(pointer);
 
   // Track the active tab in this window so every action targets the page the user is looking at.
   useEffect(() => {
@@ -93,7 +100,8 @@ export function App({ surface = 'panel' }: AppProps = {}) {
    * lib/mobile.ts holds the arithmetic, and test/mobile.test.ts holds the cases.
    */
   useEffect(() => {
-    if (surface !== 'popup') return;
+    // Only the phone sheet. A Mac popup is a fixed window with no on-screen keyboard to dodge.
+    if (surface !== 'popup' || layout !== 'compact') return;
     const vv = window.visualViewport;
     if (!vv) return;
     const apply = () => {
@@ -108,7 +116,7 @@ export function App({ surface = 'panel' }: AppProps = {}) {
       vv.removeEventListener('scroll', apply);
       document.documentElement.style.removeProperty('--keyboard-inset');
     };
-  }, [surface]);
+  }, [surface, layout]);
 
   useEffect(() => {
     const check = () => rpc({ type: 'userScripts.status' }).then(setUsStatus).catch(() => {});
@@ -158,13 +166,30 @@ export function App({ surface = 'panel' }: AppProps = {}) {
   );
 
   if (surface === 'popup') {
+    /*
+      Three destinations. On a phone they sit at the bottom, the platform convention and the only
+      part of the screen a thumb reaches without a grip change, each a full-width target well over
+      the 44px Apple asks for. On a Mac the popup is a small window under the pointer, nothing is
+      out of reach, and a row of buttons hanging off the bottom edge of a 380px window looks like a
+      phone someone shrank. So the same nav moves under the header there.
+
+      It moves in the DOM rather than with CSS `order`, so that tabbing through the popup follows
+      what is on screen.
+    */
+    const nav = (
+      <nav className="tabs popup-nav" aria-label="usermods">
+        <button type="button" data-view="chat" aria-current={tab === 'chat' ? 'page' : undefined} className={tab === 'chat' ? 'active' : ''} onClick={() => setTab('chat')}>Chat</button>
+        <button type="button" data-view="mods" aria-current={tab === 'mods' ? 'page' : undefined} className={tab === 'mods' ? 'active' : ''} onClick={() => setTab('mods')}>Mods</button>
+        <button type="button" data-view="settings" aria-current={tab === 'settings' ? 'page' : undefined} className={tab === 'settings' ? 'active' : ''} onClick={() => setTab('settings')}>Settings</button>
+      </nav>
+    );
+
     return (
-      <div className="app" data-surface="popup">
+      <div className="app" data-surface="popup" data-layout={layout}>
         {/*
-          On a phone the popup covers the page it is about, so the page has to be named on screen at
-          all times: the header is the target tab's identity, not a decoration. Everything that is
-          not one of the three views lives up here, out of thumb reach, because the bottom of the
-          screen belongs to navigation.
+          The popup covers, or sits beside, the page it is about, so the page has to be named on
+          screen at all times: the header is the target tab's identity, not a decoration. Everything
+          that is not one of the three views lives up here.
         */}
         <header className="popup-head">
           <div className="popup-target" title={pageUrl}>
@@ -189,17 +214,9 @@ export function App({ surface = 'panel' }: AppProps = {}) {
             <ThemeToggle />
           </div>
         </header>
+        {layout === 'roomy' && nav}
         <div className="popup-body">{views}</div>
-        {/*
-          Bottom navigation, the platform convention on a phone and the only part of the screen a
-          thumb reaches without a grip change. Three destinations, each a full-width target well over
-          the 44px Apple asks for, labelled in text because three icons would be a guessing game.
-        */}
-        <nav className="tabs popup-nav" aria-label="usermods">
-          <button type="button" data-view="chat" aria-current={tab === 'chat' ? 'page' : undefined} className={tab === 'chat' ? 'active' : ''} onClick={() => setTab('chat')}>Chat</button>
-          <button type="button" data-view="mods" aria-current={tab === 'mods' ? 'page' : undefined} className={tab === 'mods' ? 'active' : ''} onClick={() => setTab('mods')}>Mods</button>
-          <button type="button" data-view="settings" aria-current={tab === 'settings' ? 'page' : undefined} className={tab === 'settings' ? 'active' : ''} onClick={() => setTab('settings')}>Settings</button>
-        </nav>
+        {layout === 'compact' && nav}
       </div>
     );
   }
