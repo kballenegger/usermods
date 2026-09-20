@@ -148,10 +148,10 @@ Then in Chrome:
 
 ### Safari and iOS
 
-usermods also runs in Safari on iOS: built, installed and watched running saved mods in Mobile
-Safari on the iPhone 15 simulator (iOS 17.5). No physical iPhone or iPad has run it yet. The
-execution layer there is different, because Safari has no `chrome.userScripts`, and the UI is a
-toolbar popup built for a thumb rather than a side panel. Building it needs a full Xcode:
+The Safari iOS build has been built, installed and seen running saved mods in Mobile Safari on the iPhone
+15 simulator (iOS 17.5). No physical iPhone or iPad has run it yet. The execution layer there is
+different, because Safari has no `chrome.userScripts`, and the UI is a toolbar popup built for a thumb
+rather than a side panel. Building it needs a full Xcode:
 
 ```sh
 npm install

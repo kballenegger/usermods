@@ -1,7 +1,8 @@
 # Browser support: Firefox and Safari
 
 usermods ships on Chrome (manifest requires **Chrome 135+**, for the "Allow User Scripts" toggle
-`chrome.userScripts` needs) and on Safari for iPhone and iPad. This is a from-primary-sources look at
+`chrome.userScripts` needs) and has an iOS Safari build. The Safari build has been run in an iPhone 15
+iOS 17.5 simulator; no physical iPhone or iPad run is claimed here. This is a from-primary-sources look at
 what shipping on Firefox and Safari takes, API by API, plus effort estimates and a verdict for each.
 
 The Safari port is built. Read [docs/safari.md](safari.md) for how it works, how to build and install
@@ -130,10 +131,11 @@ Safari has neither API; a Safari build would need the toolbar-popup pattern inst
 - [MDN: `declarativeNetRequest`](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/declarativeNetRequest) · [MDN: `declarativeNetRequest.updateDynamicRules`](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/declarativeNetRequest/updateDynamicRules)
 
 usermods' one rule (`installUserJsRedirect()` in `background.ts`: redirect `*.user.js` navigations to
-`install.html#<url>` via `regexFilter` + `action.redirect.regexSubstitution`) is supported as-is on
-both Firefox and Safari at the versions above — regex redirect rules, `resourceTypes: ['main_frame']`
-and dynamic rule updates are all covered. This is the one API in the list that needs literally no
-porting work.
+`install.html#<url>` via `regexFilter` + `action.redirect.regexSubstitution`) works as-is in Chrome and
+Firefox. Safari accepts and stores the rule but iOS 17.5 did not apply it in the simulator. Safari builds
+therefore also register `watchUserJsNavigations()`, which watches the tabs API and sends the same
+navigation to the install page after it starts. The fallback is covered by the simulator evidence in
+[docs/safari.md](safari.md).
 
 ### `scripting.executeScript` (with `files`)
 
@@ -293,10 +295,10 @@ educational framing probably does not apply: usermods writes code for the user r
 them to write it. This is independent of which API runs the code, so the rewrite above does not touch
 it.
 
-What that means in practice: building and installing on your own device with your own Apple developer
-account works today and is what [docs/safari.md](safari.md) describes. App Store distribution has not
-been attempted, is not attempted by that work, and would need a real read from App Review before
-anyone counts on it. Packaging is not the obstacle. Apple's format is close to Chrome's (a
+What that means in practice: the simulator build and install path is documented and was exercised on an
+iPhone 15 simulator. No physical-device build or install was run for this task, and App Store
+distribution has not been attempted. A physical-device build still needs a team and signing setup, then
+real-device validation before anyone can claim it works there. Apple's format is close to Chrome's (a
 WebExtension bundled as an `.appex` inside a host app) and the repository carries a hand-written Xcode
 project that builds it.
 

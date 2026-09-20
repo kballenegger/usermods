@@ -1,8 +1,8 @@
 # Safari and iOS
 
-usermods runs in Safari on iOS. This page covers what the Safari build does differently, what its
-isolation guarantees actually are, what it cannot do, how to build and install it, and what was
-watched happening on iOS against what was not.
+The Safari iOS build has been verified in an iPhone 15 simulator. This page covers what the Safari build
+does differently, what its isolation guarantees actually are, what it cannot do, how to build and install
+it, and what was watched happening there against what was not.
 
 It has been built, installed, enabled and seen running saved mods in Mobile Safari on the iPhone 15
 simulator (iOS 17.5). No physical iPhone or iPad has run it.
