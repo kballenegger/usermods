@@ -17,7 +17,7 @@ absences are the whole port:
 | `userScripts.register()` per saved mod | one declared content script that asks the background what to run |
 | `userScripts.execute()` for Try | a message to that content script |
 | `runtime.onUserScriptMessage` for GM calls | `runtime.onMessage` plus a capability token |
-| a port per mod for GM value changes | one port per document, fanned out |
+| a port per mod for GM value changes | one port per document, delivered only to the mod that owns the change |
 | side panel | toolbar popup, which on iPhone is the whole screen |
 
 Everything above the execution layer is the same code: the React views, the agent loop, the provider
@@ -296,11 +296,11 @@ context.
 
 For the same reason, stored-mod execution on Safari is covered by node tests of every pure piece
 (engine choice, document matching, run-once ledger, protocol validation, grant issue and resolve,
-isolated and page evaluation, CSP refusal detection, the GM bridge) and adapter-level tests for sender
-identity, replay, revocation and runner injection, plus proof that iOS accepted the extension and its
-permissions, rather than by a mod observed changing a page in Mobile Safari. The next person with a
-device and two minutes in Settings can close that gap; the build and install path above is all it
-takes.
+isolated and page evaluation, CSP refusal detection, the GM bridge, including rejection of another
+mod's value changes) and adapter-level tests for sender identity, replay, revocation and runner
+injection, plus proof that iOS accepted the extension and its permissions, rather than by a mod
+observed changing a page in Mobile Safari. The next person with a device and two minutes in Settings
+can close that gap; the build and install path above is all it takes.
 
 ## Distribution
 
