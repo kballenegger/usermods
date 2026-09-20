@@ -280,6 +280,78 @@ const MAC_UNSIGNED_NOTE = [
   'Both are Safari-wide developer settings. Turn them off again when you are done.',
 ];
 
+// ---------------------------------------------------------------------------
+// Signing the finished bundle
+// ---------------------------------------------------------------------------
+//
+// Xcode re-signs a target when that target's own inputs change. The phase that copies the built web
+// extension into the .appex is not one of those inputs, so an incremental build where only the web
+// side changed runs the copy and skips the signature. The bundle is then sealed against the files it
+// held one build ago, and `codesign --verify --deep --strict` on the app rejects it with "a sealed
+// resource is missing or invalid" in the .appex. The build log says nothing: there is simply no
+// CodeSign line for the extension.
+//
+// The fix is ordering, not settings. Sign again here, after every step that writes into the bundle,
+// innermost first, because signing the extension invalidates the app's seal over it. Then verify,
+// and refuse to report success if the seal does not hold.
+
+/** codesign -d reports on stderr, so this one cannot go through capture(). */
+function describeSignature(target) {
+  const shown = spawnSync('/usr/bin/codesign', ['-dvv', target], { encoding: 'utf8', cwd: root });
+  return shown.stderr ?? '';
+}
+
+/**
+ * Sign a bundle again exactly as it is signed now: same identity, same entitlements, same hardened
+ * runtime. Reading all three back off the bundle rather than off the build settings is deliberate.
+ * Xcode adds things to a Debug build that no .entitlements file in the repository mentions, notably
+ * get-task-allow, and signing from the source file would quietly drop them.
+ */
+function sign(target) {
+  const shown = describeSignature(target);
+  const identity = /^Signature=adhoc$/m.test(shown) ? '-' : /^Authority=(.+)$/m.exec(shown)?.[1];
+  if (!identity) {
+    fail(
+      `cannot tell what ${path.basename(target)} is signed with`,
+      'Delete .output/safari-xcode and build again.',
+    );
+  }
+
+  const dumped = spawnSync('/usr/bin/codesign', ['-d', '--entitlements', '-', '--xml', target], {
+    encoding: 'utf8',
+    cwd: root,
+  });
+  const entitlements = dumped.stdout ?? '';
+  if (!entitlements.startsWith('<?xml')) {
+    fail(
+      `${path.basename(target)} carries no entitlements to preserve`,
+      'A Mac bundle with no entitlements is never sandboxed, and Safari ignores the extension inside it.',
+    );
+  }
+  const plist = path.join(root, '.output', 'safari-xcode', `${path.basename(target)}.entitlements.plist`);
+  fs.writeFileSync(plist, entitlements);
+
+  const args = ['--force', '--sign', identity, '--entitlements', plist];
+  if (/^CodeDirectory .*flags=0x[0-9a-f]+\([^)]*runtime[^)]*\)/m.test(shown)) args.push('--options', 'runtime');
+  args.push(target);
+  run('/usr/bin/codesign', args);
+}
+
+/** The check the whole thing is for: does the shipped app match what it says it is? */
+function verifySeal(app) {
+  const check = spawnSync('/usr/bin/codesign', ['--verify', '--deep', '--strict', '--verbose=2', app], {
+    encoding: 'utf8',
+    cwd: root,
+  });
+  if (check.status !== 0) {
+    fail(
+      `${path.relative(root, app)} does not match its own signature`,
+      (check.stderr ?? 'codesign said nothing').trim().split('\n').slice(0, 8).join('\n  '),
+    );
+  }
+  console.log(`verified ${path.relative(root, app)}  codesign --verify --deep --strict`);
+}
+
 function mac({ configuration, bundleId, team, launch }) {
   xcodebuild({ sdk: 'macosx', configuration, bundleId, team });
 
@@ -301,9 +373,11 @@ function mac({ configuration, bundleId, team, launch }) {
     );
   }
 
-  // codesign -dv reports on stderr, so this one cannot go through capture().
-  const shown = spawnSync('/usr/bin/codesign', ['-dvv', appex], { encoding: 'utf8', cwd: root });
-  const signature = (shown.stderr ?? '')
+  sign(appex);
+  sign(app);
+  verifySeal(app);
+
+  const signature = describeSignature(appex)
     .split('\n')
     .filter((l) => /^(Identifier|Signature|TeamIdentifier)=/.test(l))
     .join('; ');
@@ -314,6 +388,7 @@ function mac({ configuration, bundleId, team, launch }) {
   console.log(`         with ${path.relative(app, appex)}`);
   console.log(`         and ${path.relative(appex, manifest)}`);
   if (signature) console.log(`signed   ${signature}`);
+  console.log('         signature verified against the bundle contents, extension included');
   console.log('');
   console.log('Safari finds the extension through the app, so the app has to be somewhere it stays:');
   console.log(`  cp -R "${app}" /Applications/`);

@@ -167,3 +167,58 @@ test('the Mac extension receives network access but the host app does not', () =
   assert.doesNotMatch(app, /com\.apple\.security\.network\.client/);
   assert.match(ext, /com\.apple\.security\.network\.client/);
 });
+
+// ---------- the signature has to outlive the last step that writes into the bundle ----------
+
+test('the staged web extension replaces what the last build staged', () => {
+  const pbx = read('safari/usermods.xcodeproj/project.pbxproj');
+  // Every file the web build emits carries a content hash, so a changed file arrives under a new
+  // name and the old one stays unless something removes it. Left alone the bundle accumulates dead
+  // chunks, and each one is a file the signature was never taken over.
+  assert.match(pbx, /for staged in \\"\$STAGE\\"\/\*; do/);
+  assert.match(pbx, /rm -rf \\"\$DEST\/\$\{staged##\*\/\}\\"/);
+  // Deleting by name rather than with rsync --delete, because on iOS this destination is the
+  // bundle root: --delete there would take Info.plist and the executable with it.
+  assert.doesNotMatch(pbx, /rsync -a --delete/);
+});
+
+test('the Mac build signs the bundle after the staging phase, innermost first', () => {
+  const script = read('scripts/safari-xcode.mjs');
+  // Xcode re-signs a target when that target's own inputs change. The staging phase is not one of
+  // them, so a build where only the web side changed leaves the .appex sealed against the files it
+  // held one build ago, and `codesign --verify --deep --strict` rejects the app. Signing again here
+  // is the only step that runs after everything that writes into the bundle.
+  const body = /function mac\(\{[\s\S]*?\n\}/.exec(script)?.[0] ?? '';
+  assert.ok(body.length > 0, 'mac() not found');
+  const appex = body.indexOf('sign(appex)');
+  const app = body.indexOf('sign(app)');
+  const verify = body.indexOf('verifySeal(app)');
+  assert.ok(appex > 0, 'mac() does not sign the extension');
+  assert.ok(app > appex, 'the app must be signed after the extension it contains, not before');
+  assert.ok(verify > app, 'the signature must be verified after both bundles are signed');
+});
+
+test('signing again preserves the identity, entitlements and hardened runtime already in place', () => {
+  const script = read('scripts/safari-xcode.mjs');
+  // Reading all three off the built bundle rather than off the repository. A Debug build carries
+  // get-task-allow, which no .entitlements file here mentions, and signing from those files would
+  // drop it. Dropping com.apple.security.app-sandbox would be worse: Safari ignores an extension
+  // whose host app is not sandboxed.
+  assert.match(script, /'-d', '--entitlements', '-', '--xml', target/);
+  assert.match(script, /carries no entitlements to preserve/);
+  assert.match(script, /flags=0x\[0-9a-f\]\+.*runtime/);
+  assert.match(script, /args\.push\('--options', 'runtime'\)/);
+  assert.match(script, /Signature=adhoc\$\/m\.test\(shown\) \? '-' : \/\^Authority=/);
+});
+
+test('the Mac build refuses to report success on a signature that does not hold', () => {
+  const script = read('scripts/safari-xcode.mjs');
+  // The first version of this build printed "signed" from `codesign -dvv`, which only reads what a
+  // bundle claims about itself. It said the build was signed while the extension inside it failed
+  // verification. Only --verify compares the seal against the files.
+  assert.match(script, /'--verify', '--deep', '--strict', '--verbose=2', app/);
+  assert.match(script, /does not match its own signature/);
+  const verify = /function verifySeal\([\s\S]*?\n\}/.exec(script)?.[0] ?? '';
+  assert.match(verify, /check\.status !== 0/);
+  assert.match(verify, /fail\(/);
+});
