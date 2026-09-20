@@ -1,10 +1,10 @@
-// The popup's three mobile decisions: the keyboard inset, the target-tab chip, and the localhost
-// note. Pure functions, so the arithmetic and the wording are checked here and the screenshots only
-// have to prove the layout.
+// The popup's shell decisions: the keyboard inset, the target-tab chip, the localhost note and
+// which of the two layouts to draw. Pure functions, so the arithmetic and the wording are checked
+// here and the screenshots only have to prove the layout.
 //   npm test
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { KEYBOARD_EPSILON_PX, isLocalBaseUrl, keyboardInset, localBaseUrlNote, targetChip } from '../lib/mobile.ts';
+import { KEYBOARD_EPSILON_PX, ROOMY_MIN_WIDTH_PX, isLocalBaseUrl, keyboardInset, localBaseUrlNote, popupLayout, targetChip } from '../lib/mobile.ts';
 
 test('a closed keyboard is no inset', () => {
   // The state this is in almost all the time: the visual viewport is the window.
@@ -79,11 +79,42 @@ test('the local hosts are the ones that mean this phone', () => {
 });
 
 test('the localhost note says what to type instead, not just what is wrong', () => {
-  const note = localBaseUrlNote();
-  assert.match(note, /localhost is this device/);
-  // An example address, because "use your machine's IP" is advice and "http://192.168…" is an answer.
-  assert.match(note, /192\.168\./);
-  // Straight quotes only: the whole codebase is checked for this and a curly one in a string is the
-  // easiest place for it to hide.
-  assert.doesNotMatch(note, /[‘’“”—]/);
+  for (const coarse of [true, false]) {
+    const note = localBaseUrlNote(coarse);
+    // An example address, because "use your machine's IP" is advice and "http://192.168…" is an answer.
+    assert.match(note, /192\.168\./);
+    // Straight quotes only: the whole codebase is checked for this and a curly one in a string is the
+    // easiest place for it to hide.
+    assert.doesNotMatch(note, /[‘’“”—]/);
+  }
+});
+
+test('the localhost note means a different machine on a phone than on a Mac', () => {
+  // On iOS localhost is the phone, and a model is almost never running there, so the note is a
+  // warning. On a Mac localhost is the Mac, which is where LM Studio and Ollama actually run, so
+  // the same wording would be telling someone their working setup is wrong.
+  assert.match(localBaseUrlNote(true), /localhost is this device/);
+  assert.match(localBaseUrlNote(false), /localhost is this Mac/);
+  assert.match(localBaseUrlNote(false), /usually what you want/);
+});
+
+test('a thumb gets the compact layout at any width', () => {
+  // iPadOS reports a coarse pointer even with a keyboard attached, and its popover is wide enough
+  // for the roomy shell. The pointer is what decides, because the targets are what change.
+  for (const width of [320, 390, 500, 1024]) {
+    assert.equal(popupLayout({ coarsePointer: true, width }), 'compact');
+  }
+});
+
+test('a mouse gets the roomy layout once there is room for it', () => {
+  assert.equal(popupLayout({ coarsePointer: false, width: ROOMY_MIN_WIDTH_PX }), 'roomy');
+  assert.equal(popupLayout({ coarsePointer: false, width: 420 }), 'roomy');
+  // Narrower than the shell needs for a header and three tabs: fall back rather than overflow.
+  assert.equal(popupLayout({ coarsePointer: false, width: ROOMY_MIN_WIDTH_PX - 1 }), 'compact');
+  assert.equal(popupLayout({ coarsePointer: false, width: 0 }), 'compact');
+});
+
+test('a width the browser could not give us is compact, never a broken shell', () => {
+  assert.equal(popupLayout({ coarsePointer: false, width: Number.NaN }), 'compact');
+  assert.equal(popupLayout({ coarsePointer: false, width: Number.POSITIVE_INFINITY }), 'compact');
 });

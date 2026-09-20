@@ -4,6 +4,13 @@
 //   node scripts/safari-preview.mjs                 serve on http://127.0.0.1:4173/popup.html
 //   node scripts/safari-preview.mjs --shots out/    serve, then screenshot each view on the
 //                                                   booted iOS simulator and exit
+//   node scripts/safari-preview.mjs --webkit-shots out/
+//                                                   serve, then screenshot both popup layouts in
+//                                                   headless WebKit and exit
+//   node scripts/safari-preview.mjs --probe         serve, open the popup in the default browser,
+//                                                   print what that browser laid out, and exit
+//                                                   (--probe simulator for the booted iPhone,
+//                                                    --view mods to land on a different view)
 //
 // ---------------------------------------------------------------------------
 // What this is for, and what it is not
@@ -18,6 +25,16 @@
 // extension is a Settings toggle a person has to flip), so this serves popup.html over HTTP
 // instead and opens it in Mobile Safari on the simulator. Same document, same stylesheets, same
 // React build, same engine, same device metrics.
+//
+// --webkit-shots is the same document in Playwright's WebKit, at the two sizes the popup has to
+// handle: a Mac window and a phone. It exists because the layout decision is a media query, and a
+// media query is the engine's answer, not React's. It is still WebKit in a headless harness rather
+// than Safari with an extension loaded, so it proves the layout and nothing beyond it.
+//
+// --probe is for the machine where neither of those is available: it opens the page in the real
+// browser and has the page report back what it laid out. No screenshot, no automation permissions,
+// and the answer comes from the browser you actually have rather than from a harness. Same
+// caveat, in bold: stubbed APIs, layout only.
 //
 // It is NOT a functional test and must never be reported as one. The extension APIs are stubbed
 // below with fixed data, so what you are looking at is layout and interaction, not a live
@@ -42,6 +59,13 @@ const flag = (name, fallback) => {
 };
 const port = Number(flag('port', '4173'));
 const shots = flag('shots', null);
+const webkitShots = flag('webkit-shots', null);
+const probe = argv.includes('--probe');
+// `--probe` on its own means this Mac's browser; `--probe simulator` means the booted iPhone.
+const probeTarget = (() => {
+  const value = flag('probe', 'browser');
+  return !value || value.startsWith('--') ? 'browser' : value;
+})();
 const device = flag('device', 'booted');
 
 function fail(message, hint) {
@@ -193,6 +217,67 @@ function stubSource() {
 }
 
 // ---------------------------------------------------------------------------
+// The probe
+// ---------------------------------------------------------------------------
+
+/**
+ * A few lines the page runs about itself and posts back.
+ *
+ * Which layout the popup draws is a media query plus a width, which is the browser's answer and not
+ * something any harness can vouch for on its behalf. This asks the browser: what did you match,
+ * what width did you give the document, which layout did the shell settle on, and is the navigation
+ * above the body or below it. Then it clears the page, so a fixture tab is not left sitting there.
+ */
+function probeSource() {
+  return `(() => {
+  let sent = false;
+  const send = (report) => {
+    if (sent) return;
+    sent = true;
+    navigator.sendBeacon('/__report', JSON.stringify(report));
+    setTimeout(() => { location.replace('about:blank'); }, 400);
+  };
+  const look = () => {
+    const shell = document.querySelector(".app[data-surface='popup']");
+    if (!shell) return false;
+    const nav = shell.querySelector('.popup-nav');
+    const body = shell.querySelector('.popup-body');
+    send({
+      userAgent: navigator.userAgent,
+      width: window.innerWidth,
+      height: window.innerHeight,
+      coarsePointer: window.matchMedia('(pointer: coarse)').matches,
+      layout: shell.getAttribute('data-layout'),
+      // 4 is DOCUMENT_POSITION_FOLLOWING: the body comes after the nav, so the nav is on top.
+      navAboveBody: !!nav && !!body && (nav.compareDocumentPosition(body) & 4) !== 0,
+      navHeight: nav ? Math.round(nav.getBoundingClientRect().height) : null,
+      // What a pointer has to hit. The phone raises these and a Mac does not.
+      switchHeight: (() => {
+        const el = document.querySelector("input[type='checkbox']");
+        return el ? Math.round(el.getBoundingClientRect().height) : null;
+      })(),
+    });
+    return true;
+  };
+  // A beat after the shell appears, not the instant it does: ?view= is a click the app makes on
+  // itself once mounted, and measuring before it lands measures the chat view under another name.
+  const settle = () => { setTimeout(look, 900); };
+  const shellNow = document.querySelector(".app[data-surface='popup']");
+  if (shellNow) {
+    settle();
+  } else {
+    const observer = new MutationObserver(() => {
+      if (!document.querySelector(".app[data-surface='popup']")) return;
+      observer.disconnect();
+      settle();
+    });
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+    setTimeout(() => { observer.disconnect(); if (!sent) send({ error: 'the popup never mounted' }); }, 15000);
+  }
+})();`;
+}
+
+// ---------------------------------------------------------------------------
 // The server
 // ---------------------------------------------------------------------------
 
@@ -202,8 +287,32 @@ const MIME = {
   '.png': 'image/png', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.map': 'application/json',
 };
 
+/** Resolved by the first report a probed page posts back. */
+let reported = null;
+
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://localhost');
+  if (url.pathname === '/__report' && req.method === 'POST') {
+    let body = '';
+    req.on('data', (chunk) => { body += chunk; });
+    req.on('end', () => {
+      res.writeHead(204);
+      res.end();
+      try {
+        reported?.(JSON.parse(body));
+      } catch {
+        reported?.({ error: `unreadable report: ${body.slice(0, 200)}` });
+      }
+    });
+    return;
+  }
+
+  if (url.pathname === '/__probe.js') {
+    res.writeHead(200, { 'content-type': MIME['.js'], 'cache-control': 'no-store' });
+    res.end(probeSource());
+    return;
+  }
+
   if (url.pathname === '/__preview.js') {
     res.writeHead(200, { 'content-type': MIME['.js'], 'cache-control': 'no-store' });
     res.end(stubSource());
@@ -223,7 +332,10 @@ const server = http.createServer((req, res) => {
   if (file.endsWith('popup.html')) {
     // The stub has to be the first script on the page: theme-boot.js reads storage before the
     // first paint, and main.tsx calls chrome the moment it mounts.
-    const html = fs.readFileSync(file, 'utf8').replace('<head>', '<head><script src="/__preview.js"></script>');
+    let html = fs.readFileSync(file, 'utf8').replace('<head>', '<head><script src="/__preview.js"></script>');
+    // The probe goes at the end, after the app's own scripts, because it is watching for what they
+    // render. It is opt-in per request so an ordinary preview is untouched by it.
+    if (url.searchParams.get('probe') === '1') html = html.replace('</body>', `<script src="/__probe.js"></script></body>`);
     res.writeHead(200, { 'content-type': MIME['.html'], 'cache-control': 'no-store' });
     res.end(html);
     return;
@@ -261,14 +373,93 @@ async function screenshotViews(dir) {
   }
 }
 
+/**
+ * The same popup in headless WebKit, at a Mac window's size and at a phone's.
+ *
+ * Which layout the popup draws comes from `(pointer: coarse)` and the width, so the check worth
+ * making is the engine's: load the document, read back the `data-layout` the shell settled on, and
+ * fail if it is not the one that size is supposed to get. The screenshot is what a person looks at
+ * afterwards; the assertion is what makes this run mean something unattended.
+ */
+async function webkitCapture(dir) {
+  let playwright;
+  try {
+    playwright = await import('playwright');
+  } catch {
+    fail('playwright is not installed', 'npm install, then `npx playwright install webkit`.');
+  }
+  fs.mkdirSync(dir, { recursive: true });
+
+  const sizes = [
+    // A Mac popup. Safari caps the popover at 800x600 and this is the size mobile.css asks for.
+    { name: 'mac', layout: 'roomy', context: { viewport: { width: 420, height: 560 }, deviceScaleFactor: 2 } },
+    // A phone, through Playwright's own descriptor, so the touch and pointer flags are its problem.
+    { name: 'phone', layout: 'compact', context: playwright.devices['iPhone 14'] },
+  ];
+
+  const browser = await playwright.webkit.launch();
+  const failures = [];
+  try {
+    for (const size of sizes) {
+      const context = await browser.newContext(size.context);
+      for (const view of VIEWS) {
+        const page = await context.newPage();
+        await page.goto(`http://127.0.0.1:${port}/popup.html?view=${view}`, { waitUntil: 'load' });
+        const shell = page.locator(".app[data-surface='popup']");
+        await shell.waitFor({ state: 'visible', timeout: 15000 });
+        const got = await shell.getAttribute('data-layout');
+        if (got !== size.layout) failures.push(`${size.name}/${view}: data-layout is ${got}, expected ${size.layout}`);
+        const out = path.join(dir, `popup-${size.name}-${view}.png`);
+        await page.screenshot({ path: out });
+        console.log(`[preview] ${path.relative(ROOT, out)}  data-layout=${got}`);
+        await page.close();
+      }
+      await context.close();
+    }
+  } finally {
+    await browser.close();
+  }
+  if (failures.length) fail(`the popup drew the wrong layout:\n  ${failures.join('\n  ')}`);
+}
+
+/**
+ * Open the popup in whatever browser this Mac opens web pages with, and wait for it to report.
+ *
+ * `open` is a shell command, not an Apple event, so this needs no automation permission and does
+ * not care whether the browser is scriptable. What comes back is the browser's own account of the
+ * layout it produced.
+ */
+async function probeBrowser() {
+  // --view picks which of the three the probe lands on, because what is worth measuring differs:
+  // the mods list has the on/off switch, which is the control the phone grows and the Mac must not.
+  const view = flag('view', null);
+  const url = `http://127.0.0.1:${port}/popup.html?probe=1${view ? `&view=${view}` : ''}`;
+  const report = new Promise((resolve) => { reported = resolve; });
+  if (probeTarget === 'simulator') {
+    simctl(['openurl', device, url]);
+  } else {
+    const opened = spawnSync('/usr/bin/open', [url], { encoding: 'utf8' });
+    if (opened.status !== 0) fail(`could not open ${url}: ${(opened.stderr || '').trim()}`);
+  }
+  console.log(`[preview] opened ${url} on ${probeTarget === 'simulator' ? device : 'this Mac'}`);
+
+  const timeout = new Promise((resolve) => setTimeout(() => resolve(null), 45000));
+  const result = await Promise.race([report, timeout]);
+  if (!result) fail('the browser never reported back', 'it may not have come to the front, or the page did not load.');
+  if (result.error) fail(`the page reported: ${result.error}`);
+  console.log(JSON.stringify(result, null, 2));
+}
+
 server.listen(port, '127.0.0.1', async () => {
   console.log(`[preview] http://127.0.0.1:${port}/popup.html  (views: ${VIEWS.map((v) => `?view=${v}`).join(' ')})`);
-  if (!shots) {
+  if (!shots && !webkitShots && !probe) {
     console.log('[preview] stubbed extension APIs: layout only, nothing runs. Ctrl-C to stop.');
     return;
   }
   try {
-    await screenshotViews(path.resolve(ROOT, shots));
+    if (shots) await screenshotViews(path.resolve(ROOT, shots));
+    if (webkitShots) await webkitCapture(path.resolve(ROOT, webkitShots));
+    if (probe) await probeBrowser();
   } finally {
     server.close();
   }
