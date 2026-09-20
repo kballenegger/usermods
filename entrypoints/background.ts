@@ -7,7 +7,7 @@ import { wrapForExecution } from '@/lib/exec/wrap';
 import { checkConnect, connectOf } from '@/lib/connect';
 import { dependenciesChanged, fetchText, previewFromUrl, reparseEditedSource, resolveDependencies, toBase64 } from '@/lib/install';
 import { UPDATED_MARK } from '@/lib/importreport';
-import { scriptIdentity } from '@/lib/installurl';
+import { isUserScriptUrl, scriptIdentity } from '@/lib/installurl';
 import { resyncPlan } from '@/lib/resync';
 import { mapStack, prepareRunScript, renderRunResult, type RunResult } from '@/lib/runscript';
 import { shouldUpdate } from '@/lib/version';
@@ -21,7 +21,7 @@ import { buildTitleInput, completedTurns, sanitizeTitle, titleDecision, TITLE_SY
 import { createProvider } from '@/lib/providers';
 import { VISION_FALLBACK_PANEL_NOTE, createVisionMemory, resolveImagesSetting, visionKeyFor } from '@/lib/providers/vision';
 import { MAX_EDGE, SCREENSHOT_CAPTURE_FORMAT, SCREENSHOT_QUALITY, fitWithin, parseDataUrl } from '@/lib/images';
-import { SUBSCRIPTIONS_OFF, isSubscriptionProvider, unavailableProviderMessage } from '@/lib/buildflags';
+import { SAFARI_BUILD, SUBSCRIPTIONS_OFF, isSubscriptionProvider, unavailableProviderMessage } from '@/lib/buildflags';
 import { listFailureMessage, listWithFallback, modelsRequest, parseModelIds, type ModelListResult, type ModelListTarget } from '@/lib/modellist';
 import type { OAuthKind } from '@/lib/oauth';
 import type { AgentAttachState, AgentPortRequest, OAuthLoginState, RpcRequest } from '@/lib/rpc';
@@ -112,6 +112,8 @@ export default defineBackground(() => {
 
   chrome.runtime.onInstalled.addListener(() => void bootstrap());
   chrome.runtime.onStartup.addListener(() => void bootstrap());
+
+  watchUserJsNavigations();
 
   chrome.runtime.onMessage.addListener((msg: RpcRequest | { type?: string }, _sender, sendResponse) => {
     if (!msg || typeof msg.type !== 'string' || !msg.type.includes('.')) return false; // not an RPC (e.g. content events)
@@ -656,6 +658,50 @@ async function installUserJsRedirect(): Promise<void> {
       },
     ],
   });
+}
+
+/**
+ * Safari's half of the same job, because the rule above never fires there.
+ *
+ * iOS Safari 17.5 stores the dynamic rule (it turns up in the extension's own rule database),
+ * records no error against it, and still shows the raw script text when you open a .user.js link.
+ * Checked in the simulator against a local .user.js URL: no redirect, no complaint. So on Safari the
+ * navigation is caught from the tabs API and sent to the same install page with the same fragment,
+ * which is the one thing the rule was for.
+ *
+ * This is second best and only used where it has to be. The rule redirects before the page is
+ * fetched; this one waits for the navigation to be under way, so the script source can flash up
+ * before the install page replaces it. Chrome and Firefox keep the rule and never install this
+ * listener.
+ *
+ * Registered in the worker's first turn, next to the other listeners, because Safari suspends the
+ * background and only wakes it for listeners it saw when the worker was evaluated. A listener added
+ * later, from an async bootstrap, is a listener a suspended worker never hears from again.
+ *
+ * `handledUserJs` stops one navigation being redirected twice: onUpdated reports the same URL more than
+ * once per load, and a second tabs.update would push another entry onto the tab's history. It is
+ * keyed by tab and cleared as soon as that tab goes somewhere else, so opening the same script URL
+ * again later still offers to install it.
+ */
+const handledUserJs = new Map<number, string>();
+
+function watchUserJsNavigations(): void {
+  if (!SAFARI_BUILD) return;
+  chrome.tabs.onUpdated.addListener((tabId, change, tab) => {
+    const url = change.url ?? tab?.url ?? '';
+    if (!isUserScriptUrl(url)) {
+      if (url) handledUserJs.delete(tabId);
+      return;
+    }
+    if (handledUserJs.get(tabId) === url) return;
+    handledUserJs.set(tabId, url);
+    const target = `${chrome.runtime.getURL('install.html')}#${url}`;
+    void Promise.resolve(chrome.tabs.update(tabId, { url: target })).catch((e: unknown) => {
+      handledUserJs.delete(tabId);
+      console.warn('[usermods] .user.js navigation', e);
+    });
+  });
+  chrome.tabs.onRemoved.addListener((tabId) => handledUserJs.delete(tabId));
 }
 
 // ---------- chat titles ----------
