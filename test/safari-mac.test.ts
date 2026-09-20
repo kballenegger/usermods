@@ -222,3 +222,12 @@ test('the Mac build refuses to report success on a signature that does not hold'
   assert.match(verify, /check\.status !== 0/);
   assert.match(verify, /fail\(/);
 });
+
+test('the Mac command prints the artifact only after its seal is verified', () => {
+  const script = read('scripts/safari-xcode.mjs');
+  const body = /function mac\(\{[\s\S]*?\n\}/.exec(script)?.[0] ?? '';
+  const verify = body.indexOf('verifySeal(app)');
+  const built = body.indexOf('console.log(`built');
+  assert.ok(verify > 0, 'mac() does not verify the finished app');
+  assert.ok(built > verify, 'mac() reports a built artifact before verification finishes');
+});
