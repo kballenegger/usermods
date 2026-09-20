@@ -15,12 +15,27 @@ USERMODS_BUNDLE_ID = io.github.kballenegger.usermods
 USERMODS_MARKETING_VERSION = 0.1.0
 USERMODS_BUILD_NUMBER = 1
 
+// One pair of targets, two platforms.
+//
+// The app and the extension build for iOS and for macOS from the same sources. SDKROOT = auto picks
+// the SDK from whatever -sdk or -destination the build asks for, and SUPPORTED_PLATFORMS is the
+// list it is allowed to pick from. The alternative, a second pair of targets, would double the
+// project file and every setting in it for two files of AppKit code.
+//
+// Settings that differ per platform are written with an [sdk=...] condition rather than split into
+// another xcconfig, so the difference is visible next to the shared value.
+SDKROOT = auto
+SUPPORTED_PLATFORMS = iphoneos iphonesimulator macosx
+
 // 16.4 is where WebKit got MV3 web extensions, and it is the floor lib/manifest.ts writes into
-// browser_specific_settings.safari.strict_min_version. Keep the two in step.
+// browser_specific_settings.safari.strict_min_version. Keep the three in step.
 IPHONEOS_DEPLOYMENT_TARGET = 16.4
-SDKROOT = iphoneos
-TARGETED_DEVICE_FAMILY = 1,2
-SUPPORTED_PLATFORMS = iphoneos iphonesimulator
+// Ventura, which is where Safari 16.4 landed on the desktop.
+MACOSX_DEPLOYMENT_TARGET = 13.0
+
+// iPhone and iPad. macOS ignores this key; naming the condition keeps it from being read as a claim
+// that the Mac build is a Catalyst one, which it is not.
+TARGETED_DEVICE_FAMILY[sdk=iphone*] = 1,2
 
 SWIFT_VERSION = 5.0
 MARKETING_VERSION = $(USERMODS_MARKETING_VERSION)

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<!-- The extension's own code makes no network calls: SafariWebExtensionHandler.swift refuses
+	     every native message it is handed. The extension's web half does call providers, but that
+	     runs in Safari's processes, not in this bundle, so in principle this entitlement is not
+	     what allows it. It is in Apple's template for this target type and it is kept here because
+	     the alternative, finding out on someone else's Mac that the reasoning was wrong, is worse
+	     than an entitlement that turns out to be unused. -->
+	<key>com.apple.security.network.client</key>
+	<true/>
+</dict>
+</plist>

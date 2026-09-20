@@ -1,10 +1,20 @@
 #include "Shared.xcconfig"
 
-// The host app. On iOS a Safari web extension cannot be installed on its own: it ships inside an
-// app, and the app's only job is to tell you where the switch is. See safari/App/ViewController.swift.
+// The host app. A Safari web extension cannot be installed on its own on either platform: it ships
+// inside an app, and the app's job is to tell you where the switch is. On macOS it can do slightly
+// better than that and open the switch for you. See safari/App/ViewController.swift and
+// safari/App/MacViewController.swift.
 PRODUCT_NAME = usermods
 PRODUCT_BUNDLE_IDENTIFIER = $(USERMODS_BUNDLE_ID)
 INFOPLIST_FILE = App/Info.plist
+INFOPLIST_FILE[sdk=macosx*] = App/Info-macOS.plist
+
+// Signed, sandboxed and hardened on the Mac. Safari will not load an extension out of an unsigned
+// app bundle, and the sandbox is what an eventual notarised build needs, so the local build uses
+// the same shape rather than a looser one that works here and fails later.
+CODE_SIGN_ENTITLEMENTS[sdk=macosx*] = App/usermods-macOS.entitlements
+ENABLE_HARDENED_RUNTIME[sdk=macosx*] = YES
+COMBINE_HIDPI_IMAGES[sdk=macosx*] = YES
 
 // No app icon: the host app ships with the system placeholder on the home screen.
 //

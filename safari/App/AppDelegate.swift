@@ -1,6 +1,11 @@
+#if os(iOS)
 import UIKit
 
-/// The host app's entry point.
+/// The host app's entry point on iOS.
+///
+/// The app builds for iOS and for macOS from one target, so each platform's entry point is compiled
+/// out of the other's build. The Mac half is App/MacAppDelegate.swift; only one of the two carries
+/// `@main` for any given SDK.
 ///
 /// There is no scene manifest in Info.plist on purpose: this app has exactly one screen, it never
 /// shows two at once, and the window path below is the whole of its lifecycle. Adding scenes would
@@ -20,3 +25,4 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         return true
     }
 }
+#endif

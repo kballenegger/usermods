@@ -1,10 +1,14 @@
+#if os(iOS)
 import UIKit
 
-/// The one screen the host app has.
+/// The one screen the host app has on iOS. The Mac version is App/MacViewController.swift.
 ///
 /// On iOS a Safari web extension cannot be installed by itself. It ships inside an app, and turning
 /// it on happens in Settings, which no app can deep link into. So this screen exists to answer the
 /// question someone has right after installing: where is it, and why is nothing happening yet.
+///
+/// macOS is the same shape with one difference that is worth the separate file: there, the app can
+/// open the extension's own settings pane, so the Mac screen has a button and this one cannot.
 ///
 /// The colours are the BBS Underground tokens from docs/branding.md, spelled out here because a
 /// native screen cannot read the extension's CSS.
@@ -124,3 +128,4 @@ final class ViewController: UIViewController {
         return line
     }
 }
+#endif
