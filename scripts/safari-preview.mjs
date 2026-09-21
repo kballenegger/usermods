@@ -10,6 +10,14 @@
 //   node scripts/safari-preview.mjs --popover-size  serve, then measure in headless WebKit what
 //                                                   size the popup document hands a content-sized
 //                                                   popover, at a window far too small to help
+//   node scripts/safari-preview.mjs --measure out/ [--label after]
+//                                                   serve, then load a long seeded chat (tool rows,
+//                                                   proposals, a draft, an editing link) at iPhone
+//                                                   sizes, keyboard down and up, in both themes;
+//                                                   print how much of the screen the transcript
+//                                                   gets, save a PNG of each, and (unless the label
+//                                                   is `before`) run the compact shell's
+//                                                   accessibility assertions
 //   node scripts/safari-preview.mjs --probe         serve, open the popup in the default browser,
 //                                                   print what that browser laid out, and exit
 //                                                   (--probe simulator for the booted iPhone,
@@ -65,6 +73,8 @@ const shots = flag('shots', null);
 const webkitShots = flag('webkit-shots', null);
 const probe = argv.includes('--probe');
 const popoverSize = argv.includes('--popover-size');
+const measure = flag('measure', null);
+const measureLabel = flag('label', 'after');
 // `--probe` on its own means this Mac's browser; `--probe simulator` means the booted iPhone.
 const probeTarget = (() => {
   const value = flag('probe', 'browser');
@@ -147,6 +157,71 @@ const RPC = {
   'oauth.status': { signedIn: false },
 };
 
+// ---------------------------------------------------------------------------
+// The long fixture (?fixture=long)
+// ---------------------------------------------------------------------------
+
+/**
+ * A chat that has been worked in, for judging how much of a phone the transcript gets.
+ *
+ * The short fixture above is four rows, which flatters any layout: nothing scrolls, so nothing
+ * shows what the chrome around the transcript costs. This one is a realistic second session on an
+ * installed mod: two turns, seven tool calls, two proposals, a draft at v2 that is linked to the
+ * installed mod (so the "editing" state is on screen), which is the heaviest the area above the
+ * composer ever gets.
+ */
+const LONG_CHAT_ID = 'chat-preview-long';
+const V1_CODE = `GM_addStyle(\`
+  table.comment-tree { width: 100% !important; }
+  td.ind img { width: calc(var(--depth, 1) * 12px) !important; }
+\`);`;
+const V2_CODE = `GM_addStyle(\`
+  table.comment-tree { width: 100% !important; }
+  td.ind img { width: calc(var(--depth, 1) * 8px) !important; }
+  .comment { font-size: 15px; line-height: 1.5; }
+  @media (max-width: 480px) { td.ind img { width: calc(var(--depth, 1) * 5px) !important; } }
+\`);`;
+const LONG_ITEMS = [
+  { kind: 'model', connectionId: 'conn-1', label: 'Anthropic', model: 'claude-opus-5' },
+  { kind: 'user', id: 'u1', text: 'The comment column is too narrow to read on my phone. Widen it and give the replies more room.' },
+  { kind: 'tool', id: 't1', name: 'find_elements', input: { selector: 'table.comment-tree' }, summary: '1 match: table.comment-tree (612 rows)' },
+  { kind: 'tool', id: 't2', name: 'find_elements', input: { selector: 'td.ind img' }, summary: '611 matches, widths 0 to 360px' },
+  { kind: 'tool', id: 't3', name: 'run_script', input: { description: 'widen the comment table', code: V1_CODE }, summary: 'ran without errors' },
+  { kind: 'tool', id: 't4', name: 'wait_for', input: { selector: 'table.comment-tree', state: 'visible', timeoutMs: 2000 }, summary: 'matched after 40ms' },
+  { kind: 'assistant', text: 'The comment table is fixed at 85% with a 40px indent per reply level. I set the outer table to full width and cut the indent to 12px a level, which keeps the thread shape without eating the text.' },
+  { kind: 'proposal', version: 1, proposal: { name: 'Wider comments', description: 'Full-width comment column with a smaller reply indent.', matches: ['https://news.ycombinator.com/item*'], code: V1_CODE } },
+  { kind: 'note', text: 'Saved as a mod: Wider comments' },
+  { kind: 'user', id: 'u2', text: 'Better. Deep threads still get squeezed on the phone though, and the text is a bit small.' },
+  { kind: 'tool', id: 't5', name: 'find_elements', input: { selector: '.comment' }, summary: '611 matches, font-size 12px' },
+  { kind: 'tool', id: 't6', name: 'run_script', input: { description: 'tighter indent under 480px, 15px text', code: V2_CODE }, summary: 'ran without errors' },
+  { kind: 'tool', id: 't7', name: 'screenshot', input: { description: 'check a deep thread' }, summary: 'captured 390x844' },
+  { kind: 'assistant', text: 'Under 480px the indent is now 5px a level, so a reply ten levels deep keeps about 85% of the width. Comment text is 15px with a 1.5 line height. I checked a deep thread and nothing wraps badly.' },
+  { kind: 'proposal', version: 2, proposal: { name: 'Wider comments', description: 'Full-width comment column, tighter indent on phones, larger text.', matches: ['https://news.ycombinator.com/item*'], code: V2_CODE } },
+  { kind: 'assistant', text: 'That is v2 of the draft. Update the mod when you are happy with it, or tell me what to change.' },
+];
+const version = (n, code, description, ago) => ({
+  n, code, name: 'Wider comments', description, matches: ['https://news.ycombinator.com/item*'], createdAt: Date.now() - ago, source: 'proposal',
+});
+const LONG_ARTIFACT = {
+  id: 'artifact-long', chatId: LONG_CHAT_ID, name: 'Wider comments',
+  description: 'Full-width comment column, tighter indent on phones, larger text.',
+  matches: ['https://news.ycombinator.com/item*'],
+  versions: [
+    version(1, V1_CODE, 'Full-width comment column with a smaller reply indent.', 72e5),
+    version(2, V2_CODE, 'Full-width comment column, tighter indent on phones, larger text.', 6e5),
+  ],
+  current: 2, linkedModId: 'mod-1', savedVersion: 1,
+};
+const LONG_CHATS = [
+  { id: LONG_CHAT_ID, host: 'news.ycombinator.com', title: 'Widen the comment column', createdAt: Date.now() - 864e5, updatedAt: Date.now() - 6e5, turns: 2, url: TAB.url, editingModId: 'mod-1', editingModName: 'Wider comments' },
+  ...STORAGE.chats.map((c) => ({ ...c, id: `${c.id}-b`, title: c.id === CHAT_ID ? 'Dim visited links' : c.title })),
+  { id: 'chat-preview-4', host: 'news.ycombinator.com', title: 'Old experiment with the front page', createdAt: Date.now() - 9e9, updatedAt: Date.now() - 8e9, turns: 3, archivedAt: Date.now() - 7e9 },
+];
+const LONG = {
+  storage: { chats: LONG_CHATS, [`chat:${LONG_CHAT_ID}:items`]: LONG_ITEMS },
+  rpc: { 'chats.list': LONG_CHATS, 'chats.listAll': LONG_CHATS, 'artifact.get': LONG_ARTIFACT },
+};
+
 /**
  * The stub, as a classic script that runs before everything else on the page.
  *
@@ -159,6 +234,29 @@ function stubSource() {
   const store = ${JSON.stringify(STORAGE)};
   const rpc = ${JSON.stringify(RPC)};
   const tab = ${JSON.stringify(TAB)};
+  const query = new URLSearchParams(location.search);
+  // ?fixture=long swaps in the worked-in chat. ?theme=light|dark picks the palette, in storage
+  // (what the app reads) and in the localStorage mirror (what theme-boot.js reads before paint).
+  if (query.get('fixture') === 'long') {
+    const long = ${JSON.stringify(LONG)};
+    Object.assign(store, long.storage);
+    Object.assign(rpc, long.rpc);
+  }
+  const theme = query.get('theme');
+  if (theme === 'light' || theme === 'dark') {
+    store['usermods.theme'] = theme;
+    store.settings = { ...store.settings, theme };
+    try { localStorage.setItem('usermods.theme', theme); } catch {}
+  }
+  // ?keyboard=<px> pretends the on-screen keyboard is up, the way iOS reports it: the window
+  // keeps its height and the VISUAL viewport shrinks. Headless WebKit has no keyboard, so the
+  // visualViewport the app listens to is replaced with one that says <px> is what is visible.
+  const keyboard = Number(query.get('keyboard'));
+  if (keyboard > 0) {
+    const fake = new EventTarget();
+    Object.assign(fake, { width: innerWidth, height: keyboard, offsetTop: 0, offsetLeft: 0, pageTop: 0, pageLeft: 0, scale: 1 });
+    Object.defineProperty(window, 'visualViewport', { configurable: true, get: () => fake });
+  }
   const listeners = () => ({ addListener() {}, removeListener() {}, hasListener: () => false });
 
   const read = (keys) => {
@@ -536,6 +634,99 @@ async function measurePopoverSize() {
 }
 
 /**
+ * How much of an iPhone the transcript gets.
+ *
+ * The owner's report from a real phone was that the chat could not be seen for everything stacked
+ * above and below it. That is a number, so this measures it: the long fixture, at two iPhone sizes
+ * with the keyboard down and one with it up, and for each the height of `.messages` that is
+ * actually visible, in pixels and as a share of what the user can see.
+ *
+ * The keyboard-up case keeps the window at 390x844 and tells the page its visual viewport is 500px
+ * tall (?keyboard=500, see the stub), because that is how iOS reports a keyboard and it is the
+ * code path App.tsx's --keyboard-inset takes. The share there is of the 500px above the keyboard.
+ *
+ * Headless WebKit has no notch and no home indicator: every env(safe-area-inset-*) is 0 here. On a
+ * phone with a home indicator the numbers are a little lower, by whatever the top bar and the
+ * composer pad themselves with.
+ */
+const MEASURE_CASES = [
+  { name: 'iphone-390x844', width: 390, height: 844, keyboard: 0, min: 0.7 },
+  { name: 'iphone-430x932', width: 430, height: 932, keyboard: 0, min: 0.7 },
+  { name: 'iphone-390x844-keyboard', width: 390, height: 844, keyboard: 500, min: 0.45 },
+  // An iPad shows the popup as a popover rather than a full-screen sheet. Its exact size is
+  // Safari's, not ours; this is the compact shell in a window of about that shape, to look at.
+  { name: 'ipad-popover-400x640', width: 400, height: 640, keyboard: 0, min: 0.6, ipad: true },
+];
+
+async function measureTranscript(dir, label) {
+  let playwright;
+  try {
+    playwright = await import('playwright');
+  } catch {
+    fail('playwright is not installed', 'npm install, then `npx playwright install webkit`.');
+  }
+  fs.mkdirSync(dir, { recursive: true });
+  const browser = await playwright.webkit.launch();
+  const rows = [];
+  const failures = [];
+  try {
+    for (const c of MEASURE_CASES) {
+      for (const theme of ['dark', 'light']) {
+        const descriptor = c.ipad ? playwright.devices['iPad Mini'] : playwright.devices['iPhone 14'];
+        const context = await browser.newContext({ ...descriptor, viewport: { width: c.width, height: c.height }, screen: { width: c.width, height: c.height } });
+        const page = await context.newPage();
+        const q = `fixture=long&theme=${theme}${c.keyboard ? `&keyboard=${c.keyboard}` : ''}`;
+        await page.goto(`http://127.0.0.1:${port}/popup.html?${q}`, { waitUntil: 'load' });
+        await page.locator('.messages .msg').first().waitFor({ state: 'visible', timeout: 15000 });
+        if (c.keyboard) {
+          // A keyboard is up because a field has focus; put it there, as a thumb would have.
+          await page.locator('.composer textarea').focus();
+        }
+        await page.waitForTimeout(400);
+        const m = await page.evaluate((keyboard) => {
+          const visible = keyboard || window.innerHeight;
+          const r = document.querySelector('.messages').getBoundingClientRect();
+          const top = Math.max(0, r.top);
+          const bottom = Math.min(visible, r.bottom);
+          return {
+            layout: document.querySelector('.app').getAttribute('data-layout'),
+            visible,
+            transcript: Math.max(0, Math.round(bottom - top)),
+            overflowX: document.documentElement.scrollWidth > window.innerWidth,
+          };
+        }, c.keyboard);
+        const share = m.transcript / m.visible;
+        rows.push({ case: c.name, theme, visible: m.visible, transcript: m.transcript, share });
+        if (m.layout !== 'compact') failures.push(`${c.name}: data-layout is ${m.layout}, expected compact`);
+        if (m.overflowX) failures.push(`${c.name}/${theme}: the page scrolls sideways`);
+        if (label !== 'before' && share < c.min) {
+          failures.push(`${c.name}/${theme}: the transcript gets ${m.transcript}px of ${m.visible}px (${(share * 100).toFixed(1)}%), under the ${c.min * 100}% floor`);
+        }
+        const out = path.join(dir, `${label}-${c.name}-${theme}.png`);
+        await page.screenshot({ path: out, clip: { x: 0, y: 0, width: c.width, height: m.visible } });
+        if (label !== 'before' && theme === 'dark' && !c.keyboard && !c.ipad && c.width === 390) {
+          failures.push(...(await compactShellChecks(page, dir, label)));
+        }
+        await page.close();
+        await context.close();
+      }
+    }
+  } finally {
+    await browser.close();
+  }
+  console.log(`[preview] transcript height, long fixture, ${label}:`);
+  for (const r of rows) {
+    console.log(`[preview]   ${r.case.padEnd(26)} ${r.theme.padEnd(5)} ${String(r.transcript).padStart(4)}px of ${String(r.visible).padStart(4)}px  ${(r.share * 100).toFixed(1)}%`);
+  }
+  if (failures.length) fail(`the compact chat view is not what it should be:\n  ${failures.join('\n  ')}`);
+}
+
+/** Filled in once the compact shell exists; the `before` run never reaches it. */
+async function compactShellChecks() {
+  return [];
+}
+
+/**
  * Open the popup in whatever browser this Mac opens web pages with, and wait for it to report.
  *
  * `open` is a shell command, not an Apple event, so this needs no automation permission and does
@@ -565,7 +756,7 @@ async function probeBrowser() {
 
 server.listen(port, '127.0.0.1', async () => {
   console.log(`[preview] http://127.0.0.1:${port}/popup.html  (views: ${VIEWS.map((v) => `?view=${v}`).join(' ')})`);
-  if (!shots && !webkitShots && !probe && !popoverSize) {
+  if (!shots && !webkitShots && !probe && !popoverSize && !measure) {
     console.log('[preview] stubbed extension APIs: layout only, nothing runs. Ctrl-C to stop.');
     return;
   }
@@ -573,6 +764,7 @@ server.listen(port, '127.0.0.1', async () => {
     if (shots) await screenshotViews(path.resolve(ROOT, shots));
     if (webkitShots) await webkitCapture(path.resolve(ROOT, webkitShots));
     if (popoverSize) await measurePopoverSize();
+    if (measure) await measureTranscript(path.resolve(ROOT, measure), measureLabel);
     if (probe) await probeBrowser();
   } finally {
     server.close();
