@@ -45,6 +45,29 @@ export const SAFARI_MIN_VERSION = '16.4';
 /** The popup document. Safari's only UI surface, and never built for Chrome. */
 export const POPUP_PATH = 'popup.html';
 
+/**
+ * Icon sizes only Safari has a use for.
+ *
+ * Safari's Extensions list — the macOS Settings pane and the iOS one — draws the mark far larger
+ * than a Chrome row does, and with nothing above 128 it upscales the 128 and the pixel art blurs,
+ * which is the one failure the whole generated-and-verified icon pipeline exists to prevent.
+ * Chrome has no surface that picks either size.
+ *
+ * They are listed here rather than simply dropped in public/icon/ because WXT discovers every
+ * `public/icon/N.png` and writes them all into `icons` for every target. Two extra keys in the
+ * Chrome build's manifest.json would be behaviourally harmless and still wrong: that file is a
+ * committed, reviewed artifact and the branch has a test pinning it. wxt.config.ts uses this list
+ * in a `build:publicAssets` hook to keep the files out of the non-Safari packages entirely, so
+ * Chrome's manifest AND its zip are unchanged. test/manifest.test.ts covers both sides.
+ */
+export const SAFARI_ONLY_ICON_SIZES = [256, 512];
+
+/** Whether a public asset is one of those Safari-only icons. */
+export function isSafariOnlyIcon(relativePath: string): boolean {
+  const m = /^icons?[/\\](\d+)\.png$/.exec(relativePath);
+  return m ? SAFARI_ONLY_ICON_SIZES.includes(Number(m[1])) : false;
+}
+
 /** Permissions every target needs, in the order the Chrome build has always listed them. */
 const BASE_PERMISSIONS = ['storage', 'scripting', 'tabs', 'declarativeNetRequest'];
 

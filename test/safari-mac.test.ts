@@ -231,3 +231,71 @@ test('the Mac command prints the artifact only after its seal is verified', () =
   assert.ok(verify > 0, 'mac() does not verify the finished app');
   assert.ok(built > verify, 'mac() reports a built artifact before verification finishes');
 });
+
+// ---------------------------------------------------------------------------
+// The app icon
+// ---------------------------------------------------------------------------
+//
+// The host app shipped with the system's blank placeholder for a while, because the toolchain the
+// branch was first built on could not run actool. Every part of the wiring below fails SILENTLY:
+// a catalog that is not in the Resources phase, or an APPICON_NAME that is blank, produces a
+// successful build and an app with no icon. Nothing in a build log says so.
+
+test('the asset catalog is wired into the app target, for both SDKs', () => {
+  const xcconfig = read('safari/Config/App.xcconfig');
+  // Blank is what it was, and blank builds fine and ships no icon.
+  assert.match(xcconfig, /^ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon$/m);
+
+  const pbx = read('safari/usermods.xcodeproj/project.pbxproj');
+  // A folder.assetcatalog reference, not a plain folder: the type is what makes Xcode run actool
+  // over it rather than copying a directory of loose PNGs into the bundle.
+  assert.match(pbx, /Assets\.xcassets \*\/ = \{isa = PBXFileReference; lastKnownFileType = folder\.assetcatalog;/);
+  // In the APP target's Resources phase (…104), not the extension's (…204). The icon belongs to
+  // the app, which is what /Applications, the Dock and the home screen show.
+  const appResources = /1A0000000000000000000104 \/\* Resources \*\/ = \{[\s\S]*?\};/.exec(pbx)?.[0] ?? '';
+  assert.match(appResources, /Assets\.xcassets in Resources/);
+});
+
+test('the icon set covers both platforms the app builds for', () => {
+  const contents = JSON.parse(read('safari/App/Assets.xcassets/AppIcon.appiconset/Contents.json'));
+  const images: { idiom: string; platform?: string; size: string; scale?: string; filename: string }[] = contents.images;
+
+  // iOS: one full-bleed 1024, which is all current Xcode needs — it derives the rest. Full bleed
+  // because the system applies the superellipse mask itself, and a pre-rounded icon gets rounded
+  // twice and shows pale corners inside the mask.
+  const ios = images.filter((i) => i.platform === 'ios');
+  assert.equal(ios.length, 1, 'iOS should have exactly one universal icon');
+  assert.equal(ios[0]?.size, '1024x1024');
+  assert.equal(ios[0]?.idiom, 'universal');
+
+  // macOS: every (size, scale) slot, because macOS does not derive them and a missing one falls
+  // back to a scaled neighbour.
+  const mac = images.filter((i) => i.idiom === 'mac');
+  const slots = mac.map((i) => `${i.size}@${i.scale}`).sort();
+  assert.deepEqual(slots, [
+    '128x128@1x', '128x128@2x', '16x16@1x', '16x16@2x', '256x256@1x', '256x256@2x',
+    '32x32@1x', '32x32@2x', '512x512@1x', '512x512@2x',
+  ]);
+
+  // Every file named actually exists, which a catalog does not check and actool warns about
+  // rather than failing on.
+  for (const image of images) {
+    assert.doesNotThrow(
+      () => readFileSync(root + `safari/App/Assets.xcassets/AppIcon.appiconset/${image.filename}`),
+      `${image.filename} is named in Contents.json but not on disk`,
+    );
+  }
+});
+
+test('the icon is generated from the vector, not hand-exported', () => {
+  const script = read('scripts/render-app-icon.mjs');
+  // The mark is pixel art and its one invisible failure is interpolation, so the generator has to
+  // verify its own output rather than trusting the renderer. Without this check a mushy icon
+  // renders, ships and looks almost right.
+  assert.match(script, /outside the source artwork/);
+  assert.match(script, /assets[/\\]icon\.svg|'icon\.svg'/);
+  // The exemption that used to exist for antialiased corner arcs is gone, because the artwork
+  // carries its own bevel and nothing is rounded in CSS. If a slack band comes back, the strict
+  // no-new-colours rule has been weakened and this should be reconsidered rather than silently so.
+  assert.doesNotMatch(script, /cornerSlack/);
+});

@@ -1,5 +1,5 @@
 import { defineConfig } from 'wxt';
-import { buildManifest } from './lib/manifest';
+import { buildManifest, isSafariOnlyIcon } from './lib/manifest';
 
 /**
  * The Chrome Web Store build drops subscription sign-in; see lib/buildflags.ts. Set by
@@ -48,4 +48,26 @@ export default defineConfig({
   // The manifest differs by target; lib/manifest.ts holds the differences and test/manifest.test.ts
   // pins them.
   manifest: ({ browser }) => buildManifest(browser),
+  hooks: {
+    /**
+     * Keep the two large icon renders out of every package but Safari's.
+     *
+     * WXT builds the top-level `icons` map by discovering `public/icon/*.png`, so a file dropped in
+     * that directory is listed for every target whether the target has a use for it or not. 256 and
+     * 512 exist for Safari's Extensions list, which draws the mark large enough that upscaling the
+     * 128 would show; Chrome never picks either. Filtering here rather than overriding `icons`
+     * means the Chrome build's manifest.json AND its zip are byte-for-byte what they were, instead
+     * of only the manifest being patched while two unused PNGs ship inside the package.
+     *
+     * See SAFARI_ONLY_ICON_SIZES in lib/manifest.ts.
+     */
+    'build:publicAssets': (wxt, files) => {
+      if (wxt.config.browser === 'safari') return;
+      // Backwards, so a splice does not shift the indices still to be visited.
+      for (let i = files.length - 1; i >= 0; i--) {
+        const dest = files[i]?.relativeDest;
+        if (dest && isSafariOnlyIcon(dest)) files.splice(i, 1);
+      }
+    },
+  },
 });

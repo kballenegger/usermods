@@ -3,7 +3,9 @@
 //   npm test
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { CHROME_MIN_VERSION, POPUP_PATH, SAFARI_MIN_VERSION, actionFor, buildManifest, isSafariTarget, permissionsFor } from '../lib/manifest.ts';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { CHROME_MIN_VERSION, POPUP_PATH, SAFARI_MIN_VERSION, SAFARI_ONLY_ICON_SIZES, actionFor, buildManifest, isSafariOnlyIcon, isSafariTarget, permissionsFor } from '../lib/manifest.ts';
 
 test('only safari is the safari target', () => {
   assert.equal(isSafariTarget('safari'), true);
@@ -99,4 +101,34 @@ test('no build asks for a permission twice', () => {
     const p = permissionsFor(b);
     assert.equal(new Set(p).size, p.length, `${b} lists a permission twice`);
   }
+});
+
+test('the large icon renders are Safari-only, so the Chrome package is unchanged', () => {
+  // 256 and 512 exist for Safari's Extensions list, which draws the mark large enough that
+  // upscaling the 128 would show the blur. Chrome has no surface that picks either size, and its
+  // manifest.json is a committed artifact with a test pinning its shape, so the files are filtered
+  // out of the non-Safari packages by the build:publicAssets hook in wxt.config.ts rather than
+  // being listed for everyone.
+  assert.deepEqual(SAFARI_ONLY_ICON_SIZES, [256, 512]);
+  for (const size of SAFARI_ONLY_ICON_SIZES) {
+    assert.equal(isSafariOnlyIcon(`icon/${size}.png`), true, `icon/${size}.png should be Safari-only`);
+  }
+  // The five every target ships stay put. Filtering one of these would leave Chrome's toolbar
+  // button without the render it names in action.default_icon.
+  for (const size of [16, 32, 48, 96, 128]) {
+    assert.equal(isSafariOnlyIcon(`icon/${size}.png`), false, `icon/${size}.png must ship everywhere`);
+  }
+  // Only icon paths, and only exact ones: a hook that matched loosely would drop real assets.
+  for (const path of ['theme-boot.js', 'icon/128x128.png', 'assets/256.png', 'icon/256.png.map', '']) {
+    assert.equal(isSafariOnlyIcon(path), false, `${path} is not a Safari-only icon`);
+  }
+});
+
+test('the hook that drops them is actually wired to the build', () => {
+  // isSafariOnlyIcon is only useful if something calls it. This is the kind of wiring that fails by
+  // doing nothing: the files simply ship everywhere again and the manifest quietly grows two keys.
+  const config = readFileSync(fileURLToPath(new URL('../wxt.config.ts', import.meta.url)), 'utf8');
+  assert.match(config, /'build:publicAssets'/);
+  assert.match(config, /isSafariOnlyIcon/);
+  assert.match(config, /browser === 'safari'/);
 });

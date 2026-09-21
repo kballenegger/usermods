@@ -16,12 +16,20 @@ CODE_SIGN_ENTITLEMENTS[sdk=macosx*] = App/usermods-macOS.entitlements
 ENABLE_HARDENED_RUNTIME[sdk=macosx*] = YES
 COMBINE_HIDPI_IMAGES[sdk=macosx*] = YES
 
-// No app icon: the host app ships with the system placeholder on the home screen.
+// The app icon, from App/Assets.xcassets, on both platforms.
 //
-// The icon itself is not the problem: assets/icon.svg renders at 1024 through the same verified
-// path as the toolbar icons. An iOS home-screen icon has to go through an asset catalog, and
-// compiling one needs actool's AssetCatalogSimulatorAgent, which cannot be spawned on the toolchain
-// this was built with (Xcode 15.4 on macOS 26: "Failed to launch AssetCatalogSimulatorAgent via
-// CoreSimulator spawn"). Rather than commit a catalog that breaks `node scripts/safari-xcode.mjs
-// build` on the machine the build was verified on, there is no catalog. See docs/safari.md.
-ASSETCATALOG_COMPILER_APPICON_NAME =
+// This was empty for a while, and the reason is worth keeping: an app icon has to go through an
+// asset catalog, and compiling one needs actool, which on the toolchain this branch was first
+// built with (Xcode 15.4 on macOS 26) could not spawn its AssetCatalogSimulatorAgent — "Failed to
+// launch AssetCatalogSimulatorAgent via CoreSimulator spawn", which fails the whole xcodebuild.
+// Committing a catalog would have broken the build on the only machine that could run it, so the
+// app shipped with the system placeholder instead. On Xcode 27 actool compiles both the
+// iphonesimulator and the macosx platforms without complaint, so the catalog is in.
+//
+// The catalog is generated, not hand-exported: `node scripts/render-app-icon.mjs` renders it from
+// assets/icon.svg and refuses to write a raster containing any colour the source artwork does not
+// have, which is how a silently interpolated (mushy) pixel-art icon is kept out. iOS gets one
+// full-bleed 1024 and the system masks it; macOS gets the ten (size, scale) slots it asks for,
+// inset inside a margin the way a Mac icon is expected to be. test/safari-mac.test.ts pins the
+// wiring, since a missing icon is invisible in a build log.
+ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon

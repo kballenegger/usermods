@@ -12,6 +12,7 @@
 		1A0000000000000000000405 /* MacAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000310 /* MacAppDelegate.swift */; };
 		1A0000000000000000000406 /* MacViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000311 /* MacViewController.swift */; };
 		1A0000000000000000000403 /* SafariWebExtensionHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000304 /* SafariWebExtensionHandler.swift */; };
+		1A0000000000000000000407 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000315 /* Assets.xcassets */; };
 		1A0000000000000000000404 /* usermods-extension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000209 /* usermods-extension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -52,6 +53,7 @@
 		1A0000000000000000000312 /* Info-macOS.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info-macOS.plist"; sourceTree = "<group>"; };
 		1A0000000000000000000313 /* usermods-macOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "usermods-macOS.entitlements"; sourceTree = "<group>"; };
 		1A0000000000000000000314 /* usermods-extension-macOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "usermods-extension-macOS.entitlements"; sourceTree = "<group>"; };
+		1A0000000000000000000315 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		1A0000000000000000000306 /* Shared.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shared.xcconfig; sourceTree = "<group>"; };
 		1A0000000000000000000307 /* App.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = App.xcconfig; sourceTree = "<group>"; };
 		1A0000000000000000000308 /* Extension.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Extension.xcconfig; sourceTree = "<group>"; };
@@ -111,6 +113,7 @@
 				1A0000000000000000000302 /* ViewController.swift */,
 				1A0000000000000000000310 /* MacAppDelegate.swift */,
 				1A0000000000000000000311 /* MacViewController.swift */,
+				1A0000000000000000000315 /* Assets.xcassets */,
 				1A0000000000000000000303 /* Info.plist */,
 				1A0000000000000000000312 /* Info-macOS.plist */,
 				1A0000000000000000000313 /* usermods-macOS.entitlements */,
@@ -210,6 +213,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1A0000000000000000000407 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
