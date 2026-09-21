@@ -8,10 +8,10 @@ import type { Provider } from '../providers/types';
 import { renderRunResult, type RunResult } from '../runscript.ts';
 import { DEFAULT_CONTEXT_BUDGET, type AgentEventBody, type ModProposal, type Msg, type Part, type Settings, type UserTurn } from '../types.ts';
 import { MAX_ITERATIONS, countReads, readBudgetNudge, wrapUpNudge } from './budget.ts';
-import { compact, needsCompaction } from './compact.ts';
+import { compact, estimateTokens, needsCompaction } from './compact.ts';
 import { SYSTEM_PROMPT } from './prompt.ts';
 import { checkProposal, type ProposalContext } from './propose.ts';
-import { withRetry, type RetryDeps, type RetryPolicy } from './retry.ts';
+import { isContextLengthError, withRetry, type RetryDeps, type RetryPolicy } from './retry.ts';
 import { toolsFor } from './tools.ts';
 import {
   EMPTY_TALLY,
@@ -24,6 +24,29 @@ import {
   type WaitOutcome,
   type WaitSpec,
 } from './wait.ts';
+
+// ---------------------------------------------------------------------------
+// Context overflow: when the provider's window is smaller than the budget
+// ---------------------------------------------------------------------------
+
+/**
+ * How far under the size that just overflowed to aim when compacting for the retry.
+ *
+ * 0.5 rather than something nearer 0.9 because the failed number is an ESTIMATE of the request, not
+ * a reading of the window: lib/agent/compact.ts counts ~4 characters per token and prices an image
+ * at a flat 1500, both of which can be out by a good margin in either direction. Half of a number
+ * that was too big is comfortably smaller than the window whichever way the estimate erred, and the
+ * reply needs room too. One retry is all there is, so it has to land.
+ */
+export const OVERFLOW_SHRINK = 0.5;
+
+/** However small a window claims to be, a budget under this cannot hold a useful conversation. */
+export const MIN_NARROWED_BUDGET = 8_000;
+
+/** What the transcript says when a provider refuses a history for being too long. */
+export function contextOverflowNote(budget: number): string {
+  return `This model's context window is smaller than the context budget. usermods compacted the conversation to about ${budget.toLocaleString('en-US')} tokens and is sending it again. Set a lower context budget in Settings to avoid this.`;
+}
 
 /** Everything a tool needs from the browser. Implemented in the background worker. */
 export interface AgentEnv {
@@ -66,6 +89,17 @@ export interface AgentInput {
    * immediately rather than only at the end of the turn. Failures here are ignored.
    */
   onCompacted?: (messages: Msg[]) => void | Promise<void>;
+  /**
+   * The provider refused this history for being longer than its context window, and the loop has
+   * compacted to `budget` tokens to try once more.
+   *
+   * The caller's job is to REMEMBER it against the connection and model, so the next turn on this
+   * model starts from a budget that fits instead of rediscovering the same wall. The loop cannot
+   * do that itself: it is handed a resolved `settings` and knows nothing about which connection it
+   * is talking to. Failures here are ignored — a budget that was not remembered costs one extra
+   * compaction next turn, which is not worth failing a run over.
+   */
+  onContextOverflow?: (budget: number) => void | Promise<void>;
   /**
    * The chat's current draft mod, rendered as the block prepended to each user turn
    * (lib/artifact.ts draftBlock). Supplied by the background, which owns artifact storage; the loop
@@ -367,7 +401,7 @@ export async function runAgent(input: AgentInput): Promise<RunOutcome> {
       // not part of the conversation, and the retry streams its own from the start, so the panel is
       // told to take those characters back before it sees the same sentence again.
       let streamed = 0;
-      const res = await withRetry(
+      const sendOnce = () => withRetry(
         () => {
           streamed = 0;
           return provider.chat({
@@ -408,6 +442,48 @@ export async function runAgent(input: AgentInput): Promise<RunOutcome> {
           onResume: modelStatus,
         },
       );
+
+      /**
+       * Send, and if the provider says the conversation is longer than its window, shrink it and
+       * send once more.
+       *
+       * This is the second half of "it breaks in long sessions". The budget is one number for every
+       * provider (see the Settings help text), so a model with a 32k window overflows long before
+       * the history reaches 70% of the 120,000-token default where compaction first runs. Without
+       * this, that 400 ends the run: classifyError correctly says a 400 is not worth sending again,
+       * because the SAME request is not — but a compacted one is a different request.
+       *
+       * Once, not in a loop. If the request is still too long after compaction has been told the
+       * real size of the window, the history is not the problem and trying again is just a second
+       * bill. The narrowed budget is reported so the caller can remember it for this connection and
+       * model, which is what stops the next turn rediscovering the same limit.
+       */
+      let res: Awaited<ReturnType<typeof sendOnce>>;
+      try {
+        res = await sendOnce();
+      } catch (e) {
+        if (signal.aborted || !isContextLengthError(e)) throw e;
+        // What the provider just proved: this history does not fit. Believe the measurement over
+        // the setting — the estimate is what it is, and the window is at most what did not fit —
+        // and aim comfortably under it so the reply has somewhere to go.
+        const measured = estimateTokens(messages);
+        const narrowed = Math.max(MIN_NARROWED_BUDGET, Math.floor(measured * OVERFLOW_SHRINK));
+        emit({ type: 'note', text: contextOverflowNote(narrowed) });
+        input.onContextOverflow?.(narrowed);
+        const shrunk = await compact(messages, {
+          budget: narrowed,
+          signal,
+          summarise: input.complete ? (system, user) => input.complete!(system, user, signal) : undefined,
+          hasDraft: input.hasDraft?.() ?? false,
+        });
+        if (signal.aborted) throw e;
+        if (!shrunk.steps.length) throw e; // nothing left to cut: the same request would go again
+        messages.splice(0, messages.length, ...shrunk.messages);
+        for (const step of shrunk.steps) emit({ type: 'compacted', tier: step.tier, before: step.before, after: step.after });
+        await Promise.resolve(input.onCompacted?.(messages)).catch(() => {});
+        modelStatus();
+        res = await sendOnce();
+      }
       messages.push({ role: 'assistant', content: res.content });
 
       const calls = res.content.filter((p): p is Extract<Part, { type: 'tool_call' }> => p.type === 'tool_call');

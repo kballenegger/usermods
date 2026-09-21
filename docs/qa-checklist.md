@@ -291,6 +291,79 @@ ways — by reading `chrome.sidePanel.getOptions()`. Two things are left to you 
 
 ---
 
+## 4c. A long session: deletion that sticks, storage, and a small context window
+
+Three user reports from the Chrome build land here. Automation covers the mechanisms (`npm test`
+races a delete against a live index write, and drives a provider that refuses an over-long
+history), but it cannot spend a real hour in a real profile against a real backend — which is what
+"it breaks in long sessions" was reported from.
+
+Budget about 25 minutes. Keep the **service worker console** open throughout; it is where a storage
+failure would have gone unseen before.
+
+1. **A delete during a run.** On a busy page, send a request that will take several tool calls
+   ("go through every heading on this page and tell me what each one does"). While it is still
+   running — the activity line ticking — open the chat switcher and **Delete** that chat.
+   **Expected:** the confirm names the chat; it disappears; the panel falls back to another chat or
+   the empty composer. No error in the panel.
+   **Then:** wait ten seconds for the run to finish dying, close and reopen the side panel, and
+   navigate away and back to that site.
+   **Expected:** the chat is still gone. It does not reappear in the switcher, and reopening the
+   panel on that site does not restore it. **This is the bug that was reported** — a deleted chat
+   returning after a reload or a revisit.
+   **If it fails:** service worker console, and in the panel's DevTools run
+   `chrome.storage.local.get('chats').then(r => console.log(r.chats.map(c => c.id + ' ' + c.title)))`
+   — if the chat is listed there, copy that line.
+2. **A delete right after a turn.** Send a short message, wait for the reply to finish, and delete
+   the chat within a second or two of it completing.
+   **Expected:** same as above, and additionally, in the panel's DevTools:
+   `chrome.storage.local.get(null).then(r => console.log(Object.keys(r).filter(k => k.startsWith('chat:'))))`
+   lists no `chat:<that id>:messages`, `:items`, `:blobs` or `:artifact` key.
+   **If it fails:** copy that key list.
+3. **Bulk delete from the dashboard.** Open the dashboard, select several chats, delete them, then
+   reload the dashboard and reopen the panel on one of those sites.
+   **Expected:** all of them stay gone.
+4. **The context budget field.** Settings → **Context budget (tokens)**. Select the whole field and
+   type `50000`, one key at a time, watching the field.
+   **Expected:** it reads `5`, `50`, `500`, `5000`, `50000` as you type. It must **not** jump to
+   `10000` at any point. **This is the bug that was reported.**
+   Then: type `500` and press Tab. **Expected:** it becomes `10000` — the floor, applied once you
+   are done. Type `8000` and press Enter: same. Clear the field entirely and Tab out:
+   **Expected:** `120000`, the default. Type `64000`, and without leaving the field close the side
+   panel and reopen Settings: **Expected:** `64000` was saved.
+   **If it fails:** side panel DevTools.
+5. **A model with a small context window.** Add a connection to a local or hosted model with a small
+   window (anything 8k–32k; a small Ollama or LM Studio model is ideal). Leave the context budget at
+   its 120,000 default. Have a long conversation on a dense page — ten or more turns with several
+   page reads each — until the history is clearly large.
+   **Expected:** when the conversation outgrows that model's window, the turn does **not** fail. A
+   note appears saying the model's context window is smaller than the budget and that usermods
+   compacted and is sending it again, a compaction line appears, and the reply arrives.
+   **Then:** send another message.
+   **Expected:** the second turn does not repeat the failure — the smaller budget was remembered, so
+   it compacts up front rather than being refused first.
+   **If it fails:** service worker console; copy the provider's exact 400 body, which is what the
+   classifier reads.
+6. **Storage.** In the panel's DevTools, check usage at any point with
+   `chrome.storage.local.getBytesInUse(null).then(b => console.log((b/1048576).toFixed(2) + ' MB of 10 MB'))`.
+   Attach four images (the composer's limit) across a few messages in one chat and check again.
+   **Expected:** usage climbs by roughly 1.5 MB per full-size image. This is the headroom problem:
+   the cap is 10 MB.
+   **Then:** keep going until usage passes 8 MB.
+   **Expected:** a note appears once saying storage is N% full and to delete old chats in the
+   dashboard. It appears once, not on every turn.
+   **Then, if you can reach the cap:** keep attaching until a save is actually refused.
+   **Expected:** a note saying the chat is no longer being saved and what to do about it — not
+   silence. Before this fix, the conversation carried on on screen and quietly stopped being
+   written.
+   **If it fails:** service worker console.
+7. **Attached images are cleaned up.** In a chat with attachments, note the blob store's size:
+   `chrome.storage.local.get(null).then(r => { const k = Object.keys(r).find(k => k.endsWith(':blobs')); console.log(k, JSON.stringify(r[k]).length); })`.
+   Delete that chat, then check that no `:blobs` key for it remains.
+   **Expected:** gone with the chat.
+
+---
+
 ## 4b. Edit an installed mod in chat (including an imported one)
 
 The half of this that automation cannot reach is the real user-scripts world: the smoke flow runs in
@@ -879,6 +952,10 @@ OpenAI-compatible endpoint, ideally a local server as well.
 | 3a | Lost connection retries, Resume, interrupted run | | |
 | 4 | Chat persistence: reload, restart, second chat | | |
 | 4a | Side panel: this tab only, every tab, dashboard Open | | |
+| 4c | Delete during a run stays deleted after reload and revisit | | |
+| 4c | Context budget field takes every digit; floor applies on blur/Enter | | |
+| 4c | Small context window: one compaction, then remembered | | |
+| 4c | Storage: warning at 80%, a refused save says so, blobs go with the chat | | |
 | 4b | Edit an installed mod in chat (imported, round trip, detach, duplicate) | | |
 | 5 | Install from Greasy Fork `.user.js` link | | |
 | 6 | `@require` + `GM_setValue`/`GM_getValue` sync (2 tabs) | | |

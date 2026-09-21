@@ -14,6 +14,10 @@ import { shouldUpdate } from '@/lib/version';
 import { loadMods, modFromProposal, modFromSource, parseHeader, previewFromSource, upsertMod, deleteMod, saveMods } from '@/lib/mods';
 import { appendTurn, archiveChat, bulkChats, countTurns, createChat, deleteChat, getChat, hostFromUrl, isArchived, listChats, loadItems, loadMessages, markTitleRefreshed, renameChat, saveItems, saveMessages, setChatArtifact, setChatModel, setChatThinking, setModelTitle, touchChat } from '@/lib/chats';
 import { loadRuns, markInterrupted, pruneRuns, resumableRuns, saveRuns, type RunMap, type RunRecord } from '@/lib/runstate';
+import { isTombstoned, withKey } from '@/lib/storagequeue';
+import { collectBlobs } from '@/lib/blobs';
+import { QUOTA_PANEL_NOTE, bytesInUse, quotaWarningNote, shouldWarn } from '@/lib/quota';
+import { CONTEXT_LIMITS_KEY, effectiveBudget, limitKey, loadContextLimits, rememberLimit, saveContextLimits } from '@/lib/contextlimits';
 import { reduceItems } from '@/lib/transcript';
 import { addVersion, adoptMod, currentVersion, detachFromMod, draftBlock, fromMod, loadArtifact, recordProposal, rollbackTo, saveArtifact, toProposal, toSource, type Artifact } from '@/lib/artifact';
 import { draftStanding, duplicateOf, editModPlan, likelyUrlFor, modsBlock, modsForUrl, openModDecision, runsOnPage } from '@/lib/modmatch';
@@ -51,6 +55,7 @@ import {
   type ThinkingLevel,
 } from '@/lib/thinking';
 import { actionClickPlan, resolveScope, sidePanelAvailable, windowPanelPlan } from '@/lib/sidepanel';
+import { DEFAULT_CONTEXT_BUDGET } from '@/lib/types';
 import type { SidePanelScope } from '@/lib/types';
 import { looksLikeZip, parseTampermonkeyJson, parseTampermonkeyZipEntries, type TmScript } from '@/lib/tampermonkey';
 import type { AgentEvent, AgentEventBody, ChatItem, ContentRequest, Mod, ModProposal, Msg, Part, Settings, UserTurn } from '@/lib/types';
@@ -286,9 +291,42 @@ async function flushDetachedChat(chatId: string): Promise<void> {
   await writeDetached(chatId, entry);
 }
 
+/**
+ * Tell the user once, per worker lifetime, when storage is nearly full.
+ *
+ * Once is the point. The warning is worth saying while there is still room to act on it, and worth
+ * saying no more than that: a note on every turn of a long session is noise, and the user cannot do
+ * anything about it mid-conversation anyway. A worker restart makes it sayable again, which is the
+ * right cadence — by then they have either cleared space or come back to a new session.
+ */
+let warnedLowStorage = false;
+
+async function warnIfStorageLow(post: (e: AgentEventBody) => void): Promise<void> {
+  if (warnedLowStorage) return;
+  const used = await bytesInUse();
+  if (!shouldWarn(used)) return;
+  warnedLowStorage = true;
+  post({ type: 'note', text: quotaWarningNote(used!) });
+}
+
 /** Write out everything being kept, and stop keeping it. Called when a panel connects. */
 async function flushDetached(): Promise<void> {
   await Promise.all([...detached.keys()].map((id) => flushDetachedChat(id)));
+}
+
+/**
+ * Throw away what is being kept for these chats WITHOUT writing it. The one caller is deletion: a
+ * transcript buffered in memory for a chat that is being deleted must not be flushed to a key the
+ * delete is about to remove. Any timer it had is cancelled with it.
+ */
+function forgetDetached(ids: string[]): void {
+  for (const id of ids) {
+    const entry = detached.get(id);
+    if (!entry) continue;
+    if (entry.timer) clearTimeout(entry.timer);
+    entry.latest = null;
+    detached.delete(id);
+  }
 }
 
 // ---------- run records (lib/runstate.ts) ----------
@@ -308,8 +346,19 @@ function updateRuns(fn: (runs: RunMap) => RunMap): Promise<void> {
   return next.catch(() => {});
 }
 
+/**
+ * Record a run's state — unless its chat has just been deleted.
+ *
+ * The runs map has the same resurrection problem the chat index had, one level down. Deleting a
+ * chat with a run in flight calls clearRuns, but the run itself carries on for as long as the
+ * provider takes to answer and then writes 'failed' or 'interrupted' for that id. The record comes
+ * back after the delete removed it, and the panel offers Resume for a chat that no longer exists.
+ * The tombstone recorded by deleteChat (lib/chats.ts) is what says not to.
+ */
 function setRun(chatId: string, patch: Pick<RunRecord, 'state' | 'tabId'> & { error?: string }): Promise<void> {
+  if (isTombstoned(chatId)) return Promise.resolve();
   return updateRuns((runs) => {
+    if (isTombstoned(chatId)) return runs;
     const now = Date.now();
     const prev = runs[chatId];
     const startedAt = patch.state === 'running' || !prev ? now : prev.startedAt;
@@ -428,6 +477,14 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
     // reported, never replaced with another provider.
     const resolved = await resolveChatModel(chatId);
     settings = resolved.settings;
+    // A context budget this model has already been shown to refuse (lib/contextlimits.ts). The
+    // setting is one number for every provider, so a model with a small window would otherwise
+    // rediscover its own limit — a failed request and a compaction the user watches — on every
+    // single turn. Only ever narrows: a user asking for less than the learned number still gets it.
+    const budgetKey = limitKey(resolved.selection.connectionId, resolved.selection.model);
+    const learnedLimits = await loadContextLimits();
+    const budget = effectiveBudget(settings.contextBudget ?? DEFAULT_CONTEXT_BUDGET, learnedLimits, budgetKey);
+    if (budget !== settings.contextBudget) settings = { ...settings, contextBudget: budget };
     post({ type: 'model', connectionId: resolved.selection.connectionId, label: resolved.selection.label ?? '', model: resolved.selection.model, thinking: resolved.thinking });
     history = await loadMessages(chatId);
     if (!turn && !history.length) throw new Error('There is nothing to resume in this chat. Send your message again.');
@@ -485,7 +542,17 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
       // A compacted history is written back immediately. The next turn then starts from the small
       // version even if this one later dies mid-run, which is the whole point: the chat that was
       // too big to send must not stay too big to send.
-      onCompacted: (msgs) => saveMessages(chatId, msgs),
+      onCompacted: async (msgs) => void (await saveMessages(chatId, msgs)),
+      // The provider refused the history for being too long and the loop compacted to fit. Writing
+      // that number down against this connection and model is what stops the next turn walking
+      // into the same wall. Serialised on the key, since two chats on the same model can both
+      // discover it at once.
+      onContextOverflow: (learned) =>
+        withKey(CONTEXT_LIMITS_KEY, async () => {
+          const current = await loadContextLimits();
+          const next = rememberLimit(current, budgetKey, learned);
+          if (next !== current) await saveContextLimits(next);
+        }).catch(() => {}),
       // The conversation is written back after every completed step, not only at the end. If the
       // worker is evicted half-way through a twenty-step run, nineteen steps are on disk.
       onCheckpoint: async (msgs) => {
@@ -553,8 +620,13 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
     // Whatever happened, the loop hands back a valid conversation holding everything it completed:
     // every assistant message, every tool call and every tool result up to the step that failed.
     const messages = outcome.messages;
-    await saveMessages(chatId, messages);
+    // A save that could not happen used to be silent — every save on this path is fire-and-forget,
+    // for the good reason that losing the reply on top of the record would be worse. Silent is what
+    // made the storage half of "it breaks in long sessions" so hard to place: the conversation kept
+    // going on screen and stopped existing on disk. It still does not fail the turn; it now says so.
+    if ((await saveMessages(chatId, messages)) === 'quota') post({ type: 'note', text: QUOTA_PANEL_NOTE });
     await touchChat(chatId, { url, turns: countTurns(messages) });
+    void warnIfStorageLow(post);
     if (outcome.failure) failed = outcome.failure.message;
     succeeded = !signal.aborted && !outcome.failure;
   } catch (e) {
@@ -912,8 +984,24 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
       return listChats(req.host);
     case 'chats.listAll':
       return listChats();
-    case 'chats.transcript':
-      return loadItems(req.id);
+    case 'chats.transcript': {
+      const items = await loadItems(req.id);
+      // Collect this chat's orphaned blobs here, and ONLY here, because this is the one moment the
+      // stored transcript is authoritative. It cannot be done after a turn: the panel owns
+      // 'chat:<id>:items' and writes it on a 400ms debounce, so a read taken right after a run
+      // finishes does not yet mention the image that run just attached — and collecting against
+      // that stale copy deletes a live blob (the images smoke flow catches exactly this).
+      //
+      // Opening a chat is the right cadence anyway. Nothing is mid-write, an orphan costs only
+      // space until the next open, and the user is not waiting on the result: it is fire-and-forget
+      // while the transcript it was computed from is already on its way back.
+      //
+      // A never-reopened chat keeps its orphans, which is the honest limit of doing it here. Its
+      // keys still go together when the chat is deleted or evicted (chatKeys), so nothing leaks
+      // past the chat's own life.
+      if (items.length) void collectBlobs(req.id, items).catch(() => 0);
+      return items;
+    }
     case 'chats.create':
       return createChat(req.host, req.model, req.thinking);
     case 'chats.setModel':
@@ -925,6 +1013,11 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
     case 'agent.attach':
       return attachState();
     case 'chats.delete':
+      // Before the delete, not after: forgetDetached drops the kept transcript for this chat so
+      // the detached writer cannot flush it back over the keys deleteChat is about to remove.
+      // deleteChat's tombstone covers the window after this point; this covers the buffer already
+      // held in memory, which no tombstone can reach into.
+      forgetDetached([req.id]);
       await deleteChat(req.id);
       await clearRuns([req.id]);
       return { ok: true };
@@ -935,6 +1028,7 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
       await renameChat(req.id, req.title);
       return { ok: true };
     case 'chats.bulk':
+      if (req.action === 'delete') forgetDetached(req.ids);
       await bulkChats(req.ids, req.action);
       if (req.action === 'delete') await clearRuns(req.ids);
       return { ok: true };

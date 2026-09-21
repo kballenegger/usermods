@@ -6,6 +6,44 @@ All notable changes to usermods are recorded here. The format follows
 
 ## [Unreleased]
 
+### Fixed, from user reports on the Chrome build
+
+- **A deleted chat could come back.** Reported as "deleting it does nothing. It shows up again if I
+  reopen the window later or visit the site?" The chat index was written by nine separate
+  read-modify-write cycles over one storage key, none of them serialised. A delete that raced a
+  background turn's activity write, or a proposal being noted on the index, was overwritten by a
+  snapshot taken before the delete — putting the chat back, pointing at per-chat keys the delete had
+  already removed. Separately, the panel's debounced transcript save and the background's
+  detached-run writer could recreate a deleted chat's transcript after the fact. Every index writer
+  now goes through one per-key queue, a delete wins over writes that were already in flight for that
+  chat, and the panel drops its pending writes for a chat it is deleting rather than flushing them.
+  Chat deletion, single and bulk, is the same as before from the outside; it now sticks.
+- **The context budget field fought you while you typed it.** Reported as "You have a minimum default
+  but when I'm editing, it enforces it so it's a bit tricky for me to change the context window
+  limit." Settings applied the 10,000-token floor on every keystroke, so typing `50000` began with
+  `5`, which became `10000` under the cursor. The floor is unchanged and now applies once, when you
+  leave the field or press Enter. Escape abandons what you typed; an empty field asks for the
+  default back; a number typed and then left by closing the panel is still saved. The help text
+  names both the floor and the default.
+- **A model with a small context window no longer ends the run.** Part of "it breaks in long
+  sessions". The context budget is one number for every provider and defaults to 120,000 tokens,
+  while compaction first runs at 70% of it — so a model with a 32k window was refused by its own
+  provider long before anything shrank the conversation, and the turn died. usermods now recognises
+  that refusal (across the phrasings OpenAI, Azure, Anthropic, llama.cpp, Ollama, vLLM, TGI and
+  Gemini-compatible endpoints send), compacts the conversation, sends it once more, says so in the
+  chat, and remembers a budget that fits for that connection and model so the next turn starts from
+  it. Token rate limits and reply-length errors are deliberately not treated this way.
+- **Running out of extension storage is no longer silent.** The other part of "it breaks in long
+  sessions". Chrome caps extension storage at 10 MB, and one full-size attached image costs about
+  1.5 MB of it — so a handful of images across a profile is the whole budget. Every save was
+  fire-and-forget, so a chat that could no longer be written simply stopped being written while the
+  conversation carried on on screen. A refused save now says so in the chat, and a warning appears
+  once at 80% full, while there is still room to act. Attached images whose messages are no longer
+  in the transcript are now actually deleted when the chat is opened — the cleanup existed but had
+  never been wired to anything, so every such image stayed for the life of the chat.
+
+No new permissions: the Chrome manifest is byte-for-byte unchanged.
+
 ### Thinking: how hard the model reasons, per chat
 
 - **A Thinking level next to the model**, mapped onto each provider's own reasoning knob. The levels

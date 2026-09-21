@@ -23,6 +23,9 @@ import {
   type ThinkingLevel,
 } from '../lib/thinking.ts';
 import { createOpenAIProvider } from '../lib/providers/openai.ts';
+import { isVisionRejection } from '../lib/providers/vision.ts';
+import { isContextLengthError } from '../lib/agent/retry.ts';
+import { ProviderError } from '../lib/providers/errors.ts';
 import { DEFAULT_SETTINGS, type Msg, type Settings } from '../lib/types.ts';
 
 /** The capability for one model, at the call site's convenience. */
@@ -531,6 +534,120 @@ describe('the 400 fallback', () => {
         assert.equal(sent.length, 3, 'one send, one without images, one without either');
         assert.ok(!('reasoning_effort' in sent[2]), 'the final request carries neither');
         assert.equal(memory.keys.size, 1);
+      },
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Three reasons to re-send, and none of them may loop
+// ---------------------------------------------------------------------------
+//
+// After the fix/user-reports merge a single turn can be re-sent for three INDEPENDENT reasons:
+//
+//   images          lib/providers/openai.ts  — the endpoint refuses a picture      (adapter)
+//   reasoning field lib/providers/openai.ts  — the endpoint refuses the knob       (adapter)
+//   context overflow lib/agent/loop.ts       — the history is longer than the window (loop)
+//
+// The first two live inside one `chat()` call and are bounded by its own counter; the third lives
+// outside it and re-enters `chat()` once. The danger is multiplication and mutual misreading: a
+// context 400 mistaken for a reasoning refusal would silently drop the user's level AND skip the
+// compaction that would actually have fixed it, and an adapter that re-sent on every pass would
+// multiply the loop's one retry into several bills.
+describe('the three re-send reasons compose without looping', () => {
+  test('a context-overflow 400 is not mistaken for a reasoning or a vision refusal', () => {
+    // Every phrasing here is one lib/agent/retry.ts lists as a real backend's overflow wording. If
+    // either adapter classifier claimed one, the loop would never see it: the adapter would drop a
+    // field, the re-send would overflow again, and the run would die with the level silently lost.
+    const overflows = [
+      "This model's maximum context length is 8192 tokens. However, your messages resulted in 9101 tokens",
+      'prompt is too long: 215000 tokens > 200000 maximum',
+      'the request exceeds the available context size',
+      'input validation error: `inputs` must have less than 4096 tokens',
+      'context_length_exceeded',
+      'Please reduce the length of the messages',
+      'input token count exceeds the maximum',
+    ];
+    for (const body of overflows) {
+      assert.equal(isReasoningRejection(400, body), false, `claimed as a reasoning refusal: ${body}`);
+      assert.equal(isVisionRejection(400, body), false, `claimed as a vision refusal: ${body}`);
+      // And the loop's own classifier does recognise it, so it is handled by exactly one of the three.
+      assert.equal(isContextLengthError(new ProviderError(body, { kind: 'http', status: 400 })), true, `not recognised as an overflow: ${body}`);
+    }
+  });
+
+  test('a reasoning refusal is not mistaken for a context overflow', () => {
+    // The converse: the loop must not compact a history that was never too long. That would spend a
+    // summarisation call, throw away real turns, and still fail on the same rejected field.
+    const refusal = 'Unrecognized request argument supplied: reasoning_effort';
+    assert.equal(isContextLengthError(new ProviderError(refusal, { kind: 'http', status: 400 })), false);
+    assert.equal(isReasoningRejection(400, refusal), true);
+  });
+
+  test('one chat() call sends at most three times, whatever the server refuses', async () => {
+    // The adapter's own bound. A server that refuses everything must not be asked forever: images
+    // go, then the reasoning field, then the failure is real and is thrown.
+    const memory = fakeThinkingMemory();
+    await withFetch(
+      (body) => {
+        if ((body.messages as any[]).some((m: any) => Array.isArray(m.content) && m.content.some((p: any) => p.type === 'image_url'))) {
+          return errorResponse(400, 'Invalid content type. image_url is only supported by certain models.');
+        }
+        if ('reasoning_effort' in body) return errorResponse(400, 'Unrecognized request argument supplied: reasoning_effort');
+        return errorResponse(400, 'something else entirely');
+      },
+      async (sent) => {
+        const messages: Msg[] = [{ role: 'user', content: [{ type: 'image', mediaType: 'image/png', data: 'aW1n' }, { type: 'text', text: 'look' }] }];
+        await assert.rejects(
+          () =>
+            createOpenAIProvider(oaiSettings({ thinking: 'high', images: 'auto' }), { thinkingMemory: memory }).chat({
+              system: 'SYS',
+              messages,
+              tools: [],
+              callbacks: { onText: () => {} },
+            }),
+          /something else entirely/,
+          'the third failure is real and must surface rather than being retried again',
+        );
+        assert.equal(sent.length, 3, `the adapter sent ${sent.length} times; it must stop after shedding each thing once`);
+      },
+    );
+  });
+
+  test('a context overflow reaches the caller untouched, so the loop can compact and retry', async () => {
+    // The adapter's job here is to do NOTHING: not to drop the level, not to drop the images, not
+    // to re-send. One request, and the error propagates with its status intact so
+    // isContextLengthError can see it.
+    const memory = fakeThinkingMemory();
+    await withFetch(
+      () => errorResponse(400, "This model's maximum context length is 8192 tokens"),
+      async (sent) => {
+        const err = await chat(oaiSettings({ thinking: 'high' }), { thinkingMemory: memory }).then(
+          () => null,
+          (e) => e,
+        );
+        assert.equal(sent.length, 1, 'the adapter must not re-send on an overflow; that is the loop\'s retry to make');
+        assert.equal(memory.keys.size, 0, 'an overflow must not be remembered as a reasoning refusal');
+        assert.equal(isContextLengthError(err), true, 'the overflow did not survive the adapter as a recognisable error');
+      },
+    );
+  });
+
+  test('after a reasoning refusal, the loop\'s retry costs one request, not another fallback', async () => {
+    // The composition that matters for the bill. Turn 1 discovers the refusal (2 sends). The loop
+    // then compacts and calls chat() again — and because the refusal was REMEMBERED, that second
+    // call sends once, with no field and no rediscovery. Three sends for the whole turn, not four.
+    const memory = fakeThinkingMemory();
+    await withFetch(
+      (body) => ('reasoning_effort' in body ? errorResponse(400, 'Unrecognized request argument supplied: reasoning_effort') : okStream()),
+      async (sent) => {
+        const settings = oaiSettings({ thinking: 'high' });
+        await chat(settings, { thinkingMemory: memory });
+        assert.equal(sent.length, 2, 'the first call should discover the refusal in two sends');
+        // The loop's single retry, re-entering the adapter with the same settings.
+        await chat(settings, { thinkingMemory: memory });
+        assert.equal(sent.length, 3, 'the retry re-discovered the refusal instead of remembering it');
+        assert.ok(!('reasoning_effort' in sent[2]), 'the retry must not carry the field again');
       },
     );
   });

@@ -7,8 +7,11 @@
 //   'chat:<id>:artifact' — Artifact draft mod (lib/artifact.ts), written by the background
 // chatKeys() below is the single list of the per-chat keys, so deleting a chat cannot leave one.
 import { artifactKey } from './artifact.ts';
-import { blobsKey, elidedImageNote, type AttachedImage, type ImageThumb } from './images.ts';
+import { referencedHashes } from './blobs.ts';
+import { blobsKey, elidedImageNote, type AttachedImage } from './images.ts';
+import { trySet } from './quota.ts';
 import type { ModelSelection } from './connections.ts';
+import { dropTombstoned, isTombstoned, tombstone, withKey } from './storagequeue.ts';
 import type { ThinkingLevel } from './thinking.ts';
 import type { TitleSource } from './title';
 import type { ChatItem, Msg, Part } from './types';
@@ -216,8 +219,46 @@ async function readIndex(): Promise<Chat[]> {
   return sortChats(raw.filter((c) => c && typeof c.id === 'string'));
 }
 
+/**
+ * Write the index, minus anything deleted while this write was being prepared.
+ *
+ * dropTombstoned is the second half of the fix described in lib/storagequeue.ts. Queueing stops
+ * two writers interleaving, but a writer whose READ happened before a delete is holding a snapshot
+ * in which the chat is still alive; without this filter it would write that chat back and the user
+ * would watch a deleted conversation reappear. Every path out of this module goes through here, so
+ * there is no writer that can skip the filter.
+ */
 async function writeIndex(chats: Chat[]): Promise<void> {
-  await chrome.storage.local.set({ [INDEX_KEY]: sortChats(chats) });
+  await chrome.storage.local.set({ [INDEX_KEY]: sortChats(dropTombstoned(chats)) });
+}
+
+/**
+ * Read the index, change it, write it back — with nothing else touching the index in between.
+ *
+ * Every read-modify-write of 'chats' goes through this. They used to be written out one by one in
+ * each function, which meant each was its own unserialised cycle and any two of them overlapping
+ * lost an edit; when one of the two was a delete, it resurrected the chat (see lib/storagequeue.ts).
+ *
+ * `fn` returns the index to store, or null to write nothing — so a writer that finds its chat gone,
+ * or finds nothing to change, costs a read and no write at all.
+ */
+function mutateIndex<T>(fn: (chats: Chat[]) => { chats: Chat[] | null; result: T } | Promise<{ chats: Chat[] | null; result: T }>): Promise<T> {
+  return withKey(INDEX_KEY, async () => {
+    const { chats, result } = await fn(await readIndex());
+    if (chats) await writeIndex(chats);
+    return result;
+  });
+}
+
+/** The common shape: find the chat, change it in place, write the index back. */
+function patchChat(id: string, patch: (chat: Chat, chats: Chat[]) => boolean): Promise<void> {
+  return mutateIndex((chats) => {
+    const chat = chats.find((c) => c.id === id);
+    // A chat deleted while this call was queued behind another one: nothing to patch, and writing
+    // the index back would be a no-op anyway. Bail before the write rather than after it.
+    if (!chat || isTombstoned(id)) return { chats: null, result: undefined };
+    return { chats: patch(chat, chats) ? chats : null, result: undefined };
+  });
 }
 
 /**
@@ -227,8 +268,12 @@ async function writeIndex(chats: Chat[]): Promise<void> {
  * 200-chat ceiling is one rule in one place rather than a thing each caller remembers.
  */
 async function writeIndexCapped(chats: Chat[]): Promise<void> {
-  const { kept, dropped } = capChats(chats);
+  const { kept, dropped } = capChats(dropTombstoned(chats));
   await writeIndex(kept);
+  // An evicted chat is as gone as a deleted one, so it gets a tombstone too: the same in-flight
+  // write that could resurrect a deletion could resurrect an eviction, and its keys have just been
+  // removed either way.
+  for (const id of dropped) tombstone(id);
   if (dropped.length) await chrome.storage.local.remove(dropped.flatMap(chatKeys));
 }
 
@@ -248,7 +293,7 @@ export async function createChat(host: string, model?: ModelSelection | null, th
   if (model?.connectionId && model.model) chat.model = { connectionId: model.connectionId, model: model.model, ...(model.label ? { label: model.label } : {}) };
   // Likewise the Thinking level. 'default' is the absence of the field, so it is not written.
   if (thinking && thinking !== 'default') chat.thinking = thinking;
-  await writeIndexCapped([chat, ...(await readIndex())]);
+  await withKey(INDEX_KEY, async () => writeIndexCapped([chat, ...(await readIndex())]));
   return chat;
 }
 
@@ -260,50 +305,46 @@ export async function createChat(host: string, model?: ModelSelection | null, th
  * wherever it was last used, which is where the dashboard should reopen it. Only http(s) URLs are
  * kept — an extension page or a chrome:// URL is not somewhere to come back to.
  */
-export async function touchChat(id: string, patch: { title?: string; url?: string; turns?: number } = {}): Promise<void> {
-  const chats = await readIndex();
-  const chat = chats.find((c) => c.id === id);
-  if (!chat) return;
-  chat.updatedAt = Date.now();
-  delete chat.archivedAt;
-  if (patch.title && (!chat.title || chat.title === 'New chat')) {
-    chat.title = titleFromText(patch.title);
-    chat.titleSource = 'auto-first';
-  }
-  if (patch.url && /^https?:\/\//i.test(patch.url)) chat.url = patch.url;
-  if (typeof patch.turns === 'number') chat.turns = patch.turns;
-
-  await writeIndex(chats);
+export function touchChat(id: string, patch: { title?: string; url?: string; turns?: number } = {}): Promise<void> {
+  return patchChat(id, (chat) => {
+    chat.updatedAt = Date.now();
+    delete chat.archivedAt;
+    if (patch.title && (!chat.title || chat.title === 'New chat')) {
+      chat.title = titleFromText(patch.title);
+      chat.titleSource = 'auto-first';
+    }
+    if (patch.url && /^https?:\/\//i.test(patch.url)) chat.url = patch.url;
+    if (typeof patch.turns === 'number') chat.turns = patch.turns;
+    return true;
+  });
 }
 
 /**
  * Record which model a chat talks to. Not activity: picking a model does not reorder the switcher
  * or unarchive anything, so this goes round touchChat the same way setChatArtifact does.
  */
-export async function setChatModel(id: string, model: ModelSelection): Promise<void> {
-  const chats = await readIndex();
-  const chat = chats.find((c) => c.id === id);
-  if (!chat) return;
-  if (chat.model?.connectionId === model.connectionId && chat.model.model === model.model && chat.model.label === model.label) return;
-  chat.model = { connectionId: model.connectionId, model: model.model, ...(model.label ? { label: model.label } : {}) };
-  await writeIndex(chats);
+export function setChatModel(id: string, model: ModelSelection): Promise<void> {
+  return patchChat(id, (chat) => {
+    if (chat.model?.connectionId === model.connectionId && chat.model.model === model.model && chat.model.label === model.label) return false;
+    chat.model = { connectionId: model.connectionId, model: model.model, ...(model.label ? { label: model.label } : {}) };
+    return true;
+  });
 }
 
 /**
  * Record how much this chat asks the model to think. Not activity, for the same reason setChatModel
  * is not: choosing a level does not reorder the switcher or unarchive anything.
  */
-export async function setChatThinking(id: string, thinking: ThinkingLevel): Promise<void> {
-  const chats = await readIndex();
-  const chat = chats.find((c) => c.id === id);
-  if (!chat) return;
-  const current = chat.thinking ?? 'default';
-  if (current === thinking) return;
-  // 'default' is the absence of the field, not a value: a chat set back to it is indistinguishable
-  // from one that was never touched, which is what keeps the stored shape from growing over time.
-  if (thinking === 'default') delete chat.thinking;
-  else chat.thinking = thinking;
-  await writeIndex(chats);
+export function setChatThinking(id: string, thinking: ThinkingLevel): Promise<void> {
+  return patchChat(id, (chat) => {
+    const current = chat.thinking ?? 'default';
+    if (current === thinking) return false;
+    // 'default' is the absence of the field, not a value: a chat set back to it is indistinguishable
+    // from one that was never touched, which is what keeps the stored shape from growing over time.
+    if (thinking === 'default') delete chat.thinking;
+    else chat.thinking = thinking;
+    return true;
+  });
 }
 
 /**
@@ -315,29 +356,28 @@ export async function setChatThinking(id: string, thinking: ThinkingLevel): Prom
 export async function setModelTitle(id: string, title: string, { refresh = false } = {}): Promise<string | null> {
   const clean = titleFromText(title);
   if (!clean || clean === 'New chat') return null;
-  const chats = await readIndex();
-  const chat = chats.find((c) => c.id === id);
-  if (!chat) return null;
-  // The user may have renamed it while the title call was in flight; their name wins.
-  if (titleSourceOf(chat) === 'user') return null;
-  const changed = chat.title !== clean;
-  chat.title = clean;
-  chat.titleSource = 'auto-model';
-  if (refresh) chat.titleRefreshed = true;
-  await writeIndex(chats);
-  return changed ? clean : null;
+  return mutateIndex<string | null>((chats) => {
+    const chat = chats.find((c) => c.id === id);
+    if (!chat || isTombstoned(id)) return { chats: null, result: null };
+    // The user may have renamed it while the title call was in flight; their name wins.
+    if (titleSourceOf(chat) === 'user') return { chats: null, result: null };
+    const changed = chat.title !== clean;
+    chat.title = clean;
+    chat.titleSource = 'auto-model';
+    if (refresh) chat.titleRefreshed = true;
+    return { chats, result: changed ? clean : null };
+  });
 }
 
 /**
  * Spend the one allowed retitle without changing the title. Used when the refresh call came back
  * empty or refused: keeping the existing name is right, but asking again on every later turn is not.
  */
-export async function markTitleRefreshed(id: string): Promise<void> {
-  const chats = await readIndex();
-  const chat = chats.find((c) => c.id === id);
-  if (!chat) return;
-  chat.titleRefreshed = true;
-  await writeIndex(chats);
+export function markTitleRefreshed(id: string): Promise<void> {
+  return patchChat(id, (chat) => {
+    chat.titleRefreshed = true;
+    return true;
+  });
 }
 
 /**
@@ -357,49 +397,56 @@ export function countTurns(messages: Msg[]): number {
  * artifact is bookkeeping, and touchChat bumps updatedAt and unarchives — which would reorder the
  * switcher and resurrect an archived chat every time the model proposed something in it.
  */
-export async function setChatArtifact(id: string, artifactId: string, versions: number, editing?: { id: string; name: string } | null): Promise<void> {
-  const chats = await readIndex();
-  const chat = chats.find((c) => c.id === id);
-  if (!chat) return;
-  // `undefined` means "leave the link alone" and `null` means "there is no link any more", which is
-  // the difference between a proposal (which says nothing about linkage) and a detach (which says
-  // everything). A plain optional could not tell those apart.
-  const nextModId = editing === undefined ? chat.editingModId : (editing?.id ?? undefined);
-  const nextModName = editing === undefined ? chat.editingModName : (editing?.name ?? undefined);
-  if (chat.artifactId === artifactId && chat.artifactVersions === versions && chat.editingModId === nextModId && chat.editingModName === nextModName) return;
-  chat.artifactId = artifactId;
-  chat.artifactVersions = versions;
-  if (nextModId === undefined) delete chat.editingModId;
-  else chat.editingModId = nextModId;
-  if (nextModName === undefined) delete chat.editingModName;
-  else chat.editingModName = nextModName;
-  await writeIndex(chats);
+export function setChatArtifact(id: string, artifactId: string, versions: number, editing?: { id: string; name: string } | null): Promise<void> {
+  return patchChat(id, (chat) => {
+    // `undefined` means "leave the link alone" and `null` means "there is no link any more", which
+    // is the difference between a proposal (which says nothing about linkage) and a detach (which
+    // says everything). A plain optional could not tell those apart.
+    const nextModId = editing === undefined ? chat.editingModId : (editing?.id ?? undefined);
+    const nextModName = editing === undefined ? chat.editingModName : (editing?.name ?? undefined);
+    if (chat.artifactId === artifactId && chat.artifactVersions === versions && chat.editingModId === nextModId && chat.editingModName === nextModName) return false;
+    chat.artifactId = artifactId;
+    chat.artifactVersions = versions;
+    if (nextModId === undefined) delete chat.editingModId;
+    else chat.editingModId = nextModId;
+    if (nextModName === undefined) delete chat.editingModName;
+    else chat.editingModName = nextModName;
+    return true;
+  });
 }
 
 /** Archive or unarchive a chat. Reversible, so the UI does not confirm it. */
-export async function archiveChat(id: string, archived: boolean): Promise<void> {
-  const chats = await readIndex();
-  const chat = chats.find((c) => c.id === id);
-  if (!chat) return;
-  if (archived) chat.archivedAt = Date.now();
-  else delete chat.archivedAt;
-  await writeIndex(chats);
+export function archiveChat(id: string, archived: boolean): Promise<void> {
+  return patchChat(id, (chat) => {
+    if (archived) chat.archivedAt = Date.now();
+    else delete chat.archivedAt;
+    return true;
+  });
 }
 
 /** The user naming a chat by hand. This is the one title source nothing else overwrites. */
-export async function renameChat(id: string, title: string): Promise<void> {
-  const chats = await readIndex();
-  const chat = chats.find((c) => c.id === id);
-  if (!chat) return;
+export function renameChat(id: string, title: string): Promise<void> {
   const clean = titleFromText(title);
-  if (!clean || clean === 'New chat') return;
-  chat.title = clean;
-  chat.titleSource = 'user';
-  await writeIndex(chats);
+  if (!clean || clean === 'New chat') return Promise.resolve();
+  return patchChat(id, (chat) => {
+    chat.title = clean;
+    chat.titleSource = 'user';
+    return true;
+  });
 }
 
+/**
+ * Delete a chat: off the index, and every key it owns removed.
+ *
+ * The tombstone is recorded FIRST, before the index is even read. That ordering is the fix for the
+ * user's "I deleted something then I saw it back again": a writer whose read already happened is
+ * about to write a snapshot in which this chat is alive, and only a tombstone recorded before that
+ * write reaches storage can stop it (writeIndex filters on the way out). Recording it after the
+ * write would leave exactly the window the bug lives in.
+ */
 export async function deleteChat(id: string): Promise<void> {
-  await writeIndex((await readIndex()).filter((c) => c.id !== id));
+  tombstone(id);
+  await withKey(INDEX_KEY, async () => writeIndex((await readIndex()).filter((c) => c.id !== id)));
   await chrome.storage.local.remove(chatKeys(id));
 }
 
@@ -412,18 +459,23 @@ export async function deleteChat(id: string): Promise<void> {
 export async function bulkChats(ids: string[], action: 'archive' | 'unarchive' | 'delete'): Promise<void> {
   const wanted = new Set(ids);
   if (!wanted.size) return;
-  const chats = await readIndex();
-  if (action === 'delete') {
-    await writeIndex(chats.filter((c) => !wanted.has(c.id)));
-    await chrome.storage.local.remove([...wanted].flatMap(chatKeys));
-    return;
-  }
-  // Capped like every other index write. A bulk unarchive is the case that needs it: an index of
-  // 200 where most are archived is within the cap only because archived chats are cheap to evict,
-  // and unarchiving them does not grow the index but does change which chats the next cap pass
-  // would drop. Going through the cap here keeps the ceiling and the transcript cleanup in one
-  // rule rather than leaving this one writer to grow the index past MAX_CHATS by another route.
-  await writeIndexCapped(applyBulkArchive(chats, wanted, action, Date.now()));
+  // Tombstoned before the read, for the same reason deleteChat does it: a bulk delete races the
+  // same background writers a single delete does.
+  if (action === 'delete') for (const id of wanted) tombstone(id);
+  await withKey(INDEX_KEY, async () => {
+    const chats = await readIndex();
+    if (action === 'delete') {
+      await writeIndex(chats.filter((c) => !wanted.has(c.id)));
+      await chrome.storage.local.remove([...wanted].flatMap(chatKeys));
+      return;
+    }
+    // Capped like every other index write. A bulk unarchive is the case that needs it: an index of
+    // 200 where most are archived is within the cap only because archived chats are cheap to
+    // evict, and unarchiving them does not grow the index but does change which chats the next cap
+    // pass would drop. Going through the cap here keeps the ceiling and the transcript cleanup in
+    // one rule rather than leaving this one writer to grow the index past MAX_CHATS by another.
+    await writeIndexCapped(applyBulkArchive(chats, wanted, action, Date.now()));
+  });
 }
 
 /**
@@ -508,15 +560,10 @@ export function elideAttachedImages(content: Part[]): Part[] {
   return changed ? out : content;
 }
 
-/** Every blob hash a transcript still refers to, so nothing else has to know the item shape. */
-export function referencedHashes(items: ChatItem[]): string[] {
-  const out: string[] = [];
-  for (const it of items) {
-    if (it.kind !== 'user' || !it.images) continue;
-    for (const img of it.images as ImageThumb[]) if (img.hash) out.push(img.hash);
-  }
-  return out;
-}
+// referencedHashes moved to lib/blobs.ts, which is where the only thing that needs it lives (the
+// blob collector). Re-exported here because it was part of this module's surface, and because
+// "which hashes does a transcript still mention" reads as a question about chats.
+export { referencedHashes };
 
 /**
  * The history to persist when a run failed before runAgent could return one: everything that was
@@ -535,8 +582,19 @@ export function appendTurn(history: Msg[], turn: { text: string; images?: Attach
   return [...history, { role: 'user', content: [...images, { type: 'text', text: turn.text }] }];
 }
 
-export async function saveMessages(id: string, messages: Msg[]): Promise<void> {
-  await chrome.storage.local.set({ [messagesKey(id)]: slimMessages(messages) });
+/**
+ * Write a chat's model history — unless the chat has just been deleted.
+ *
+ * The index is not the only thing a late write can resurrect. deleteChat removes every per-chat key
+ * (chatKeys), but the panel's debounced transcript save and the background's detached-run writer
+ * both hold an id and an array and flush on their own schedule — a pagehide, a 400ms timer, a run
+ * finishing. One of those landing after the delete recreates 'chat:<id>:items', and from then on
+ * the profile carries a transcript nothing lists and nothing will ever clean up. So the same
+ * tombstone that guards the index guards these two keys.
+ */
+export async function saveMessages(id: string, messages: Msg[]): Promise<'ok' | 'quota' | 'error' | 'skipped'> {
+  if (isTombstoned(id)) return 'skipped';
+  return trySet({ [messagesKey(id)]: slimMessages(messages) });
 }
 
 export async function loadItems(id: string): Promise<ChatItem[]> {
@@ -544,6 +602,7 @@ export async function loadItems(id: string): Promise<ChatItem[]> {
   return (r[itemsKey(id)] as ChatItem[] | undefined) ?? [];
 }
 
-export async function saveItems(id: string, items: ChatItem[]): Promise<void> {
-  await chrome.storage.local.set({ [itemsKey(id)]: items });
+export async function saveItems(id: string, items: ChatItem[]): Promise<'ok' | 'quota' | 'error' | 'skipped'> {
+  if (isTombstoned(id)) return 'skipped';
+  return trySet({ [itemsKey(id)]: items });
 }

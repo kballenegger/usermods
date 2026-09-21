@@ -1,6 +1,44 @@
-import { DEFAULT_SETTINGS, resolveTheme, type Prefs, type Settings, type ThemeChoice } from './types';
+// The .ts extension is load-bearing, as in lib/transcript.ts and lib/agent/retry.ts: `npm test`
+// runs this through node --experimental-strip-types, whose ESM resolver does not guess extensions.
+// It matters here now that test/settings.test.ts imports this module directly.
+import { DEFAULT_CONTEXT_BUDGET, DEFAULT_SETTINGS, resolveTheme, type Prefs, type Settings, type ThemeChoice } from './types.ts';
 
 const KEY = 'settings';
+
+/**
+ * The smallest context budget that is worth having. Below roughly this, compaction's own summary
+ * (SUMMARY_MAX_TOKENS ≈ 1500) plus the system prompt plus the turns it promises to keep verbatim
+ * is already most of the budget, and every single turn would trigger a summarisation call.
+ */
+export const MIN_CONTEXT_BUDGET = 10_000;
+
+/**
+ * What a typed context budget becomes when the user is finished typing it.
+ *
+ * THE BUG THIS EXISTS FOR. The Settings field clamped inside onChange:
+ *
+ *     onChange={(e) => update({ contextBudget: Math.max(10_000, Number(e.target.value) || …) })}
+ *
+ * which clamps every INTERMEDIATE value, not the final one. To type 50000 you must first type "5",
+ * and "5" clamps to 10000 — so the field rewrites itself under the cursor and you cannot get to
+ * any number whose prefixes are below the floor. The user's words: "You have a minimum default but
+ * when I'm editing, it enforces it so it's a bit tricky for me to change the context window limit."
+ *
+ * The rule is the same; WHEN it runs is the fix. Typing is left alone, and this runs once, on blur
+ * or Enter — which is also where an empty field means "I want the default back" rather than zero.
+ *
+ * Returns null when there is nothing to commit (the text is unchanged in meaning), so the caller
+ * can leave the stored value alone rather than writing an identical one.
+ */
+export function commitContextBudget(text: string, current: number = DEFAULT_CONTEXT_BUDGET): number {
+  const trimmed = text.trim();
+  // An empty field is a request for the default, not a request for zero. Anything unparseable
+  // (a stray letter, a lone minus) keeps what was already there rather than inventing a number.
+  if (!trimmed) return DEFAULT_CONTEXT_BUDGET;
+  const n = Number(trimmed);
+  if (!Number.isFinite(n)) return current;
+  return Math.max(MIN_CONTEXT_BUDGET, Math.round(n));
+}
 
 /**
  * The global preferences, as a `Settings` with the provider fields at their inert defaults.
