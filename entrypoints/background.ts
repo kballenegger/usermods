@@ -14,6 +14,7 @@ import { shouldUpdate } from '@/lib/version';
 import { loadMods, modFromProposal, modFromSource, parseHeader, previewFromSource, upsertMod, deleteMod, saveMods } from '@/lib/mods';
 import { appendTurn, archiveChat, bulkChats, countTurns, createChat, deleteChat, getChat, hostFromUrl, isArchived, listChats, loadItems, loadMessages, markTitleRefreshed, renameChat, saveItems, saveMessages, setChatArtifact, setChatModel, setModelTitle, touchChat } from '@/lib/chats';
 import { loadRuns, markInterrupted, pruneRuns, resumableRuns, saveRuns, type RunMap, type RunRecord } from '@/lib/runstate';
+import { isTombstoned } from '@/lib/storagequeue';
 import { reduceItems } from '@/lib/transcript';
 import { addVersion, adoptMod, currentVersion, detachFromMod, draftBlock, fromMod, loadArtifact, recordProposal, rollbackTo, saveArtifact, toProposal, toSource, type Artifact } from '@/lib/artifact';
 import { draftStanding, duplicateOf, editModPlan, likelyUrlFor, modsBlock, modsForUrl, openModDecision, runsOnPage } from '@/lib/modmatch';
@@ -280,6 +281,21 @@ async function flushDetached(): Promise<void> {
   await Promise.all([...detached.keys()].map((id) => flushDetachedChat(id)));
 }
 
+/**
+ * Throw away what is being kept for these chats WITHOUT writing it. The one caller is deletion: a
+ * transcript buffered in memory for a chat that is being deleted must not be flushed to a key the
+ * delete is about to remove. Any timer it had is cancelled with it.
+ */
+function forgetDetached(ids: string[]): void {
+  for (const id of ids) {
+    const entry = detached.get(id);
+    if (!entry) continue;
+    if (entry.timer) clearTimeout(entry.timer);
+    entry.latest = null;
+    detached.delete(id);
+  }
+}
+
 // ---------- run records (lib/runstate.ts) ----------
 
 /** One writer, one chain: two chats finishing at once must not lose each other's record. */
@@ -297,8 +313,19 @@ function updateRuns(fn: (runs: RunMap) => RunMap): Promise<void> {
   return next.catch(() => {});
 }
 
+/**
+ * Record a run's state — unless its chat has just been deleted.
+ *
+ * The runs map has the same resurrection problem the chat index had, one level down. Deleting a
+ * chat with a run in flight calls clearRuns, but the run itself carries on for as long as the
+ * provider takes to answer and then writes 'failed' or 'interrupted' for that id. The record comes
+ * back after the delete removed it, and the panel offers Resume for a chat that no longer exists.
+ * The tombstone recorded by deleteChat (lib/chats.ts) is what says not to.
+ */
 function setRun(chatId: string, patch: Pick<RunRecord, 'state' | 'tabId'> & { error?: string }): Promise<void> {
+  if (isTombstoned(chatId)) return Promise.resolve();
   return updateRuns((runs) => {
+    if (isTombstoned(chatId)) return runs;
     const now = Date.now();
     const prev = runs[chatId];
     const startedAt = patch.state === 'running' || !prev ? now : prev.startedAt;
@@ -889,6 +916,11 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
     case 'agent.attach':
       return attachState();
     case 'chats.delete':
+      // Before the delete, not after: forgetDetached drops the kept transcript for this chat so
+      // the detached writer cannot flush it back over the keys deleteChat is about to remove.
+      // deleteChat's tombstone covers the window after this point; this covers the buffer already
+      // held in memory, which no tombstone can reach into.
+      forgetDetached([req.id]);
       await deleteChat(req.id);
       await clearRuns([req.id]);
       return { ok: true };
@@ -899,6 +931,7 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
       await renameChat(req.id, req.title);
       return { ok: true };
     case 'chats.bulk':
+      if (req.action === 'delete') forgetDetached(req.ids);
       await bulkChats(req.ids, req.action);
       if (req.action === 'delete') await clearRuns(req.ids);
       return { ok: true };
