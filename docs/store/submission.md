@@ -1,5 +1,38 @@
 # Chrome Web Store submission checklist
 
+## Live submission status — 2026-09-22
+
+- Publisher: `kenneth@ballenegger.com` (`46adec1d-bb94-408a-99c8-7cc35d663a6f`).
+- Created draft item: `dhmdjekbeinhhnfhcgnkgdpgdafpboic`.
+- [Developer dashboard](https://chrome.google.com/u/2/webstore/devconsole/46adec1d-bb94-408a-99c8-7cc35d663a6f/dhmdjekbeinhhnfhcgnkgdpgdafpboic/edit/listing).
+- Uploaded the audited ZIP below, with its SHA-256 verified unchanged. Saved the description,
+  category, language, icon, all five screenshots, both promo tiles, homepage and support URLs.
+- Saved privacy disclosures and permission justifications. Distribution is free, Public,
+  and All regions.
+- Reviewer endpoint, dedicated API key, and 468-character setup instructions saved in Google's
+  confidential Test instructions form on 2026-09-22, with explicit owner authorization.
+- Public publisher contact email `kenneth@ballenegger.com` verified on 2026-09-22.
+- **Submitted for review on 2026-09-22.** Google confirmed **Pending Review** and that the item
+  is undergoing compliance review. Broad host permissions may require in-depth review.
+- Automatic publication is **off**: publication is staged after approval. Automatic approval
+  review blocked enabling automatic publication without explicit authorization for that step;
+  the review submission itself completed successfully. Do not resubmit while pending.
+
+Live dashboard corrections to the original handoff:
+
+- Summary is read-only and comes from the manifest, just like the title. The uploaded release
+  uses `Vibe-code userscripts in place. Customize any website by chatting with any LLM.`
+- Description limit is 16,000 characters. Single purpose and each permission justification
+  are limited to 1,000 characters; the host justification was shortened to fit.
+- Choosing no remote code disables its justification field. Explain userscript execution
+  in reviewer test instructions instead.
+- Reviewer access is under **Test instructions**, with Username and Password fields limited
+  to 100 characters each and Additional instructions limited to 500. The planned mapping is
+  endpoint in Username, dedicated reviewer key in Password, and concise setup steps explicitly
+  explaining that mapping. Never put credential values in this document.
+
+---
+
 Every field the developer dashboard asks for, in the order it asks, with the exact value to paste
 or the file to upload. Written so the submission is a paste job with no decisions left in it.
 
