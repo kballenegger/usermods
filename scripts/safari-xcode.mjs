@@ -236,33 +236,111 @@ function productPath(configuration, sdk) {
   return path.join(root, '.output', 'safari-xcode', 'Build', 'Products', `${configuration}${suffix}`, 'usermods.app');
 }
 
+/**
+ * Every simulator this machine could actually use, newest runtime first.
+ *
+ * simctl groups devices under a runtime identifier like
+ * `com.apple.CoreSimulator.SimRuntime.iOS-26-4`, so the version is in the key rather than on the
+ * device, and it has to be parsed back out to sort by it.
+ */
+function availableSimulators(env) {
+  const json = capture('/usr/bin/xcrun', ['simctl', 'list', 'devices', '-j'], { env });
+  const groups = JSON.parse(json ?? '{}').devices ?? {};
+  const out = [];
+  for (const [runtime, devices] of Object.entries(groups)) {
+    const m = /SimRuntime\.iOS-(\d+)-(\d+)/.exec(runtime);
+    if (!m) continue; // watchOS, tvOS, visionOS: not somewhere Safari extensions run.
+    const version = [Number(m[1]), Number(m[2])];
+    for (const d of devices) if (d.isAvailable) out.push({ ...d, runtime, version });
+  }
+  return out.sort((a, b) => b.version[0] - a.version[0] || b.version[1] - a.version[1]);
+}
+
+/**
+ * Which iPhone to install on when nobody said.
+ *
+ * The default used to be the literal string "iPhone 15", and that is a name, not a capability:
+ * Xcode ships whatever simulators its own SDK came with, and on a machine with Xcode 27 the
+ * iPhone 15 family is simply not there — every device is iPhone 17-era on iOS 26.x, so the command
+ * failed outright until `--device 'iPhone 17 Pro'` was passed by hand. A version number baked into
+ * a script ages into a bug on a schedule.
+ *
+ * So the default is derived instead:
+ *
+ *   1. An iPhone that is ALREADY BOOTED, if there is one. Booting a second simulator is slow, and
+ *      if someone has one open it is almost certainly the one they are watching.
+ *   2. Otherwise the plain iPhone on the newest runtime — "iPhone 17" over "iPhone 17 Pro Max" —
+ *      because the narrowest screen is where a popup sheet's layout is worth looking at, and the
+ *      shortest name sorts to the smallest device.
+ *
+ * iPads are excluded: the extension runs there, but the popup's compact layout is drawn for a
+ * phone and a phone is what a default should show. `--device 'iPad (A16)'` still works.
+ *
+ * Whatever it picks, it says so, because a default that chooses for you and stays quiet is worse
+ * than one that fails.
+ */
+function pickSimulator(env) {
+  const all = availableSimulators(env);
+  const phones = all.filter((d) => /^iPhone/.test(d.name));
+  if (!phones.length) {
+    fail(
+      'no available iPhone simulator',
+      all.length
+        ? `Installed: ${[...new Set(all.map((d) => d.name))].join(', ')}. Pass one with --device.`
+        : 'Install a simulator runtime in Xcode > Settings > Components.',
+    );
+  }
+  const booted = phones.find((d) => d.state === 'Booted');
+  if (booted) return { device: booted, why: 'already booted' };
+  // Newest runtime first from availableSimulators; within it, the shortest name is the plain model.
+  const newest = phones.filter((d) => d.runtime === phones[0].runtime);
+  const plain = [...newest].sort((a, b) => a.name.length - b.name.length || a.name.localeCompare(b.name))[0];
+  return { device: plain, why: `newest runtime (iOS ${plain.version.join('.')})` };
+}
+
 function simulator({ configuration, bundleId, device }) {
+  // The device is resolved BEFORE the build, because the build's -destination names it too, and a
+  // name that does not exist fails xcodebuild with a far less helpful message than this one.
+  const probeEnv = xcodeEnv(findXcode());
+  let target;
+  let why;
+  if (device) {
+    const all = availableSimulators(probeEnv);
+    target = all.find((d) => d.name === device);
+    if (!target) {
+      fail(
+        `no available simulator named ${device}`,
+        `Pick one from: ${[...new Set(all.map((d) => d.name))].join(', ') || '(none installed)'}`,
+      );
+    }
+    why = 'from --device';
+  } else {
+    ({ device: target, why } = pickSimulator(probeEnv));
+  }
+  console.log(`simulator  ${target.name} (iOS ${target.version.join('.')}, ${why})`);
+  console.log('');
+
   const { developerDir } = xcodebuild({
     sdk: 'iphonesimulator',
     configuration,
     bundleId,
-    destination: `platform=iOS Simulator,name=${device}`,
+    destination: `platform=iOS Simulator,id=${target.udid}`,
   });
   const env = xcodeEnv(developerDir);
   const app = productPath(configuration, 'iphonesimulator');
   if (!fs.existsSync(app)) fail(`the build produced no app at ${app}`);
 
-  const json = capture('/usr/bin/xcrun', ['simctl', 'list', 'devices', '-j'], { env });
-  const all = Object.values(JSON.parse(json ?? '{}').devices ?? {}).flat();
-  const target = all.find((d) => d.name === device && d.isAvailable);
-  if (!target) {
-    fail(
-      `no available simulator named ${device}`,
-      `Pick one from: ${all.filter((d) => d.isAvailable).map((d) => d.name).join(', ') || '(none installed)'}`,
-    );
-  }
   if (target.state !== 'Booted') run('/usr/bin/xcrun', ['simctl', 'boot', target.udid], { env });
   run('/usr/bin/xcrun', ['simctl', 'install', target.udid, app], { env });
   const id = bundleId ?? 'io.github.kballenegger.usermods';
   run('/usr/bin/xcrun', ['simctl', 'launch', target.udid, id], { env });
   console.log('');
-  console.log(`installed and launched ${id} on ${device} (${target.udid}).`);
+  console.log(`installed and launched ${id} on ${target.name} (${target.udid}).`);
   console.log('Enable it in the simulator: Settings > Apps > Safari > Extensions > usermods.');
+  // Xcode 27 ships no Simulator.app. The window lives inside Xcode now, so say where rather than
+  // leaving someone to conclude the boot silently failed.
+  console.log('The simulator window: Xcode > Window > Devices, or open');
+  console.log('  /Applications/Xcode.app/Contents/Applications/DeviceHub.app');
 }
 
 /**
@@ -437,7 +515,8 @@ switch (command) {
     break;
   case 'simulator':
     if (!has('no-stage')) stage({ build: !has('no-build') });
-    simulator({ configuration, bundleId, device: flag('device', 'iPhone 15') });
+    // No default here: pickSimulator() derives it from what this machine actually has.
+    simulator({ configuration, bundleId, device: flag('device') });
     break;
   case 'mac':
     if (!has('no-stage')) stage({ build: !has('no-build') });
