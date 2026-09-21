@@ -7,6 +7,9 @@
 //   node scripts/safari-preview.mjs --webkit-shots out/
 //                                                   serve, then screenshot both popup layouts in
 //                                                   headless WebKit and exit
+//   node scripts/safari-preview.mjs --providers     serve, then check in headless WebKit that the
+//                                                   provider menu offers both subscriptions and that a
+//                                                   pending sign-in survives a reload (stubbed, no vendor)
 //   node scripts/safari-preview.mjs --popover-size  serve, then measure in headless WebKit what
 //                                                   size the popup document hands a content-sized
 //                                                   popover, at a window far too small to help
@@ -65,6 +68,7 @@ const shots = flag('shots', null);
 const webkitShots = flag('webkit-shots', null);
 const probe = argv.includes('--probe');
 const popoverSize = argv.includes('--popover-size');
+const providers = argv.includes('--providers');
 // `--probe` on its own means this Mac's browser; `--probe simulator` means the booted iPhone.
 const probeTarget = (() => {
   const value = flag('probe', 'browser');
@@ -106,6 +110,11 @@ const STORAGE = {
     list: [
       { id: 'conn-1', kind: 'anthropic', label: 'Anthropic', baseUrl: '', apiKey: 'sk-ant-preview-not-a-real-key' },
       { id: 'conn-2', kind: 'openai-compatible', label: 'LM Studio', baseUrl: 'http://localhost:1234/v1', apiKey: '' },
+      // A SuperGrok row, so the sign-in card is on screen in the screenshots and so --providers has
+      // something to open. It carries no token and no key: `oauth.status` answers "not signed in",
+      // which is the state worth looking at anyway. It exists in the Safari build because that
+      // build has subscription sign-in — the thing this branch put back.
+      { id: 'conn-3', kind: 'xai', label: 'SuperGrok subscription', baseUrl: '', apiKey: '' },
     ],
   },
   modelChoice: { connectionId: 'conn-1', model: 'claude-opus-5', label: 'Anthropic' },
@@ -148,6 +157,25 @@ const RPC = {
 };
 
 /**
+ * A device-code sign-in, invented end to end.
+ *
+ * NOTHING here touches a vendor. `auth.x.ai` and `auth.openai.com` are never contacted, no real
+ * device code is requested and no token is ever exchanged — the point of the check this feeds is
+ * that the POPUP restores a pending sign-in after its document is reloaded, which is a question
+ * about the UI and about `oauth.restore`, not about the vendors. The code below is obviously fake
+ * and the URL points at example.invalid, which cannot resolve.
+ *
+ * The stub keeps it in the same page-lifetime `store` the storage stub uses, so a reload of the
+ * document finds it exactly the way the real popup finds the record the background wrote.
+ */
+const PENDING_SIGNIN = {
+  kind: 'xai',
+  userCode: 'PREVIEW-FAKE',
+  verificationUri: 'https://device.example.invalid/preview',
+  expiresAt: Date.now() + 10 * 60 * 1000,
+};
+
+/**
  * The stub, as a classic script that runs before everything else on the page.
  *
  * It answers the handful of extension APIs the popup touches on the way to a first paint, and
@@ -159,7 +187,56 @@ function stubSource() {
   const store = ${JSON.stringify(STORAGE)};
   const rpc = ${JSON.stringify(RPC)};
   const tab = ${JSON.stringify(TAB)};
+  const fakeSignin = ${JSON.stringify(PENDING_SIGNIN)};
   const listeners = () => ({ addListener() {}, removeListener() {}, hasListener: () => false });
+
+  /*
+   * The oauth RPCs, answered from a record in sessionStorage.
+   *
+   * sessionStorage rather than the page-lifetime \`store\`, because the whole question being asked
+   * is what survives the DOCUMENT being thrown away — which is what happens on iOS when opening
+   * the verification tab dismisses the popup. sessionStorage is per tab and outlives a reload,
+   * which is as close as a plain web page gets to "the background still has the record".
+   *
+   * No vendor is contacted for any of this. ?signin=pending seeds a fake pending sign-in so the
+   * restored state can be checked; without it every vendor reads as idle.
+   */
+  const PENDING_KEY = 'preview:pending-signin';
+  const seed = new URLSearchParams(location.search).get('signin');
+  if (seed === 'pending') {
+    try { sessionStorage.setItem(PENDING_KEY, JSON.stringify(fakeSignin)); } catch {}
+  } else if (seed === 'none') {
+    try { sessionStorage.removeItem(PENDING_KEY); } catch {}
+  }
+  const readPending = (kind) => {
+    try {
+      const raw = sessionStorage.getItem(PENDING_KEY);
+      if (!raw) return null;
+      const p = JSON.parse(raw);
+      return p && p.kind === kind ? p : null;
+    } catch { return null; }
+  };
+  const oauth = (req) => {
+    const p = readPending(req.kind);
+    switch (req.type) {
+      case 'oauth.status': return { signedIn: false };
+      case 'oauth.restore':
+      case 'oauth.poll':
+        return p
+          ? { status: 'pending', userCode: p.userCode, verificationUri: p.verificationUri, expiresAt: p.expiresAt }
+          : { status: 'idle' };
+      case 'oauth.start': {
+        const next = { ...fakeSignin, kind: req.kind };
+        try { sessionStorage.setItem(PENDING_KEY, JSON.stringify(next)); } catch {}
+        return { status: 'pending', userCode: next.userCode, verificationUri: next.verificationUri, expiresAt: next.expiresAt };
+      }
+      case 'oauth.cancel':
+      case 'oauth.signout':
+        try { sessionStorage.removeItem(PENDING_KEY); } catch {}
+        return { ok: true };
+      default: return null;
+    }
+  };
 
   const read = (keys) => {
     if (keys == null) return { ...store };
@@ -180,6 +257,10 @@ function stubSource() {
       getURL: (p) => '/' + String(p).replace(/^\\/+/, ''),
       sendMessage: async (req) => {
         const type = req && req.type;
+        if (typeof type === 'string' && type.startsWith('oauth.')) {
+          const answer = oauth(req);
+          if (answer) return { ok: true, data: answer };
+        }
         if (type in rpc) return { ok: true, data: rpc[type] };
         // Anything not in the fixture is a write, a run, or a network call. Saying so beats
         // pretending it worked: this preview has no background worker to do any of it.
@@ -194,7 +275,12 @@ function stubSource() {
       query: async () => [tab],
       get: async () => tab,
       update: async () => tab,
-      create: async () => tab,
+      // Recorded rather than ignored: on iOS this is the call that dismisses the popup, so a check
+      // wants to know it happened and with which URL. It deliberately does NOT navigate anywhere.
+      create: async (props) => {
+        (globalThis.__usermodsOpenedTabs ||= []).push(props && props.url);
+        return tab;
+      },
       sendMessage: async () => undefined,
       onActivated: listeners(),
       onUpdated: listeners(),
@@ -427,6 +513,155 @@ async function webkitCapture(dir) {
 }
 
 /**
+ * Does the built Safari popup actually offer the subscription providers, and does a pending
+ * sign-in come back after the document is thrown away?
+ *
+ * ---------------------------------------------------------------------------
+ * What this is for
+ * ---------------------------------------------------------------------------
+ *
+ * Two regressions, both of which shipped and neither of which any unit test would have caught,
+ * because both are about what the BUILT bundle renders:
+ *
+ *   1. The Safari build had `SUBSCRIPTIONS_OFF` set, so `presetsFor()` returned no subscription
+ *      presets and the "Add provider" row simply did not list ChatGPT or SuperGrok. The owner's
+ *      report was exactly this: "i don't see the subscriptions on safari provider menu (grok
+ *      supergrok for example)". The flag is compile-time, so the only honest check is to load the
+ *      built file and look at the buttons.
+ *   2. On iPhone the popup is a sheet over the page, and opening the verification tab dismisses
+ *      it. The sign-in card used to mount with `{status:'idle'}` and draw a fresh "Sign in"
+ *      button while a live code sat on the vendor's page. The fix is `oauth.restore`, and what
+ *      proves it is reloading the document mid-flow and finding the same code.
+ *
+ * Both layouts are checked, because the compact one is where the owner is actually doing this and
+ * the two have different CSS and different target sizes.
+ *
+ * ---------------------------------------------------------------------------
+ * What it does NOT prove
+ * ---------------------------------------------------------------------------
+ *
+ * Nothing here signs in to anything. The extension APIs are stubbed (see stubSource), the device
+ * code is the literal string PREVIEW-FAKE, and the verification URL points at example.invalid.
+ * auth.x.ai and auth.openai.com are never contacted, and no token is ever issued, exchanged or
+ * stored. That a REAL sign-in completes needs the owner's own account and is a manual step; see
+ * docs/safari.md. This proves the build offers the providers and that the UI resumes — the two
+ * things that were broken — and nothing about the vendors.
+ */
+async function checkProviders() {
+  let playwright;
+  try {
+    playwright = await import('playwright');
+  } catch {
+    fail('playwright is not installed', 'npm install, then `npx playwright install webkit`.');
+  }
+
+  const layouts = [
+    { name: 'roomy', context: { viewport: { width: 420, height: 560 }, deviceScaleFactor: 2 } },
+    { name: 'compact', context: playwright.devices['iPhone 14'] },
+  ];
+  // The two presets by the labels lib/connections.ts gives them. These strings are what the user
+  // reads on the buttons, so they are what is asserted.
+  const WANTED = ['ChatGPT subscription', 'SuperGrok subscription'];
+
+  const browser = await playwright.webkit.launch();
+  const failures = [];
+  try {
+    for (const layout of layouts) {
+      const context = await browser.newContext(layout.context);
+      const page = await context.newPage();
+      await page.goto(`http://127.0.0.1:${port}/popup.html?view=settings&signin=none`, { waitUntil: 'load' });
+
+      const shell = page.locator(".app[data-surface='popup']");
+      await shell.waitFor({ state: 'visible', timeout: 15000 });
+      const got = await shell.getAttribute('data-layout');
+      if (got !== layout.name) failures.push(`${layout.name}: data-layout is ${got}`);
+
+      await page.locator('[data-testid="providers"]').waitFor({ state: 'visible', timeout: 15000 });
+      const presets = await page.locator('[data-testid="add-provider"]').evaluateAll((els) =>
+        els.map((e) => (e.textContent ?? '').trim()),
+      );
+      for (const want of WANTED) {
+        if (!presets.includes(want)) {
+          failures.push(`${layout.name}: "Add provider" does not offer ${want} (offers: ${presets.join(', ') || 'nothing'})`);
+        }
+      }
+
+      // Apple asks for 44px. The subscription buttons are the ones being added here, so they are
+      // the ones measured, and only where a thumb is what presses them.
+      if (layout.name === 'compact') {
+        for (const want of WANTED) {
+          const box = await page.locator(`[data-testid="add-provider"][data-preset="${want}"]`).boundingBox().catch(() => null);
+          if (!box) failures.push(`compact: ${want} has no box to measure`);
+          else if (box.height < 44) failures.push(`compact: ${want} is ${Math.round(box.height)}px tall, under the 44px minimum`);
+        }
+      }
+
+      // --- the pending sign-in survives the document being thrown away ---
+      await page.goto(`http://127.0.0.1:${port}/popup.html?view=settings&signin=pending`, { waitUntil: 'load' });
+      await page.locator('[data-testid="providers"]').waitFor({ state: 'visible', timeout: 15000 });
+
+      // Open the SuperGrok card. The fixture carries one, and its presence is itself a check: a
+      // build with subscriptions off renders it as "Not available in this build" with no sign-in
+      // control at all, which is what the Safari build used to do.
+      const card = page.locator('[data-testid="provider-card"][data-kind="xai"]');
+      if ((await card.count()) === 0) {
+        failures.push(`${layout.name}: the SuperGrok connection is missing from the providers list entirely`);
+        await page.close();
+        await context.close();
+        continue;
+      }
+      const status = await card.getAttribute('data-status');
+      if (status === 'unavailable') {
+        failures.push(`${layout.name}: SuperGrok reads as "${await card.locator('[data-testid="provider-status"]').textContent()}" — this build has subscriptions off`);
+      }
+      await card.locator('[data-testid="provider-toggle"]').click();
+
+      // Not `waitFor` — an absent card is a RESULT here, not a harness problem, and the whole
+      // point is to report it as the sentence a reader can act on rather than as a Playwright
+      // timeout stack. A build with subscriptions off renders no sign-in card at all, which is
+      // exactly the state the Safari build was in when the owner reported it missing.
+      const pendingCard = page.locator('[data-testid="subscription-login"][data-kind="xai"]');
+      await pendingCard.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+      if ((await pendingCard.count()) === 0) {
+        failures.push(
+          `${layout.name}: the SuperGrok card has no sign-in control at all — this build was made with ` +
+            'subscriptions off (USERMODS_STORE=1), or SUBSCRIPTIONS_OFF still includes SAFARI_BUILD',
+        );
+        await page.close();
+        await context.close();
+        continue;
+      }
+
+      const code = page.locator('[data-testid="user-code"]');
+      await code.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+      const shownCode = await code.inputValue().catch(() => null);
+      if (shownCode !== PENDING_SIGNIN.userCode) {
+        failures.push(
+          `${layout.name}: a reopened popup showed ${shownCode === null ? 'no pending code at all' : `"${shownCode}"`}, ` +
+            `expected the persisted "${PENDING_SIGNIN.userCode}" — the sign-in did not resume`,
+        );
+      }
+      // And the way back to the vendor page has to be there, not just the code.
+      if ((await page.locator('[data-testid="open-verification"]').count()) === 0) {
+        failures.push(`${layout.name}: the restored sign-in offers no way to reopen the verification page`);
+      }
+      if ((await page.locator('[data-testid="cancel-signin"]').count()) === 0) {
+        failures.push(`${layout.name}: the restored sign-in offers no way to cancel`);
+      }
+
+      console.log(`[preview] ${layout.name}: presets ${presets.length}, restored code ${shownCode ?? '(none)'}`);
+      await page.close();
+      await context.close();
+    }
+  } finally {
+    await browser.close();
+  }
+  if (failures.length) fail(`the Safari popup's providers are wrong:\n  ${failures.join('\n  ')}`);
+  console.log('[preview] both subscription presets are offered in both layouts, and a pending sign-in is restored after a reload.');
+  console.log('[preview] stubbed APIs: no vendor was contacted and no token was issued.');
+}
+
+/**
  * What size does this document hand a popover that is sized FROM it?
  *
  * This is the check for the bug that shipped on this branch: on macOS the toolbar popover opened
@@ -565,7 +800,7 @@ async function probeBrowser() {
 
 server.listen(port, '127.0.0.1', async () => {
   console.log(`[preview] http://127.0.0.1:${port}/popup.html  (views: ${VIEWS.map((v) => `?view=${v}`).join(' ')})`);
-  if (!shots && !webkitShots && !probe && !popoverSize) {
+  if (!shots && !webkitShots && !probe && !popoverSize && !providers) {
     console.log('[preview] stubbed extension APIs: layout only, nothing runs. Ctrl-C to stop.');
     return;
   }
@@ -573,6 +808,7 @@ server.listen(port, '127.0.0.1', async () => {
     if (shots) await screenshotViews(path.resolve(ROOT, shots));
     if (webkitShots) await webkitCapture(path.resolve(ROOT, webkitShots));
     if (popoverSize) await measurePopoverSize();
+    if (providers) await checkProviders();
     if (probe) await probeBrowser();
   } finally {
     server.close();

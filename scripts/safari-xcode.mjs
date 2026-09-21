@@ -4,6 +4,8 @@
 //
 //   node scripts/safari-xcode.mjs doctor              what is installed, and what that allows
 //   node scripts/safari-xcode.mjs stage               npm build + copy the output into safari/
+//   node scripts/safari-xcode.mjs stage --store       the same, from the App Store build (no
+//                                                     subscription sign-in; see lib/buildflags.ts)
 //   node scripts/safari-xcode.mjs build               stage, then xcodebuild for the simulator
 //   node scripts/safari-xcode.mjs build --sdk iphoneos --team ABCDE12345
 //   node scripts/safari-xcode.mjs simulator           build, boot a simulator, install, launch
@@ -47,7 +49,17 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const projectDir = path.join(root, 'safari');
 const project = path.join(projectDir, 'usermods.xcodeproj');
 const stageDir = path.join(projectDir, 'Extension', 'Resources');
-const buildOutput = path.join(root, '.output', 'safari-mv3');
+/**
+ * Which build gets staged into the .appex.
+ *
+ * `--store` selects the App Store variant (`USERMODS_STORE=1 wxt build -b safari`), which drops
+ * subscription sign-in; without it, the ordinary Safari build, which has it. They land in separate
+ * .output folders on purpose — staging the wrong one produces an app that builds, installs, runs
+ * and is simply missing the sign-in, with nothing in any log to say which build it came from.
+ */
+const storeVariant = process.argv.includes('--store');
+const buildOutput = path.join(root, '.output', storeVariant ? 'store-safari-mv3' : 'safari-mv3');
+const buildScript = storeVariant ? 'build:safari:store' : 'build:safari';
 
 /** Bail with one readable line rather than a stack trace at whoever is reading a build log. */
 function fail(message, hint) {
@@ -170,14 +182,16 @@ function doctor() {
 
   const staged = fs.existsSync(path.join(stageDir, 'manifest.json'));
   console.log(`staged web extension    ${staged ? stageDir : 'not staged yet (run: stage)'}`);
+  console.log(`stage source            ${path.relative(root, buildOutput)}${storeVariant ? '  (--store)' : ''}`);
 }
 
 function stage({ build = true } = {}) {
-  if (build) run('npm', ['run', 'build:safari']);
+  console.log(`staging the ${storeVariant ? 'App Store' : 'ordinary'} Safari build (${path.relative(root, buildOutput)})`);
+  if (build) run('npm', ['run', buildScript]);
   if (!fs.existsSync(path.join(buildOutput, 'manifest.json'))) {
     fail(
       `${buildOutput} has no manifest.json`,
-      'Run `npm run build:safari` first, or drop --no-build.',
+      `Run \`npm run ${buildScript}\` first, or drop --no-build.`,
     );
   }
   fs.rmSync(stageDir, { recursive: true, force: true });
@@ -415,6 +429,48 @@ function sign(target) {
   run('/usr/bin/codesign', args);
 }
 
+/**
+ * Does the web extension inside the bundle match the one that was just staged?
+ *
+ * This is not paranoia; it was hit while writing the subscription work. The copy phase is a shell
+ * script Xcode treats as up to date when its declared inputs have not changed, so a build whose
+ * ONLY change was on the web side ran the app target, reported ** BUILD SUCCEEDED **, and left the
+ * previous web extension inside the .appex. The app that came out was signed, verified, installed
+ * and ran — carrying a background.js from the build before. In that instance the stale copy was
+ * the App Store variant, so the shipped app was silently missing subscription sign-in, which is
+ * precisely the bug this branch exists to fix, reintroduced by the build system rather than by the
+ * code.
+ *
+ * It fails the same way the signing bug did: no error, no log line, a successful build and a wrong
+ * artifact. So the finished bundle is compared against the stage directory byte for byte, by size,
+ * for every staged file. Nothing else in the pipeline would notice.
+ */
+function assertBundleMatchesStage(bundleResources) {
+  const staged = execFileSync('/usr/bin/find', [stageDir, '-type', 'f'], { encoding: 'utf8' })
+    .trim()
+    .split('\n')
+    .filter(Boolean);
+  const wrong = [];
+  for (const file of staged) {
+    const rel = path.relative(stageDir, file);
+    const inBundle = path.join(bundleResources, rel);
+    if (!fs.existsSync(inBundle)) {
+      wrong.push(`${rel}: staged but not in the bundle`);
+      continue;
+    }
+    const a = fs.statSync(file).size;
+    const b = fs.statSync(inBundle).size;
+    if (a !== b) wrong.push(`${rel}: staged ${a} bytes, bundle has ${b}`);
+  }
+  if (wrong.length) {
+    fail(
+      `the extension inside the app is not the one that was staged (${wrong.length} file${wrong.length === 1 ? '' : 's'} differ)`,
+      `${wrong.slice(0, 5).join('\n  ')}\n  Xcode skipped the copy phase. Delete .output/safari-xcode and build again.`,
+    );
+  }
+  console.log(`bundle matches the staged build  ${staged.length} files, ${path.relative(root, stageDir)}`);
+}
+
 /** The check the whole thing is for: does the shipped app match what it says it is? */
 function verifySeal(app) {
   const check = spawnSync('/usr/bin/codesign', ['--verify', '--deep', '--strict', '--verbose=2', app], {
@@ -450,6 +506,7 @@ function mac({ configuration, bundleId, team, launch }) {
       'Run `node scripts/safari-xcode.mjs stage`, then build again.',
     );
   }
+  assertBundleMatchesStage(path.join(appex, 'Contents', 'Resources'));
 
   sign(appex);
   sign(app);
