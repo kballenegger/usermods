@@ -15,6 +15,8 @@ import { loadMods, modFromProposal, modFromSource, parseHeader, previewFromSourc
 import { appendTurn, archiveChat, bulkChats, countTurns, createChat, deleteChat, getChat, hostFromUrl, isArchived, listChats, loadItems, loadMessages, markTitleRefreshed, renameChat, saveItems, saveMessages, setChatArtifact, setChatModel, setModelTitle, touchChat } from '@/lib/chats';
 import { loadRuns, markInterrupted, pruneRuns, resumableRuns, saveRuns, type RunMap, type RunRecord } from '@/lib/runstate';
 import { isTombstoned, withKey } from '@/lib/storagequeue';
+import { collectBlobs } from '@/lib/blobs';
+import { QUOTA_PANEL_NOTE, bytesInUse, quotaWarningNote, shouldWarn } from '@/lib/quota';
 import { CONTEXT_LIMITS_KEY, effectiveBudget, limitKey, loadContextLimits, rememberLimit, saveContextLimits } from '@/lib/contextlimits';
 import { reduceItems } from '@/lib/transcript';
 import { addVersion, adoptMod, currentVersion, detachFromMod, draftBlock, fromMod, loadArtifact, recordProposal, rollbackTo, saveArtifact, toProposal, toSource, type Artifact } from '@/lib/artifact';
@@ -278,6 +280,24 @@ async function flushDetachedChat(chatId: string): Promise<void> {
   await writeDetached(chatId, entry);
 }
 
+/**
+ * Tell the user once, per worker lifetime, when storage is nearly full.
+ *
+ * Once is the point. The warning is worth saying while there is still room to act on it, and worth
+ * saying no more than that: a note on every turn of a long session is noise, and the user cannot do
+ * anything about it mid-conversation anyway. A worker restart makes it sayable again, which is the
+ * right cadence — by then they have either cleared space or come back to a new session.
+ */
+let warnedLowStorage = false;
+
+async function warnIfStorageLow(post: (e: AgentEventBody) => void): Promise<void> {
+  if (warnedLowStorage) return;
+  const used = await bytesInUse();
+  if (!shouldWarn(used)) return;
+  warnedLowStorage = true;
+  post({ type: 'note', text: quotaWarningNote(used!) });
+}
+
 /** Write out everything being kept, and stop keeping it. Called when a panel connects. */
 async function flushDetached(): Promise<void> {
   await Promise.all([...detached.keys()].map((id) => flushDetachedChat(id)));
@@ -507,7 +527,7 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
       // A compacted history is written back immediately. The next turn then starts from the small
       // version even if this one later dies mid-run, which is the whole point: the chat that was
       // too big to send must not stay too big to send.
-      onCompacted: (msgs) => saveMessages(chatId, msgs),
+      onCompacted: async (msgs) => void (await saveMessages(chatId, msgs)),
       // The provider refused the history for being too long and the loop compacted to fit. Writing
       // that number down against this connection and model is what stops the next turn walking
       // into the same wall. Serialised on the key, since two chats on the same model can both
@@ -585,8 +605,17 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
     // Whatever happened, the loop hands back a valid conversation holding everything it completed:
     // every assistant message, every tool call and every tool result up to the step that failed.
     const messages = outcome.messages;
-    await saveMessages(chatId, messages);
+    // A save that could not happen used to be silent — every save on this path is fire-and-forget,
+    // for the good reason that losing the reply on top of the record would be worse. Silent is what
+    // made the storage half of "it breaks in long sessions" so hard to place: the conversation kept
+    // going on screen and stopped existing on disk. It still does not fail the turn; it now says so.
+    if ((await saveMessages(chatId, messages)) === 'quota') post({ type: 'note', text: QUOTA_PANEL_NOTE });
     await touchChat(chatId, { url, turns: countTurns(messages) });
+    // Blobs whose transcript rows are gone (compaction, an unqueued message, a rollback) were
+    // leaking for the life of the chat: pruneBlobs existed and nothing called it. At ~1.5 MB of a
+    // 10 MB quota per image, that is a large share of why long sessions run out of room.
+    void collectBlobs(chatId, await loadItems(chatId)).catch(() => 0);
+    void warnIfStorageLow(post);
     if (outcome.failure) failed = outcome.failure.message;
     succeeded = !signal.aborted && !outcome.failure;
   } catch (e) {

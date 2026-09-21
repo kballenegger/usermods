@@ -7,7 +7,9 @@
 //   'chat:<id>:artifact' — Artifact draft mod (lib/artifact.ts), written by the background
 // chatKeys() below is the single list of the per-chat keys, so deleting a chat cannot leave one.
 import { artifactKey } from './artifact.ts';
-import { blobsKey, elidedImageNote, type AttachedImage, type ImageThumb } from './images.ts';
+import { referencedHashes } from './blobs.ts';
+import { blobsKey, elidedImageNote, type AttachedImage } from './images.ts';
+import { trySet } from './quota.ts';
 import type { ModelSelection } from './connections.ts';
 import { dropTombstoned, isTombstoned, tombstone, withKey } from './storagequeue.ts';
 import type { TitleSource } from './title';
@@ -529,15 +531,10 @@ export function elideAttachedImages(content: Part[]): Part[] {
   return changed ? out : content;
 }
 
-/** Every blob hash a transcript still refers to, so nothing else has to know the item shape. */
-export function referencedHashes(items: ChatItem[]): string[] {
-  const out: string[] = [];
-  for (const it of items) {
-    if (it.kind !== 'user' || !it.images) continue;
-    for (const img of it.images as ImageThumb[]) if (img.hash) out.push(img.hash);
-  }
-  return out;
-}
+// referencedHashes moved to lib/blobs.ts, which is where the only thing that needs it lives (the
+// blob collector). Re-exported here because it was part of this module's surface, and because
+// "which hashes does a transcript still mention" reads as a question about chats.
+export { referencedHashes };
 
 /**
  * The history to persist when a run failed before runAgent could return one: everything that was
@@ -566,9 +563,9 @@ export function appendTurn(history: Msg[], turn: { text: string; images?: Attach
  * the profile carries a transcript nothing lists and nothing will ever clean up. So the same
  * tombstone that guards the index guards these two keys.
  */
-export async function saveMessages(id: string, messages: Msg[]): Promise<void> {
-  if (isTombstoned(id)) return;
-  await chrome.storage.local.set({ [messagesKey(id)]: slimMessages(messages) });
+export async function saveMessages(id: string, messages: Msg[]): Promise<'ok' | 'quota' | 'error' | 'skipped'> {
+  if (isTombstoned(id)) return 'skipped';
+  return trySet({ [messagesKey(id)]: slimMessages(messages) });
 }
 
 export async function loadItems(id: string): Promise<ChatItem[]> {
@@ -576,7 +573,7 @@ export async function loadItems(id: string): Promise<ChatItem[]> {
   return (r[itemsKey(id)] as ChatItem[] | undefined) ?? [];
 }
 
-export async function saveItems(id: string, items: ChatItem[]): Promise<void> {
-  if (isTombstoned(id)) return;
-  await chrome.storage.local.set({ [itemsKey(id)]: items });
+export async function saveItems(id: string, items: ChatItem[]): Promise<'ok' | 'quota' | 'error' | 'skipped'> {
+  if (isTombstoned(id)) return 'skipped';
+  return trySet({ [itemsKey(id)]: items });
 }

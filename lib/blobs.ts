@@ -15,8 +15,25 @@
 // belonged to.
 
 import { blobsKey, imageHash, type AttachedImage, type ImageThumb, type StoredBlob } from './images.ts';
+import type { ChatItem } from './types';
 
 export { blobsKey };
+
+/**
+ * Every blob hash a transcript still refers to, so nothing else has to know the item shape.
+ *
+ * Lives here rather than in lib/chats.ts (where it used to) because the collector below is its only
+ * caller, and keeping the two together is what makes it obvious that one exists to serve the other
+ * — the previous arrangement had the question in one file and no answer anywhere.
+ */
+export function referencedHashes(items: ChatItem[]): string[] {
+  const out: string[] = [];
+  for (const it of items) {
+    if (it.kind !== 'user' || !it.images) continue;
+    for (const img of it.images as ImageThumb[]) if (img.hash) out.push(img.hash);
+  }
+  return out;
+}
 
 /** Every full-size attachment stored for one chat, by hash. */
 export type BlobStore = Record<string, StoredBlob>;
@@ -80,4 +97,32 @@ export function pruneBlobs(store: BlobStore, keep: Iterable<string>): BlobStore 
   const out: BlobStore = {};
   for (const [hash, blob] of Object.entries(store)) if (wanted.has(hash)) out[hash] = blob;
   return out;
+}
+
+/**
+ * Drop a chat's orphaned blobs from storage, and report how many bytes that freed.
+ *
+ * pruneBlobs existed and NOTHING EVER CALLED IT — so an image whose transcript row was rewritten
+ * (compaction, an unqueued message, a rollback) stayed in the blob store for the life of the chat,
+ * unreachable and unremovable. Against the real constants that is ~1.53 MB of a 10 MB quota per
+ * leaked image, which is a large share of why long sessions run out of room (see lib/quota.ts).
+ *
+ * Returns 0 when there was nothing to drop, so the caller can skip the write. Never throws: a
+ * cleanup that could not run is not a reason to fail whatever asked for it.
+ */
+export async function collectBlobs(chatId: string, items: ChatItem[]): Promise<number> {
+  try {
+    const store = await loadBlobs(chatId);
+    const hashes = Object.keys(store);
+    if (!hashes.length) return 0;
+    const kept = pruneBlobs(store, referencedHashes(items));
+    const dropped = hashes.filter((h) => !(h in kept));
+    if (!dropped.length) return 0;
+    const freed = dropped.reduce((n, h) => n + (store[h]?.data.length ?? 0), 0);
+    if (Object.keys(kept).length) await chrome.storage.local.set({ [blobsKey(chatId)]: kept });
+    else await chrome.storage.local.remove(blobsKey(chatId));
+    return freed;
+  } catch {
+    return 0;
+  }
 }
