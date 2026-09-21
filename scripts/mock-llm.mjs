@@ -16,13 +16,19 @@
 //                              without ?client_version=, a {models:[{slug, visibility, priority}]}
 //                              catalog with it (/codex-down always 400s). See "Endpoints" below.
 //   GET  /__requests           -> {requests: [{at, script, endpoint, model, messages, images,
-//                              hasImages}, ...]} body
+//                              hasImages, reasoning}, ...]} body
 //        DELETE /__requests    received, in order; the isolation flow reads this back to prove that
 //                              one chat's user text never entered another chat's model
 //                              conversation, and the images flow reads `images` — one entry per
 //                              image_url part, with its media type, byte size, dimensions when the
 //                              PNG header gives them, and where it sat relative to the text — to
 //                              prove what an attachment actually looked like on the wire.
+//                              `reasoning` is the reasoning knob this request carried, if any —
+//                              {field, value} for reasoning_effort / chat_template_kwargs plus any
+//                              custom fields — which is how the thinking flow proves that picking
+//                              a level put the documented field on the wire and that Off changed
+//                              it. Absent when the request carried none, which is what 'default'
+//                              must produce.
 //                              DELETE empties the log.
 //   GET  /__violations        -> {violations: [{at, kind, detail, script}, ...]}  every request
 //        DELETE /__violations  that was structurally invalid. See "Validation" below.
@@ -693,7 +699,29 @@ export const MODELS = {
   holdMs: 6000,
 };
 
+/**
+ * The thinking flow's conversation. Four one-step turns: the level is what the flow is asserting
+ * about, and it reads that off /__requests rather than out of the reply, so each turn only has to
+ * finish quickly and distinguishably.
+ */
+export const THINKING = {
+  turns: [
+    { prompt: 'start off plainly THINKPROMPT-1', done: 'THINKDONE-1' },
+    { prompt: 'think hard about this THINKPROMPT-2', done: 'THINKDONE-2' },
+    { prompt: 'now stop thinking THINKPROMPT-3', done: 'THINKDONE-3' },
+    { prompt: 'try the fussy server THINKPROMPT-4', done: 'THINKDONE-4' },
+    { prompt: 'and once more THINKPROMPT-5', done: 'THINKDONE-5' },
+  ],
+};
+
 const escapeRe = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const THINKING_SCRIPTS = THINKING.turns.map((t, i) => ({
+  name: `thinking-${i + 1}`,
+  match: new RegExp(escapeRe(t.prompt), 'i'),
+  steps: [{ text: `${t.done} Done.` }],
+}));
+
 const MODELS_SCRIPTS = [
   {
     name: 'models-1',
@@ -724,7 +752,7 @@ const MODELS_SCRIPTS = [
 ];
 
 // In front: each of these prompts carries a unique token, and nothing scripted earlier may claim it.
-SCRIPTS.unshift(...MODELS_SCRIPTS);
+SCRIPTS.unshift(...MODELS_SCRIPTS, ...THINKING_SCRIPTS);
 
 // ---------------------------------------------------------------------------
 // The edit-a-mod flow (screenshots.mjs --editmod).
@@ -1427,6 +1455,14 @@ function sse(res, obj) {
 //                                                answer with that status (and Retry-After, seconds).
 //   {kind: 'refuse'}                             kill the socket before answering: what a refused
 //                                                connection or no route looks like to fetch().
+//   {kind: 'no-reasoning'}                       answer 400 the way a server with no reasoning
+//                                                parameter does, but ONLY when the request actually
+//                                                carried one; a request without it is let through
+//                                                untouched. Exactly the pair the reasoning fallback
+//                                                needs: the first request is refused, the extension
+//                                                re-sends without the field, and the same standing
+//                                                fault lets that one through.
+//                                                Defaults to "until cleared".
 //   {kind: 'no-vision'}                          answer 400 the way a text-only model does, but
 //                                                ONLY when the request actually carried an image
 //                                                part; a request without one is let through
@@ -1451,10 +1487,10 @@ let faults = [];
 function parseFaults(plan) {
   if (!Array.isArray(plan)) return [];
   return plan
-    .filter((f) => f && ['drop', 'status', 'refuse', 'no-vision'].includes(f.kind))
+    .filter((f) => f && ['drop', 'status', 'refuse', 'no-vision', 'no-reasoning'].includes(f.kind))
     .map((f) => ({
       kind: f.kind,
-      times: Number.isFinite(f.times) ? f.times : f.kind === 'refuse' || f.kind === 'no-vision' ? Infinity : 1,
+      times: Number.isFinite(f.times) ? f.times : f.kind === 'refuse' || f.kind === 'no-vision' || f.kind === 'no-reasoning' ? Infinity : 1,
       skip: Number.isFinite(f.skip) ? f.skip : 0,
       afterChunks: Number.isFinite(f.afterChunks) ? f.afterChunks : 3,
       status: Number.isFinite(f.status) ? f.status : 503,
@@ -1472,11 +1508,15 @@ function parseFaults(plan) {
  * A 'no-vision' fault therefore does NOT consume a turn on an image-free request; it simply does
  * not apply, and the next fault in the plan (if any) is considered instead.
  */
-function takeFault(scriptName, carriesImages = false) {
+function takeFault(scriptName, carriesImages = false, carriesReasoning = false) {
   for (const f of faults) {
     if (f.times <= 0) continue;
     if (f.script && f.script !== scriptName) continue;
     if (f.kind === 'no-vision' && !carriesImages) continue;
+    // Same rule as no-vision, for the same reason: a server without the parameter refuses the
+    // request that carries it and answers the one that does not, so the fault does not apply (and
+    // does not consume a turn) on a request with no reasoning field.
+    if (f.kind === 'no-reasoning' && !carriesReasoning) continue;
     if (f.skip > 0) {
       f.skip -= 1;
       return null;
@@ -1493,6 +1533,26 @@ function takeFault(scriptName, carriesImages = false) {
  * invented here to match it.
  */
 const NO_VISION_BODY = { error: { message: 'Invalid content type. image_url is only supported by certain models.', type: 'invalid_request_error', code: 'unsupported_content' } };
+
+/**
+ * The 400 a server with no reasoning parameter answers with. OpenAI's own wording for an argument
+ * the model does not take — the extension's classifier (lib/thinking.ts isReasoningRejection) has
+ * to recognise real refusals, not a phrase invented here to match it.
+ */
+const NO_REASONING_BODY = { error: { message: 'Unrecognized request argument supplied: reasoning_effort', type: 'invalid_request_error', code: 'unknown_parameter' } };
+
+/**
+ * The reasoning knob a request carried, for /__requests. Returns null when it carried none, which
+ * is what a chat left on 'default' must produce — the flow asserts on the absence as much as on the
+ * presence, because a field sent when nobody asked for one is the bug that would hide here.
+ */
+function collectReasoning(body) {
+  const out = {};
+  if (body.reasoning_effort !== undefined) out.reasoning_effort = body.reasoning_effort;
+  if (body.chat_template_kwargs !== undefined) out.chat_template_kwargs = body.chat_template_kwargs;
+  if (body.reasoning !== undefined) out.reasoning = body.reasoning;
+  return Object.keys(out).length ? out : null;
+}
 
 /** Thrown inside streamStep to stop writing once the socket has been killed on purpose. */
 const DROPPED = Symbol('dropped');
@@ -1793,7 +1853,10 @@ const server = http.createServer(async (req, res) => {
     // Collected once and reused: the fault decision needs to know whether a picture is on the wire,
     // and every recorded request carries the same summary so a flow can count what was sent.
     const collected = collectImages(messages);
-    const fault = takeFault(kind, collected.images.length > 0);
+    // The reasoning knob this request carried, recorded on every request and consulted by the
+    // 'no-reasoning' fault the same way the images are by 'no-vision'.
+    const reasoning = collectReasoning(body);
+    const fault = takeFault(kind, collected.images.length > 0, reasoning !== null);
     if (fault && fault.kind !== 'drop') {
       requests.push({
         at: Date.now(),
@@ -1803,6 +1866,7 @@ const server = http.createServer(async (req, res) => {
         messages: stripImageData(messages),
         images: collected.images,
         hasImages: collected.images.length > 0,
+        ...(reasoning ? { reasoning } : {}),
       });
       if (process.env.MOCK_LLM_VERBOSE) console.error(`[mock-llm] FAULT ${fault.kind} on ${kind} (${collected.images.length} image parts)`);
       if (fault.kind === 'refuse') {
@@ -1812,6 +1876,11 @@ const server = http.createServer(async (req, res) => {
       if (fault.kind === 'no-vision') {
         res.writeHead(400, { 'content-type': 'application/json' });
         res.end(JSON.stringify(NO_VISION_BODY));
+        return;
+      }
+      if (fault.kind === 'no-reasoning') {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify(NO_REASONING_BODY));
         return;
       }
       res.writeHead(fault.status, {
@@ -1832,13 +1901,13 @@ const server = http.createServer(async (req, res) => {
     // is still recorded, because the isolation flow's "no chat's text entered another chat's model
     // conversation" assertion has to hold for the title call too.
     if (isSummaryRequest(body)) {
-      requests.push({ at: Date.now(), script: 'summary', ...where, messages: stripImageData(messages), images: collected.images, hasImages: collected.images.length > 0 });
+      requests.push({ at: Date.now(), script: 'summary', ...where, messages: stripImageData(messages), images: collected.images, hasImages: collected.images.length > 0, ...(reasoning ? { reasoning } : {}) });
       if (process.env.MOCK_LLM_VERBOSE) console.error('[mock-llm] compaction summary');
       await streamStep(res, { text: SUMMARY_REPLY, calls: [] }, body.model ?? 'demo');
       return;
     }
     if (isTitleRequest(body)) {
-      requests.push({ at: Date.now(), script: 'title', ...where, messages: stripImageData(messages), images: collected.images, hasImages: collected.images.length > 0 });
+      requests.push({ at: Date.now(), script: 'title', ...where, messages: stripImageData(messages), images: collected.images, hasImages: collected.images.length > 0, ...(reasoning ? { reasoning } : {}) });
       if (process.env.MOCK_LLM_VERBOSE) console.error(`[mock-llm] title -> ${TITLE_REPLY}`);
       await streamStep(res, { text: TITLE_REPLY, calls: [] }, body.model ?? 'demo');
       return;
@@ -1858,6 +1927,7 @@ const server = http.createServer(async (req, res) => {
       // A plain boolean beside the detail, so a flow can assert "this request carried no picture"
       // without reasoning about an empty array it might have failed to collect.
       hasImages: collected.images.length > 0,
+      ...(reasoning ? { reasoning } : {}),
     });
     if (process.env.MOCK_LLM_VERBOSE) {
       console.error(`[mock-llm] ${script.name ?? 'fallback'} step ${script.steps.indexOf(step)}: ${(step.calls ?? []).map((c) => c.name).join(', ') || 'text only'}`);

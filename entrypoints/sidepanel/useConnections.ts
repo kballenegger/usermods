@@ -13,11 +13,14 @@ import {
   loadConnections,
   loadModelChoice,
   loadSignedIn,
+  loadThinkingChoice,
+  THINKING_CHOICE_KEY,
   touchesConnections,
   type ConnectionsState,
   type ModelSelection,
   type SignedIn,
 } from '@/lib/connections';
+import type { ThinkingLevel } from '@/lib/thinking';
 
 export interface ConnectionsView {
   /** False until the first read has landed. Nothing should be decided about a selection before it. */
@@ -25,10 +28,12 @@ export interface ConnectionsView {
   state: ConnectionsState;
   /** The last model the user picked: a new chat's default. */
   last: ModelSelection | null;
+  /** The last Thinking level the user picked, for the same reason and on the same terms. */
+  lastThinking: ThinkingLevel;
   signedIn: SignedIn;
 }
 
-const INITIAL: ConnectionsView = { ready: false, state: EMPTY_CONNECTIONS, last: null, signedIn: NOT_SIGNED_IN };
+const INITIAL: ConnectionsView = { ready: false, state: EMPTY_CONNECTIONS, last: null, lastThinking: 'default', signedIn: NOT_SIGNED_IN };
 
 export function useConnections(): ConnectionsView {
   const [view, setView] = useState<ConnectionsView>(INITIAL);
@@ -42,9 +47,9 @@ export function useConnections(): ConnectionsView {
         // Connections first: that read is what migrates a legacy profile, and the migration is
         // what writes the last choice the second read is about to ask for.
         const state = await loadConnections();
-        const [last, signedIn] = await Promise.all([loadModelChoice(), loadSignedIn()]);
+        const [last, lastThinking, signedIn] = await Promise.all([loadModelChoice(), loadThinkingChoice(), loadSignedIn()]);
         // A slower, older read must not overwrite a newer one.
-        if (live && mine === seq) setView({ ready: true, state, last, signedIn });
+        if (live && mine === seq) setView({ ready: true, state, last, lastThinking, signedIn });
       } catch {
         if (live && mine === seq) setView((v) => ({ ...v, ready: true }));
       }
@@ -53,7 +58,7 @@ export function useConnections(): ConnectionsView {
     const onChanged = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
       // 'settings' too: a legacy profile appearing there (an older build, a restored backup) is
       // something loadConnections migrates, and the view should follow.
-      if (area === 'local' && (touchesConnections(changes) || 'settings' in changes)) void read();
+      if (area === 'local' && (touchesConnections(changes) || THINKING_CHOICE_KEY in changes || 'settings' in changes)) void read();
     };
     chrome.storage.onChanged.addListener(onChanged);
     return () => {

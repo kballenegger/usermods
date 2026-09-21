@@ -525,6 +525,13 @@ function ChatRow({
               <span className="break" data-testid="chat-model" title={chat.model.label ? `${chat.model.model} on ${chat.model.label}` : chat.model.model}>
                 {chat.model.model}
               </span>
+              {/* The Thinking level beside the model it applies to, and only when it is not the
+                  default — a row saying "default" on every chat would be noise, not information. */}
+              {chat.thinking && chat.thinking !== 'default' && (
+                <span data-testid="chat-thinking" title={`This chat asks the model to think: ${chat.thinking}`}>
+                  thinking: {chat.thinking}
+                </span>
+              )}
             </>
           )}
           {/* A chat that produced a draft mod, and how many versions it took. The count comes from

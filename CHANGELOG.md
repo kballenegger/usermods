@@ -6,6 +6,35 @@ All notable changes to usermods are recorded here. The format follows
 
 ## [Unreleased]
 
+### Thinking: how hard the model reasons, per chat
+
+- **A Thinking level next to the model**, mapped onto each provider's own reasoning knob. The levels
+  are Default, Off, Low, Medium, High and Max, and only the ones the chosen model accepts are shown
+  — a model with no reasoning setting shows no row at all. It is per chat, like the model:
+  remembered across reloads, a new chat starts on the last level picked, changing it applies from
+  the next turn, and the transcript marks the spot (*thinking: high*). The dashboard's chat list and
+  transcript preview show it beside the model.
+- **Default sends nothing.** A chat nobody has touched makes byte-for-byte the request it made
+  before, on every provider.
+- **One scale over five wire formats**, each verified against current provider documentation:
+  Claude's `output_config.effort` (a top-level sibling of `thinking`, not a field inside it) on
+  models that take adaptive thinking, and `thinking.type: "enabled"` with `budget_tokens` on the
+  older ones that reject an effort parameter; `reasoning.effort` on the Responses API for ChatGPT
+  and SuperGrok; `reasoning_effort` on OpenAI-compatible chat/completions; and Qwen 3's
+  `chat_template_kwargs: {enable_thinking}`. What a model cannot do is never offered: SuperGrok and
+  the always-thinking Claude models have no Off, Grok's `-fast` and non-reasoning variants and
+  ordinary chat models have no row.
+- **Changing the level does not disturb Claude's prompt cache breakpoint.** The thinking fields are
+  top-level siblings of `system`, so the cached system block and its `cache_control` marker are
+  byte-identical at every level — asserted in the unit tests.
+- **Titles and compaction summaries always run at the lowest level the model allows**, whatever the
+  chat is set to: short mechanical calls the user did not ask for should not be billed at Max.
+- **For servers nothing can guess**, each OpenAI-compatible provider gains a **Reasoning field**
+  setting (Auto, `reasoning_effort`, `chat_template_kwargs: enable_thinking`, None) and a validated
+  **Custom request fields** JSON box merged into every request. A server that answers 400 to the
+  reasoning field has that one request re-sent without it, is remembered for that endpoint and
+  model, and the panel says so — the same pattern as the Images fallback.
+
 ### Safari on iPhone and iPad
 
 - **A content-first chat view on iPhone.** From a report on a real phone that the chat could not be

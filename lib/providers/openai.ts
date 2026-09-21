@@ -1,5 +1,15 @@
 // OpenAI-compatible chat completions adapter. Covers OpenAI, OpenRouter, Ollama, LM Studio,
 // vLLM, mlx_lm.server and anything else that speaks /v1/chat/completions with tools.
+import {
+  applyThinking,
+  isReasoningRejection,
+  NO_THINKING_MEMORY,
+  resolveReasoningField,
+  resolveThinkingLevel,
+  thinkingCapability,
+  thinkingKey,
+  type ThinkingMemory,
+} from '../thinking.ts';
 import type { Msg, Part, Settings, ToolDef } from '../types';
 import { ProviderError, fetchOrNetworkError, httpError, parseRetryAfter, readStream, streamIncomplete } from './errors.ts';
 import type { Provider, ProviderResponse } from './types';
@@ -140,6 +150,10 @@ export interface OpenAIProviderDeps {
   memory?: VisionMemory;
   /** Told once, when Auto has just discovered a text-only backend. The panel shows a note. */
   onVisionUnsupported?: (key: string) => void;
+  /** Where "this endpoint+model does not take a reasoning field" is remembered (lib/thinking.ts). */
+  thinkingMemory?: ThinkingMemory;
+  /** Told once, when a server has just refused the reasoning field. The panel shows a note. */
+  onThinkingUnsupported?: (key: string) => void;
 }
 
 export function createOpenAIProvider(settings: Settings, deps: OpenAIProviderDeps = {}): Provider {
@@ -147,13 +161,26 @@ export function createOpenAIProvider(settings: Settings, deps: OpenAIProviderDep
   const memory = deps.memory ?? NO_VISION_MEMORY;
   const setting = resolveImagesSetting(settings.images);
   const key = visionKeyFor(settings);
+  const thinkMemory = deps.thinkingMemory ?? NO_THINKING_MEMORY;
+  const thinkKey = thinkingKey(settings.baseUrl || DEFAULT_OPENAI_BASE, settings.model ?? '');
 
   return {
     async chat({ system, messages, tools, signal, callbacks }): Promise<ProviderResponse> {
       const toolsField = tools.length
         ? { tools: tools.map((t) => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.inputSchema } })) }
         : {};
-      const send = (withImages: boolean) =>
+
+      // The reasoning fields this chat's Thinking level asks for, if any. 'default' produces
+      // nothing, and so does a model whose connection says it takes no reasoning field — in both
+      // cases the request below is byte-for-byte what it was before this feature.
+      const level = resolveThinkingLevel(settings.thinking);
+      const cap = thinkingCapability({ kind: 'openai-compatible', model: settings.model, reasoningField: resolveReasoningField(settings.reasoningField) });
+      const reasoningFields = applyThinking(level, cap).body;
+      // The connection's own "Custom request fields" box, for servers whose knob nothing can guess.
+      // Merged last so an explicitly typed field wins over the mapped one.
+      const custom = settings.customFields ?? {};
+
+      const send = (withImages: boolean, withReasoning: boolean) =>
         fetchOrNetworkError(`${base}/chat/completions`, {
           method: 'POST',
           signal,
@@ -166,6 +193,8 @@ export function createOpenAIProvider(settings: Settings, deps: OpenAIProviderDep
             stream: true,
             messages: toOpenAIMessages(system, messages, withImages),
             ...toolsField,
+            ...(withReasoning ? reasoningFields : {}),
+            ...(withReasoning ? custom : {}),
           }),
         });
 
@@ -174,7 +203,13 @@ export function createOpenAIProvider(settings: Settings, deps: OpenAIProviderDep
       const carriesImages = hasImages(messages);
       const withImages = carriesImages && (await shouldSendImages(setting, key, memory));
 
-      let res = await send(withImages);
+      // Does it carry a reasoning field, and has this endpoint already refused one? Same shape of
+      // question as the images above, and the same answer: a request with nothing to send never
+      // consults the store.
+      const carriesReasoning = Object.keys(reasoningFields).length > 0 || Object.keys(custom).length > 0;
+      const withReasoning = carriesReasoning && !(await thinkMemory.isUnsupported(thinkKey));
+
+      let res = await send(withImages, withReasoning);
 
       // The Auto fallback. It lives HERE, in the adapter, rather than in the agent loop, for two
       // reasons. Only the adapter knows whether this request actually put an `image_url` part on
@@ -189,21 +224,38 @@ export function createOpenAIProvider(settings: Settings, deps: OpenAIProviderDep
       // compose exactly as they should. If this second request fails in a way backoff CAN fix, it
       // throws and withRetry takes it from there, and the images are already remembered as
       // unsupported so the retry does not re-discover it.
-      if (!res.ok && withImages && setting === 'auto') {
-        // The body is read here rather than by httpError, because the classifier needs it and a
+      //
+      // The reasoning fallback rides alongside it, for the same reasons and with one extra: the two
+      // refusals are INDEPENDENT. A text-only server that also takes no reasoning_effort would
+      // otherwise have its second complaint hidden behind the first, so each 400 is classified on
+      // its own and each drops only the thing it named. A request can therefore shed the images,
+      // then shed the reasoning field, and still be the same conversation — at most two extra
+      // sends, each immediate and each remembered so the next turn pays for neither.
+      let sentImages = withImages;
+      let sentReasoning = withReasoning;
+      for (let attempt = 0; attempt < 2 && !res.ok; attempt++) {
+        // The body is read here rather than by httpError, because the classifiers need it and a
         // Response body can only be read once.
         const body = await res.text().catch(() => '');
-        if (isVisionRejection(res.status, body)) {
+        if (sentImages && setting === 'auto' && isVisionRejection(res.status, body)) {
           await memory.markUnsupported(key);
           deps.onVisionUnsupported?.(key);
-          res = await send(false);
-        } else {
-          throw new ProviderError(`${res.status} ${res.statusText}: ${body.slice(0, 500)}`.trim(), {
-            kind: 'http',
-            status: res.status,
-            retryAfterMs: parseRetryAfter(res.headers),
-          });
+          sentImages = false;
+          res = await send(sentImages, sentReasoning);
+          continue;
         }
+        if (sentReasoning && isReasoningRejection(res.status, body)) {
+          await thinkMemory.markUnsupported(thinkKey);
+          deps.onThinkingUnsupported?.(thinkKey);
+          sentReasoning = false;
+          res = await send(sentImages, sentReasoning);
+          continue;
+        }
+        throw new ProviderError(`${res.status} ${res.statusText}: ${body.slice(0, 500)}`.trim(), {
+          kind: 'http',
+          status: res.status,
+          retryAfterMs: parseRetryAfter(res.headers),
+        });
       }
       if (!res.ok || !res.body) throw await httpError(res);
 

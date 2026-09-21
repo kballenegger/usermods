@@ -1,0 +1,537 @@
+// The Thinking level: the capability table, the per-provider mapping, and the two things that must
+// never break — the Anthropic prompt cache, and a server that refuses the field.
+//
+// Every expectation here is a documented request shape, not an invented one. The doc URLs are in
+// lib/thinking.ts beside the rule each one justifies; where a test asserts a REJECTION (a field a
+// model must never receive) the reason is restated in place, because that is the assertion whose
+// point is easiest to lose later.
+import assert from 'node:assert/strict';
+import { test, describe } from 'node:test';
+import {
+  applyThinking,
+  guessReasoningField,
+  isReasoningRejection,
+  lowestThinkingLevel,
+  parseCustomFields,
+  resolveReasoningField,
+  resolveThinkingLevel,
+  supportsThinking,
+  thinkingCapability,
+  thinkingKey,
+  THINKING_LEVELS,
+  xaiSupportsReasoning,
+  type ThinkingLevel,
+} from '../lib/thinking.ts';
+import { createOpenAIProvider } from '../lib/providers/openai.ts';
+import { DEFAULT_SETTINGS, type Msg, type Settings } from '../lib/types.ts';
+
+/** The capability for one model, at the call site's convenience. */
+const cap = (kind: Parameters<typeof thinkingCapability>[0]['kind'], model: string, reasoningField?: Parameters<typeof thinkingCapability>[0]['reasoningField']) =>
+  thinkingCapability({ kind, model, reasoningField });
+
+/** The request body one level produces on one model. */
+const bodyFor = (level: ThinkingLevel, kind: Parameters<typeof cap>[0], model: string, field?: Parameters<typeof cap>[2]) =>
+  applyThinking(level, cap(kind, model, field));
+
+describe('the neutral scale', () => {
+  test('an unknown or missing stored value reads as the default', () => {
+    assert.equal(resolveThinkingLevel(undefined), 'default');
+    assert.equal(resolveThinkingLevel(null), 'default');
+    assert.equal(resolveThinkingLevel('xhigh'), 'default', 'a level we do not expose is not adopted from storage');
+    assert.equal(resolveThinkingLevel(7), 'default');
+    for (const level of THINKING_LEVELS) assert.equal(resolveThinkingLevel(level), level);
+  });
+
+  test("'default' never puts a field on the wire, on any provider", () => {
+    // This is the property that makes the whole feature additive: an untouched chat sends exactly
+    // the request it sent before this module existed.
+    const models: Array<[Parameters<typeof cap>[0], string]> = [
+      ['anthropic', 'claude-opus-5'],
+      ['anthropic', 'claude-sonnet-4-5'],
+      ['chatgpt', 'gpt-5'],
+      ['xai', 'grok-4.6'],
+      ['openai-compatible', 'gpt-5'],
+      ['openai-compatible', 'qwen3-32b'],
+      ['openai-compatible', 'llama-3-8b'],
+    ];
+    for (const [kind, model] of models) {
+      const out = bodyFor('default', kind, model);
+      assert.deepEqual(out.body, {}, `${kind}/${model} sent a body field for 'default'`);
+      assert.equal(out.thinking, undefined, `${kind}/${model} sent a thinking field for 'default'`);
+    }
+  });
+
+  test('a level the model does not support produces nothing', () => {
+    // Belt to the picker's braces: a stale stored level cannot put a rejected field on the wire.
+    const fable = cap('anthropic', 'claude-fable-5');
+    assert.ok(!fable.levels.includes('off'), 'Fable 5 must not offer Off');
+    assert.deepEqual(applyThinking('off', fable), { body: {} }, 'a level outside the capability sends nothing');
+  });
+});
+
+describe('Anthropic: adaptive thinking and output_config.effort', () => {
+  // https://platform.claude.com/docs/en/build-with-claude/effort — the effort parameter is
+  // TOP-LEVEL `output_config.effort`, a sibling of `thinking`, not a field inside it.
+  test('effort is sent as top-level output_config.effort, not inside thinking', () => {
+    const out = bodyFor('medium', 'anthropic', 'claude-opus-5');
+    assert.deepEqual(out.body, { output_config: { effort: 'medium' } });
+    assert.equal(out.thinking, undefined, 'an effort level does not restate the thinking mode');
+  });
+
+  test('the ladder maps onto the documented effort values', () => {
+    assert.deepEqual(bodyFor('low', 'anthropic', 'claude-opus-5').body, { output_config: { effort: 'low' } });
+    assert.deepEqual(bodyFor('high', 'anthropic', 'claude-opus-5').body, { output_config: { effort: 'high' } });
+    // 'max' is a real documented level, above xhigh, for "absolute maximum capability".
+    assert.deepEqual(bodyFor('max', 'anthropic', 'claude-opus-5').body, { output_config: { effort: 'max' } });
+  });
+
+  test('Off disables thinking on models that accept it, and sends no effort with it', () => {
+    const out = bodyFor('off', 'anthropic', 'claude-opus-5');
+    assert.deepEqual(out.thinking, { type: 'disabled' });
+    // Opus 5 rejects thinking "disabled" combined with effort xhigh or max, so Off must never ride
+    // along with an effort value at all.
+    assert.deepEqual(out.body, {}, 'Off must not send an effort level beside a disabled thinking block');
+  });
+
+  test('the always-thinking models are not offered Off at all', () => {
+    // The support table marks Fable 5/5.1, Mythos 5/5.1 and Mythos Preview "Always on":
+    // thinking: {type: "disabled"} is a 400 on every one of them.
+    for (const model of ['claude-fable-5', 'claude-fable-5-1', 'claude-mythos-5', 'claude-mythos-preview']) {
+      const c = cap('anthropic', model);
+      assert.ok(!c.levels.includes('off'), `${model} must not offer Off`);
+      assert.deepEqual(applyThinking('off', c).thinking, undefined, `${model} must never be sent thinking.disabled`);
+      // It still takes effort, which is the whole point of the row for these models.
+      assert.deepEqual(applyThinking('low', c).body, { output_config: { effort: 'low' } });
+    }
+  });
+
+  test('Opus 5 and Sonnet 5 do offer Off', () => {
+    // The table marks these "On": they default to thinking but accept "disabled".
+    for (const model of ['claude-opus-5', 'claude-sonnet-5']) {
+      assert.ok(cap('anthropic', model).levels.includes('off'), `${model} should offer Off`);
+    }
+  });
+
+  test('the legacy models get budget_tokens and never an effort field', () => {
+    // Claude Sonnet 4.5 / Haiku 4.5 / Opus 4.5 are extended-thinking-only: "adaptive" is a 400, and
+    // thinking depth is budget_tokens. Sending output_config.effort in their shape would be wrong.
+    for (const model of ['claude-sonnet-4-5', 'claude-haiku-4-5']) {
+      const c = cap('anthropic', model);
+      assert.equal(c.style, 'anthropic-budget');
+      const out = applyThinking('medium', c);
+      assert.deepEqual(out.thinking, { type: 'enabled', budget_tokens: 4000 });
+      assert.deepEqual(out.body, {}, `${model} must not be sent output_config.effort`);
+    }
+  });
+
+  test('every budget respects the documented 1024 floor and stays under max_tokens', () => {
+    const c = cap('anthropic', 'claude-sonnet-4-5');
+    for (const level of ['low', 'medium', 'high'] as ThinkingLevel[]) {
+      const budget = (applyThinking(level, c).thinking as { budget_tokens: number }).budget_tokens;
+      assert.ok(budget >= 1024, `${level} budget ${budget} is below the API's 1024 minimum`);
+      // The adapter sends max_tokens: 16000, and the budget must leave room for the answer.
+      assert.ok(budget < 16000, `${level} budget ${budget} does not leave room under max_tokens`);
+    }
+  });
+
+  test('the adaptive and budget families are split on the right models', () => {
+    for (const model of ['claude-opus-5', 'claude-sonnet-5', 'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-opus-4-7', 'claude-fable-5']) {
+      assert.equal(cap('anthropic', model).style, 'anthropic-effort', `${model} should use adaptive + effort`);
+    }
+    for (const model of ['claude-sonnet-4-5', 'claude-opus-4-5', 'claude-haiku-4-5', 'claude-3-5-sonnet']) {
+      assert.equal(cap('anthropic', model).style, 'anthropic-budget', `${model} should use budget_tokens`);
+    }
+  });
+});
+
+describe('Anthropic: the prompt cache survives a level change', () => {
+  /**
+   * The request the adapter builds, reduced to what the cache prefix is made of.
+   *
+   * This mirrors lib/providers/anthropic.ts: the system block carries the cache_control marker, and
+   * the thinking fields are spread at the TOP LEVEL beside it. The point of the test is that no
+   * level can reach inside `system`.
+   */
+  const buildRequest = (level: ThinkingLevel, model = 'claude-opus-5') => {
+    const think = applyThinking(level, cap('anthropic', model));
+    return {
+      model,
+      max_tokens: 16000,
+      system: [{ type: 'text', text: 'SYSTEM PROMPT', cache_control: { type: 'ephemeral' } }],
+      messages: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }],
+      tools: [{ name: 'get_page', description: 'read', input_schema: { type: 'object' } }],
+      thinking: { type: 'adaptive' },
+      ...(think.thinking ? { thinking: think.thinking } : {}),
+      ...think.body,
+    };
+  };
+
+  test('the system block and its cache_control are byte-identical across every level', () => {
+    const baseline = JSON.stringify(buildRequest('default').system);
+    for (const level of THINKING_LEVELS) {
+      const req = buildRequest(level);
+      assert.equal(JSON.stringify(req.system), baseline, `level ${level} changed the cached system block`);
+      // Not just equal by value: the marker itself must still be there and unchanged.
+      assert.deepEqual(req.system[0]?.cache_control, { type: 'ephemeral' }, `level ${level} disturbed the cache_control marker`);
+    }
+  });
+
+  test('the tools and messages are identical across every level too', () => {
+    // Tool and system-prompt breakpoints can miss depending on where the model renders the
+    // configuration; what WE control is that we do not rewrite them ourselves.
+    const tools = JSON.stringify(buildRequest('default').tools);
+    const messages = JSON.stringify(buildRequest('default').messages);
+    for (const level of THINKING_LEVELS) {
+      assert.equal(JSON.stringify(buildRequest(level).tools), tools, `level ${level} rewrote the tools array`);
+      assert.equal(JSON.stringify(buildRequest(level).messages), messages, `level ${level} rewrote the messages`);
+    }
+  });
+
+  test('a level only ever adds top-level siblings of system', () => {
+    // Whatever a level changes, it changes OUTSIDE the cached prefix's own fields.
+    const base = buildRequest('default');
+    const raised = buildRequest('max');
+    const changed = Object.keys(raised).filter((k) => JSON.stringify((raised as Record<string, unknown>)[k]) !== JSON.stringify((base as Record<string, unknown>)[k]));
+    assert.deepEqual(changed, ['output_config'], `a level changed ${JSON.stringify(changed)}; only top-level thinking fields may differ`);
+  });
+
+  test('the same level twice produces the identical request, so consecutive turns cache', () => {
+    assert.equal(JSON.stringify(buildRequest('medium')), JSON.stringify(buildRequest('medium')));
+  });
+});
+
+describe('Responses API: ChatGPT and xAI', () => {
+  test('ChatGPT maps onto reasoning.effort', () => {
+    assert.deepEqual(bodyFor('low', 'chatgpt', 'gpt-5').body, { reasoning: { effort: 'low' } });
+    assert.deepEqual(bodyFor('high', 'chatgpt', 'gpt-5').body, { reasoning: { effort: 'high' } });
+  });
+
+  test("ChatGPT's Off is the documented 'none' effort", () => {
+    assert.deepEqual(bodyFor('off', 'chatgpt', 'gpt-5').body, { reasoning: { effort: 'none' } });
+  });
+
+  test('xAI is never offered Off, because its reasoning cannot be disabled', () => {
+    // docs.x.ai: "reasoning cannot be disabled" on the models that take the parameter. Offering Off
+    // would be offering a request the API refuses.
+    const c = cap('xai', 'grok-4.6');
+    assert.ok(!c.levels.includes('off'), 'xAI must not offer Off');
+    assert.deepEqual(applyThinking('off', c).body, {}, 'xAI must never be sent effort: none');
+    assert.deepEqual(applyThinking('medium', c).body, { reasoning: { effort: 'medium' } });
+  });
+
+  test('the xAI -fast and non-reasoning variants are offered nothing at all', () => {
+    // lib/providers/index.ts already omits the field for these; the row must agree, or the picker
+    // would offer a level that silently does nothing.
+    for (const model of ['grok-4-fast', 'grok-3-non-reasoning']) {
+      const c = cap('xai', model);
+      assert.equal(supportsThinking(c), false, `${model} should show no Thinking row`);
+      assert.deepEqual(applyThinking('high', c).body, {}, `${model} must never receive a reasoning field`);
+      assert.equal(xaiSupportsReasoning(model), false);
+    }
+    assert.equal(xaiSupportsReasoning('grok-4.6'), true);
+  });
+});
+
+describe('OpenAI-compatible chat/completions', () => {
+  test("OpenAI's own reasoning models take reasoning_effort", () => {
+    for (const model of ['gpt-5', 'gpt-5-mini', 'o3', 'o4-mini']) {
+      const c = cap('openai-compatible', model);
+      assert.equal(c.style, 'chat-effort', `${model} should use reasoning_effort`);
+      assert.deepEqual(applyThinking('low', c).body, { reasoning_effort: 'low' });
+    }
+    assert.deepEqual(bodyFor('off', 'openai-compatible', 'gpt-5').body, { reasoning_effort: 'none' });
+  });
+
+  test('a non-reasoning chat/completions model is sent no field and shows no row', () => {
+    // This is the rejection that matters most: a plain gpt-4o or a local llama answers 400 to
+    // reasoning_effort, and Auto must not guess one onto it.
+    for (const model of ['gpt-4o', 'llama-3-8b-instruct', 'mistral-small', 'gemma-2-9b']) {
+      const c = cap('openai-compatible', model);
+      assert.equal(supportsThinking(c), false, `${model} should show no Thinking row`);
+      for (const level of THINKING_LEVELS) {
+        assert.deepEqual(applyThinking(level, c).body, {}, `${model} must never receive a reasoning field (level ${level})`);
+      }
+    }
+  });
+
+  test('Qwen 3 goes through chat_template_kwargs, as a boolean', () => {
+    const c = cap('openai-compatible', 'qwen3-32b');
+    assert.equal(c.style, 'chat-template');
+    assert.deepEqual(applyThinking('off', c).body, { chat_template_kwargs: { enable_thinking: false } });
+    assert.deepEqual(applyThinking('high', c).body, { chat_template_kwargs: { enable_thinking: true } });
+    // A boolean has no ladder: the middle levels are not offered rather than silently rounded.
+    assert.deepEqual(c.levels, ['default', 'off', 'high']);
+  });
+
+  test('the guess is conservative and the explicit setting overrides it', () => {
+    assert.equal(guessReasoningField('gpt-5'), 'reasoning_effort');
+    assert.equal(guessReasoningField('o3-mini'), 'reasoning_effort');
+    assert.equal(guessReasoningField('Qwen3-8B'), 'enable_thinking');
+    assert.equal(guessReasoningField('some-local-finetune'), 'none', 'an unknown id must be guessed as nothing');
+    assert.equal(guessReasoningField(''), 'none');
+    // An endpoint the guess gets wrong is corrected by the connection's own setting.
+    assert.equal(cap('openai-compatible', 'my-finetune', 'reasoning_effort').style, 'chat-effort');
+    assert.equal(cap('openai-compatible', 'gpt-5', 'none').style, 'none');
+    assert.equal(cap('openai-compatible', 'gpt-5', 'enable_thinking').style, 'chat-template');
+  });
+
+  test('a stored reasoning field that is unknown reads as auto', () => {
+    assert.equal(resolveReasoningField(undefined), 'auto');
+    assert.equal(resolveReasoningField('nonsense'), 'auto');
+    assert.equal(resolveReasoningField('reasoning_effort'), 'reasoning_effort');
+  });
+});
+
+describe('titles and summaries run at the floor', () => {
+  test('the lowest level is Off wherever a model can stop thinking', () => {
+    assert.equal(lowestThinkingLevel(cap('anthropic', 'claude-opus-5')), 'off');
+    assert.equal(lowestThinkingLevel(cap('chatgpt', 'gpt-5')), 'off');
+    assert.equal(lowestThinkingLevel(cap('openai-compatible', 'gpt-5')), 'off');
+    assert.equal(lowestThinkingLevel(cap('openai-compatible', 'qwen3-32b')), 'off');
+  });
+
+  test('where thinking cannot be stopped, it is the lowest level that exists', () => {
+    // xAI always reasons, and Fable 5 always thinks: the floor is 'low', not an illegal 'off'.
+    assert.equal(lowestThinkingLevel(cap('xai', 'grok-4.6')), 'low');
+    assert.equal(lowestThinkingLevel(cap('anthropic', 'claude-fable-5')), 'low');
+  });
+
+  test('a model with no reasoning knob is left entirely alone', () => {
+    assert.equal(lowestThinkingLevel(cap('openai-compatible', 'llama-3-8b')), 'default');
+    assert.equal(lowestThinkingLevel(cap('xai', 'grok-4-fast')), 'default');
+  });
+});
+
+describe('a server that refuses the reasoning field', () => {
+  test('it recognises real refusals', () => {
+    const real = [
+      'Unrecognized request argument supplied: reasoning_effort',
+      "{'error': {'message': \"This model does not support reasoning_effort.\"}}",
+      'reasoning_effort is not supported for this model',
+      'Extra inputs are not permitted',
+      'chat_template_kwargs error: template has no variable enable_thinking',
+    ];
+    for (const body of real) assert.equal(isReasoningRejection(400, body), true, `not recognised: ${body}`);
+  });
+
+  test('it does NOT fire on other 400s, which must stay real errors', () => {
+    // A false positive silently drops the level the user chose and never puts it back, so these
+    // matter more than the matches above.
+    const other = [
+      'context length exceeded: 9000 tokens',
+      'Invalid content type. image_url is only supported by certain models.',
+      'invalid request',
+      'tool schema is not valid JSON Schema',
+      'model not found',
+    ];
+    for (const body of other) assert.equal(isReasoningRejection(400, body), false, `wrongly classified: ${body}`);
+  });
+
+  test('it ignores statuses that are not the server refusing a field', () => {
+    assert.equal(isReasoningRejection(500, 'reasoning_effort is not supported'), false, 'a 5xx is an outage, not a refusal');
+    assert.equal(isReasoningRejection(429, 'reasoning_effort is not supported'), false, 'a rate limit is not a refusal');
+    assert.equal(isReasoningRejection(400, ''), false);
+    assert.equal(isReasoningRejection(undefined, 'reasoning_effort is not supported'), false);
+  });
+
+  test('the memory key folds trailing slashes and case, like the vision key', () => {
+    assert.equal(thinkingKey('http://Localhost:1234/v1/', 'gpt-5'), thinkingKey('http://localhost:1234/v1', 'gpt-5'));
+    assert.notEqual(thinkingKey('http://localhost:1234/v1', 'gpt-5'), thinkingKey('http://localhost:1234/v1', 'gpt-4o'));
+  });
+});
+
+describe('custom request fields', () => {
+  test('an empty box is valid and contributes nothing', () => {
+    assert.deepEqual(parseCustomFields(''), { ok: true, fields: {}, error: '' });
+    assert.deepEqual(parseCustomFields('   '), { ok: true, fields: {}, error: '' });
+  });
+
+  test('a JSON object parses', () => {
+    const r = parseCustomFields('{"reasoning_effort": "low", "top_p": 0.9}');
+    assert.equal(r.ok, true);
+    assert.deepEqual(r.fields, { reasoning_effort: 'low', top_p: 0.9 });
+  });
+
+  test('anything that cannot be spread into a body is rejected with a reason', () => {
+    for (const bad of ['[1,2]', '"text"', '42', '{nope}']) {
+      const r = parseCustomFields(bad);
+      assert.equal(r.ok, false, `${bad} should be rejected`);
+      assert.ok(r.error, `${bad} should say why`);
+      assert.deepEqual(r.fields, {}, `${bad} must contribute no fields`);
+    }
+  });
+
+  test('an absurdly long box is rejected rather than sent on every request', () => {
+    const r = parseCustomFields(`{"a": "${'x'.repeat(3000)}"}`);
+    assert.equal(r.ok, false);
+    assert.match(r.error, /Too long/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The adapter: the field actually reaches the wire, and a refusal is survived
+// ---------------------------------------------------------------------------
+
+/** An SSE body that ends a turn with one line of text. Mirrors test/vision.test.ts's helper. */
+function okStream(text = 'fine'): Response {
+  const body = [
+    `data: ${JSON.stringify({ choices: [{ delta: { content: text }, finish_reason: null }] })}`,
+    `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }] })}`,
+    'data: [DONE]',
+    '',
+  ].join('\n\n');
+  return new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } });
+}
+
+function errorResponse(status: number, message: string): Response {
+  return new Response(JSON.stringify({ error: { message } }), { status, statusText: 'Bad Request', headers: { 'content-type': 'application/json' } });
+}
+
+/** Swap global fetch for one test, recording every body sent. */
+async function withFetch<T>(handler: (body: any, calls: number) => Response | Promise<Response>, fn: (sent: any[]) => Promise<T>): Promise<T> {
+  const sent: any[] = [];
+  const original = globalThis.fetch;
+  globalThis.fetch = (async (_url: string, init: RequestInit) => {
+    const body = JSON.parse(String(init.body));
+    sent.push(body);
+    return handler(body, sent.length);
+  }) as typeof fetch;
+  try {
+    return await fn(sent);
+  } finally {
+    globalThis.fetch = original;
+  }
+}
+
+/** A thinking memory backed by a plain Set, so the whole policy runs under node. */
+function fakeThinkingMemory(initial: string[] = []) {
+  const keys = new Set(initial);
+  return { keys, isUnsupported: async (k: string) => keys.has(k), markUnsupported: async (k: string) => void keys.add(k) };
+}
+
+const chat = (settings: Settings, deps = {}) =>
+  createOpenAIProvider(settings, deps).chat({ system: 'SYS', messages: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }], tools: [], callbacks: { onText: () => {} } });
+
+const oaiSettings = (patch: Partial<Settings> = {}): Settings => ({
+  ...DEFAULT_SETTINGS,
+  provider: 'openai-compatible',
+  baseUrl: 'http://localhost:1234/v1',
+  model: 'gpt-5',
+  ...patch,
+});
+
+describe('the OpenAI-compatible adapter carries the level', () => {
+  test('a chosen level puts reasoning_effort on the wire', async () => {
+    await withFetch(
+      () => okStream(),
+      async (sent) => {
+        await chat(oaiSettings({ thinking: 'low' }));
+        assert.equal(sent.length, 1);
+        assert.equal(sent[0].reasoning_effort, 'low');
+      },
+    );
+  });
+
+  test("'default' sends no reasoning field at all", async () => {
+    await withFetch(
+      () => okStream(),
+      async (sent) => {
+        await chat(oaiSettings({ thinking: 'default' }));
+        assert.ok(!('reasoning_effort' in sent[0]), 'default must not send reasoning_effort');
+        assert.ok(!('chat_template_kwargs' in sent[0]));
+      },
+    );
+  });
+
+  test('a non-reasoning model is sent nothing even at a raised level', async () => {
+    await withFetch(
+      () => okStream(),
+      async (sent) => {
+        await chat(oaiSettings({ model: 'llama-3-8b', thinking: 'high' }));
+        assert.ok(!('reasoning_effort' in sent[0]), 'a model with no knob must never receive the field');
+      },
+    );
+  });
+
+  test('custom request fields are merged into the body', async () => {
+    await withFetch(
+      () => okStream(),
+      async (sent) => {
+        await chat(oaiSettings({ thinking: 'default', customFields: { top_p: 0.5, reasoning_effort: 'medium' } }));
+        assert.equal(sent[0].top_p, 0.5);
+        assert.equal(sent[0].reasoning_effort, 'medium', 'an explicitly typed field is sent even when the level is default');
+      },
+    );
+  });
+});
+
+describe('the 400 fallback', () => {
+  test('a refusal is retried once without the field, and remembered', async () => {
+    const memory = fakeThinkingMemory();
+    const told: string[] = [];
+    await withFetch(
+      (body, calls) => (calls === 1 && 'reasoning_effort' in body ? errorResponse(400, 'Unrecognized request argument supplied: reasoning_effort') : okStream()),
+      async (sent) => {
+        const res = await chat(oaiSettings({ thinking: 'high' }), { thinkingMemory: memory, onThinkingUnsupported: (k: string) => told.push(k) });
+        // Two requests: the one that was refused, and the same conversation without the field.
+        assert.equal(sent.length, 2, 'the request should have been sent again exactly once');
+        assert.equal(sent[0].reasoning_effort, 'high');
+        assert.ok(!('reasoning_effort' in sent[1]), 'the retry must not carry the field that was refused');
+        // The history is otherwise identical: it is the same turn, not a different one.
+        assert.deepEqual(sent[1].messages, sent[0].messages);
+        // And the turn succeeded, rather than surfacing as an error.
+        assert.equal(res.content.some((p) => p.type === 'text'), true);
+        assert.equal(memory.keys.size, 1, 'the endpoint+model should be remembered');
+        assert.equal(told.length, 1, 'the panel should be told once');
+      },
+    );
+  });
+
+  test('a remembered endpoint never sends the field again', async () => {
+    const memory = fakeThinkingMemory([thinkingKey('http://localhost:1234/v1', 'gpt-5')]);
+    await withFetch(
+      () => okStream(),
+      async (sent) => {
+        await chat(oaiSettings({ thinking: 'high' }), { thinkingMemory: memory });
+        assert.equal(sent.length, 1, 'a known-refusing endpoint should cost no second request');
+        assert.ok(!('reasoning_effort' in sent[0]));
+      },
+    );
+  });
+
+  test('a 400 that is NOT about reasoning stays an error', async () => {
+    const memory = fakeThinkingMemory();
+    await withFetch(
+      () => errorResponse(400, 'context length exceeded'),
+      async (sent) => {
+        await assert.rejects(() => chat(oaiSettings({ thinking: 'high' }), { thinkingMemory: memory }), /context length/);
+        assert.equal(sent.length, 1, 'an unrelated 400 must not be retried');
+        assert.equal(memory.keys.size, 0, 'an unrelated 400 must not mark the endpoint');
+      },
+    );
+  });
+
+  test('a server that refuses BOTH images and reasoning sheds them one at a time', async () => {
+    // The two refusals are independent, and the second must not be hidden behind the first.
+    const memory = fakeThinkingMemory();
+    await withFetch(
+      (body, calls) => {
+        if (calls === 1) return errorResponse(400, 'Invalid content type. image_url is only supported by certain models.');
+        if (calls === 2) return errorResponse(400, 'Unrecognized request argument supplied: reasoning_effort');
+        return okStream();
+      },
+      async (sent) => {
+        const messages: Msg[] = [{ role: 'user', content: [{ type: 'image', mediaType: 'image/png', data: 'aW1n' }, { type: 'text', text: 'look' }] }];
+        await createOpenAIProvider(oaiSettings({ thinking: 'high', images: 'auto' }), { thinkingMemory: memory }).chat({
+          system: 'SYS',
+          messages,
+          tools: [],
+          callbacks: { onText: () => {} },
+        });
+        assert.equal(sent.length, 3, 'one send, one without images, one without either');
+        assert.ok(!('reasoning_effort' in sent[2]), 'the final request carries neither');
+        assert.equal(memory.keys.size, 1);
+      },
+    );
+  });
+});

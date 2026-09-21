@@ -35,9 +35,17 @@ export function modelRowText(items: ChatItem[], index: number, { showFirst = fal
   const it = items[index];
   if (it?.kind !== 'model') return null;
   const name = it.label ? `${it.model} · ${it.label}` : it.model;
+  const level = it.thinking ?? 'default';
+  const think = level === 'default' ? '' : `thinking: ${level}`;
   const first = !items.slice(0, index).some((x) => x.kind === 'model');
-  if (first) return showFirst ? `model: ${name}` : null;
-  return `switched to ${name}`;
+  if (first) return showFirst ? [`model: ${name}`, think].filter(Boolean).join(' · ') : null;
+  // A row can exist because only the LEVEL changed, on the same model. Saying "switched to
+  // <the model it was already on>" would read as a swap that never happened, so such a row says
+  // only what actually changed.
+  const prev = lastModel(items.slice(0, index));
+  const sameModel = !!prev && prev.connectionId === it.connectionId && prev.model === it.model;
+  if (sameModel) return think || `switched to ${name}`;
+  return [`switched to ${name}`, think].filter(Boolean).join(' · ');
 }
 
 /**
@@ -131,9 +139,12 @@ export function reduceItems(items: ChatItem[], event: AgentEventBody): ChatItem[
     case 'model': {
       // Recorded when it CHANGES. The same array comes back for a run on the model the chat was
       // already on, so an unchanged chat gains no rows and an offscreen one schedules no write.
+      // The Thinking level counts as a change too: it is the other half of "what answered this",
+      // and a turn run at a different level is worth the same one line as a different model.
       const last = lastModel(items);
-      if (last && last.connectionId === event.connectionId && last.model === event.model) return items;
-      return [...items, { kind: 'model', connectionId: event.connectionId, label: event.label, model: event.model }];
+      const level = event.thinking ?? 'default';
+      if (last && last.connectionId === event.connectionId && last.model === event.model && (last.thinking ?? 'default') === level) return items;
+      return [...items, { kind: 'model', connectionId: event.connectionId, label: event.label, model: event.model, ...(level === 'default' ? {} : { thinking: level }) }];
     }
     case 'status':
       // What the run is doing right now drives the activity line, which is not a transcript row:

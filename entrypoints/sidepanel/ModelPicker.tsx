@@ -28,12 +28,22 @@ import {
   type SignedIn,
 } from '@/lib/connections';
 import { rpc } from '@/lib/rpc';
+import {
+  resolveReasoningField,
+  supportsThinking,
+  thinkingCapability,
+  thinkingLabel,
+  type ThinkingLevel,
+} from '@/lib/thinking';
 import './modelpicker.css';
 
 /** What the closed button says when the chat has no usable model. Exported for the smoke flow's docs. */
 export const PICK_A_MODEL = 'Pick a model';
 export const NO_PROVIDER = 'No provider connected';
 export const NEXT_TURN_NOTE = 'Applies from the next turn. The reply in progress stays on the model it started with.';
+
+/** The Thinking row's label, and the line under it when a model has no reasoning knob to show. */
+export const THINKING_LABEL = 'Thinking';
 
 interface Option {
   key: string;
@@ -53,6 +63,8 @@ export function ModelPicker({
   disabled,
   onSelect,
   onManage,
+  thinking = 'default',
+  onThinking,
   inline = false,
   onDone,
 }: {
@@ -67,6 +79,10 @@ export function ModelPicker({
   disabled?: boolean;
   onSelect: (selection: ModelSelection, typed: boolean) => void;
   onManage: () => void;
+  /** How much this chat asks the model to think (lib/thinking.ts). */
+  thinking?: ThinkingLevel;
+  /** Omitted where there is nothing to change it on (a chat that does not exist yet). */
+  onThinking?: (level: ThinkingLevel) => void;
   /**
    * Draw the list in place, always open, with no button: the compact shell (iPhone, iPad) raises
    * the picker as a bottom sheet of its own, and the sheet is what opens and closes. Same groups,
@@ -110,6 +126,26 @@ export function ModelPicker({
   }, [groups, typed]);
 
   const current: ModelSelection | null = resolved.ok ? resolved.selection : null;
+
+  /**
+   * What the chosen model does with a Thinking level, and therefore which levels the row offers.
+   * Computed from the RESOLVED connection, so the per-connection "Reasoning field" setting is what
+   * decides whether an OpenAI-compatible endpoint shows the row at all. A model with nothing to
+   * offer (a plain gpt-4o, an xAI -fast variant, an unguessable local id) hides the row entirely
+   * rather than showing one that cannot be used.
+   */
+  const capability = useMemo(
+    () =>
+      resolved.ok
+        ? thinkingCapability({
+            kind: resolved.connection.kind,
+            model: resolved.model,
+            reasoningField: resolveReasoningField(resolved.connection.reasoningField),
+          })
+        : null,
+    [resolved],
+  );
+  const showThinking = !!capability && supportsThinking(capability) && !!onThinking;
 
   function close(returnFocus: boolean) {
     if (inline) {
@@ -294,6 +330,38 @@ export function ModelPicker({
         {current?.label && <span className="model-provider">{current.label}</span>}
         <span className="model-caret" aria-hidden="true">▾</span>
       </button>}
+      {/*
+        The Thinking row: one radio group under the chosen model, showing only the levels this model
+        actually accepts. Radios rather than a select, because the whole scale is three to six short
+        words and seeing them all is the point — "which of these does this model even have" is half
+        the question being asked. Hidden entirely when the model supports none, so a row that could
+        only say "Default" never appears.
+      */}
+      {showThinking && capability && (
+        <div className="thinking-row" data-testid="thinking-row" role="radiogroup" aria-label={`${THINKING_LABEL}: how much the model reasons before answering`}>
+          <span className="thinking-label">{THINKING_LABEL}</span>
+          <span className="thinking-levels">
+            {capability.levels.map((level) => (
+              <button
+                key={level}
+                type="button"
+                role="radio"
+                aria-checked={level === thinking}
+                className={`thinking-level${level === thinking ? ' selected' : ''}`}
+                data-testid="thinking-level"
+                data-level={level}
+                disabled={disabled}
+                onClick={() => onThinking?.(level)}
+              >
+                {thinkingLabel(level)}
+              </button>
+            ))}
+          </span>
+          <span className="thinking-help" data-testid="thinking-help">
+            {capability.help}
+          </span>
+        </div>
+      )}
       {(problem || note) && (
         <span className={`model-note${problem ? ' problem' : ''}`} data-testid="model-note" role={problem ? 'alert' : 'status'}>
           {problem || note}

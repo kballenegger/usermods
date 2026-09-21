@@ -247,7 +247,16 @@ message uses the new one; types a model id for a provider that cannot list; remo
 provider and checks nothing is sent; checks the layout at 320px; and lists models from a mock of the
 ChatGPT Codex backend, which answers 400 without `client_version` exactly as the real one does.
 Every other flow still seeds the old settings shape, so each of them exercises the migration too.
-`npm run smoke:composer` measures the growing message box in a real panel.
+The thinking flow (`npm run smoke:thinking`) covers the per-chat Thinking level: the mock records
+the reasoning knob every request carried, so the flow proves that a chat left on Default sends no
+reasoning field at all, that picking High puts `reasoning_effort: high` on the next turn's wire and
+marks the transcript, that Off sends `none` rather than dropping the field, and that titles run at
+the model's floor. It then stands up a backend that answers 400 to any request carrying the field —
+in OpenAI's own wording, so the classifier has to recognise a real refusal — and asserts the turn
+still finishes, that the refused request was re-sent once without the field, that the panel said
+why, and that the next turn does not pay for the discovery again. Finally it reloads to check the
+level survived, and points the connection at a model with no reasoning knob to check the row
+disappears. `npm run smoke:composer` measures the growing message box in a real panel.
 Backoff is shortened for the flow through a `chrome.storage.local` key (`debug:retryPolicy`), which
 only the extension's own contexts can write.
 
@@ -297,6 +306,32 @@ picker if they are a day old.
   waits for you to pick another model. It never quietly sends your page to a different provider.
 - Titles and compaction summaries use the chat's model too. The context budget is one setting for
   every provider, so set it for the smallest context window you use.
+
+### How much the model thinks
+
+Under the model is **Thinking**: how hard this chat asks the model to reason before it answers,
+mapped onto whatever knob that provider actually has. It shows only the levels the chosen model
+accepts, and it is not shown at all for a model that has none.
+
+- **Default changes nothing.** Every chat starts there, and a chat left on Default sends exactly
+  the request it always did. The other levels are **Off**, **Low**, **Medium**, **High** and
+  **Max** — whichever of them the model supports.
+- **One scale, each provider's own knob.** On current Claude models it is `output_config.effort`,
+  and on older ones a thinking token budget; on ChatGPT and SuperGrok it is `reasoning.effort`; on
+  an OpenAI-compatible endpoint it is `reasoning_effort`, or Qwen 3's `enable_thinking`.
+- **What a model cannot do is not offered.** SuperGrok cannot stop reasoning, so it has no Off;
+  Claude Fable and Mythos always think, so they have no Off either; Grok's `-fast` variants and
+  ordinary chat models like `gpt-4o` take no reasoning setting at all, so the row is hidden.
+- **It is per chat**, like the model: remembered across reloads, and a new chat starts on the last
+  level you picked. Changing it applies from the next turn and the transcript marks the spot
+  (*thinking: high*). The dashboard shows it beside the chat's model.
+- **Titles and compaction summaries always run at the lowest level the model allows**, whatever the
+  chat is set to. They are short mechanical calls you did not ask for, and you pay for them.
+- **For a local server that needs something else**, each OpenAI-compatible provider has a
+  **Reasoning field** setting in Settings — Auto (guessed from the model name), `reasoning_effort`,
+  `chat_template_kwargs: enable_thinking`, or None — and a **Custom request fields** box for extra
+  JSON merged into every request. If a server answers 400 to the reasoning field, usermods sends
+  that one request again without it, says so, and leaves it out for that model from then on.
 
 ### Using a subscription instead of an API key
 

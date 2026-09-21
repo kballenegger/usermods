@@ -9,6 +9,7 @@
 import { artifactKey } from './artifact.ts';
 import { blobsKey, elidedImageNote, type AttachedImage, type ImageThumb } from './images.ts';
 import type { ModelSelection } from './connections.ts';
+import type { ThinkingLevel } from './thinking.ts';
 import type { TitleSource } from './title';
 import type { ChatItem, Msg, Part } from './types';
 
@@ -75,6 +76,16 @@ export interface Chat {
    * takes the default a new chat would (selectionForChat) and has it written here on its next run.
    */
   model?: ModelSelection;
+  /**
+   * How much the model thinks before it answers, on the neutral scale in lib/thinking.ts, mapped
+   * onto whatever knob the chosen provider actually has.
+   *
+   * Beside `model` and read at the same moment, because it is the same kind of fact: a property of
+   * this conversation that the next run consults, not of the connection. Absent means 'default' —
+   * whatever the adapter did before this existed — so every chat written by an earlier build, and
+   * every new one, behaves exactly as it always has until the user changes it.
+   */
+  thinking?: ThinkingLevel;
   /**
    * The installed mod this chat's draft is linked to, mirrored onto the index from the artifact.
    *
@@ -230,11 +241,13 @@ export async function getChat(id: string): Promise<Chat | null> {
   return (await readIndex()).find((c) => c.id === id) ?? null;
 }
 
-export async function createChat(host: string, model?: ModelSelection | null): Promise<Chat> {
+export async function createChat(host: string, model?: ModelSelection | null, thinking?: ThinkingLevel): Promise<Chat> {
   const now = Date.now();
   const chat: Chat = { id: crypto.randomUUID(), host, title: 'New chat', titleSource: 'auto-first', createdAt: now, updatedAt: now };
   // The model picked in the composer before the first message, so the first run uses it.
   if (model?.connectionId && model.model) chat.model = { connectionId: model.connectionId, model: model.model, ...(model.label ? { label: model.label } : {}) };
+  // Likewise the Thinking level. 'default' is the absence of the field, so it is not written.
+  if (thinking && thinking !== 'default') chat.thinking = thinking;
   await writeIndexCapped([chat, ...(await readIndex())]);
   return chat;
 }
@@ -273,6 +286,23 @@ export async function setChatModel(id: string, model: ModelSelection): Promise<v
   if (!chat) return;
   if (chat.model?.connectionId === model.connectionId && chat.model.model === model.model && chat.model.label === model.label) return;
   chat.model = { connectionId: model.connectionId, model: model.model, ...(model.label ? { label: model.label } : {}) };
+  await writeIndex(chats);
+}
+
+/**
+ * Record how much this chat asks the model to think. Not activity, for the same reason setChatModel
+ * is not: choosing a level does not reorder the switcher or unarchive anything.
+ */
+export async function setChatThinking(id: string, thinking: ThinkingLevel): Promise<void> {
+  const chats = await readIndex();
+  const chat = chats.find((c) => c.id === id);
+  if (!chat) return;
+  const current = chat.thinking ?? 'default';
+  if (current === thinking) return;
+  // 'default' is the absence of the field, not a value: a chat set back to it is indistinguishable
+  // from one that was never touched, which is what keeps the stored shape from growing over time.
+  if (thinking === 'default') delete chat.thinking;
+  else chat.thinking = thinking;
   await writeIndex(chats);
 }
 

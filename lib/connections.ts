@@ -23,6 +23,7 @@
 // the bottom is the only part that touches chrome. `.ts` extensions and type-only imports of
 // ./types, because the node test runner resolves neither extensionless specifiers nor WXT aliases.
 import { isSubscriptionProvider, providerAvailable, SUBSCRIPTIONS_OFF } from './buildflags.ts';
+import { parseCustomFields, resolveThinkingLevel, type ReasoningField, type ThinkingLevel } from './thinking.ts';
 import type { ImagesSetting, ProviderKind, Settings } from './types';
 
 // ---------------------------------------------------------------------------
@@ -56,6 +57,19 @@ export interface Connection {
    * different answers at the same time. Only read for 'openai-compatible'.
    */
   images?: ImagesSetting;
+  /**
+   * Which reasoning field this endpoint takes (lib/thinking.ts). Per connection for the same reason
+   * Images is: "OpenAI-compatible" is whatever was typed into Base URL, and one server wants
+   * `reasoning_effort` while the next wants `chat_template_kwargs` and a third takes neither.
+   * Absent means 'auto', which guesses from the model id. Only read for 'openai-compatible'.
+   */
+  reasoningField?: ReasoningField;
+  /**
+   * Extra top-level JSON merged into every request to this endpoint, as the user typed it. Stored
+   * as text rather than parsed so a half-finished edit survives a reload and can be shown back with
+   * its error; parsed on the way out (effectiveSettings) and invalid text is simply not sent.
+   */
+  customFields?: string;
   /**
    * Model ids offered whether or not a listing has them: the preset's default, the model a migrated
    * profile was using, and anything the user typed into the picker. This is what makes an endpoint
@@ -193,7 +207,7 @@ export function addConnection(state: ConnectionsState, conn: Connection): Connec
 }
 
 /** What Settings may change on a connection. `id` and `kind` are fixed for its life. */
-export type ConnectionPatch = Partial<Pick<Connection, 'label' | 'baseUrl' | 'apiKey' | 'images' | 'extraModels' | 'models'>>;
+export type ConnectionPatch = Partial<Pick<Connection, 'label' | 'baseUrl' | 'apiKey' | 'images' | 'reasoningField' | 'customFields' | 'extraModels' | 'models'>>;
 
 /**
  * Apply a patch to one connection. An unknown id is a no-op (the connection was removed in another
@@ -430,7 +444,10 @@ export function sameSelection(a: ModelSelection | null | undefined, b: ModelSele
  * The `Settings` every model-facing function takes, for one resolved selection: the global
  * preferences, with the provider fields filled from the connection and the model from the chat.
  */
-export function effectiveSettings(prefs: Settings, connection: Connection, model: string): Settings {
+export function effectiveSettings(prefs: Settings, connection: Connection, model: string, thinking: ThinkingLevel = 'default'): Settings {
+  // Invalid custom JSON is dropped rather than sent: the settings field already shows the user why
+  // it is not being used, and putting unparseable text on the wire would fail every request instead.
+  const custom = parseCustomFields(connection.customFields ?? '');
   return {
     ...prefs,
     provider: connection.kind,
@@ -438,6 +455,9 @@ export function effectiveSettings(prefs: Settings, connection: Connection, model
     apiKey: connection.apiKey.trim(),
     model,
     images: connection.images,
+    thinking,
+    reasoningField: connection.reasoningField,
+    ...(custom.ok && Object.keys(custom.fields).length ? { customFields: custom.fields } : {}),
   };
 }
 
@@ -589,6 +609,29 @@ export async function loadModelChoice(): Promise<ModelSelection | null> {
 
 export async function saveModelChoice(selection: ModelSelection): Promise<void> {
   await chrome.storage.local.set({ [MODEL_CHOICE_KEY]: selection });
+}
+
+/** The last Thinking level the user picked; a new chat starts there, exactly as it does with the model. */
+export const THINKING_CHOICE_KEY = 'thinkingChoice';
+
+export async function loadThinkingChoice(): Promise<ThinkingLevel> {
+  const r = await chrome.storage.local.get(THINKING_CHOICE_KEY);
+  return resolveThinkingLevel(r[THINKING_CHOICE_KEY]);
+}
+
+export async function saveThinkingChoice(level: ThinkingLevel): Promise<void> {
+  await chrome.storage.local.set({ [THINKING_CHOICE_KEY]: level });
+}
+
+/**
+ * A chat's Thinking level: its own if it has one, else the last one the user picked.
+ *
+ * Deliberately NOT filtered by what the chat's model supports — that is applyThinking's job, and it
+ * already refuses to send a level the capability does not list. Resolving it here as well would
+ * mean a level silently forgotten by switching to a model that cannot do it and back.
+ */
+export function thinkingForChat(chat: { thinking?: ThinkingLevel } | null | undefined, last: ThinkingLevel = 'default'): ThinkingLevel {
+  return chat?.thinking ?? last;
 }
 
 /** Where lib/oauth keeps a vendor's tokens. Restated, because importing lib/oauth here would pull

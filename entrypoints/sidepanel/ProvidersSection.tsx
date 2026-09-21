@@ -31,6 +31,7 @@ import {
 } from '@/lib/connections';
 import { FALLBACK_NOTE } from '@/lib/modellist';
 import { resolveImagesSetting } from '@/lib/providers/vision';
+import { CUSTOM_FIELDS_MAX, parseCustomFields, resolveReasoningField, type ReasoningField } from '@/lib/thinking';
 import { rpc, type OAuthKind, type OAuthLoginState } from '@/lib/rpc';
 import type { ImagesSetting } from '@/lib/types';
 import type { ConnectionsView } from './useConnections';
@@ -153,6 +154,12 @@ function ConnectionCard({
   const [baseUrl, setBaseUrl] = useState(conn.baseUrl);
   const [apiKey, setApiKey] = useState(conn.apiKey);
   const [images, setImages] = useState<ImagesSetting>(resolveImagesSetting(conn.images));
+  const [reasoningField, setReasoningField] = useState<ReasoningField>(resolveReasoningField(conn.reasoningField));
+  // Kept as TEXT, not as parsed JSON: a half-typed object has to survive a keystroke and be shown
+  // back with its error, which a parsed value cannot do.
+  const [customFields, setCustomFields] = useState(conn.customFields ?? '');
+  /** Shown under the box instead of the help line while the JSON does not parse. */
+  const customFieldsError = parseCustomFields(customFields).error;
   const [confirming, setConfirming] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [fetchError, setFetchError] = useState('');
@@ -335,6 +342,61 @@ function ConnectionCard({
                 refusal.
               </span>
             </label>
+          )}
+
+          {/*
+            Which reasoning field this endpoint takes (lib/thinking.ts). Per connection for the same
+            reason Images is: "OpenAI-compatible" is whatever URL was typed in, and the protocol has
+            no way to ask. Auto guesses from the model id and sends nothing when it cannot; the
+            explicit choices are for the servers the guess gets wrong, and the JSON box below is for
+            the ones nothing can guess at all.
+          */}
+          {conn.kind === 'openai-compatible' && (
+            <>
+              <label className="field">
+                Reasoning field
+                <select
+                  data-testid="settings-reasoning-field"
+                  value={reasoningField}
+                  onChange={(e) => {
+                    const next = e.target.value as ReasoningField;
+                    setReasoningField(next);
+                    save({ reasoningField: next });
+                  }}
+                >
+                  <option value="auto">Auto — guess from the model name</option>
+                  <option value="reasoning_effort">reasoning_effort</option>
+                  <option value="enable_thinking">chat_template_kwargs: enable_thinking</option>
+                  <option value="none">None — this model has no reasoning setting</option>
+                </select>
+                <span>
+                  How the Thinking level in the composer is sent to this endpoint. Auto uses reasoning_effort for OpenAI’s
+                  o-series and GPT-5 models, enable_thinking for Qwen 3, and sends nothing for anything it does not
+                  recognise. If a server answers 400 to the field, usermods sends that request again without it and leaves
+                  it out for that model from then on.
+                </span>
+              </label>
+              <label className="field">
+                Custom request fields
+                <textarea
+                  data-testid="settings-custom-fields"
+                  rows={2}
+                  spellCheck={false}
+                  placeholder={'{"reasoning_effort": "low"}'}
+                  value={customFields}
+                  maxLength={CUSTOM_FIELDS_MAX}
+                  onChange={(e) => {
+                    setCustomFields(e.target.value);
+                    save({ customFields: e.target.value });
+                  }}
+                />
+                <span data-testid="settings-custom-fields-note" className={customFieldsError ? 'problem' : undefined}>
+                  {customFieldsError
+                    ? customFieldsError
+                    : 'Extra JSON merged into every request to this endpoint, for a server whose reasoning knob is none of the above. Invalid JSON is not sent.'}
+                </span>
+              </label>
+            </>
           )}
 
           {status !== 'unavailable' && (

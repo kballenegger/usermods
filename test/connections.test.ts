@@ -16,6 +16,7 @@ import {
   connectionStatus,
   defaultSelection,
   effectiveSettings,
+  thinkingForChat,
   isConnected,
   labelFor,
   migrateLegacySettings,
@@ -451,7 +452,35 @@ test('effective settings: the connection and the chat\'s model over the global p
     apiKey: 'k',
     model: 'qwen3-coder',
     images: 'never',
+    thinking: 'default',
+    reasoningField: undefined,
   });
   // A connection with no Images setting must not inherit one from anywhere: it reads as Auto.
   assert.equal(effectiveSettings({ ...prefs, images: 'never' }, conn({ id: 'x' }), 'm').images, undefined);
+});
+
+test('effective settings carry the chat\'s Thinking level and the connection\'s reasoning fields', () => {
+  const prefs = { ...DEFAULT_SETTINGS };
+  const c = conn({ id: 'l', reasoningField: 'reasoning_effort', customFields: '{"top_p": 0.4}' });
+  const s = effectiveSettings(prefs, c, 'gpt-5', 'high');
+  assert.equal(s.thinking, 'high');
+  assert.equal(s.reasoningField, 'reasoning_effort');
+  assert.deepEqual(s.customFields, { top_p: 0.4 });
+  // The level defaults to 'default' when the caller does not name one.
+  assert.equal(effectiveSettings(prefs, c, 'gpt-5').thinking, 'default');
+});
+
+test('custom request fields that do not parse are not sent at all', () => {
+  // The settings field already tells the user why; putting unparseable text on the wire would fail
+  // every request instead of none.
+  const s = effectiveSettings({ ...DEFAULT_SETTINGS }, conn({ id: 'l', customFields: '{oops' }), 'gpt-5', 'low');
+  assert.equal(s.customFields, undefined);
+  assert.equal(s.thinking, 'low', 'a broken custom box must not take the chosen level down with it');
+});
+
+test("a chat's Thinking level falls back to the last one picked", () => {
+  assert.equal(thinkingForChat({ thinking: 'max' }, 'low'), 'max', "the chat's own level wins");
+  assert.equal(thinkingForChat({}, 'low'), 'low', 'a chat with none takes the last choice');
+  assert.equal(thinkingForChat(null, 'low'), 'low');
+  assert.equal(thinkingForChat(null), 'default', 'with no last choice either, it is the default');
 });

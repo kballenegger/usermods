@@ -18,6 +18,10 @@
   align-items: center;
   gap: var(--sp-2);
   min-width: 0;
+  /* The Thinking row sits UNDER the model button rather than beside it, so the line wraps. Without
+   * this the row would be squeezed into whatever the model id left over, which on a 320px panel is
+   * nothing. */
+  flex-wrap: wrap;
 }
 
 /*
@@ -294,4 +298,81 @@
   min-width: 0;
   overflow-wrap: anywhere;
   text-align: center;
+}
+
+/* ---------------------------------------------------------------------------
+ * The Thinking row (lib/thinking.ts)
+ * ------------------------------------------------------------------------ */
+
+/*
+ * How much the model reasons before it answers, under the model it applies to. It takes the whole
+ * width of the line so it always starts a row of its own, and it is only ever drawn for a model
+ * that has the knob — a row that could say nothing but "Default" is not shown at all.
+ *
+ * A segmented radio group rather than a select: the whole scale is three to six short words, and
+ * which levels a model even HAS is half of what the row is telling you. Same quiet-value reading as
+ * the model button above it (mono, meta size, sentence case), because it shows a setting, not an
+ * action.
+ */
+.thinking-row {
+  flex: 1 0 100%;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-2);
+  min-width: 0;
+}
+
+.thinking-label {
+  font: 400 var(--fs-meta) / 1.4 var(--font-mono);
+  color: var(--text-3);
+}
+
+.thinking-levels {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+
+.thinking-level {
+  min-height: 24px;
+  padding: 0 var(--sp-2);
+  border: var(--border-width) solid var(--border-control);
+  border-radius: var(--r-field);
+  background: none;
+  color: var(--text-2);
+  font: 400 var(--fs-meta) / 1.4 var(--font-mono);
+  cursor: pointer;
+  transition: color 120ms ease, background 120ms ease, border-color 120ms ease;
+}
+
+.thinking-level:hover:not(:disabled) {
+  border-color: var(--primary);
+  background: var(--surface-2);
+  color: var(--text-1);
+}
+
+/* Chosen is a state, so it does not rest on colour alone (design.md §5): the inset rule is the
+ * same device the open model button uses. */
+.thinking-level.selected {
+  border-color: var(--primary);
+  color: var(--text-1);
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+
+.thinking-level:disabled {
+  cursor: default;
+  background: var(--surface-well);
+  color: var(--btn-disabled-fg);
+}
+
+/* One line of help, naming what the knob actually is on this backend. It wraps to its own row so a
+ * sentence never squeezes the levels it explains. */
+.thinking-help {
+  flex: 1 0 100%;
+  min-width: 0;
+  font: 400 var(--fs-meta) / 1.4 var(--font-sans);
+  color: var(--text-3);
+  overflow-wrap: anywhere;
 }
