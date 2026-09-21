@@ -611,10 +611,6 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
     // going on screen and stopped existing on disk. It still does not fail the turn; it now says so.
     if ((await saveMessages(chatId, messages)) === 'quota') post({ type: 'note', text: QUOTA_PANEL_NOTE });
     await touchChat(chatId, { url, turns: countTurns(messages) });
-    // Blobs whose transcript rows are gone (compaction, an unqueued message, a rollback) were
-    // leaking for the life of the chat: pruneBlobs existed and nothing called it. At ~1.5 MB of a
-    // 10 MB quota per image, that is a large share of why long sessions run out of room.
-    void collectBlobs(chatId, await loadItems(chatId)).catch(() => 0);
     void warnIfStorageLow(post);
     if (outcome.failure) failed = outcome.failure.message;
     succeeded = !signal.aborted && !outcome.failure;
@@ -955,8 +951,24 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
       return listChats(req.host);
     case 'chats.listAll':
       return listChats();
-    case 'chats.transcript':
-      return loadItems(req.id);
+    case 'chats.transcript': {
+      const items = await loadItems(req.id);
+      // Collect this chat's orphaned blobs here, and ONLY here, because this is the one moment the
+      // stored transcript is authoritative. It cannot be done after a turn: the panel owns
+      // 'chat:<id>:items' and writes it on a 400ms debounce, so a read taken right after a run
+      // finishes does not yet mention the image that run just attached — and collecting against
+      // that stale copy deletes a live blob (the images smoke flow catches exactly this).
+      //
+      // Opening a chat is the right cadence anyway. Nothing is mid-write, an orphan costs only
+      // space until the next open, and the user is not waiting on the result: it is fire-and-forget
+      // while the transcript it was computed from is already on its way back.
+      //
+      // A never-reopened chat keeps its orphans, which is the honest limit of doing it here. Its
+      // keys still go together when the chat is deleted or evicted (chatKeys), so nothing leaks
+      // past the chat's own life.
+      if (items.length) void collectBlobs(req.id, items).catch(() => 0);
+      return items;
+    }
     case 'chats.create':
       return createChat(req.host, req.model);
     case 'chats.setModel':
