@@ -219,9 +219,25 @@ const LONG_CHATS = [
   ...STORAGE.chats.map((c) => ({ ...c, id: `${c.id}-b`, title: c.id === CHAT_ID ? 'Dim visited links' : c.title })),
   { id: 'chat-preview-4', host: 'news.ycombinator.com', title: 'Old experiment with the front page', createdAt: Date.now() - 9e9, updatedAt: Date.now() - 8e9, turns: 3, archivedAt: Date.now() - 7e9 },
 ];
+/**
+ * The same chat with a run in flight (?busy=1): a third turn, two tool calls back and one still
+ * running, and the background reporting the chat as running. It is how the activity line, a
+ * folded run that names its running step, and the composer's Stop are looked at without a worker.
+ */
+const BUSY_ITEMS = [
+  ...LONG_ITEMS,
+  { kind: 'user', id: 'u3', text: 'Also make the vote arrows easier to hit.' },
+  { kind: 'tool', id: 't8', name: 'find_elements', input: { selector: '.votearrow' }, summary: '611 matches, 10x10px' },
+  { kind: 'tool', id: 't9', name: 'get_styles', input: { selector: '.votearrow' }, summary: 'width 10px, height 10px, margin 3px 2px 6px' },
+  { kind: 'tool', id: 't10', name: 'run_script', input: { description: 'grow the vote arrows to 24px', code: 'GM_addStyle(`.votearrow { transform: scale(2.4); margin: 10px; }`);' } },
+];
 const LONG = {
   storage: { chats: LONG_CHATS, [`chat:${LONG_CHAT_ID}:items`]: LONG_ITEMS },
   rpc: { 'chats.list': LONG_CHATS, 'chats.listAll': LONG_CHATS, 'artifact.get': LONG_ARTIFACT },
+  busy: {
+    storage: { [`chat:${LONG_CHAT_ID}:items`]: BUSY_ITEMS },
+    rpc: { 'agent.attach': { running: { [LONG_CHAT_ID]: { startedAt: Date.now() - 14000, status: { type: 'status', chatId: LONG_CHAT_ID, phase: 'tool', tool: 'run_script', detail: 'grow the vote arrows to 24px', iteration: 3 } } }, resumable: {} } },
+  },
 };
 
 /**
@@ -243,6 +259,10 @@ function stubSource() {
     const long = ${JSON.stringify(LONG)};
     Object.assign(store, long.storage);
     Object.assign(rpc, long.rpc);
+    if (query.get('busy') === '1') {
+      Object.assign(store, long.busy.storage);
+      Object.assign(rpc, long.busy.rpc);
+    }
   }
   const theme = query.get('theme');
   if (theme === 'light' || theme === 'dark') {
@@ -510,14 +530,25 @@ async function webkitCapture(dir) {
   try {
     for (const size of sizes) {
       const context = await browser.newContext(size.context);
-      for (const view of VIEWS) {
+      // The three views on the short fixture, then the chat again on the long one in both themes:
+      // a draft, an editing line, tool rows and proposal cards are most of what the chat view can
+      // draw, and the Mac captures of them are what a change to the phone is compared against.
+      const shotsToTake = [
+        ...VIEWS.map((view) => ({ view, query: `view=${view}`, name: view })),
+        { view: 'chat', query: 'fixture=long&theme=dark', name: 'chat-long-dark' },
+        { view: 'chat', query: 'fixture=long&theme=light', name: 'chat-long-light' },
+      ];
+      for (const { view, query, name } of shotsToTake) {
         const page = await context.newPage();
-        await page.goto(`http://127.0.0.1:${port}/popup.html?view=${view}`, { waitUntil: 'load' });
+        await page.goto(`http://127.0.0.1:${port}/popup.html?${query}`, { waitUntil: 'load' });
         const shell = page.locator(".app[data-surface='popup']");
         await shell.waitFor({ state: 'visible', timeout: 15000 });
+        if (name !== view) await page.locator('.messages .msg').first().waitFor({ state: 'visible', timeout: 15000 });
+        // Let the transcript's scroll-to-end and the fonts settle, so two runs are comparable.
+        await page.waitForTimeout(500);
         const got = await shell.getAttribute('data-layout');
         if (got !== size.layout) failures.push(`${size.name}/${view}: data-layout is ${got}, expected ${size.layout}`);
-        const out = path.join(dir, `popup-${size.name}-${view}.png`);
+        const out = path.join(dir, `popup-${size.name}-${name}.png`);
         await page.screenshot({ path: out });
         console.log(`[preview] ${path.relative(ROOT, out)}  data-layout=${got}`);
         await page.close();
@@ -819,8 +850,8 @@ async function compactShellChecks(page, dir, label) {
   const shot = (name) => page.screenshot({ path: path.join(dir, `${label}-sheet-${name}.png`) });
 
   // Names and target sizes, for whatever is on screen right now.
-  const audit = async (where) => {
-    const found = await page.evaluate(() => {
+  const audit = async (where, target = page) => {
+    const found = await target.evaluate(() => {
       const out = [];
       const scope = document.querySelector('.sheet') ?? document.querySelector('.app');
       const visible = (el) => {
@@ -953,6 +984,33 @@ async function compactShellChecks(page, dir, label) {
   await page.screenshot({ path: path.join(dir, `${label}-view-settings.png`) });
   await page.locator('[data-action="back-to-chat"]').click();
   await page.locator('.composer.compact').waitFor({ state: 'visible', timeout: 5000 }).catch(() => problems.push('back: "Chat" did not return to the chat view'));
+
+  // A run in flight: the one button is Stop with nothing typed and Queue once there is, the
+  // activity line is up, and the run's tool rows are folded into a line that names the live one.
+  const busy = await page.context().newPage();
+  await busy.goto(`http://127.0.0.1:${port}/popup.html?fixture=long&busy=1&theme=dark`, { waitUntil: 'load' });
+  await busy.locator('.activity').waitFor({ state: 'visible', timeout: 15000 }).catch(() => problems.push('busy: no activity line for a running chat'));
+  const send = busy.locator('[data-action="send"]');
+  if ((await send.getAttribute('data-mode')) !== 'stop' || (await send.getAttribute('aria-label')) !== 'Stop') problems.push('busy: with nothing typed the button is not Stop');
+  const fold = (await busy.locator('[data-testid="steps"]').last().textContent())?.trim() ?? '';
+  if (!/^3 steps · run_script/.test(fold)) problems.push(`busy: the folded run reads "${fold}", not "3 steps · run_script…"`);
+  await busy.waitForTimeout(300);
+  await busy.screenshot({ path: path.join(dir, `${label}-running.png`) });
+  await busy.locator('.composer.compact textarea').fill('and the comment links');
+  if ((await send.getAttribute('data-mode')) !== 'queue' || (await send.getAttribute('aria-label')) !== 'Queue message') problems.push('busy: with text typed the button is not Queue');
+  // ...and Stop must still be on screen then, which is the activity line's job in this shell.
+  if ((await busy.locator('.activity .activity-action', { hasText: 'Stop' }).count()) !== 1) problems.push('busy: with text typed there is no Stop anywhere on screen');
+  await audit('running chat', busy);
+  // The box grows with its text and stays one row with its buttons.
+  await busy.locator('.composer.compact textarea').fill('one\ntwo\nthree');
+  const grown = await busy.evaluate(() => {
+    const t = document.querySelector('.composer.compact textarea').getBoundingClientRect();
+    const b = document.querySelector('[data-action="send"]').getBoundingClientRect();
+    return { height: Math.round(t.height), sameRow: Math.abs(t.bottom - b.bottom) < 2 };
+  });
+  if (grown.height < 80) problems.push(`busy: three lines of text left the message box ${grown.height}px tall`);
+  if (!grown.sameRow) problems.push('busy: the message box and Send are no longer one row');
+  await busy.close();
 
   return problems;
 }

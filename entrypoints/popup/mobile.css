@@ -13,14 +13,16 @@
  *  - roomy is a Mac. The popup is a small window hanging off the toolbar, the pointer is exact, and
  *    nothing covers anything.
  *
- * App.tsx picks between them from `(pointer: coarse)` and the width (popupLayout in lib/mobile.ts),
- * not from the user agent. Rules that hold for both are left unqualified; the phone ones carry
- * `[data-layout='compact']` so that a Mac does not inherit a thumb's worth of padding.
+ * App.tsx picks between them from `(pointer: coarse)` alone (popupLayout in lib/mobile.ts), not
+ * from the user agent and not from a width. Rules that hold for both are left unqualified; the
+ * phone ones carry `[data-layout='compact']` so that a Mac does not inherit a thumb's worth of
+ * padding.
  *
  * Four things drive the compact half:
  *
- *  1. Reach. The bottom of the screen is the only part a thumb gets to without a grip change, so
- *     navigation lives there and everything else goes up top.
+ *  1. Content first. A phone is read far more than it is operated, so the chat view keeps on
+ *     screen what reading and sending need (a 44px bar, the transcript, a one-row composer) and
+ *     puts everything else one tap away in a bottom sheet. See "The compact shell" below.
  *  2. Target size. Apple asks for 44px and the panel's controls are 28px, because a mouse is exact
  *     and a thumb is about 9mm wide. Every control you are expected to hit in here is raised.
  *  3. The keyboard. iOS does not resize the window when the keyboard opens, it shrinks the visual
@@ -1153,6 +1155,11 @@ html[data-keyboard] .app[data-surface='popup'][data-layout='compact'] .sheet {
 
 .app[data-surface='popup'][data-layout='compact'] .sheet-list > .sheet-row:first-child {
   border-top: 0;
+}
+
+/* Inside the row, because the list clips its corners and would clip an outside ring with them. */
+.app[data-surface='popup'][data-layout='compact'] .sheet-row:focus-visible {
+  outline-offset: -2px;
 }
 
 .app[data-surface='popup'][data-layout='compact'] .sheet-row:active:not(:disabled) {

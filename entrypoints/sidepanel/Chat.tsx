@@ -1309,7 +1309,6 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
   // outlive its draft, and the save that stopped to ask takes over from whatever was up.
   useEffect(() => {
     setSheet((cur) => nextSheet(cur, { type: 'chat-changed' }, { hasDraft: true }));
-    // Leaving a chat ends its rename, which in the compact shell lives in the chat sheet.
   }, [chatId]);
   useEffect(() => {
     if (!artifact) setSheet((cur) => (cur === 'draft' ? null : cur));
@@ -1317,6 +1316,12 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
   useEffect(() => {
     if (duplicate) setSheet(null);
   }, [duplicate]);
+  // The rename form lives inside the chat sheet in this shell, so however that sheet goes away
+  // (closed, replaced, the chat changing under it) an unfinished rename goes with it. Outside the
+  // compact shell `sheet` never changes and this never fires.
+  useEffect(() => {
+    if (compact && sheet !== 'chat') setRenaming(null);
+  }, [compact, sheet]);
 
   /**
    * Grow the compact message box with its text. `field-sizing: content` does this on Chrome; the
@@ -1779,6 +1784,7 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
         retry={activity.retry}
         onStop={abort}
         onRetry={() => void retry()}
+        stopAlways={compact}
       />
       {/* The phone's composer: one row. "+" on the left holds everything that is not typing
           (point at an element, attach an image, the model, a new chat), the message box grows

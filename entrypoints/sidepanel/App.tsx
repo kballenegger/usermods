@@ -325,7 +325,7 @@ export function App({ surface = 'panel' }: AppProps = {}) {
               <nav className="sheet-list" aria-label="usermods">
                 <SheetRow label="Chat" current={tab === 'chat'} onClick={() => go('chat')} action="view-chat" />
                 <SheetRow label="Mods" current={tab === 'mods'} onClick={() => go('mods')} action="view-mods" />
-                <SheetRow label="Settings" icon={<SettingsIcon />} current={tab === 'settings'} onClick={() => go('settings')} action="view-settings" />
+                <SheetRow label="Settings" current={tab === 'settings'} onClick={() => go('settings')} action="view-settings" />
               </nav>
               <div className="sheet-list">
                 <SheetRow

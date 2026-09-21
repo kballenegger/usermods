@@ -36,6 +36,13 @@ export interface ActivityProps {
   retry?: ChatActivity['retry'];
   onStop: () => void;
   onRetry: () => void;
+  /**
+   * Offer Stop for the whole run, not only once it has stalled. The panel has a Stop button beside
+   * Send for as long as a run lasts, so its line only needs one when something looks wrong. The
+   * compact shell (iPhone, iPad) has ONE button beside the message box, which is Queue the moment
+   * there is something typed, and this line is then the only Stop on screen.
+   */
+  stopAlways?: boolean;
 }
 
 export function Activity(props: ActivityProps) {
@@ -67,6 +74,7 @@ export function Activity(props: ActivityProps) {
     retry: props.retry ? { ...props.retry, remainingMs: props.retry.until - now } : undefined,
   });
   if (!a) return null;
+  const action = a.action ?? (props.stopAlways ? 'stop' : undefined);
 
   return (
     <div className={`activity${a.tone === 'live' ? '' : ` ${a.tone}`}`} role="status" aria-live="polite">
@@ -84,12 +92,12 @@ export function Activity(props: ActivityProps) {
           <span className="activity-seg">{s}</span>
         </span>
       ))}
-      {a.action === 'stop' && (
+      {action === 'stop' && (
         <button className="activity-action" onClick={props.onStop}>
           Stop
         </button>
       )}
-      {a.action === 'retry' && (
+      {action === 'retry' && (
         <button className="activity-action" onClick={props.onRetry}>
           Retry
         </button>
