@@ -52,6 +52,14 @@ html:has(.app[data-surface='popup'][data-layout='compact']) #root {
  * Safari sizes the popover to the document and caps it at 800x600. A document with no size of its
  * own collapses to its content, so the window would jump every time you changed tab. These are the
  * size, and 560 leaves the transcript most of it.
+ *
+ * These numbers are NOT the first thing that sets them. entrypoints/popup/popup-size.css states
+ * the same 420x560 under a bare `(pointer: fine)` media query, linked render-blocking from
+ * index.html, because Safari has already sized the popover from this document by the time React
+ * mounts and can put `data-layout` on. This rule is what keeps the size once the attribute exists;
+ * that one is what gives Safari something to measure in the first place. They must agree to the
+ * pixel or the popover resizes itself the instant the app appears, and test/popupshell.test.ts
+ * fails if they drift apart.
  */
 html:has(.app[data-surface='popup'][data-layout='roomy']),
 html:has(.app[data-surface='popup'][data-layout='roomy']) body,

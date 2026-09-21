@@ -18,6 +18,7 @@
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test test/*.test.ts",
     "postinstall": "wxt prepare",
+    "popover-size": "npm run build:safari && node scripts/safari-preview.mjs --popover-size",
     "screenshots": "USERMODS_TEST_BUILD=1 wxt build && USERMODS_TEST_BUILD=1 node scripts/screenshots.mjs",
     "smoke": "USERMODS_TEST_BUILD=1 wxt build && USERMODS_TEST_BUILD=1 node scripts/screenshots.mjs --smoke",
     "smoke:chats": "USERMODS_TEST_BUILD=1 wxt build && USERMODS_TEST_BUILD=1 node scripts/screenshots.mjs --chats",

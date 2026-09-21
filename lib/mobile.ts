@@ -111,22 +111,36 @@ export function localBaseUrlNote(coarsePointer: boolean): string {
  *
  * 'compact' is the phone sheet: navigation along the bottom where a thumb reaches, controls at
  * 44px, type at 16px so iOS does not zoom the page when a field takes focus. 'roomy' is the Mac
- * popup: a fixed 420px window, navigation under the header where a mouse expects tabs, and the
+ * popup: a fixed 420x560 window, navigation under the header where a mouse expects tabs, and the
  * same control sizes the side panel uses.
  *
- * The pointer decides, not the width. Safari sizes a Mac popup to whatever the document asks for,
- * so its width is an output of this function and cannot also be its input; the width only appears
- * here as a floor, for the case of a pointer-driven window too narrow to lay the roomy shell out
- * at all. iPadOS reports a coarse primary pointer even with a trackpad attached, which is the
- * answer we want: the popup there is still a popover on a touch screen.
+ * The pointer decides, and ONLY the pointer. The width is not an input, and this is the part that
+ * was got wrong once and is worth stating plainly, because the failure was invisible in a diff and
+ * obvious on screen.
+ *
+ * Safari on macOS sizes a toolbar popover FROM its document. There is no window for the page to
+ * fill: whatever the document measures at the first layout pass is what the popover becomes. So a
+ * width read from `window.innerWidth` inside the popup is not a fact about the user's screen that
+ * the layout can react to — it is this function's own output coming back round. An earlier version
+ * required `width >= 360` before it would answer 'roomy', and the result was a deadlock: at first
+ * paint there was no meaningful width, so the answer was 'compact', whose CSS is `height: 100dvh`
+ * with no width — a percentage of a window that is itself waiting for the content to have a size.
+ * The document never got a size, the width never reached 360, the layout never flipped, and the
+ * popover opened as a ~470px by 90px sliver showing the top edge of the header and nothing else.
+ *
+ * Hence: fine pointer means 'roomy', at any width, including a width of zero or NaN. The document
+ * declares its own 420x560 in entrypoints/popup/popup-size.css before React ever mounts, so the
+ * roomy shell always has exactly the room it was drawn for, and there is nothing left for a floor
+ * to protect against. A floor could only ever fire on a measurement that the floor itself caused.
+ *
+ * Coarse pointer means 'compact' at any width, which is the case a floor might have looked like it
+ * was serving and is not: iPhone, and iPad including an iPad with a trackpad attached, where
+ * iPadOS still reports a coarse primary pointer. That is the answer we want — the popup there is a
+ * sheet on a touch screen, sized by the system, and it needs thumb-sized targets whether it is
+ * 390px or 1024px across.
  */
 export type PopupLayout = 'compact' | 'roomy';
 
-/** Below this, the roomy shell has nowhere to put three tabs and a header. */
-export const ROOMY_MIN_WIDTH_PX = 360;
-
-export function popupLayout(env: { coarsePointer: boolean; width: number }): PopupLayout {
-  if (env.coarsePointer) return 'compact';
-  if (!Number.isFinite(env.width) || env.width < ROOMY_MIN_WIDTH_PX) return 'compact';
-  return 'roomy';
+export function popupLayout(env: { coarsePointer: boolean; width?: number }): PopupLayout {
+  return env.coarsePointer ? 'compact' : 'roomy';
 }

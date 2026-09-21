@@ -4,7 +4,7 @@
 //   npm test
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { KEYBOARD_EPSILON_PX, ROOMY_MIN_WIDTH_PX, isLocalBaseUrl, keyboardInset, localBaseUrlNote, popupLayout, targetChip } from '../lib/mobile.ts';
+import { KEYBOARD_EPSILON_PX, isLocalBaseUrl, keyboardInset, localBaseUrlNote, popupLayout, targetChip } from '../lib/mobile.ts';
 
 test('a closed keyboard is no inset', () => {
   // The state this is in almost all the time: the visual viewport is the window.
@@ -99,22 +99,29 @@ test('the localhost note means a different machine on a phone than on a Mac', ()
 });
 
 test('a thumb gets the compact layout at any width', () => {
-  // iPadOS reports a coarse pointer even with a keyboard attached, and its popover is wide enough
-  // for the roomy shell. The pointer is what decides, because the targets are what change.
-  for (const width of [320, 390, 500, 1024]) {
+  // iPadOS reports a coarse pointer even with a keyboard and trackpad attached, and its popover is
+  // wide enough for the roomy shell. The pointer is what decides, because the targets are what
+  // change: a finger is about 9mm wide whether the sheet is 390px or 1024px across.
+  for (const width of [0, 320, 390, 500, 1024, 2560]) {
     assert.equal(popupLayout({ coarsePointer: true, width }), 'compact');
   }
+  assert.equal(popupLayout({ coarsePointer: true, width: Number.NaN }), 'compact');
+  assert.equal(popupLayout({ coarsePointer: true }), 'compact');
 });
 
-test('a mouse gets the roomy layout once there is room for it', () => {
-  assert.equal(popupLayout({ coarsePointer: false, width: ROOMY_MIN_WIDTH_PX }), 'roomy');
-  assert.equal(popupLayout({ coarsePointer: false, width: 420 }), 'roomy');
-  // Narrower than the shell needs for a header and three tabs: fall back rather than overflow.
-  assert.equal(popupLayout({ coarsePointer: false, width: ROOMY_MIN_WIDTH_PX - 1 }), 'compact');
-  assert.equal(popupLayout({ coarsePointer: false, width: 0 }), 'compact');
-});
-
-test('a width the browser could not give us is compact, never a broken shell', () => {
-  assert.equal(popupLayout({ coarsePointer: false, width: Number.NaN }), 'compact');
-  assert.equal(popupLayout({ coarsePointer: false, width: Number.POSITIVE_INFINITY }), 'compact');
+test('a mouse gets the roomy layout no matter what the width says', () => {
+  // The bug this pins. Safari on macOS sizes a toolbar popover FROM its document, so at the first
+  // layout pass the popup has no meaningful width — the width is this function's own output coming
+  // back round. A floor of 360 here answered 'compact', whose CSS is `height: 100dvh` and no width,
+  // the document never got a size, the width never grew, and the popover opened as a sliver.
+  //
+  // So every one of these is 'roomy', including the ones that look broken: zero, a fraction, a NaN
+  // from a browser that could not answer, and a width narrower than the 420px shell. The document
+  // declares its own size in entrypoints/popup/popup-size.css before React mounts, so the shell
+  // always has the room it was drawn for.
+  for (const width of [0, 1, 100, 359, 420, 800, Number.NaN, Number.POSITIVE_INFINITY]) {
+    assert.equal(popupLayout({ coarsePointer: false, width }), 'roomy', `width ${width}`);
+  }
+  // And with no width reported at all, which is what usePointerEnvironment now passes.
+  assert.equal(popupLayout({ coarsePointer: false }), 'roomy');
 });

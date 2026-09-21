@@ -40,6 +40,22 @@
     <!-- Classic, non-deferred, ahead of the stylesheet, so the saved theme is on <html> before the
          first paint. See public/theme-boot.js and the longer note in sidepanel/index.html. -->
     <script src="/theme-boot.js"></script>
+    <!--
+      The Mac popover's size, stated before anything runs.
+
+      Safari on macOS sizes a toolbar popover FROM this document: there is no window for the page
+      to fill, so whatever the document measures at the first layout pass is the popover. A size
+      that arrives after React mounts, or that depends on a measured width, is therefore too late —
+      and worse, it deadlocks, because the width it would read is the width it was supposed to
+      produce. This stylesheet is linked synchronously and render-blocking so that Safari's very
+      first layout already sees 420x560. popup-size.css has the whole story; mobile.css restates
+      the same numbers under [data-layout='roomy'] once the app is up, and test/popupshell.test.ts
+      fails if the two ever disagree.
+
+      It is scoped to (pointer: fine), so iPhone and iPad — which report a coarse primary pointer
+      even with a trackpad attached — are untouched and keep the 100dvh sheet.
+    -->
+    <link rel="stylesheet" href="./popup-size.css" />
     <link rel="stylesheet" href="../sidepanel/styles.css" />
     <link rel="stylesheet" href="./mobile.css" />
   </head>

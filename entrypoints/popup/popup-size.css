@@ -1,0 +1,39 @@
+/*
+ * The Mac popover's size, before anything renders.
+ *
+ * This file exists for one reason, and it is a chicken-and-egg problem in how Safari presents a
+ * toolbar popover on macOS: the popover is sized FROM the document, not the other way round. There
+ * is no window whose width the page can fill. At the first layout pass the document has whatever
+ * size its own CSS gives it, and whatever that is becomes the popover.
+ *
+ * So the size cannot be decided by anything that has to run first. React mounting, a media query
+ * on the measured width, a resize listener, a state update — all of them are downstream of a
+ * layout that has already happened, and all of them were tried by the version of this branch that
+ * shipped a popover collapsed to a ~470x90 sliver: popupLayout() gated 'roomy' on
+ * `width >= 360`, the first paint had no meaningful width, the document got the compact rule
+ * (`height: 100dvh`, no width) which is a percentage of a window that is itself waiting for the
+ * content, nothing ever gave the document a size, and the width never reached 360 so it never
+ * flipped. A deadlock, and it renders, so nothing but eyes catches it.
+ *
+ * The fix is to state the size statically, in a stylesheet the popup document links synchronously,
+ * keyed off nothing but the pointer. `(pointer: fine)` is a media query the engine can answer
+ * during the first style resolution without measuring anything, which is exactly the property the
+ * width gate did not have.
+ *
+ * iOS and iPadOS report `(pointer: coarse)` for the primary pointer even with a trackpad attached,
+ * so they never match this rule: the sheet there keeps 100dvh, its safe areas and its bottom
+ * navigation, and is not pinned to a desktop window size.
+ *
+ * The numbers must agree with the `[data-layout='roomy']` rule in mobile.css, which takes over once
+ * React has mounted and put the attribute on. test/popupshell.test.ts asserts they are equal;
+ * disagreeing would make the popover resize itself the moment the app appeared.
+ */
+@media (pointer: fine) {
+  html,
+  body,
+  #root {
+    width: 420px;
+    height: 560px;
+    min-height: 0;
+  }
+}

@@ -7,6 +7,9 @@
 //   node scripts/safari-preview.mjs --webkit-shots out/
 //                                                   serve, then screenshot both popup layouts in
 //                                                   headless WebKit and exit
+//   node scripts/safari-preview.mjs --popover-size  serve, then measure in headless WebKit what
+//                                                   size the popup document hands a content-sized
+//                                                   popover, at a window far too small to help
 //   node scripts/safari-preview.mjs --probe         serve, open the popup in the default browser,
 //                                                   print what that browser laid out, and exit
 //                                                   (--probe simulator for the booted iPhone,
@@ -61,6 +64,7 @@ const port = Number(flag('port', '4173'));
 const shots = flag('shots', null);
 const webkitShots = flag('webkit-shots', null);
 const probe = argv.includes('--probe');
+const popoverSize = argv.includes('--popover-size');
 // `--probe` on its own means this Mac's browser; `--probe simulator` means the booted iPhone.
 const probeTarget = (() => {
   const value = flag('probe', 'browser');
@@ -423,6 +427,115 @@ async function webkitCapture(dir) {
 }
 
 /**
+ * What size does this document hand a popover that is sized FROM it?
+ *
+ * This is the check for the bug that shipped on this branch: on macOS the toolbar popover opened
+ * as a sliver roughly 470px by 90px, showing the top edge of the header and an empty grey strip.
+ * Safari sizes a popover from its document's content, so at the first layout pass the window has
+ * no useful width to give the page. `popupLayout` gated the roomy shell on `width >= 360`, so it
+ * answered 'compact', whose CSS is `height: 100dvh` with no width — a percentage of a window that
+ * was itself waiting for the content. Nothing gave the document a size, the width never reached
+ * 360, and the layout never flipped. A deadlock that renders, which is the kind nothing but eyes
+ * catch.
+ *
+ * So the measurement is the document's own box, in a window deliberately far smaller than the
+ * popup, with a fine pointer. `getBoundingClientRect()` on <html>, NOT `scrollWidth`: scrollWidth
+ * is max(content, viewport), so in any browser window wider than the document it reports the
+ * window and would pass whatever the page did.
+ *
+ * WHAT THIS PROVES: the built popup document, in the engine Safari ships, lays itself out at
+ * 420x560 with a fine pointer whatever the window says, and at the window's own size with a
+ * coarse one. A popover measured from this content would therefore be the right size.
+ *
+ * WHAT IT DOES NOT PROVE: that Safari's popover does the measuring the way this assumes. Nothing
+ * here is a popover, an extension, or Safari. Installing the extension and clicking its toolbar
+ * item cannot be automated, so the real popover stays a manual check. This narrows the failure to
+ * "Safari read the document differently than WebKit laid it out", which the pre-mount stylesheet
+ * is written to survive either way.
+ */
+async function measurePopoverSize() {
+  let playwright;
+  try {
+    playwright = await import('playwright');
+  } catch {
+    fail('playwright is not installed', 'npm install, then `npx playwright install webkit`.');
+  }
+
+  // Each case is a window, a pointer, and what the document should make of them.
+  const cases = [
+    {
+      label: 'fine pointer, 100x50 window (nothing useful to measure)',
+      context: { viewport: { width: 100, height: 50 }, deviceScaleFactor: 1 },
+      expect: { width: 420, height: 560, layout: 'roomy' },
+    },
+    {
+      label: 'fine pointer, 470x90 window (the sliver the bug produced)',
+      context: { viewport: { width: 470, height: 90 }, deviceScaleFactor: 1 },
+      expect: { width: 420, height: 560, layout: 'roomy' },
+    },
+    {
+      // iOS must be untouched: a phone sheet fills its window and is never pinned to a Mac size.
+      label: 'coarse pointer, iPhone 14 (the sheet)',
+      context: playwright.devices['iPhone 14'],
+      expect: { layout: 'compact', notPinned: true },
+    },
+  ];
+
+  const browser = await playwright.webkit.launch();
+  const failures = [];
+  try {
+    for (const c of cases) {
+      const context = await browser.newContext(c.context);
+      const page = await context.newPage();
+      await page.goto(`http://127.0.0.1:${port}/popup.html`, { waitUntil: 'load' });
+
+      // Before the app mounts. This is the layout a popover would be measured from, and the frame
+      // the bug lived in.
+      const early = await page.evaluate(() => {
+        const r = document.documentElement.getBoundingClientRect();
+        return { fine: matchMedia('(pointer: fine)').matches, width: Math.round(r.width), height: Math.round(r.height) };
+      });
+      await page.locator(".app[data-surface='popup']").waitFor({ state: 'visible', timeout: 15000 });
+      const late = await page.evaluate(() => {
+        const r = document.documentElement.getBoundingClientRect();
+        return {
+          layout: document.querySelector('.app').getAttribute('data-layout'),
+          width: Math.round(r.width),
+          height: Math.round(r.height),
+        };
+      });
+
+      console.log(`[preview] ${c.label}`);
+      console.log(`[preview]   (pointer: fine) ${early.fine}`);
+      console.log(`[preview]   before mount    <html> ${early.width}x${early.height}`);
+      console.log(`[preview]   after mount     <html> ${late.width}x${late.height}  data-layout=${late.layout}`);
+
+      if (late.layout !== c.expect.layout) {
+        failures.push(`${c.label}: data-layout is ${late.layout}, expected ${c.expect.layout}`);
+      }
+      if (c.expect.width) {
+        // Both measurements, because a size that only appears after React mounts is a size the
+        // popover was never offered.
+        for (const [when, got] of [['before mount', early], ['after mount', late]]) {
+          if (got.width !== c.expect.width || got.height !== c.expect.height) {
+            failures.push(`${c.label}: ${when} the document is ${got.width}x${got.height}, expected ${c.expect.width}x${c.expect.height}`);
+          }
+        }
+      }
+      if (c.expect.notPinned && (late.width === 420 || late.height === 560)) {
+        failures.push(`${c.label}: the sheet was pinned to the Mac window size (${late.width}x${late.height})`);
+      }
+      await page.close();
+      await context.close();
+    }
+  } finally {
+    await browser.close();
+  }
+  if (failures.length) fail(`the popup document would size a popover wrongly:\n  ${failures.join('\n  ')}`);
+  console.log('[preview] every case as expected: a content-sized popover would get 420x560 on a Mac, and the sheet is untouched.');
+}
+
+/**
  * Open the popup in whatever browser this Mac opens web pages with, and wait for it to report.
  *
  * `open` is a shell command, not an Apple event, so this needs no automation permission and does
@@ -452,13 +565,14 @@ async function probeBrowser() {
 
 server.listen(port, '127.0.0.1', async () => {
   console.log(`[preview] http://127.0.0.1:${port}/popup.html  (views: ${VIEWS.map((v) => `?view=${v}`).join(' ')})`);
-  if (!shots && !webkitShots && !probe) {
+  if (!shots && !webkitShots && !probe && !popoverSize) {
     console.log('[preview] stubbed extension APIs: layout only, nothing runs. Ctrl-C to stop.');
     return;
   }
   try {
     if (shots) await screenshotViews(path.resolve(ROOT, shots));
     if (webkitShots) await webkitCapture(path.resolve(ROOT, webkitShots));
+    if (popoverSize) await measurePopoverSize();
     if (probe) await probeBrowser();
   } finally {
     server.close();
