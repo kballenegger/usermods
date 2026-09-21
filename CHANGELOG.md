@@ -4,6 +4,32 @@ All notable changes to usermods are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Safari on iPhone and iPad
+
+- **A content-first chat view on iPhone.** From a report on a real phone that the chat could not be
+  seen for everything around it. The popup now keeps a slim top bar, the conversation and a one-row
+  message box on screen, and puts the rest one tap away in bottom sheets: the chat's title opens
+  this site's chats with New chat, Rename, Archive, Edit a mod… and Open dashboard; the model name
+  beside it opens the model picker; **+** beside the message box holds Point at element, Attach
+  image, Model and New chat; the menu button holds Chat, Mods, Settings, the dashboard and the
+  theme. There is no bottom navigation any more. With a long chat on a 390x844 screen the
+  conversation went from 300px to 693px, and from 32px to 349px with the keyboard up.
+- The draft panel and the "Editing" line are one line above the message box, only while a draft
+  exists (`Wider comments · v2 · editing`, with Save or Update on it). Tapping it opens the full
+  draft: versions, diff, Try, Export, rename, roll back, Save as a new mod instead.
+- The button beside the message box is Send, then Queue while a run is going and there is something
+  typed, and Stop when there is not.
+- Runs of three or more tool calls fold into one "N steps" line, which still shows a running step
+  and counts failures. Proposal cards are shorter. Status notes can be dismissed.
+- On the Mods view, a mod's Run once, Export, Update and Delete are behind a "more" button; the
+  switch and Edit in chat stay on the card.
+- **iPad: the popup opened as a tiny panel that could not be resized.** Safari on iPad sizes the
+  popover from the page, as on a Mac, and the page had no size of its own there. It now opens at
+  440 wide and 600 to 720 tall depending on the iPad, and fits itself to Split View and Slide Over.
+- The Chrome side panel, the dashboard and the Mac popover are unchanged.
+
 ## [0.1.0] — 2026-09-19
 
 First public release, and the first submission to the Chrome Web Store.

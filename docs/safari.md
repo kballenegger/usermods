@@ -252,17 +252,19 @@ between a tall column beside a visible page driven by a mouse and a full-screen 
 thumb is real enough that faking one with the other would be worse than having two.
 
 The popup itself then has two shapes, because a phone sheet and a Mac popover are not the same
-object either. They are one shell with a `data-layout` attribute rather than a third surface, since
-what differs is sizes and where the navigation sits, not what is on screen.
+object either. They are one shell with a `data-layout` attribute rather than a third surface. On a
+Mac what differs from the panel is sizes and where the navigation sits. On a phone it is more than
+that: the chat view is a different arrangement of the same parts, described under
+[The compact shell](#the-compact-shell-content-first).
 
 | | compact | roomy |
 |---|---|---|
 | where | iPhone, iPad | Mac |
-| navigation | across the bottom, 48px rows | under the header, 34px rows |
+| chrome | one 44px top bar; everything else in bottom sheets | header, tabs, chat bar, draft panel, composer with its buttons |
+| navigation | the Menu button in the top bar; `‹ Chat` on Mods and Settings | under the header, 34px rows |
 | controls | 44px, switch 48x28 | the panel's own sizes, switch 32x18 |
 | fields | 16px minimum, which is what stops iOS zooming on focus | the panel's sizes |
-| document | `100dvh`, safe-area insets, keyboard inset measured | a fixed 420x560 window, stated in `popup-size.css` before React mounts |
-| header actions | icons, labels hidden | icons with their labels |
+| document | iPhone: `100dvh`, safe-area insets, keyboard inset measured. iPad: 440x600/660/720, stated in `popup-size.css` before React mounts | a fixed 420x560 window, stated in `popup-size.css` before React mounts |
 
 `popupLayout()` in `lib/mobile.ts` picks between them from `(pointer: coarse)` and **nothing else**,
 and `usePointerEnvironment()` in `entrypoints/sidepanel/usePointer.ts` keeps that current if a mouse
@@ -305,8 +307,9 @@ The fix is in two halves, and both are needed:
   `matchMedia` in a lazy `useState` initializer rather than an effect — a `setState` on mount would
   give a Mac one painted frame of the compact sheet, which is the frame Safari would measure.
 
-iOS and iPadOS are untouched by both halves: they report `(pointer: coarse)`, never match the
-pre-mount rule, and keep `100dvh`, the safe areas and the bottom navigation. The popup is the only
+The iPhone is untouched by both halves: it reports `(pointer: coarse)`, never matches the
+`(pointer: fine)` rule, and keeps `100dvh` and the safe areas. The iPad turned out not to be, and
+has [a pre-mount rule of its own](#the-ipad-popover). The popup is the only
 document Safari hosts inside the popover — `options_ui` sets `open_in_tab: true`, the dashboard opens
 through `chrome.tabs.create`, and `install.html` replaces a tab's navigation — so nothing else needed
 the same treatment.
@@ -315,23 +318,140 @@ the same treatment.
 headless WebKit. See [What was verified](#what-was-verified-and-how) for what that does and does not
 prove.
 
-The navigation moves in the DOM rather than with CSS `order`, so tabbing through the popup follows
-what is on screen.
+### The iPad popover
+
+Found on the owner's iPad Pro 13-inch (iPadOS 26.6): "the popover panel is tiny and not resizable".
+**Safari on iPad presents the popup as a popover sized from its document, as on a Mac**; only the
+iPhone gets a sheet the system sizes. An iPad reports a coarse pointer, so it got the compact
+document, `height: 100dvh` with no width, and the `(pointer: fine)` rule never reached it. Same
+deadlock, second platform.
+
+The fix has the same shape. `popup-size.css` states a size under
+`@media (pointer: coarse) and (min-device-width: 700px)`, render-blocking, before React exists:
+
+- **The signal is the screen, not the window.** Inside a content-sized popover the window's width
+  is the document's own output, so nothing may read it. `device-width` is a fact about the hardware
+  the engine can answer at first style resolution. On iOS it is the portrait width in both
+  orientations; every iPhone is at most 440pt and the narrowest iPad (mini) is 744pt, so 700px
+  divides them. The file contains no `min-width`, `max-width` or viewport unit, and
+  `test/popupshell.test.ts` fails if one appears or if any non-Mac query could match a phone.
+- **440px wide, and 600, 660 or 720px tall** by `min-device-width` 700, 760 and 1000. The portrait
+  width is the landscape height, and landscape is where a popover hanging off the toolbar runs out
+  of room: 600 fits a 744px-tall iPad mini under Safari's toolbar, 720 suits the 13-inch. The size
+  is published as `--popover-w` and `--popover-h`, and `mobile.css` restates those same properties
+  under `[data-layout='compact'][data-device='tablet']`, so the two cannot drift.
+- **It is still `compact`.** `popupLayout()` is unchanged and still pointer-only. The iPad keeps
+  thumb-sized targets and the content-first shell; `data-device="tablet"` (from the same media
+  query, in `usePointerEnvironment`) only selects the sizing rule.
+- **Clamped popovers and sheets.** A fixed size is a guess. Safari may clamp the popover shorter,
+  and in Split View, Slide Over or a narrow Stage Manager window the iPad presents the popup as a
+  sheet with a size of its own, where a fixed 440px would overflow sideways. A `max-width: 100%`
+  style guard cannot fix that without reintroducing the circular dependency, because in a popover
+  100% *is* the content. So it is done after mount instead, by `tabletPopupSize()` in
+  `lib/compactshell.ts`: the document adopts the viewport the system settled on, with three rules
+  that keep it from collapsing the popover again. A viewport under 320x420 is not a real window and
+  is ignored; a smaller real viewport is adopted; a larger one is adopted only if it is larger by
+  48px or more, so a popover a few pixels bigger than its content is never chased. In a
+  content-sized popover the viewport is the document's size, which is a fixed point.
+
+`npm run popover-size` covers it: the iPad cases load the document with an iPad's screen behind a
+100x50 and a 470x90 window and assert 440x720, 440x660 and 440x600 **with every script blocked**, at
+load, and after mount, in portrait and landscape; a 320x900 Slide Over case and a clamped 440x560
+case assert the adoption and that nothing overflows; and a 440x956 phone screen (the largest iPhone)
+is the negative control beside the iPhone 14. **What this cannot show is the real popover.** Whether
+Safari on iPad measures the document the way this assumes, what it clamps to, and how it presents
+the popup in Split View are all unverified: only the owner's iPad can confirm them.
+
+### The compact shell: content first
+
+The owner's report from a real iPhone: *"It works but the UI needs mobile optimizing. Right now
+can't even see the chat because there's so much stuff above and below."* Measured with a long
+seeded chat (`node scripts/safari-preview.mjs --measure out/`): the transcript had **300px of an
+844px screen (35.5%)**, and **32px of the 500px above the keyboard (6.4%)**. Above it were the
+header and the chat bar; below it the draft panel, the EDITING line, a four-line message box, the
+model line, two rows of buttons and the navigation.
+
+The compact chat view now keeps three things on screen, plus one line while a draft exists:
+
+| On screen | One tap away |
+|---|---|
+| **Top bar**, 44px: the site and the chat's title (one button), the model as a small chip, Menu | **Chats** sheet from the title: New chat, this site's chats (archived grouped), Rename, Archive (or Unarchive and Delete), Edit a mod…, Open dashboard |
+| | **Model** sheet from the chip: provider groups, filter, typed id, Refresh models, Manage providers…. Changing model is two taps |
+| | **Menu** sheet: Chat, Mods, Settings, Open dashboard, Theme |
+| **Transcript** | tool rows are one line each; three or more in a row fold into "N steps", which names a running step and counts failures |
+| **Draft pill**, 44px, only with a draft: `Wider comments · v2 · editing`, and **Save** / **Update** / **Saved** | **Draft** sheet from the pill: the whole draft panel (versions, Diff, Try, Update mod, Export, rename, roll back, Save as a new mod instead, Copy, Edit in dashboard) |
+| **Composer**, one row: **+**, the message box, **Send** | **Add** sheet from +: Point at element, Attach image, Model, New chat |
+
+Decisions worth recording:
+
+- **No bottom navigation, anywhere.** On a phone you change view a few times a session and read the
+  transcript the whole time, so a permanent 48px row under the composer was the worst trade on the
+  screen, and with the keyboard up it must not be there at all. Navigation is the Menu button in
+  the top bar. Mods and Settings replace the chat's title with `‹ Chat`, a word rather than only an
+  arrow, so the way back is obvious; the Menu is still there for going sideways.
+- **One button beside the message box.** The panel shows Stop and Queue side by side during a run.
+  Here the spot is shared (`sendMode()`): Stop with nothing typed, Queue once there is something to
+  send. Stop is never out of reach: in this shell the activity line carries a Stop for the whole
+  run (`stopAlways`), not only once a run has stalled as it does in the panel.
+- **The model is a chip in the top bar,** not a line under the composer. The model is a property of
+  the chat, the bar is about the chat, and up there it costs no height. It reads "No model" in
+  amber when the chat has none, and a line above the composer says why and opens the sheet.
+- **Small to look at, 44px to hit.** Tool rows, the pill's button, text links and disclosures are
+  drawn at their own size and carry their target on a `::before` that reaches into the gap around
+  them. `--measure` computes targets that way and fails under 44px.
+- **One `Sheet`** (`components/Sheet.tsx`): `role="dialog"`, `aria-modal`, named by its title, and the
+  rest of the shell `inert` while it is up. Focus lands on the panel (never a field, so opening a
+  sheet does not raise the keyboard) and returns to the control that opened it, which is named
+  explicitly because tapping a button does not focus it in Safari on iOS. Tab is walked by hand:
+  Safari's default skips buttons, so a browser-led trap walks straight out of a sheet made of
+  buttons. Escape, the scrim, the close button and dragging the grabber all close it. It is at most
+  85% of the visible height, scrolls inside, sits on the keyboard, and pads for the home indicator.
+  A sheet opened from a sheet replaces it (`nextSheet()`), so closing always lands on the chat.
+- **The keyboard.** The composer sits on it through the existing `--keyboard-inset`. New: with the
+  keyboard up `html[data-keyboard]` drops the composer's and the sheets' home-indicator padding,
+  because the indicator is under the keyboard and `env(safe-area-inset-bottom)` does not know.
+- **Selects are drawn in CSS** (`appearance: none`) and still open the native iOS picker. WebKit's
+  themed pop-up button ignores `min-height`, so left to the platform it was 23px in the harness.
+- **Mods:** a card's foot keeps the switch and **Edit in chat**; Run once, Export, Update and Delete
+  are in a sheet named for the mod.
+
+After: **693px of 844px (82.1%)**, **781px of 932px (83.8%)**, and **349px of 500px (69.8%)** with
+the keyboard up; 509px of a 440x660 iPad popover (77.1%). `--measure` fails under 70% keyboard down
+or 45% keyboard up, and also runs the shell's accessibility assertions: every sheet is a named modal
+dialog, focus goes in and comes back to its opener, Tab stays inside, the shell behind is inert,
+nothing is over 85%, every control has an accessible name that is not a `title` tooltip (a phone has
+no hover), and every target is 44px. Before and after PNGs, both themes, and one of each sheet are
+in `docs/screenshots/ios-ui/`.
+
+Only compact changed. Every branch is on a shell context whose default is the panel's, a `Sheet`
+with no compact shell to portal into renders nothing, every new rule is scoped to
+`[data-layout='compact']` (asserted selector by selector in `test/popupshell.test.ts`), and the
+Mac popover's five WebKit captures, including a long chat with a draft in both themes, are
+byte-identical before and after.
+
+**Not verifiable from here:** the real keyboard (the harness fakes `visualViewport`), the real safe
+areas (every `env()` inset is 0 in headless WebKit), whether iOS focuses a field inside a sheet
+without scrolling the page, the drag-to-dismiss gesture under a real finger, momentum scrolling
+inside a sheet, Dynamic Type, and how all of it *feels*, which is the owner's call on the phone.
+
+### What else the popup shell does
+
+The Mac's navigation moves in the DOM rather than with CSS `order`, so tabbing through the popup
+follows what is on screen.
 
 What the popup shell does that the panel does not:
 
-- **Navigation of its own.** Three destinations, labelled in text. On a phone they are full-width
-  rows in the only part of the screen a thumb reaches without a grip change, and everything that is
-  not one of the three views sits in the header, out of thumb reach.
-- **Target tab identity in the header,** always, with the path and a live dot. It says why rather than
+- **Navigation of its own.** Three destinations. On a Mac they are tabs under the header; on a phone
+  they are rows in the Menu sheet, as above.
+- **Target tab identity in the header,** always, with a live dot (and the path on a Mac). It says why rather than
   going blank when there is no page it can act on, for example on a `chrome:` or extension page.
 - **Keyboard handling,** on the phone only. iOS shrinks `window.visualViewport` instead of resizing the window, so a
   composer pinned to the bottom of `100dvh` ends up under the keyboard. `keyboardInset()` in
   `lib/mobile.ts` measures the covered strip, subtracting `offsetTop` because iOS also scrolls within
   the visual viewport, and the popup pads it off the bottom. A Mac popup is a fixed window with no
   on-screen keyboard, so the listener is not attached there at all. Cases in `test/mobile.test.ts`.
-- **Safe areas.** `env(safe-area-inset-*)` on the header and the navigation, so neither lands under
-  the notch or the home indicator.
+- **Safe areas.** `env(safe-area-inset-*)` on the top bar, the composer, the transcript's gutters
+  and the sheets, so nothing lands under the notch or the home indicator.
 - **Touch targets.** On a phone, buttons, selects and the mod on/off switch are grown to at least
   44px. Every one of those rules is scoped to `[data-layout='compact']`, so the Mac popup keeps the
   sizes the views were drawn with. `test/popupshell.test.ts` fails if a thumb-sized rule is written
@@ -485,7 +605,7 @@ reason in [the gaps](#the-gaps-and-why).
 | | |
 |---|---|
 | ![The chat view](screenshots/ios-popup-chat.png) | ![The mods view](screenshots/ios-popup-mods.png) |
-| **Chat.** The target tab is named in the header at all times, because the popup covers the page it acts on. Bottom navigation, three destinations, thumb reach. | **Mods.** Install from a URL or a file, then the mods that match this site. Each card carries its match pattern and GM grants, and the on/off switch is 48x28 inside a 44px label. |
+| **Chat, as it was before the compact shell.** The target tab is named in the header at all times, because the popup covers the page it acts on. These three simulator captures predate [the content-first shell](#the-compact-shell-content-first); the current one is in `screenshots/ios-ui/`, from headless WebKit. | **Mods.** Install from a URL or a file, then the mods that match this site. Each card carries its match pattern and GM grants, and the on/off switch is 48x28 inside a 44px label. |
 | ![Settings](screenshots/ios-popup-settings.png) | ![The host app](screenshots/ios-host-app.png) |
 | **Settings.** Connected providers, then the presets you can add, all of them API-key providers in this build. The address bar showing 127.0.0.1 is the preview route, not the extension. | **The host app.** One screen, whose only job is to say where the switch is, because no app can deep link into that Settings pane. |
 
@@ -510,7 +630,7 @@ preview page with stubbed extension APIs is not the extension running.
 
 | Tier | What ran | Result |
 |---|---|---|
-| Automated, node | `npm test`, including `test/exec-engine`, `exec-plan`, `exec-protocol`, `exec-grants`, `exec-evaluate`, `exec-wrap`, `exec-adapter`, `gm-bridge`, `manifest`, `mobile`, `popupshell`, `safari-mac` | pass, 837 tests |
+| Automated, node | `npm test`, including `test/exec-engine`, `exec-plan`, `exec-protocol`, `exec-grants`, `exec-evaluate`, `exec-wrap`, `exec-adapter`, `gm-bridge`, `manifest`, `mobile`, `compactshell`, `popupshell`, `safari-mac` | pass, 871 tests |
 | Automated, types | `npx tsc --noEmit` | pass |
 | Chromium build | `npm run build`, manifest compared byte for byte against the shipped one | unchanged |
 | Safari build | `npm run build:safari` | pass, MV3 manifest as pinned |
@@ -528,6 +648,9 @@ preview page with stubbed extension APIs is not the extension running.
 | macOS deep link | clicked "Open Safari extension settings" | Safari opened its Extensions pane; the app's failure note stayed hidden |
 | Desktop Safari layout | the built popup served over HTTP and opened in Safari 26.6.2, which reported back what it laid out (`scripts/safari-preview.mjs --probe`) | `coarsePointer: false`, `layout: "roomy"`, navigation above the body, switch 18px, so no phone rule leaked |
 | Popover sizing | the built popup in headless WebKit 26.6 at 100x50 and at 470x90 with a fine pointer, and as an iPhone 14, measuring the document's own `<html>` box before and after mount (`npm run popover-size`) | pass: 420x560 at both fine-pointer windows **before React mounts** as well as after, `data-layout=roomy`; the coarse case stays 390x664 and `compact`. Checked against a deliberately reverted build, which reproduced the 470x90 sliver — so the check is not vacuous. **Not a popover**: see below |
+| iPad popover sizing | the same check with an iPad's screen (`screen` 1032x1376, 820x1180, 744x1133; coarse pointer) behind 100x50 and 470x90 windows, portrait and landscape, plus a 320x900 Slide Over window, a popover clamped to 440x560, and a 440x956 phone screen as a second negative control | pass: 440x720, 440x660 and 440x600 **with every script blocked**, at load and after mount, `data-layout=compact`, `data-device=tablet`; the Slide Over and clamped cases adopt their window with no overflow; both phones fill their window and carry no `data-device`. With the rule disabled the script-free document measured 100x50 and 470x90, which is the owner's tiny popover, so the check is not vacuous. **Not a popover, and not an iPad**: what Safari on iPadOS does with this document is the owner's to confirm |
+| Compact chat shell | the built popup in headless WebKit as an iPhone at 390x844 and 430x932, at 390x844 with `visualViewport` reporting 500px (the keyboard), and as a 440x660 iPad popover, long seeded chat, both themes (`node scripts/safari-preview.mjs --measure out/`) | transcript 693px (82.1%), 781px (83.8%), 349px of 500px (69.8%), 509px (77.1%); was 300px (35.5%), 388px (41.6%) and 32px (6.4%). Every sheet a named `aria-modal` dialog with the shell behind it inert, focus in and back to its opener, Tab contained, none over 85%; every control named without relying on `title`; every target 44px; Stop, Queue and the folded run checked on a chat with a run in flight. Stubbed APIs, a faked keyboard, no safe areas: layout and interaction only |
+| Mac popover unchanged | `--webkit-shots` from a build of the commit before the compact shell and from this one: the three views, and a long chat with a draft in both themes | all five PNGs byte-identical |
 | macOS extension, loaded | not run | Safari lists no ad-hoc signed extension until two developer settings are on; see [the gaps](#the-gaps-and-why) |
 | Real device | not run | no device authorized for this work |
 
