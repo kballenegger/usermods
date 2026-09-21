@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { SUBSCRIPTIONS_OFF } from '@/lib/buildflags';
-import { loadSettings, savePrefs } from '@/lib/settings';
+import { commitContextBudget, loadSettings, MIN_CONTEXT_BUDGET, savePrefs } from '@/lib/settings';
 import { resolveScope } from '@/lib/sidepanel';
 import { applyTheme } from '@/lib/theme';
 import { DEFAULT_CONTEXT_BUDGET, type Prefs, type Settings, type SidePanelScope, type ThemeChoice } from '@/lib/types';
@@ -28,6 +28,14 @@ export function SettingsView({ onReviewNotice }: { onReviewNotice?: () => void }
   const [providersSaving, setProvidersSaving] = useState(false);
   const pending = useRef<Partial<Prefs>>({});
   const providers = useConnections();
+  /**
+   * The context budget AS TYPED, or null when the field is not being edited.
+   *
+   * A number input reports every keystroke, and "5" on the way to "50000" is not a number the user
+   * means. Holding the text here and committing it once (blur, Enter) is what stops the floor being
+   * applied to a half-typed number — the whole of the user's third report.
+   */
+  const [budget, setBudget] = useState<string | null>(null);
 
   useEffect(() => {
     void loadSettings().then(setS);
@@ -51,6 +59,41 @@ export function SettingsView({ onReviewNotice }: { onReviewNotice?: () => void }
     setS((prev) => (prev ? { ...prev, ...patch } : prev));
     setPrefsSaved(false);
   }
+
+  /**
+   * Turn the typed context budget into a stored one and stop editing.
+   *
+   * Idempotent and safe to call when nothing is being edited (blur fires on a field the user never
+   * touched), and it writes nothing when the committed number matches what is stored — so tabbing
+   * through the form does not mark the screen unsaved.
+   */
+  function commitBudget() {
+    if (budget === null) return;
+    const next = commitContextBudget(budget, s?.contextBudget ?? DEFAULT_CONTEXT_BUDGET);
+    setBudget(null);
+    if (next !== (s?.contextBudget ?? DEFAULT_CONTEXT_BUDGET)) update({ contextBudget: next });
+  }
+
+  /**
+   * A draft the user typed and then closed the panel on still counts. The side panel is closed
+   * constantly, and a number typed but not blurred would otherwise be dropped silently — which is
+   * the same class of complaint as the clamping was.
+   *
+   * The ref pair is what lets one unmount-only effect read the LATEST draft rather than the empty
+   * one it closed over on mount.
+   */
+  const budgetRef = useRef<string | null>(null);
+  budgetRef.current = budget;
+  const storedBudgetRef = useRef<number>(DEFAULT_CONTEXT_BUDGET);
+  storedBudgetRef.current = s?.contextBudget ?? DEFAULT_CONTEXT_BUDGET;
+  useEffect(() => {
+    return () => {
+      const draft = budgetRef.current;
+      if (draft === null) return;
+      const next = commitContextBudget(draft, storedBudgetRef.current);
+      if (next !== storedBudgetRef.current) void savePrefs({ contextBudget: next }).catch(() => {});
+    };
+  }, []);
 
   if (!s) return <div className="view muted">loading…</div>;
   const saved = prefsSaved && !providersSaving;
@@ -78,20 +121,46 @@ export function SettingsView({ onReviewNotice }: { onReviewNotice?: () => void }
         </span>
       </label>
 
+      {/*
+        The one field on this screen you TYPE a number into, which is why it is the one that needs
+        a draft. Everything else here is a toggle or a select, where the value the control reports
+        is always a value worth storing; a number field reports every keystroke, and half-typed
+        numbers are not values. See commitContextBudget in lib/settings.ts for the bug this shape
+        fixes — clamping each keystroke made the field fight the user.
+
+        `budget` holds the text while it is being edited and is null the rest of the time, so the
+        input shows the stored number whenever the user is not typing into it, including after
+        another view changes it.
+      */}
       <label className="field">
         Context budget (tokens)
         <input
           type="number"
-          min={10000}
+          min={MIN_CONTEXT_BUDGET}
           step={10000}
-          value={s.contextBudget ?? DEFAULT_CONTEXT_BUDGET}
-          onChange={(e) => update({ contextBudget: Math.max(10_000, Number(e.target.value) || DEFAULT_CONTEXT_BUDGET) })}
+          data-testid="settings-context-budget"
+          value={budget ?? String(s.contextBudget ?? DEFAULT_CONTEXT_BUDGET)}
+          onChange={(e) => setBudget(e.target.value)}
+          onBlur={commitBudget}
+          onKeyDown={(e) => {
+            // Enter commits without waiting for focus to leave, so the keyboard alone is enough.
+            // Escape abandons the draft and puts the stored number back.
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              commitBudget();
+            } else if (e.key === 'Escape') {
+              e.preventDefault();
+              setBudget(null);
+            }
+          }}
         />
         <span>
           How much conversation to send the model before usermods compacts it: first by trimming old
           page snapshots and tool output, then by summarising the earlier part of the chat. Lower is
           cheaper and faster; higher keeps more of the chat in front of the model. One budget for
-          every provider: set it for the smallest context window you use.
+          every provider: set it for the smallest context window you use. The smallest allowed is{' '}
+          {MIN_CONTEXT_BUDGET.toLocaleString('en-US')}, applied when you finish editing; leave it
+          empty for the default of {DEFAULT_CONTEXT_BUDGET.toLocaleString('en-US')}.
         </span>
       </label>
 
