@@ -163,10 +163,80 @@ at all times (`lib/mobile.ts`, `targetChip`): once the popup is open there is no
 to tell you which tab you opened it from, and "Try this mod" against the wrong tab is a confusing
 failure rather than an obvious one.
 
-**API-key providers only.** `lib/buildflags.ts` turns subscription sign-in off in the Safari build.
-The ChatGPT and SuperGrok flows are device-code flows against endpoints the vendors do not document,
-and neither has been exercised on Safari or iOS. A sign-in button that has never run on the platform
-it is on would be worse than saying so. Settings explains it in place.
+**Subscription sign-in works here, and had to be rebuilt to.** The Safari build offers ChatGPT and
+SuperGrok sign-in exactly as the GitHub Chrome build does. It briefly did not: `SUBSCRIPTIONS_OFF`
+was `STORE_BUILD || SAFARI_BUILD`, which conflated "this is a storefront build" with "this is
+Safari", and the result was a build whose Add provider row simply did not list the two subscription
+presets. The owner, who signs in with SuperGrok, reported it as *"i don't see the subscriptions on
+safari provider menu (grok supergrok for example)"*.
+
+They are two independent axes, and they are now written as two:
+
+| Build | Command | Output | Subscription sign-in |
+|---|---|---|---|
+| Chrome, GitHub | `npm run build` | `.output/chrome-mv3` | yes |
+| Chrome, Web Store | `npm run build:store` | `.output/store-chrome-mv3` | no |
+| Safari, own devices | `npm run build:safari` | `.output/safari-mv3` | **yes** |
+| Safari, App Store | `npm run build:safari:store` | `.output/store-safari-mv3` | no |
+
+`SUBSCRIPTIONS_OFF` is now `STORE_BUILD` alone. `SAFARI_BUILD` remains, and still gates the things
+that are genuinely about the engine — no `userScripts`, no sidebar, the `localhost` note, the
+`.user.js` navigation fallback — plus which storefront the unavailable message names. The four rows
+above are pinned in `test/buildflags.test.ts`, and `scripts/safari-xcode.mjs stage --store` selects
+the App Store variant so the two can never be staged into the app by accident.
+
+### What the device-code flow needed before it would work on Safari
+
+The flows themselves are unchanged on the wire. What could not survive Safari was where the state
+lived, and all four of these were real defects rather than hardening:
+
+- **The flow lived in a closure the system kills.** `lib/oauth.ts` used to expose
+  `poll(signal)`, which slept inside an `await` loop and held the device code in scope. Safari's MV3
+  background is an event page the system suspends aggressively — on iOS within seconds of the popup
+  closing, which is precisely when the user has switched to the verification tab. The suspend took
+  the closure, the timer and the only copy of the device code, so the sign-in could not be resumed,
+  only restarted, which hands the user a code that no longer matches the page in front of them.
+  `lib/pendinglogin.ts` now persists everything needed to resume — device code, user code,
+  verification URI, interval, expiry, vendor — in `chrome.storage.local` under
+  `oauth:pending:<vendor>`, written *before* the user is sent anywhere. `oauth.ts` exposes
+  `pollOnce(record)`, a single step with no loop and no timer.
+- **The popup forgot mid-flow.** On iPhone the popup is a sheet over the page and `tabs.create`
+  dismisses it, so the component holding the user code unmounted at the exact moment the code was
+  needed. Reopening drew a fresh "Sign in with SuperGrok" button while a live, approvable code sat
+  on the vendor's page. The card now asks `oauth.restore` on mount and comes back with the same
+  code, a button to reopen the verification page, and Cancel.
+- **`chrome.alarms` is the wrong tool and is not in the manifest.** Its floor is one minute; a
+  device-code interval is five seconds and the codes expire in 10–15 minutes, so a one-minute tick
+  spends a sixth of the window per poll and makes an approval take up to a minute to land. The poll
+  is driven instead by whichever extension page is open (`oauth.poll`, ticking at 2s, which wakes
+  the worker), with the vendor's own interval enforced from the stored record so no arrangement of
+  callers can outpace it. The background also steps every pending vendor on startup, so an approval
+  that landed while nothing was running is noticed at the next wake. No new permission was added.
+- **A blocked host looked like a dead network.** Safari grants host access per site and a freshly
+  installed extension has been granted nothing — `<all_urls>` is a request there, not a grant. A
+  fetch to a host the user has not allowed rejects with the same opaque `TypeError: Load failed`
+  that no network gives, with no status and no CORS message. Every request in `lib/oauth.ts` now
+  goes through a wrapper that recognises that shape and names the check the user can actually make,
+  per platform, instead of "Failed to fetch".
+
+**Headers Safari will not let an extension set.** `chatgptHeaders` and `xaiProxyHeaders` set
+`authorization`, `chatgpt-account-id`, `openai-beta`, `originator` and the `x-grok-*` family. All of
+those are ordinary custom headers and Safari sends them. What no engine permits a page or extension
+to set is the forbidden-header set — `User-Agent`, `Origin`, `Referer`, `Host`, `Cookie`,
+`Content-Length` and friends — and usermods sets none of them on any request, so there is nothing to
+work around. `Origin` is attached by the engine itself from the extension's own origin, which is
+what the vendor backends see; both accepted it in the Chrome build and neither documents an
+allow-list, so it is a thing to watch rather than a thing that is known broken.
+
+**Streaming is fine.** `readStream` in `lib/providers/errors.ts` uses `body.getReader()` and
+`new TextDecoder()`, both of which WebKit has had for years. It does not use `TextDecoderStream` or
+`pipeThrough`, which are the two places a Chrome-only assumption would usually hide. No change was
+needed.
+
+**The model list is unchanged.** `lib/modellist.ts` sends `client_version` and falls back to the
+built-in list when a listing fails, on Safari exactly as on Chrome; its default bases come from
+`lib/buildflags.ts` and are blank only in a store build, which is now the only build that blanks
+them.
 
 **`localhost` means the phone.** On a desktop, "run a model locally" and "point usermods at
 localhost" are the same sentence. On iOS the extension runs inside Safari on the phone, so
@@ -510,11 +580,14 @@ preview page with stubbed extension APIs is not the extension running.
 
 | Tier | What ran | Result |
 |---|---|---|
-| Automated, node | `npm test`, including `test/exec-engine`, `exec-plan`, `exec-protocol`, `exec-grants`, `exec-evaluate`, `exec-wrap`, `exec-adapter`, `gm-bridge`, `manifest`, `mobile`, `popupshell`, `safari-mac` | pass, 837 tests |
+| Automated, node | `npm test`, including `test/exec-engine`, `exec-plan`, `exec-protocol`, `exec-grants`, `exec-evaluate`, `exec-wrap`, `exec-adapter`, `gm-bridge`, `manifest`, `mobile`, `popupshell`, `safari-mac`, `buildflags`, `pendinglogin`, `authfetch` | pass, 872 tests |
 | Automated, types | `npx tsc --noEmit` | pass |
 | Chromium build | `npm run build`, manifest compared byte for byte against the shipped one | unchanged |
 | Safari build | `npm run build:safari` | pass, MV3 manifest as pinned |
+| Build-flag matrix | all four builds made, each grepped for `auth.openai.com` / `auth.x.ai` | `chrome-mv3` 1 file per host, `store-chrome-mv3` 0, `safari-mv3` 1 per host, `store-safari-mv3` 0 — so the Safari build carries the sign-in and only a store build drops it |
+| Safari provider menu | the built Safari popup in headless WebKit, both layouts, stubbed extension APIs (`npm run safari-providers`) | pass: "Add provider" offers ChatGPT subscription and SuperGrok subscription in roomy and compact, both ≥44px tall on a phone, and a pending sign-in is restored with its code after the document is reloaded. Checked against the store build, which reproduced the owner's report — so the check is not vacuous. **No vendor was contacted**: the device code is the literal string `PREVIEW-FAKE` and the URL is `example.invalid` |
 | Native build, iOS | `node scripts/safari-xcode.mjs build --sdk iphonesimulator` on Xcode 27, simulator SDK | `** BUILD SUCCEEDED **`; the bundle carries `Assets.car`, `AppIcon60x60@2x.png` and `CFBundleIcons.CFBundlePrimaryIcon.CFBundleIconFiles = [AppIcon60x60]` |
+| Native build, iOS device SDK | `xcodebuild -sdk iphoneos -destination 'generic/platform=iOS' -allowProvisioningUpdates DEVELOPMENT_TEAM=2TK86C98Z5 CODE_SIGN_STYLE=Automatic` on Xcode 27 | `** BUILD SUCCEEDED **`, signed `TeamIdentifier=2TK86C98Z5`, and the embedded `.appex` carries the subscription build (`auth.openai.com` and `auth.x.ai` each present once) — so what would install on a real iPhone has the sign-in in it |
 | Native build, macOS | `node scripts/safari-xcode.mjs mac --team 2TK86C98Z5` on Xcode 27, macOS SDK 27.0 | `** BUILD SUCCEEDED **`, `usermods.app` with `Contents/PlugIns/usermods-extension.appex` inside it |
 | macOS app icon | `Contents/Resources/` of the built app, and `assetutil --info` on its `Assets.car` | `AppIcon.icns` present, `CFBundleIconFile` and `CFBundleIconName` both `AppIcon`, all ten macOS slots compiled; the icns extracted from the signed bundle was rendered and looked at |
 | iOS simulator, install | installed and launched on iPhone 15 (iOS 17.5); `pluginkit -m -v -p com.apple.Safari.web-extension` lists `io.github.kballenegger.usermods.extension(0.1.0)`; `Library/Safari/WebExtensions/Extensions.plist` records it with `AccessibleOrigins: ["<all_urls>"]` and `Permissions: [storage, tabs, scripting, declarativeNetRequest]` | pass, nothing in the manifest refused |
@@ -522,7 +595,8 @@ preview page with stubbed extension APIs is not the extension running.
 | Mobile Safari layout | the built popup served over HTTP with stubbed extension APIs (`scripts/safari-preview.mjs`) | pass, layout only |
 | macOS signature | `codesign --verify --deep --strict` on the built app, which `safari-xcode.mjs mac` now runs itself | valid on disk, satisfies its designated requirement. Signed with the owner's development team this time: `Identifier=io.github.kballenegger.usermods.extension`, `TeamIdentifier=2TK86C98Z5` |
 | macOS signature, after a web-only change | changed a popup stylesheet, rebuilt, verified again | pass. The same sequence before this branch's fix failed with "a sealed resource is missing or invalid" |
-| macOS bundle contents | the `.appex` resource list compared against the staged build output | identical, 36 files, no stale content-hashed chunks left over |
+| macOS bundle contents | the `.appex` resource list compared against the staged build output | identical, 38 files, no stale content-hashed chunks left over |
+| macOS bundle freshness | every staged file compared by size against the copy inside the finished `.appex`, by `safari-xcode.mjs mac` itself | pass, 38 files. This check is new, and it is here because the copy phase silently skipped during this work and shipped a signed, verifying app carrying the PREVIOUS web build — in that instance the App Store variant, so the app was quietly missing the sign-in. Probed against a bundle with one truncated and one missing file, which it caught |
 | macOS entitlements | `codesign -d --entitlements` on both bundles | app: `app-sandbox`; extension: `app-sandbox` and `network.client` |
 | macOS host app | launched, window drawn, accessibility tree read back | the four enabling steps, both notes and the settings button all present |
 | macOS deep link | clicked "Open Safari extension settings" | Safari opened its Extensions pane; the app's failure note stayed hidden |
@@ -530,6 +604,7 @@ preview page with stubbed extension APIs is not the extension running.
 | Popover sizing | the built popup in headless WebKit 26.6 at 100x50 and at 470x90 with a fine pointer, and as an iPhone 14, measuring the document's own `<html>` box before and after mount (`npm run popover-size`) | pass: 420x560 at both fine-pointer windows **before React mounts** as well as after, `data-layout=roomy`; the coarse case stays 390x664 and `compact`. Checked against a deliberately reverted build, which reproduced the 470x90 sliver — so the check is not vacuous. **Not a popover**: see below |
 | macOS extension, loaded | not run | Safari lists no ad-hoc signed extension until two developer settings are on; see [the gaps](#the-gaps-and-why) |
 | Real device | not run | no device authorized for this work |
+| A real subscription sign-in | **not run** | cannot be: it needs the owner's own ChatGPT or SuperGrok account, and no test may touch one. The state machine, the restore, the interval, `slow_down`, expiry and the permission-error classification are all unit tested; that the vendors accept *these* requests from *this* extension is the manual check below |
 
 ### What was seen running in Mobile Safari
 
@@ -607,6 +682,71 @@ Allow" step writes. That pair is easy to miss and decides everything: enabled wi
 origins, Safari loads the extension, applies its declarative rules, and injects no content script
 anywhere, so no mod ever runs. Nothing in the extension was patched to reach that state, and the
 build that ran is the committed one.
+
+### Checking a real subscription sign-in (the owner's step)
+
+No automated check here signs in to anything, and none can: it needs a real ChatGPT or SuperGrok
+account, and using the owner's is his own decision, taken knowingly, rather than something a test
+run does on his behalf. Everything the code can be held to without an account is — the persisted
+state machine, resume after a restart, `slow_down`, expiry, cancel, two vendors at once, the
+permission-error classification, and the built popup's provider menu and restore in WebKit. What
+follows is the part only he can close, on each of the three devices, and roughly what it costs.
+
+**Before any of it, the host permission.** This is the single most likely thing to go wrong and it
+looks like a network failure. Safari asks per website; grant every site once and the rest of the
+flow has a chance.
+
+- **Mac:** Safari > Settings > Extensions > usermods > Edit Websites → set to **Allow on Every
+  Website**. (Or the toolbar icon > Always Allow on Every Website.)
+- **iPhone / iPad:** Settings > Apps > Safari > Extensions > usermods > **All Websites → Allow**.
+
+If it is not granted, the sign-in fails with the sentence that names the host to allow rather than
+"Failed to fetch" — that sentence appearing is itself the check that the classification works.
+
+**On the Mac** (about three minutes):
+
+1. Open usermods from the toolbar → Settings → Providers. **Expect:** "Add provider" lists
+   *ChatGPT subscription* and *SuperGrok subscription*. Their absence is the original bug.
+2. Add *SuperGrok subscription*, open its card, press **Sign in with SuperGrok**. **Expect:** a
+   user code appears and a tab opens on xAI's device page.
+3. Press **Copy code**. **Expect:** the button reads *Copied*, or *Selected — hold to copy* with the
+   code selected — the fallback for when WebKit refuses the Clipboard API in an extension popup.
+   Either is a pass; nothing happening is not.
+4. Approve on the xAI page, return to the popup. **Expect:** within a few seconds the card reads
+   *Signed in to SuperGrok*, with the account label if xAI returned one.
+5. Pick a Grok model in the chat's model picker and send one message. **Expect:** a streamed reply.
+   This is the part that exercises `cli-chat-proxy.grok.com` and the `x-grok-*` headers, which the
+   sign-in alone does not.
+
+**On the iPhone** (about five minutes, and the one that matters most — every problem this branch
+fixed was an iOS problem):
+
+1. Same first two steps. **Expect:** the code is on screen *before* the tab opens.
+2. When the verification tab opens, the popup is dismissed. **This is normal and the card says so.**
+   Do not treat it as the sign-in being cancelled.
+3. Approve on the xAI page, then **reopen usermods** from the toolbar and go back to Settings >
+   Providers > SuperGrok. **Expect:** either *Signed in to SuperGrok*, or the **same** user code
+   still showing with *waiting for approval* — never a fresh "Sign in with SuperGrok" button. A
+   fresh button here is the regression to report.
+4. Harder version of the same thing: start a sign-in, then leave Safari entirely, lock the phone for
+   a minute, unlock, reopen Safari and reopen usermods. **Expect:** the pending card again, with the
+   same code, still valid.
+5. Send one message on a Grok model.
+6. Leave a sign-in unapproved for fifteen minutes. **Expect:** *The SuperGrok sign-in code expired
+   before it was approved. Start again to get a new one.* — not a code that looks live.
+
+**On the iPad:** step 1 and step 3 are the ones worth repeating, because the iPad's popup is a
+popover rather than a full sheet and may not be dismissed by the tab opening at all. If it is not
+dismissed, the flow simply completes in place, which is the easy case.
+
+**Repeat step 1 for ChatGPT** if that subscription is in use: the two flows differ on the wire
+(OpenAI signals "not approved yet" with a 403/404 rather than an RFC error body, and adds a code
+exchange after approval), so one working does not prove the other.
+
+**What a failure at each point means:** no presets → the build flags regressed; "Failed to fetch" →
+the host is not allowed; a fresh sign-in button after reopening → the persistence or `oauth.restore`
+regressed; signed in but the chat fails → the backend host, not the auth host, is the one not
+allowed.
 
 ## Distribution
 
