@@ -1418,6 +1418,76 @@ html[data-keyboard] .app[data-surface='popup'][data-layout='compact'] .sheet {
   padding-bottom: max(var(--sp-4), env(safe-area-inset-bottom));
 }
 
+/*
+ * Subscription sign-in on a phone.
+ *
+ * This card is where someone is holding the phone in one hand and a code in their head: the popup
+ * is about to be dismissed by the very button they are reaching for, and they will type the code
+ * into another page. So the code is the biggest thing on the card and selectable (it is a
+ * read-only field, see ProvidersSection.tsx), and the three actions are a column in the order a
+ * thumb wants them: the primary full width, then Copy code and Cancel sharing a row beneath it.
+ * A three-across row of uppercase labels at 390px wraps to something nobody designed.
+ */
+.app[data-surface='popup'][data-layout='compact'] .subscription-login {
+  gap: var(--sp-2);
+}
+
+/* 26px mono with 2px tracking is 8 or 9 characters across a 390px card; a longer code shrinks to
+   fit rather than scrolling inside a field nobody knows is scrollable. */
+.app[data-surface='popup'][data-layout='compact'] .user-code {
+  min-height: 56px;
+  margin: 0;
+  padding: var(--sp-2) var(--sp-1);
+  font-size: clamp(20px, 7vw, 28px);
+  font-weight: 500;
+  user-select: all;
+  -webkit-user-select: all;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .subscription-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-2);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .subscription-actions .btn {
+  min-width: 0;
+  padding-left: var(--sp-2);
+  padding-right: var(--sp-2);
+  /* "Selected — hold to copy" is the longest label this row ever carries, and it may take two
+     lines rather than push Cancel off the card. */
+  white-space: normal;
+  line-height: 1.25;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .subscription-actions .btn.primary {
+  grid-column: 1 / -1;
+}
+
+/* Not signed in: the sentence above, the button under it at full width, not squeezed beside it. */
+.app[data-surface='popup'][data-layout='compact'] .subscription-login > .row:has(> [data-testid='start-signin']) {
+  flex-wrap: wrap;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .subscription-login [data-testid='start-signin'] {
+  flex: 1 1 100%;
+}
+
+/*
+ * The permission error is a paragraph, with a settings path in it, arriving in a slot drawn for one
+ * line. It wraps anywhere it has to (the path has no spaces a narrow card can break on around
+ * "cli-chat-proxy.grok.com"), reads at the body size, and can be selected, since the next thing
+ * the reader does is go and find that path in Settings.
+ */
+.app[data-surface='popup'][data-layout='compact'] .subscription-login .error {
+  padding: var(--sp-2) var(--sp-3);
+  font-size: var(--fs-body);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
 /* A mod card's foot: the switch, the one thing you do most, and everything else behind "more". */
 .app[data-surface='popup'][data-layout='compact'] .mod-foot {
   flex-wrap: nowrap;

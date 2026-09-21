@@ -30,6 +30,21 @@ All notable changes to usermods are recorded here. The format follows
   440 wide and 600 to 720 tall depending on the iPad, and fits itself to Split View and Slide Over.
 - The Chrome side panel, the dashboard and the Mac popover are unchanged.
 
+### Safari: subscription sign-in
+
+- **ChatGPT and SuperGrok subscription sign-in are back in the Safari build.** They had been switched
+  off for every Safari build rather than only for a storefront one. `npm run build:safari:store` is
+  the variant without them, matching `npm run build:store` for Chrome.
+- A sign-in in progress survives Safari: the code and its expiry are kept in storage, so reopening
+  the popup (on iPhone, opening the vendor's page dismisses it) shows the same code still waiting
+  for approval instead of a fresh sign-in button. The card has **Open … page**, **Copy code** and
+  **Cancel**, and says that opening the page closes the panel.
+- When Safari has not been allowed on the vendor's website, the sign-in says so, names the host and
+  gives the path to the setting on each platform, instead of "Failed to fetch".
+- On iPhone and iPad the card is laid out for a thumb: a large, selectable code, the primary action
+  full width with the other two beneath it, and an error that wraps inside the card.
+- The Mac build checks that the extension inside the finished app is the build that was staged.
+
 ## [0.1.0] — 2026-09-19
 
 First public release, and the first submission to the Chrome Web Store.

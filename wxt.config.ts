@@ -2,9 +2,14 @@ import { defineConfig } from 'wxt';
 import { buildManifest, isSafariOnlyIcon } from './lib/manifest';
 
 /**
- * The Chrome Web Store build drops subscription sign-in; see lib/buildflags.ts. Set by
- * `npm run build:store` / `npm run zip:store`. A literal define, so the bundler folds the flag
- * and tree-shakes lib/oauth out of the store build entirely.
+ * A storefront build drops subscription sign-in; see lib/buildflags.ts. Set by
+ * `npm run build:store` / `npm run zip:store` (Chrome Web Store) and `npm run build:safari:store`
+ * (an App Store submission). A literal define, so the bundler folds the flag and tree-shakes
+ * lib/oauth out of the store build entirely.
+ *
+ * It is independent of the target: `USERMODS_STORE=1 wxt build -b safari` is a Safari build for a
+ * storefront, and a plain `wxt build -b safari` — the one the owner installs on his own devices —
+ * has subscription sign-in exactly like the plain Chrome build.
  */
 const storeBuild = process.env.USERMODS_STORE === '1';
 
@@ -24,6 +29,13 @@ const testBuild = process.env.USERMODS_TEST_BUILD === '1';
 // Order matters: a store build launched for testing (there isn't one today, but if that ever
 // happens) should land in the test folder, not the store folder, since the test folder is the one
 // nothing but test scripts ever read from.
+//
+// `{{browser}}` is what keeps the two Safari builds apart without a fourth branch: a plain
+// `wxt build -b safari` writes `.output/safari-mv3`, and `USERMODS_STORE=1 wxt build -b safari`
+// writes `.output/store-safari-mv3`. That matters more here than it does for Chrome, because
+// scripts/safari-xcode.mjs stages one of those folders into the .appex — staging the wrong one
+// would produce an app that builds, installs and is simply missing the sign-in, with nothing in
+// any log to say which build it came from. See its --store flag.
 const outDirTemplate = testBuild
   ? 'test-{{browser}}-mv{{manifestVersion}}{{modeSuffix}}'
   : storeBuild

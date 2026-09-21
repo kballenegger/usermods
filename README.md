@@ -149,9 +149,10 @@ Then in Chrome:
 ### Safari on iOS and macOS
 
 One app, one extension, two platforms. The execution layer differs from Chrome's, because Safari has
-no `chrome.userScripts`, and the UI is a toolbar popup rather than a side panel: a full-screen sheet
-with bottom navigation on a phone, a small window with tabs under the header on a Mac. Building
-either needs a full Xcode.
+no `chrome.userScripts`, and the UI is a toolbar popup rather than a side panel: a small window with
+tabs under the header on a Mac, and on iPhone and iPad a content-first chat (a slim top bar, the
+conversation, a one-row message box) with the chat list, the model, the draft and navigation each
+one tap away in a bottom sheet. Building either needs a full Xcode.
 
 ```sh
 npm install
@@ -161,8 +162,13 @@ node scripts/safari-xcode.mjs mac         # macOS: build the app with the extens
 ```
 
 On iOS, turn the extension on in **Settings > Apps > Safari > Extensions > usermods** and allow it
-on the sites you want. This has been built, installed and seen running saved mods in Mobile Safari
-on the iPhone 15 simulator (iOS 17.5). No physical iPhone or iPad has run it yet.
+on the sites you want. Safari asks per website and grants nothing by default, so **All Websites >
+Allow** is worth doing up front: without it, requests to a provider fail in a way that looks like a
+dead network. This has been built, installed and seen running saved mods in Mobile Safari on the
+iPhone 15 simulator (iOS 17.5). The owner has since run it on his own iPhone and iPad Pro; what he
+reported from them (a chat view too crowded to read on the phone, a tiny popover on the iPad) is
+what the compact shell and the iPad popover size answer, and neither fix has been seen on those
+devices yet.
 
 On macOS, copy the built `usermods.app` somewhere permanent (Safari finds the extension through the
 app, so a build directory is not good enough), open it, then turn usermods on in **Safari >
@@ -173,10 +179,17 @@ developers**, then **Develop > Allow unsigned extensions**. The Mac app builds, 
 launches, and the popup lays out correctly in Safari 26.6; it has not been seen running as a loaded
 extension, because that needs those two settings.
 
+The Safari build has every provider the GitHub Chrome build has, **including ChatGPT and SuperGrok
+subscription sign-in**. Those device-code flows needed real work to survive the platform — Safari
+suspends the background aggressively, and on iPhone opening the verification page dismisses the
+popup — so the pending sign-in is persisted and resumed rather than held in memory; see
+[docs/safari.md](docs/safari.md). Only a storefront build drops subscriptions:
+`npm run build:safari:store` is the App Store variant, matching `npm run build:store` for Chrome.
+
 [docs/safari.md](docs/safari.md) has the device build, the isolation guarantees, the limitations
-(page-world mods and site CSP, the ignored install redirect rule, API-key providers only, what
-`localhost` means on each platform) and a row-by-row account of what was seen running and what was
-not.
+(page-world mods and site CSP, the ignored install redirect rule, what `localhost` means on each
+platform), the four-way build matrix, the manual steps for checking a real subscription sign-in on
+each device, and a row-by-row account of what was seen running and what was not.
 
 ### Where the panel opens
 

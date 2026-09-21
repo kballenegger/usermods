@@ -149,3 +149,59 @@ label.field > span.warn {
   border-radius: var(--r-field);
   padding: var(--sp-1) var(--sp-2);
 }
+
+/* ---------------------------------------------------------------------------
+ * Subscription sign-in
+ * ------------------------------------------------------------------------ */
+
+.subscription-login {
+  margin-bottom: var(--sp-3);
+}
+
+/*
+ * The device code, as a read-only input rather than a block of text.
+ *
+ * Two reasons, both about phones. It gives "Copy code" a fallback that needs no Clipboard API —
+ * focus it and select() — and it gives a thumb something that selects reliably on a long press,
+ * which a <div> inside a popup sheet does not. It is styled to read as a displayed code and not as
+ * a field to type in: no visible caret affordance, centred, and wide enough for the longest code
+ * either vendor issues.
+ */
+.user-code {
+  width: 100%;
+  box-sizing: border-box;
+  text-align: center;
+  font: 400 var(--fs-stat) / 1.2 var(--font-mono);
+  letter-spacing: 2px;
+  color: var(--accent-text);
+  /* The well and the control edge. (--bg-2 and --border are not tokens in this system, so the field
+     had no surface and no outline at all; an undefined var() drops the whole declaration.) */
+  background: var(--surface-well);
+  border: var(--border-width) solid var(--border-control);
+  border-radius: var(--r-field);
+  padding: var(--sp-2);
+  margin: var(--sp-2) 0;
+  cursor: text;
+}
+
+/*
+ * The three actions under the code wrap rather than compress.
+ *
+ * On a phone the card is about 320px of usable width and the three labels ("Open ChatGPT page",
+ * "Copy code", "Cancel") do not fit on one line at a 44px target height. `.row` is a flex row that
+ * would shrink them instead, which produces three buttons too narrow to hit accurately — the exact
+ * failure the 44px rule exists to prevent. Wrapping gives each one its full label and its full
+ * height, on two lines when that is what the width allows.
+ */
+.subscription-actions {
+  flex-wrap: wrap;
+}
+
+.subscription-actions .btn {
+  flex: 1 1 auto;
+}
+
+/* The primary action gets the whole first line on a narrow card: it is the one being asked for. */
+.app[data-surface='popup'][data-layout='compact'] .subscription-actions .btn.primary {
+  flex-basis: 100%;
+}

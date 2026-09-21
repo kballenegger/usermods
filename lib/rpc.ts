@@ -85,7 +85,14 @@ export type RpcRequest =
   | { type: 'mods.edit'; modId: string; currentChatId?: string; host: string; /** The composer's model, for the case where this creates a chat: it starts on it, like any new chat. */ model?: ModelSelection | null }
   | { type: 'oauth.status'; kind: OAuthKind }
   | { type: 'oauth.start'; kind: OAuthKind }
+  /** Advance a pending sign-in by at most one poll of the vendor, and say where it stands. */
   | { type: 'oauth.poll'; kind: OAuthKind }
+  /**
+   * What a sign-in looks like right now, WITHOUT polling. Asked by the popup on mount, so a popup
+   * reopened mid-flow — which on iOS is every popup, because opening the verification tab dismisses
+   * it — paints the pending code again instead of a fresh "Sign in" button.
+   */
+  | { type: 'oauth.restore'; kind: OAuthKind }
   | { type: 'oauth.cancel'; kind: OAuthKind }
   | { type: 'oauth.signout'; kind: OAuthKind }
   /** List one connection's models (lib/modellist.ts) and cache the answer on it. */
@@ -115,6 +122,7 @@ interface RpcResults {
   'oauth.status': { signedIn: boolean; label?: string };
   'oauth.start': OAuthLoginState;
   'oauth.poll': OAuthLoginState;
+  'oauth.restore': OAuthLoginState;
   'models.list': ModelListResult;
   'chats.list': Chat[];
   'chats.listAll': Chat[];

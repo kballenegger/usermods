@@ -115,6 +115,13 @@ export default defineBackground(() => {
 
   watchUserJsNavigations();
 
+  // A sign-in that was in flight when this worker was last torn down. Safari suspends the
+  // background constantly — on iOS, as soon as the popup closes, which is exactly when the user is
+  // over on the verification page — so every wake is a chance to notice an approval that has
+  // already landed. Fire and forget: nothing else waits on it, and the popup's own poll covers the
+  // case where this one is too early.
+  void resumePendingLogins().catch(() => {});
+
   chrome.runtime.onMessage.addListener((msg: RpcRequest | { type?: string }, _sender, sendResponse) => {
     if (!msg || typeof msg.type !== 'string' || !msg.type.includes('.')) return false; // not an RPC (e.g. content events)
     handleRpc(msg as RpcRequest)
@@ -926,18 +933,33 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
       return startLogin(req.kind);
     case 'oauth.poll':
       if (SUBSCRIPTIONS_OFF) return { status: 'error', message: unavailableProviderMessage(req.kind) };
-      return logins.get(req.kind)?.state ?? { status: 'idle' };
-    case 'oauth.cancel':
+      // Doing the poll here, rather than reading a state some other timer maintains, is what makes
+      // the flow survive this worker being suspended: the asking surface is the clock.
+      return stepLogin(req.kind);
+    case 'oauth.restore': {
+      // What a popup asks on mount. It must not poll — a reopened popup should paint the pending
+      // code immediately — so this only reads what storage already knows.
+      if (SUBSCRIPTIONS_OFF) return { status: 'idle' };
+      const pl = await import('@/lib/pendinglogin');
+      const done = finished.get(req.kind);
+      if (done && done.status !== 'idle') return done;
+      return pl.restore(await pl.loadPending(req.kind), Date.now());
+    }
+    case 'oauth.cancel': {
       if (SUBSCRIPTIONS_OFF) return { ok: true };
-      logins.get(req.kind)?.controller.abort();
-      logins.delete(req.kind);
+      const pl = await import('@/lib/pendinglogin');
+      finished.delete(req.kind);
+      await pl.clearPending(req.kind);
       return { ok: true };
-    case 'oauth.signout':
+    }
+    case 'oauth.signout': {
       if (SUBSCRIPTIONS_OFF) return { ok: true };
-      logins.get(req.kind)?.controller.abort();
-      logins.delete(req.kind);
+      const pl = await import('@/lib/pendinglogin');
+      finished.delete(req.kind);
+      await pl.clearPending(req.kind);
       await (await oauthModule()).saveTokens(req.kind, null);
       return { ok: true };
+    }
     case 'models.list':
       return listModels(req.connectionId);
     case 'artifact.get':
@@ -1437,8 +1459,6 @@ async function handleGm(msg: GmMessage, sender: chrome.runtime.MessageSender): P
 
 // ---------- subscription sign-in (device code) ----------
 
-const logins = new Map<OAuthKind, { state: OAuthLoginState; controller: AbortController }>();
-
 /**
  * lib/oauth, loaded on demand. Every call site is behind `if (SUBSCRIPTIONS_OFF)`, so the bundler drops
  * this import — and the vendor auth endpoints it reaches — from the store build. See lib/buildflags.
@@ -1447,29 +1467,115 @@ function oauthModule() {
   return import('@/lib/oauth');
 }
 
+/**
+ * The outcome of a sign-in that has already finished, kept only until the surface that asked reads
+ * it once.
+ *
+ * Everything still IN FLIGHT lives in storage (lib/pendinglogin.ts) and is deliberately not held
+ * here — that is the whole point of this branch's rework, because on Safari this worker is an event
+ * page the system suspends whenever the popup closes, which on iOS is the moment the user opens the
+ * verification tab. A Map is fine for the terminal state because it is read within a tick or two of
+ * being written, and because losing it is harmless: `oauth.poll` falls back to reading storage,
+ * where a success has already written real tokens and a cleared pending record. The worst a lost
+ * entry costs is that the popup learns "signed in" from `oauth.status` instead of from a 'done'.
+ */
+const finished = new Map<OAuthKind, OAuthLoginState>();
+
+/**
+ * Begin a device-code sign-in, and persist everything needed to finish it from cold.
+ *
+ * The write to storage happens BEFORE this returns, so by the time the popup has a user code to
+ * show — and certainly by the time it opens the verification tab and is dismissed — the flow is
+ * already recoverable by anything that can read storage.
+ */
 async function startLogin(kind: OAuthKind): Promise<OAuthLoginState> {
-  logins.get(kind)?.controller.abort();
-  const controller = new AbortController();
-  const entry = { state: { status: 'idle' } as OAuthLoginState, controller };
-  logins.set(kind, entry);
+  const pl = await import('@/lib/pendinglogin');
+  finished.delete(kind);
+  await pl.clearPending(kind);
   try {
     const o = await oauthModule();
     const login = kind === 'chatgpt' ? await o.startChatgptLogin() : await o.startXaiLogin();
-    entry.state = { status: 'pending', userCode: login.userCode, verificationUri: login.verificationUri, expiresAt: login.expiresAt };
-    void login
-      .poll(controller.signal)
-      .then(async (tokens) => {
-        await o.saveTokens(kind, tokens);
-        entry.state = { status: 'done' };
-      })
-      .catch((e: unknown) => {
-        if (controller.signal.aborted) return;
-        entry.state = { status: 'error', message: e instanceof Error ? e.message : String(e) };
-      });
+    const pending = pl.pendingFrom(kind, login, Date.now());
+    await pl.savePending(pending);
+    // Poll once in the background straight away, in case approval is instant, but do not make the
+    // caller wait for it: the user needs the code on screen now.
+    void stepLogin(kind).catch(() => {});
+    return { status: 'pending', userCode: pending.userCode, verificationUri: pending.verificationUri, expiresAt: pending.expiresAt };
   } catch (e) {
-    entry.state = { status: 'error', message: e instanceof Error ? e.message : String(e) };
+    const message = e instanceof Error ? e.message : String(e);
+    return { status: 'error', message };
   }
-  return entry.state;
+}
+
+/**
+ * Advance a pending sign-in by at most one poll, and report where it stands.
+ *
+ * This is the whole state machine's only moving part, and it is idempotent and re-entrant by
+ * design: it reads the record from storage, asks lib/pendinglogin whether a poll is due, does at
+ * most one, folds the answer back in and writes it. Called from the popup's 2s tick, from the
+ * worker waking, and from `startLogin` — at any rate, from any surface, after any number of
+ * suspends — it never polls faster than the vendor's interval, because "when did we last poll" is
+ * in the record rather than in a timer.
+ */
+async function stepLogin(kind: OAuthKind): Promise<OAuthLoginState> {
+  const pl = await import('@/lib/pendinglogin');
+  const now = Date.now();
+  const pending = await pl.loadPending(kind);
+  if (!pending) return finished.get(kind) ?? { status: 'idle' };
+
+  if (pl.isExpired(pending, now)) {
+    await pl.clearPending(kind);
+    const state: OAuthLoginState = { status: 'error', message: pl.expiredMessage(kind) };
+    finished.set(kind, state);
+    return state;
+  }
+
+  if (!pl.shouldPoll(pending, now)) {
+    return { status: 'pending', userCode: pending.userCode, verificationUri: pending.verificationUri, expiresAt: pending.expiresAt };
+  }
+
+  const o = await oauthModule();
+  const outcome = await o.pollOnce(pending);
+  const effect = pl.applyOutcome(pending, outcome, Date.now());
+  if (effect.store === 'keep') {
+    await pl.savePending(effect.next);
+    return { status: 'pending', userCode: effect.next.userCode, verificationUri: effect.next.verificationUri, expiresAt: effect.next.expiresAt };
+  }
+
+  await pl.clearPending(kind);
+  let state: OAuthLoginState;
+  switch (outcome.kind) {
+    case 'success':
+      await o.saveTokens(kind, outcome.tokens as Awaited<ReturnType<typeof o.getValidTokens>>);
+      state = { status: 'done' };
+      break;
+    case 'expired':
+      state = { status: 'error', message: pl.expiredMessage(kind) };
+      break;
+    case 'denied':
+    case 'fatal':
+      state = { status: 'error', message: outcome.message };
+      break;
+    default:
+      state = { status: 'idle' };
+  }
+  finished.set(kind, state);
+  return state;
+}
+
+/**
+ * Pick up any sign-in that was in flight when this worker last died.
+ *
+ * On Safari the worker is torn down and rebuilt constantly, and each rebuild runs the top level of
+ * this file. Stepping each pending vendor on startup means an approval that landed while nothing
+ * was running is noticed at the next wake — a message, a tab change, an alarm-less nudge of any
+ * kind — rather than waiting for the user to reopen the popup and look.
+ */
+async function resumePendingLogins(): Promise<void> {
+  if (SUBSCRIPTIONS_OFF) return;
+  const pl = await import('@/lib/pendinglogin');
+  const all = await pl.loadAllPending();
+  for (const kind of Object.keys(all) as OAuthKind[]) await stepLogin(kind).catch(() => {});
 }
 
 /**

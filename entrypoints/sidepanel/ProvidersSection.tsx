@@ -386,17 +386,71 @@ function ConnectionCard({
   );
 }
 
+/**
+ * Put the user code on the clipboard, and say whether it worked.
+ *
+ * `navigator.clipboard.writeText` is not something to assume in a Safari extension popup. WebKit
+ * gates it on a transient user activation AND on a secure context, and an extension page's
+ * `safari-web-extension://` origin has been treated inconsistently across versions; on iOS the
+ * whole Clipboard API has a history of resolving without writing anything. So the promise is
+ * awaited rather than fire-and-forgotten, and a rejection is a real answer rather than a shrug.
+ *
+ * The fallback is not another API: it is selecting the code, which is what a person does anyway,
+ * and which works in every engine with no permission at all. The caller shows the code in a
+ * read-only <input> for exactly this reason — `select()` on an input is reliable where
+ * `getSelection().addRange()` over a <div> is not.
+ */
+async function copyUserCode(code: string, field: HTMLInputElement | null): Promise<'copied' | 'selected'> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(code);
+      return 'copied';
+    }
+  } catch {
+    // Fall through: below is the version that needs nothing.
+  }
+  if (field) {
+    field.focus();
+    field.select();
+    field.setSelectionRange(0, code.length);
+  }
+  return 'selected';
+}
+
 function SubscriptionLogin({ kind }: { kind: OAuthKind }) {
   const [status, setStatus] = useState<{ signedIn: boolean; label?: string } | null>(null);
   const [login, setLogin] = useState<OAuthLoginState>({ status: 'idle' });
+  const [copied, setCopied] = useState<'copied' | 'selected' | null>(null);
   const timer = useRef<number | null>(null);
-  const vendor = kind === 'chatgpt' ? 'ChatGPT' : 'xAI';
+  const codeField = useRef<HTMLInputElement | null>(null);
+  const vendor = kind === 'chatgpt' ? 'ChatGPT' : 'SuperGrok';
 
   const refresh = () => rpc({ type: 'oauth.status', kind }).then(setStatus).catch(() => setStatus({ signedIn: false }));
+
+  /**
+   * On mount, ask what is already in flight.
+   *
+   * This is the fix for the iOS case that made the whole flow unusable: opening the verification
+   * tab dismisses the popup, so this component unmounts the moment the user needs the code, and
+   * the next time they open usermods it mounts fresh. It used to `setLogin({status:'idle'})` and
+   * draw "Sign in with ChatGPT" while a live, approvable code was sitting on the vendor's page.
+   * `oauth.restore` reads the persisted record instead, so the code comes back.
+   */
   useEffect(() => {
-    setLogin({ status: 'idle' });
+    let live = true;
+    setCopied(null);
     void refresh();
-    return () => stopPolling();
+    void rpc({ type: 'oauth.restore', kind })
+      .then((st) => {
+        if (!live) return;
+        setLogin(st);
+        if (st.status === 'pending') startPolling();
+      })
+      .catch(() => live && setLogin({ status: 'idle' }));
+    return () => {
+      live = false;
+      stopPolling();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kind]);
 
@@ -404,6 +458,15 @@ function SubscriptionLogin({ kind }: { kind: OAuthKind }) {
     if (timer.current != null) window.clearInterval(timer.current);
     timer.current = null;
   }
+  /**
+   * Drive the background's poll while this page is open.
+   *
+   * The background does not run its own timer: on Safari it is an event page that gets suspended,
+   * so a timer there is a promise the system does not keep. Each tick is an `oauth.poll`, which
+   * wakes the worker if it is asleep and does at most one vendor request — lib/pendinglogin.ts
+   * enforces the vendor's own interval from the stored record, so ticking at 2s here never polls
+   * the vendor faster than it asked.
+   */
   function startPolling() {
     stopPolling();
     timer.current = window.setInterval(async () => {
@@ -411,23 +474,39 @@ function SubscriptionLogin({ kind }: { kind: OAuthKind }) {
       setLogin(st);
       if (st.status === 'done' || st.status === 'error' || st.status === 'idle') {
         stopPolling();
-        if (st.status === 'idle') setLogin({ status: 'error', message: 'Sign-in was interrupted. Start again.' });
         void refresh();
       }
     }, 2000);
   }
+
+  /**
+   * Start a sign-in, then send the user to the vendor.
+   *
+   * The order matters and is the second half of the iOS fix. `oauth.start` does not resolve until
+   * the background has WRITTEN the pending record to storage, so by the time `tabs.create` runs —
+   * which on iOS closes this popup immediately — the code is recoverable and `oauth.restore` will
+   * hand it back. The code is also rendered before the tab opens, so it is on screen for the
+   * fraction of a second the user has, and is the first thing they see when they come back.
+   */
   async function start() {
+    setCopied(null);
     setLogin({ status: 'idle' });
     const st = await rpc({ type: 'oauth.start', kind }).catch((e) => ({ status: 'error', message: String(e) }) as OAuthLoginState);
     setLogin(st);
     if (st.status === 'pending') {
-      chrome.tabs.create({ url: st.verificationUri }).catch(() => {});
       startPolling();
+      // A paint before the popup can be dismissed, so the code is not merely "in state".
+      await new Promise((r) => requestAnimationFrame(() => r(null)));
+      chrome.tabs.create({ url: st.verificationUri }).catch(() => {});
     }
+  }
+  async function copy(code: string) {
+    setCopied(await copyUserCode(code, codeField.current));
   }
   async function cancel() {
     stopPolling();
     await rpc({ type: 'oauth.cancel', kind });
+    setCopied(null);
     setLogin({ status: 'idle' });
   }
   async function signOut() {
@@ -438,7 +517,7 @@ function SubscriptionLogin({ kind }: { kind: OAuthKind }) {
   }
 
   return (
-    <div className="card" style={{ marginBottom: 'var(--sp-3)' }}>
+    <div className="card subscription-login" data-testid="subscription-login" data-kind={kind} data-login={login.status}>
       {status?.signedIn ? (
         <div className="row">
           <span className="dot" aria-hidden="true" />
@@ -448,16 +527,43 @@ function SubscriptionLogin({ kind }: { kind: OAuthKind }) {
       ) : login.status === 'pending' ? (
         <>
           <div className="label">Enter this code on the {vendor} page</div>
-          <div className="mono" style={{ fontSize: 'var(--fs-stat)', letterSpacing: 2, textAlign: 'center', padding: 'var(--sp-2) 0', color: 'var(--accent-text)' }}>{login.userCode}</div>
-          <div className="row">
-            <button className="btn" onClick={() => chrome.tabs.create({ url: login.verificationUri })}>Open sign-in page</button>
-            <button className="btn" onClick={() => navigator.clipboard.writeText(login.userCode).catch(() => {})}>Copy code</button>
-            <span className="grow" />
-            <button className="btn" onClick={() => void cancel()}>Cancel</button>
+          {/*
+            A read-only input rather than a <div>, so "Copy code" has something to fall back to
+            when the Clipboard API is unavailable or silently refuses, which in a Safari extension
+            popup is a real possibility rather than a theoretical one. It is also why the code can
+            be selected by hand on a phone at all: a long-press on a <div> in a popup sheet is not
+            a dependable way to get a selection.
+          */}
+          <input
+            ref={codeField}
+            className="mono user-code"
+            data-testid="user-code"
+            readOnly
+            value={login.userCode}
+            aria-label={`Your ${vendor} sign-in code`}
+            onFocus={(e) => e.currentTarget.select()}
+          />
+          <div className="row subscription-actions">
+            <button className="btn primary" data-testid="open-verification" onClick={() => chrome.tabs.create({ url: login.verificationUri })}>
+              Open {vendor} page
+            </button>
+            <button className="btn" data-testid="copy-code" onClick={() => void copy(login.userCode)}>
+              {copied === 'copied' ? 'Copied' : copied === 'selected' ? 'Selected — hold to copy' : 'Copy code'}
+            </button>
+            <button className="btn" data-testid="cancel-signin" onClick={() => void cancel()}>Cancel</button>
           </div>
           <div className="row">
             <span className="dot running" aria-hidden="true" />
             <span className="label" style={{ marginBottom: 0 }}>waiting for approval</span>
+          </div>
+          {/*
+            Said explicitly because on iPhone the popup is a sheet and opening the page dismisses
+            it, which looks exactly like the sign-in being cancelled. It is not: the flow is in
+            storage and this card comes back to this state.
+          */}
+          <div className="muted" style={{ fontSize: 'var(--fs-meta)' }}>
+            Opening the page closes this panel. The code stays valid — reopen usermods and this card
+            comes back with it, and finishes as soon as you approve.
           </div>
         </>
       ) : (
@@ -465,9 +571,9 @@ function SubscriptionLogin({ kind }: { kind: OAuthKind }) {
           <div className="row">
             <span className="dot off" aria-hidden="true" />
             <span className="grow">Not signed in to {vendor}</span>
-            <button className="btn primary" onClick={() => void start()}>Sign in with {vendor}</button>
+            <button className="btn primary" data-testid="start-signin" onClick={() => void start()}>Sign in with {vendor}</button>
           </div>
-          {login.status === 'error' && <div className="error">▲ {login.message}</div>}
+          {login.status === 'error' && <div className="error" data-testid="signin-error">▲ {login.message}</div>}
           {login.status === 'done' && <div className="ok">● Signed in</div>}
           <div className="muted" style={{ fontSize: 'var(--fs-meta)' }}>
             {kind === 'chatgpt'
