@@ -9,7 +9,8 @@
 //   npm test
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { RESUME_NUDGE, runAgent, trimUnanswered, type AgentEnv, type AgentInput } from '../lib/agent/loop.ts';
+import { MIN_NARROWED_BUDGET, RESUME_NUDGE, runAgent, trimUnanswered, type AgentEnv, type AgentInput } from '../lib/agent/loop.ts';
+import { estimateTokens } from '../lib/agent/compact.ts';
 import { ProviderError, streamIncomplete } from '../lib/providers/errors.ts';
 import { toAnthropicMessages } from '../lib/providers/anthropic.ts';
 import { toOpenAIMessages } from '../lib/providers/openai.ts';
@@ -334,4 +335,116 @@ test('a message queued during the run still joins the conversation after a retry
   assert.ok(textOf(requests[2]![requests[2]!.length - 1]!).includes('QUEUED-MARKER'));
   assert.deepEqual(events.filter((e) => e.type === 'accepted').map((e) => (e.type === 'accepted' ? e.id : '')), ['t1', 'q1']);
   assertValid(out.messages, 'with a queued message');
+});
+
+// ---------------------------------------------------------------------------
+// "It breaks in long sessions": a window smaller than the budget
+// ---------------------------------------------------------------------------
+//
+// contextBudget is one number for every provider and defaults to 120,000 tokens; compaction first
+// runs at 70% of it. Point a chat at a model with a 32k window and the history overflows that
+// window while the compactor is still waiting for 84,000 tokens — so the provider answers 400 and
+// the run ends, with the user's turn lost and nothing saying why.
+//
+// The loop now treats that one 400 as retryable AFTER compacting, once.
+
+/** A history long enough to be worth compacting: `turns` user turns, each with a bulky tool round. */
+function longHistory(turns: number): Msg[] {
+  const out: Msg[] = [];
+  for (let i = 0; i < turns; i++) {
+    out.push({ role: 'user', content: [{ type: 'text', text: `turn ${i}: ${'ask '.repeat(200)}` }] });
+    out.push({ role: 'assistant', content: [{ type: 'tool_call', id: `h${i}`, name: 'get_page', input: {} }] });
+    out.push({
+      role: 'user',
+      content: [{ type: 'tool_result', toolCallId: `h${i}`, content: [{ type: 'text', text: `<main>${'page '.repeat(2000)}</main>` }] }],
+    });
+    out.push({ role: 'assistant', content: [{ type: 'text', text: `reply ${i}: ${'words '.repeat(200)}` }] });
+  }
+  return out;
+}
+
+const overflow = () =>
+  new ProviderError(
+    "400 Bad Request: {\"error\":{\"message\":\"This model's maximum context length is 8192 tokens. However, your messages resulted in 40000 tokens.\",\"code\":\"context_length_exceeded\"}}",
+    { kind: 'http', status: 400 },
+  );
+
+test('a provider whose window is smaller than the budget: the turn survives one compaction', async () => {
+  // THE BUG. Before this, the 400 ended the run — classifyError says a 400 is not the weather, and
+  // it is right that the SAME request is not worth sending again. A compacted one is a different
+  // request, and that is the distinction the loop now makes.
+  const { provider, requests } = fakeProvider([
+    { fail: overflow() },
+    reply('Now it fits.'),
+  ]);
+  const { args, events } = input(provider, fakeEnv().env, {
+    history: longHistory(12),
+    // The budget the user set: far above what this model actually accepts, which is the whole
+    // point — it is one number for every provider and this model is the small one.
+    settings: { ...SETTINGS, contextBudget: 500_000 } as Settings,
+  });
+  const out = await runAgent(args);
+
+  assert.equal(out.failure, undefined, 'the run died on a context overflow instead of compacting');
+  assert.equal(requests.length, 2, 'exactly one retry, after compacting');
+  const first = estimateTokens(requests[0]!);
+  const second = estimateTokens(requests[1]!);
+  assert.ok(second < first, `the retry resent the same size (${first} -> ${second})`);
+  assert.ok(events.some((e) => e.type === 'compacted'), 'the transcript should show the compaction that saved the turn');
+  const note = events.find((e) => e.type === 'note');
+  assert.ok(note && note.type === 'note' && /context window is smaller/.test(note.text), 'the user is told why');
+  assertValid(out.messages, 'after a context overflow');
+});
+
+test('the narrowed budget is reported so the next turn starts from it', async () => {
+  // Recovering is not enough on its own: without remembering, every turn on this model pays for a
+  // failed request and a compaction the user watches happen.
+  const learned: number[] = [];
+  const { provider } = fakeProvider([{ fail: overflow() }, reply('Fits now.')]);
+  const { args } = input(provider, fakeEnv().env, {
+    history: longHistory(12),
+    settings: { ...SETTINGS, contextBudget: 500_000 } as Settings,
+    onContextOverflow: (b) => void learned.push(b),
+  });
+  await runAgent(args);
+  assert.equal(learned.length, 1, 'the overflow should be reported exactly once');
+  assert.ok(learned[0]! >= MIN_NARROWED_BUDGET, 'a learned budget below the floor is not usable');
+  assert.ok(learned[0]! < 500_000, 'the learned budget must be smaller than the one that overflowed');
+});
+
+test('a second overflow after compacting is a real failure, not an endless shrink', async () => {
+  // One retry, not a loop. If it still does not fit once compaction has been told the real size,
+  // the history is not the problem, and trying again is only a second bill.
+  const { provider, requests } = fakeProvider([{ fail: overflow() }, { fail: overflow() }]);
+  const { args } = input(provider, fakeEnv().env, {
+    history: longHistory(12),
+    settings: { ...SETTINGS, contextBudget: 500_000 } as Settings,
+  });
+  const out = await runAgent(args);
+  assert.ok(out.failure, 'a history that does not fit even compacted has to be reported');
+  assert.equal(requests.length, 2, 'it must not keep compacting and resending');
+  assert.ok(/context length/i.test(out.failure!.message), "the provider's own words reach the user");
+});
+
+test('a history with nothing left to compact fails rather than resending the same request', async () => {
+  // A single short turn that a (broken or tiny) endpoint calls too long. There is nothing to cut,
+  // so compact() returns no steps — and resending an identical request would be pure waste.
+  const { provider, requests } = fakeProvider([{ fail: overflow() }]);
+  const { args } = input(provider, fakeEnv().env, { history: [] });
+  const out = await runAgent(args);
+  assert.ok(out.failure);
+  assert.equal(requests.length, 1, 'nothing was compacted, so nothing should have been resent');
+});
+
+test('an ordinary 400 still ends the run without compacting anything', async () => {
+  // The recovery must be narrow. A bad key or a missing model is not fixed by throwing away the
+  // conversation, and doing so would destroy context for nothing.
+  const { provider, requests } = fakeProvider([
+    { fail: new ProviderError('401 Unauthorized: invalid api key', { kind: 'http', status: 401 }) },
+  ]);
+  const { args, events } = input(provider, fakeEnv().env, { history: longHistory(12) });
+  const out = await runAgent(args);
+  assert.ok(out.failure);
+  assert.equal(requests.length, 1);
+  assert.equal(events.some((e) => e.type === 'compacted'), false, 'a bad key must not trigger compaction');
 });

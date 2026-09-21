@@ -88,6 +88,80 @@ function classifyStatus(status: number | undefined, retryAfterMs: number | undef
 }
 
 // ---------------------------------------------------------------------------
+// Context-length failures
+// ---------------------------------------------------------------------------
+//
+// "It breaks in long sessions." One proven way it does: contextBudget defaults to 120,000 tokens
+// for EVERY provider, and the Settings screen says so outright ("One budget for every provider: set
+// it for the smallest context window you use"). Point a chat at a model with a 32k window and the
+// history sails past that window long before it reaches 70% of 120,000, which is where compaction
+// first runs. The provider answers 400, classifyError says "not the weather", and the run dies —
+// with the compactor watching, holding a history it was never asked to shrink.
+//
+// A context overflow is not retryable as-is (sending the same thing again gets the same 400), but
+// it IS retryable after compaction, which is a different request. That is a third category, and
+// the loop acts on it: compact hard, send once more, remember a smaller budget for this connection
+// and model, and say so in the transcript.
+//
+// It has to be recognised from the message, because there is no status or code that means it
+// everywhere. Every phrasing below is one a real backend sends:
+//
+//   OpenAI / OpenAI-compatible  "This model's maximum context length is 8192 tokens. However, your
+//                               messages resulted in 9101 tokens", code "context_length_exceeded"
+//   Azure OpenAI                "maximum context length", code "context_length_exceeded"
+//   Anthropic                   "prompt is too long: 215000 tokens > 200000 maximum"
+//   llama.cpp / LM Studio       "the request exceeds the available context size", "context window"
+//   Ollama                      "maximum context length", "too many tokens"
+//   vLLM / TGI                  "longer than the maximum ... length", "input validation error:
+//                               `inputs` must have less than N tokens"
+//   Google / Gemini-compatible  "input token count exceeds the maximum"
+//
+// Deliberately NOT matched: "max_tokens" on its own, which is about the REPLY length and is a
+// setting, not an overflow; and "rate limit ... tokens per minute", which is a 429 and already has
+// its own handling. Both would send the loop compacting for no reason.
+const CONTEXT_LENGTH_MESSAGE = new RegExp(
+  [
+    'context[ _]?length[ _]?exceeded',
+    'maximum context length',
+    "model's maximum context",
+    'context window',
+    'exceeds? the available context',
+    'prompt is too long',
+    'too many tokens',
+    'reduce the length of the messages',
+    'input token count exceeds',
+    'longer than the maximum',
+    'must have less than \\d+ tokens',
+    'exceeds the maximum (?:allowed )?(?:input |prompt )?(?:tokens|length)',
+  ].join('|'),
+  'i',
+);
+
+/** The phrasings that LOOK like an overflow but are about something else. Checked first. */
+const NOT_CONTEXT_OVERFLOW = /rate[ _]?limit|tokens per (?:minute|day)|max_tokens must|max_completion_tokens/i;
+
+/**
+ * Does this error mean "your conversation is longer than this model's window"?
+ *
+ * Pure, and message-based by necessity — see the note above. Only ever consulted for a failure that
+ * is NOT otherwise retryable, so a 429 whose body happens to mention a context window is still
+ * handled as a rate limit.
+ */
+export function isContextLengthError(e: unknown): boolean {
+  const status = e instanceof ProviderError ? e.status : (e as { status?: unknown } | null)?.status;
+  // A 5xx is the server falling over, whatever its body says; an overflow is always the request's
+  // own fault, which providers report as a 4xx (400 almost everywhere, 413 on a few gateways).
+  if (typeof status === 'number' && (status < 400 || status >= 500)) return false;
+  let cur: unknown = e;
+  for (let depth = 0; depth < 4 && cur instanceof Error; depth++) {
+    const msg = cur.message;
+    if (CONTEXT_LENGTH_MESSAGE.test(msg) && !NOT_CONTEXT_OVERFLOW.test(msg)) return true;
+    cur = (cur as { cause?: unknown }).cause;
+  }
+  return false;
+}
+
+// ---------------------------------------------------------------------------
 // Policy
 // ---------------------------------------------------------------------------
 

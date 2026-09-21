@@ -14,7 +14,8 @@ import { shouldUpdate } from '@/lib/version';
 import { loadMods, modFromProposal, modFromSource, parseHeader, previewFromSource, upsertMod, deleteMod, saveMods } from '@/lib/mods';
 import { appendTurn, archiveChat, bulkChats, countTurns, createChat, deleteChat, getChat, hostFromUrl, isArchived, listChats, loadItems, loadMessages, markTitleRefreshed, renameChat, saveItems, saveMessages, setChatArtifact, setChatModel, setModelTitle, touchChat } from '@/lib/chats';
 import { loadRuns, markInterrupted, pruneRuns, resumableRuns, saveRuns, type RunMap, type RunRecord } from '@/lib/runstate';
-import { isTombstoned } from '@/lib/storagequeue';
+import { isTombstoned, withKey } from '@/lib/storagequeue';
+import { CONTEXT_LIMITS_KEY, effectiveBudget, limitKey, loadContextLimits, rememberLimit, saveContextLimits } from '@/lib/contextlimits';
 import { reduceItems } from '@/lib/transcript';
 import { addVersion, adoptMod, currentVersion, detachFromMod, draftBlock, fromMod, loadArtifact, recordProposal, rollbackTo, saveArtifact, toProposal, toSource, type Artifact } from '@/lib/artifact';
 import { draftStanding, duplicateOf, editModPlan, likelyUrlFor, modsBlock, modsForUrl, openModDecision, runsOnPage } from '@/lib/modmatch';
@@ -42,6 +43,7 @@ import {
   type ModelSelection,
 } from '@/lib/connections';
 import { actionClickPlan, resolveScope, sidePanelAvailable, windowPanelPlan } from '@/lib/sidepanel';
+import { DEFAULT_CONTEXT_BUDGET } from '@/lib/types';
 import type { SidePanelScope } from '@/lib/types';
 import { looksLikeZip, parseTampermonkeyJson, parseTampermonkeyZipEntries, type TmScript } from '@/lib/tampermonkey';
 import type { AgentEvent, AgentEventBody, ChatItem, ContentRequest, Mod, ModProposal, Msg, Part, Settings, UserTurn } from '@/lib/types';
@@ -444,6 +446,14 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
     // reported, never replaced with another provider.
     const resolved = await resolveChatModel(chatId);
     settings = resolved.settings;
+    // A context budget this model has already been shown to refuse (lib/contextlimits.ts). The
+    // setting is one number for every provider, so a model with a small window would otherwise
+    // rediscover its own limit — a failed request and a compaction the user watches — on every
+    // single turn. Only ever narrows: a user asking for less than the learned number still gets it.
+    const budgetKey = limitKey(resolved.selection.connectionId, resolved.selection.model);
+    const learnedLimits = await loadContextLimits();
+    const budget = effectiveBudget(settings.contextBudget ?? DEFAULT_CONTEXT_BUDGET, learnedLimits, budgetKey);
+    if (budget !== settings.contextBudget) settings = { ...settings, contextBudget: budget };
     post({ type: 'model', connectionId: resolved.selection.connectionId, label: resolved.selection.label ?? '', model: resolved.selection.model });
     history = await loadMessages(chatId);
     if (!turn && !history.length) throw new Error('There is nothing to resume in this chat. Send your message again.');
@@ -498,6 +508,16 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
       // version even if this one later dies mid-run, which is the whole point: the chat that was
       // too big to send must not stay too big to send.
       onCompacted: (msgs) => saveMessages(chatId, msgs),
+      // The provider refused the history for being too long and the loop compacted to fit. Writing
+      // that number down against this connection and model is what stops the next turn walking
+      // into the same wall. Serialised on the key, since two chats on the same model can both
+      // discover it at once.
+      onContextOverflow: (learned) =>
+        withKey(CONTEXT_LIMITS_KEY, async () => {
+          const current = await loadContextLimits();
+          const next = rememberLimit(current, budgetKey, learned);
+          if (next !== current) await saveContextLimits(next);
+        }).catch(() => {}),
       // The conversation is written back after every completed step, not only at the end. If the
       // worker is evicted half-way through a twenty-step run, nineteen steps are on disk.
       onCheckpoint: async (msgs) => {
