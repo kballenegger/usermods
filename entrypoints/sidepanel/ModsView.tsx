@@ -1,12 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { summarizeImport } from '@/lib/importreport';
 import { rpc } from '@/lib/rpc';
 import type { Mod, ScriptPreview } from '@/lib/types';
 import { HANDOFF_KEY, type ChatHandoff } from '@/lib/dashboard';
 import { urlMatches } from '@/lib/mods';
-import { EditModIcon } from './components/icons';
+import { DeleteIcon, EditModIcon, MoreIcon } from './components/icons';
 import { InstallPreview } from './components/InstallPreview';
+import { Sheet, SheetRow } from './components/Sheet';
 import { TampermonkeyCard } from './components/TampermonkeyCard';
+import { useShell } from './shell';
 
 /** A script waiting on the user's confirmation, plus where it came from. */
 interface Pending {
@@ -218,6 +220,18 @@ function ModCard({
   onUpdate: (m: Mod) => void;
   onEdit: (m: Mod) => void;
 }) {
+  /**
+   * On a phone (the compact Safari popup) five buttons in a row is a row that wraps to three lines
+   * of 44px targets under every card. There the foot keeps the switch and the one verb the card is
+   * for, and the rest go behind "more", in a sheet named for the mod. Same five actions either way.
+   */
+  const { compact } = useShell();
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreRef = useRef<HTMLButtonElement>(null);
+  const fromSheet = (fn: (m: Mod) => void) => () => {
+    setMoreOpen(false);
+    fn(m);
+  };
   // An enabled mod is alive: the toggle at the foot of the card carries the volt. A disabled one
   // recedes rather than being decorated with an "off" marker. How it recedes is the theme's
   // business (styles.css): dark can simply dim it, light has to keep the text legible.
@@ -242,7 +256,7 @@ function ModCard({
         <summary>▼ code</summary>
         <pre>{m.source}</pre>
       </details>
-      <div className="row">
+      <div className={compact ? 'row mod-foot' : 'row'}>
         <label className="toggle">
           <input type="checkbox" checked={m.enabled} onChange={() => onToggle(m)} /> {m.enabled ? 'on' : 'off'}
         </label>
@@ -261,11 +275,40 @@ function ModCard({
           <EditModIcon />
           <span className="action-label">Edit in chat</span>
         </button>
-        <button className="btn" onClick={() => onTry(m)}>Run once</button>
-        <button className="btn" onClick={() => onExport(m)}>Export</button>
-        {m.downloadUrl && <button className="btn" onClick={() => onUpdate(m)}>Update</button>}
-        <button className="btn danger" onClick={() => onRemove(m)}>Delete</button>
+        {compact ? (
+          <button
+            ref={moreRef}
+            type="button"
+            className="btn mod-more"
+            data-action="mod-more"
+            aria-haspopup="dialog"
+            aria-expanded={moreOpen}
+            aria-label={`More actions for “${m.name}”: run once, export${m.downloadUrl ? ', update' : ''}, delete`}
+            onClick={() => setMoreOpen(true)}
+          >
+            <MoreIcon />
+          </button>
+        ) : (
+          <>
+            <button className="btn" onClick={() => onTry(m)}>Run once</button>
+            <button className="btn" onClick={() => onExport(m)}>Export</button>
+            {m.downloadUrl && <button className="btn" onClick={() => onUpdate(m)}>Update</button>}
+            <button className="btn danger" onClick={() => onRemove(m)}>Delete</button>
+          </>
+        )}
       </div>
+      {compact && moreOpen && (
+        <Sheet title={m.name} onClose={() => setMoreOpen(false)} returnFocus={moreRef} testId="sheet-mod-actions">
+          <div className="sheet-list">
+            <SheetRow label="Run once" action="mod-try" onClick={fromSheet(onTry)} />
+            <SheetRow label="Export" value=".user.js" action="mod-export" onClick={fromSheet(onExport)} />
+            {m.downloadUrl && <SheetRow label="Update" value="from its download URL" action="mod-update" onClick={fromSheet(onUpdate)} />}
+          </div>
+          <div className="sheet-list">
+            <SheetRow label="Delete" icon={<DeleteIcon />} action="mod-delete" danger onClick={fromSheet(onRemove)} />
+          </div>
+        </Sheet>
+      )}
     </div>
   );
 }

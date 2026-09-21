@@ -1,8 +1,14 @@
 # Browser support: Firefox and Safari
 
-usermods ships on Chrome today (manifest requires **Chrome 135+**, for the "Allow User Scripts"
-toggle `chrome.userScripts` needs). This is a from-primary-sources look at what shipping on Firefox
-and Safari would actually take, API by API, plus effort estimates and a verdict for each.
+usermods ships on Chrome (manifest requires **Chrome 135+**, for the "Allow User Scripts" toggle
+`chrome.userScripts` needs) and has a Safari build for iOS and macOS. That build has been run in an
+iPhone 15 iOS 17.5 simulator; no physical iPhone or iPad run is claimed here, and no run as a loaded
+Safari extension on macOS is claimed either. This is a from-primary-sources look at what shipping on
+Firefox and Safari takes, API by API, plus effort estimates and a verdict for each.
+
+The Safari port is built. Read [docs/safari.md](safari.md) for how it works, how to build and install
+it, what its isolation guarantees are and what it cannot do. This page is the research the port came
+out of; it is kept as written, with the Safari verdict updated to match what shipped.
 
 Method: `grep -rn 'chrome\.' entrypoints/ lib/` for the exact call sites, then each API's support,
 minimum version and behavioral differences checked against MDN's webextensions browser-compat-data
@@ -126,10 +132,11 @@ Safari has neither API; a Safari build would need the toolbar-popup pattern inst
 - [MDN: `declarativeNetRequest`](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/declarativeNetRequest) · [MDN: `declarativeNetRequest.updateDynamicRules`](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/declarativeNetRequest/updateDynamicRules)
 
 usermods' one rule (`installUserJsRedirect()` in `background.ts`: redirect `*.user.js` navigations to
-`install.html#<url>` via `regexFilter` + `action.redirect.regexSubstitution`) is supported as-is on
-both Firefox and Safari at the versions above — regex redirect rules, `resourceTypes: ['main_frame']`
-and dynamic rule updates are all covered. This is the one API in the list that needs literally no
-porting work.
+`install.html#<url>` via `regexFilter` + `action.redirect.regexSubstitution`) works as-is in Chrome and
+Firefox. Safari accepts and stores the rule but iOS 17.5 did not apply it in the simulator. Safari builds
+therefore also register `watchUserJsNavigations()`, which watches the tabs API and sends the same
+navigation to the install page after it starts. The fallback is covered by the simulator evidence in
+[docs/safari.md](safari.md).
 
 ### `scripting.executeScript` (with `files`)
 
@@ -251,58 +258,59 @@ integration harness for `chrome.userScripts` and none is planned by this doc).
 
 ## Safari verdict
 
-**Not feasible without rearchitecting the mod-execution layer, and the App Store path adds a second,
-independent blocker.** Two separate problems, either one sufficient on its own:
+**Updated after the port.** This section originally read "not feasible without rearchitecting the
+mod-execution layer". The first half of that was right and the rearchitecture has since been done:
+usermods has a Safari build that runs mods in Mobile Safari, verified on the iOS 17.5 simulator and
+not yet on a physical device. The same app and extension build for macOS from the same sources. [docs/safari.md](safari.md) documents the build, the isolation
+guarantees, the limitations and exactly what was observed. The API research below is unchanged and still accurate,
+because none of it was wrong. What changed is the conclusion drawn from it.
 
-**1. No `userScripts` API — this is the entire execution model, not one feature.** Safari Web
-Extensions (WebKit's WebExtensions implementation) have never shipped `browser.userScripts`, legacy
-or MV3 (confirmed via MDN compat data: `version_added: false` across every `userScripts` interface
-and member, and via how [quoid/userscripts](https://github.com/quoid/userscripts) — the
-most-complete existing Safari userscript manager — is built: its own injection plumbing, not a
-`browser.userScripts` primitive, and it documents that Safari content scripts cannot bypass page CSP,
-something Chrome/Firefox's isolated `USER_SCRIPT` world sidesteps). usermods' entire mod lifecycle —
-`chrome.userScripts.register()` for saved mods that survive worker restarts and re-run on every
-matching page load, `chrome.userScripts.execute()` for the Try flow, `configureWorld({messaging:
-true})` plus `onUserScriptMessage`/ports for the GM API bridge — has no Safari equivalent to swap in.
-Re-architecting to Safari's actual primitives means: registering mods as `scripting.executeScript()`
-calls with `world: 'MAIN'`/`ISOLATED` (supported since Safari 15.4) fired from a persistent listener
-matching the mod's `@match` patterns yourself (Safari has `scripting.registerContentScripts` since
-16.4, but that's static per-extension-update registration, not the dynamic per-mod register/unregister
-usermods does today at runtime from LLM output) rather than one declarative `register()` call; losing
-the isolated-world CSP bypass `userScripts` provides, which several real userscripts depend on;
-rebuilding the entire GM API message bridge (`lib/gm.ts`) on `scripting`'s messaging model instead of
-`onUserScriptMessage`'s dedicated channel. This is a rewrite of the code-execution core, not a port —
-every other API gap (`sidePanel`, `declarativeNetRequest`, `storage.session`) is either irrelevant
-(Safari supports `declarativeNetRequest`/`scripting`/`storage.session` fine, per the tables above) or
-a UI-shell swap (`sidePanel` → Safari's toolbar popup, since Safari has no sidebar API for extensions
-either); `userScripts` is the one piece with no substitute primitive to swap toward.
+Two separate problems were identified. The first is solved. The second is still open, and it is a
+distribution question rather than an engineering one.
 
-**2. App Store review: Guideline 2.5.2 targets exactly what usermods does.** Apple's App Review
-Guideline 2.5.2 blocks apps (and their extensions) from downloading, installing, or executing code
-that "introduces or changes features or functionality," with a narrow carve-out for educational
-code-execution apps that make all such code "completely viewable and editable by the user"
-([App Review Guidelines](https://developer.apple.com/app-store/review/guidelines/)). usermods' entire
-premise — an LLM writes a script live and the extension runs it, first as a Try, then registered
-permanently on Save — is close to the paradigm case this guideline exists to catch, whether or not
-"educational" framing could plausibly apply (it likely can't: usermods isn't teaching the user to
-code, it's writing code *for* them). This is a distribution-policy risk independent of the API gap
-above: even a from-scratch Safari port using only `scripting.executeScript` (no `userScripts`)
-still runs code an LLM generated at runtime, which is the behavior 2.5.2 is written to prevent,
-not the specific API used to run it.
+**1. No `userScripts` API. Solved by writing a second execution engine.** The finding stands: Safari
+Web Extensions have never shipped `browser.userScripts` in any form, so there was nothing to port to
+and the entire mod lifecycle had to be rebuilt on Safari's own primitives. That is what `lib/exec/`
+is. One content script declared on `<all_urls>` at `document_start` in all frames asks the background
+which mods belong to its document, and the background answers with code built and bound to that
+frame; the runner honours each mod's `@run-at` itself, because Safari always injects immediately.
+`scripting.executeScript` turned out to be the wrong primitive for this, not the right one: it takes
+`files` or a serialized `func` and never a code string, so it cannot run source a model just wrote.
 
-**What Safari App Store distribution requires, if pursued anyway:** an active Apple Developer
-Program membership (paid, annual), a macOS build via Xcode's Safari Web Extension converter, and
-App Store / Notarization review under the Guidelines above — all before the `userScripts` rewrite is
-even in scope. Apple's Safari Web Extension format itself (manifest + WebExtension APIs, wrapped in a
-native app shell, `safari-web-extension-converter`) is otherwise close to Chrome/Firefox's, so the
-packaging mechanics aren't the blocker; the review guideline is.
+Two consequences were predicted here and both are real. The isolated-world CSP bypass that
+`userScripts` gives elsewhere is gone, so a `@grant none` mod fails on CSP-strict sites and usermods
+reports it blocked rather than rewriting the site's CSP. And the GM bridge had to be rebuilt, because
+GM traffic now shares `runtime.onMessage` with every other extension surface; a self-declared `modId`
+on that channel would be a forgeable claim, so identity moved to a capability token the background
+mints per mod per frame (`lib/exec/grants.ts`). The `sidePanel` gap was the UI-shell swap this section
+predicted: the popup is the whole of usermods on iOS, which turned out to be a genuine mobile UI
+project rather than a swap.
 
-**Bottom line:** no realistic effort estimate closes this — it's not a matter of engineering time. A
-Safari build is blocked first by an execution model that has no equivalent to port to, and second,
-independently, by an App Store review guideline aimed squarely at what the extension does. Either one
-alone would justify leaving Safari off the roadmap; both together make it not worth scoping further
-unless Apple ships a `userScripts`-equivalent API and revises 2.5.2's applicability to
-developer-facing tools, neither of which this research found any signal of.
+**2. App Store review: guideline 2.5.2 still applies, and nothing here tests it.** Apple's guideline
+2.5.2 blocks apps and their extensions from downloading, installing or executing code that
+"introduces or changes features or functionality", with a narrow carve-out for educational
+code-execution apps that keep all such code viewable and editable by the user
+([App Review Guidelines](https://developer.apple.com/app-store/review/guidelines/)). A model writing
+a script that the extension then runs is close to the case that guideline exists to catch, and the
+educational framing probably does not apply: usermods writes code for the user rather than teaching
+them to write it. This is independent of which API runs the code, so the rewrite above does not touch
+it.
+
+What that means in practice: the simulator build and install path is documented and was exercised on an
+iPhone 15 simulator. No physical-device build or install was run for this task, and App Store
+distribution has not been attempted. A physical-device build still needs a team and signing setup, then
+real-device validation before anyone can claim it works there. Apple's format is close to Chrome's (a
+WebExtension bundled as an `.appex` inside a host app) and the repository carries a hand-written Xcode
+project that builds it.
+
+**3. The Mac has the same signing problem in a smaller shape.** macOS will run an ad-hoc signed app,
+so `node scripts/safari-xcode.mjs mac` produces a sandboxed, hardened, launchable `usermods.app` with
+the extension inside it. Safari will not *list* that extension until two Safari-wide developer
+settings are on: **Settings > Advanced > Show features for web developers**, then **Develop > Allow
+unsigned extensions**, which resets when Safari quits. That is a person's decision about their whole
+browser, not something a build script should make for them, so the Mac evidence stops at build,
+signature, launch and popup layout. A Developer ID signature removes the requirement; App Store
+distribution runs into guideline 2.5.2 above, which is the same wall on both platforms.
 
 ---
 

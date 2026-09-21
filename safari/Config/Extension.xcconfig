@@ -1,0 +1,14 @@
+#include "Shared.xcconfig"
+
+// The extension itself: a thin native wrapper whose bundle holds the built web extension. The
+// identifier has to be prefixed by the app's, which is why it reads from the same variable.
+PRODUCT_NAME = usermods-extension
+PRODUCT_BUNDLE_IDENTIFIER = $(USERMODS_BUNDLE_ID).extension
+INFOPLIST_FILE = Extension/Info.plist
+SKIP_INSTALL = YES
+
+// The Info.plist is the same on both platforms: NSExtensionPointIdentifier is what makes the bundle
+// a Safari web extension, and WebKit reads it the same way on iOS and macOS. Only the entitlements
+// differ, because only macOS has a sandbox to declare.
+CODE_SIGN_ENTITLEMENTS[sdk=macosx*] = Extension/usermods-extension-macOS.entitlements
+ENABLE_HARDENED_RUNTIME[sdk=macosx*] = YES

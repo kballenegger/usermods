@@ -1,11 +1,13 @@
 import { runAgent, type AgentEnv } from '@/lib/agent/loop';
 import { RETRY_POLICY_KEY, resolvePolicy } from '@/lib/agent/retry';
 import { isDomCondition, urlMatches, type WaitOutcome, type WaitSpec } from '@/lib/agent/wait';
-import { buildRegisteredCode, gmValuesKey, loadGmValues, type GmMessage } from '@/lib/gm';
+import { gmValuesKey, loadGmValues, type GmMessage } from '@/lib/gm';
+import { createExecAdapter } from '@/lib/exec/adapter';
+import { wrapForExecution } from '@/lib/exec/wrap';
 import { checkConnect, connectOf } from '@/lib/connect';
 import { dependenciesChanged, fetchText, previewFromUrl, reparseEditedSource, resolveDependencies, toBase64 } from '@/lib/install';
 import { UPDATED_MARK } from '@/lib/importreport';
-import { scriptIdentity } from '@/lib/installurl';
+import { installPageUrl, isUserScriptUrl, scriptIdentity } from '@/lib/installurl';
 import { resyncPlan } from '@/lib/resync';
 import { mapStack, prepareRunScript, renderRunResult, type RunResult } from '@/lib/runscript';
 import { shouldUpdate } from '@/lib/version';
@@ -19,7 +21,7 @@ import { buildTitleInput, completedTurns, sanitizeTitle, titleDecision, TITLE_SY
 import { createProvider } from '@/lib/providers';
 import { VISION_FALLBACK_PANEL_NOTE, createVisionMemory, resolveImagesSetting, visionKeyFor } from '@/lib/providers/vision';
 import { MAX_EDGE, SCREENSHOT_CAPTURE_FORMAT, SCREENSHOT_QUALITY, fitWithin, parseDataUrl } from '@/lib/images';
-import { STORE_BUILD, isSubscriptionProvider, unavailableProviderMessage } from '@/lib/buildflags';
+import { SAFARI_BUILD, SUBSCRIPTIONS_OFF, isSubscriptionProvider, unavailableProviderMessage } from '@/lib/buildflags';
 import { listFailureMessage, listWithFallback, modelsRequest, parseModelIds, type ModelListResult, type ModelListTarget } from '@/lib/modellist';
 import type { OAuthKind } from '@/lib/oauth';
 import type { AgentAttachState, AgentPortRequest, OAuthLoginState, RpcRequest } from '@/lib/rpc';
@@ -38,12 +40,33 @@ import {
   type ModelCache,
   type ModelSelection,
 } from '@/lib/connections';
-import { actionClickPlan, resolveScope, windowPanelPlan } from '@/lib/sidepanel';
+import { actionClickPlan, resolveScope, sidePanelAvailable, windowPanelPlan } from '@/lib/sidepanel';
 import type { SidePanelScope } from '@/lib/types';
 import { looksLikeZip, parseTampermonkeyJson, parseTampermonkeyZipEntries, type TmScript } from '@/lib/tampermonkey';
 import type { AgentEvent, AgentEventBody, ChatItem, ContentRequest, Mod, ModProposal, Msg, Part, Settings, UserTurn } from '@/lib/types';
 
+/**
+ * The execution engine for this browser, picked once.
+ *
+ * Chrome and Firefox get `chrome.userScripts`; Safari gets the content-script runner. Everything
+ * below talks to the adapter rather than to either API directly, so the difference lives in one
+ * file (lib/exec/adapter.ts) instead of being spread through every call site.
+ */
+const exec = createExecAdapter({
+  handleGm,
+  loadMods,
+  loadGmValues,
+  onBlocked: (report) => {
+    // A mod that a page refused to run is a failure the user can act on (switch the mod out of the
+    // page world), so it is named in the log rather than dropped.
+    console.warn(`[usermods] ${report.modId} was blocked on ${report.url}: ${report.reason}`);
+  },
+});
+
 export default defineBackground(() => {
+  // Before anything can await: MV3 only wakes a sleeping worker for listeners registered here.
+  exec.install();
+
   // The window-level panel is configured from the stored scope, not unconditionally opened on every
   // tab: see applyPanelScope below and lib/sidepanel.ts for the two layers Chrome gives us.
   void applyPanelScope();
@@ -67,6 +90,9 @@ export default defineBackground(() => {
    * a click reaching this listener is already evidence the scope is 'tab'.
    */
   chrome.action.onClicked.addListener((tab) => {
+    // With a popup in the manifest (Safari) the click opens the popup and this never fires; the
+    // guard is for the case where a build has neither.
+    if (!sidePanelAvailable()) return;
     const plan = actionClickPlan(panelScope, tab.id);
     if (!plan.setOptions || !plan.open) return;
     // No await between these two: setOptions is fire-and-forget so open() stays in the gesture.
@@ -87,16 +113,14 @@ export default defineBackground(() => {
   chrome.runtime.onInstalled.addListener(() => void bootstrap());
   chrome.runtime.onStartup.addListener(() => void bootstrap());
 
-  // Registered mods call back here for GM_setValue, GM_xmlhttpRequest and friends. The listener is
-  // permanent (not per-run) so it survives the worker sleeping between page loads.
-  chrome.runtime.onUserScriptMessage.addListener((msg: unknown, sender: chrome.runtime.MessageSender, sendResponse: (r?: unknown) => void) => {
-    const m = msg as Partial<GmMessage> | null;
-    if (!m || m.__usermods !== true || typeof m.modId !== 'string' || typeof m.type !== 'string') return false;
-    handleGm(m as GmMessage, sender)
-      .then((result) => sendResponse({ result }))
-      .catch((e: unknown) => sendResponse({ error: e instanceof Error ? e.message : String(e) }));
-    return true;
-  });
+  watchUserJsNavigations();
+
+  // A sign-in that was in flight when this worker was last torn down. Safari suspends the
+  // background constantly — on iOS, as soon as the popup closes, which is exactly when the user is
+  // over on the verification page — so every wake is a chance to notice an approval that has
+  // already landed. Fire and forget: nothing else waits on it, and the popup's own poll covers the
+  // case where this one is too early.
+  void resumePendingLogins().catch(() => {});
 
   chrome.runtime.onMessage.addListener((msg: RpcRequest | { type?: string }, _sender, sendResponse) => {
     if (!msg || typeof msg.type !== 'string' || !msg.type.includes('.')) return false; // not an RPC (e.g. content events)
@@ -107,9 +131,8 @@ export default defineBackground(() => {
   });
 
   chrome.runtime.onConnect.addListener((port) => {
-    // A registered mod's GM shim connects as "gm:<modId>" to hear about value changes made by the
-    // same mod running in another tab or frame.
-    if (port.name.startsWith('gm:')) return registerGmPort(port);
+    // A mod's GM shim and the Safari runner both connect too; exec.install() registered their
+    // listener, so anything that is not the panel's agent port is not ours to handle here.
     if (port.name !== 'agent') return;
     agentPorts.add(port);
     // A panel is listening again, so the transcript is its to write. Whatever was kept on its
@@ -586,6 +609,7 @@ async function applyPanelScope() {
   } catch {
     panelScope = 'tab';
   }
+  if (!sidePanelAvailable()) return;
   const plan = windowPanelPlan(panelScope);
   try {
     await chrome.sidePanel.setOptions(plan.options);
@@ -601,10 +625,8 @@ async function applyPanelScope() {
 
 async function bootstrap() {
   try {
-    if (userScriptsAvailable()) {
-      await chrome.userScripts.configureWorld({ messaging: true });
-      await syncRegistrations();
-    }
+    await exec.configure();
+    await syncRegistrations();
   } catch (e) {
     console.warn('[usermods] bootstrap', e);
   }
@@ -643,6 +665,50 @@ async function installUserJsRedirect(): Promise<void> {
       },
     ],
   });
+}
+
+/**
+ * Safari's half of the same job, because the rule above never fires there.
+ *
+ * iOS Safari 17.5 stores the dynamic rule (it turns up in the extension's own rule database),
+ * records no error against it, and still shows the raw script text when you open a .user.js link.
+ * Checked in the simulator against a local .user.js URL: no redirect, no complaint. So on Safari the
+ * navigation is caught from the tabs API and sent to the same install page with the same fragment,
+ * which is the one thing the rule was for.
+ *
+ * This is second best and only used where it has to be. The rule redirects before the page is
+ * fetched; this one waits for the navigation to be under way, so the script source can flash up
+ * before the install page replaces it. Chrome and Firefox keep the rule and never install this
+ * listener.
+ *
+ * Registered in the worker's first turn, next to the other listeners, because Safari suspends the
+ * background and only wakes it for listeners it saw when the worker was evaluated. A listener added
+ * later, from an async bootstrap, is a listener a suspended worker never hears from again.
+ *
+ * `handledUserJs` stops one navigation being redirected twice: onUpdated reports the same URL more than
+ * once per load, and a second tabs.update would push another entry onto the tab's history. It is
+ * keyed by tab and cleared as soon as that tab goes somewhere else, so opening the same script URL
+ * again later still offers to install it.
+ */
+const handledUserJs = new Map<number, string>();
+
+function watchUserJsNavigations(): void {
+  if (!SAFARI_BUILD) return;
+  chrome.tabs.onUpdated.addListener((tabId, change, tab) => {
+    const url = change.url ?? tab?.url ?? '';
+    if (!isUserScriptUrl(url)) {
+      if (url) handledUserJs.delete(tabId);
+      return;
+    }
+    if (handledUserJs.get(tabId) === url) return;
+    handledUserJs.set(tabId, url);
+    const target = installPageUrl(chrome.runtime.getURL('install.html'), url);
+    void Promise.resolve(chrome.tabs.update(tabId, { url: target })).catch((e: unknown) => {
+      handledUserJs.delete(tabId);
+      console.warn('[usermods] .user.js navigation', e);
+    });
+  });
+  chrome.tabs.onRemoved.addListener((tabId) => handledUserJs.delete(tabId));
 }
 
 // ---------- chat titles ----------
@@ -795,13 +861,13 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
       if ('modId' in req) {
         const mod = (await loadMods()).find((m) => m.id === req.modId);
         if (!mod) throw new Error('That mod no longer exists.');
-        const code = buildRegisteredCode(mod, await loadGmValues(mod.id));
+        const code = await exec.buildModCode(mod, await loadGmValues(mod.id), { tabId: req.tabId, frameId: 0 });
         return legacyRunShape(await executeInTab(req.tabId, code, { world: mod.world, raw: true }));
       }
       return legacyRunShape(await executeInTab(req.tabId, req.code, { raw: true }));
     }
     case 'userScripts.status':
-      return userScriptsStatus();
+      return exec.status();
     case 'page.pick':
       await sendToContent(req.tabId, { type: 'pick' });
       return { ok: true };
@@ -858,27 +924,42 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
       return mods;
     }
     case 'oauth.status': {
-      if (STORE_BUILD) return { signedIn: false };
+      if (SUBSCRIPTIONS_OFF) return { signedIn: false };
       const t = await (await oauthModule()).loadTokens(req.kind);
       return { signedIn: !!t, label: t?.label };
     }
     case 'oauth.start':
-      if (STORE_BUILD) return { status: 'error', message: unavailableProviderMessage(req.kind) };
+      if (SUBSCRIPTIONS_OFF) return { status: 'error', message: unavailableProviderMessage(req.kind) };
       return startLogin(req.kind);
     case 'oauth.poll':
-      if (STORE_BUILD) return { status: 'error', message: unavailableProviderMessage(req.kind) };
-      return logins.get(req.kind)?.state ?? { status: 'idle' };
-    case 'oauth.cancel':
-      if (STORE_BUILD) return { ok: true };
-      logins.get(req.kind)?.controller.abort();
-      logins.delete(req.kind);
+      if (SUBSCRIPTIONS_OFF) return { status: 'error', message: unavailableProviderMessage(req.kind) };
+      // Doing the poll here, rather than reading a state some other timer maintains, is what makes
+      // the flow survive this worker being suspended: the asking surface is the clock.
+      return stepLogin(req.kind);
+    case 'oauth.restore': {
+      // What a popup asks on mount. It must not poll — a reopened popup should paint the pending
+      // code immediately — so this only reads what storage already knows.
+      if (SUBSCRIPTIONS_OFF) return { status: 'idle' };
+      const pl = await import('@/lib/pendinglogin');
+      const done = finished.get(req.kind);
+      if (done && done.status !== 'idle') return done;
+      return pl.restore(await pl.loadPending(req.kind), Date.now());
+    }
+    case 'oauth.cancel': {
+      if (SUBSCRIPTIONS_OFF) return { ok: true };
+      const pl = await import('@/lib/pendinglogin');
+      finished.delete(req.kind);
+      await pl.clearPending(req.kind);
       return { ok: true };
-    case 'oauth.signout':
-      if (STORE_BUILD) return { ok: true };
-      logins.get(req.kind)?.controller.abort();
-      logins.delete(req.kind);
+    }
+    case 'oauth.signout': {
+      if (SUBSCRIPTIONS_OFF) return { ok: true };
+      const pl = await import('@/lib/pendinglogin');
+      finished.delete(req.kind);
+      await pl.clearPending(req.kind);
       await (await oauthModule()).saveTokens(req.kind, null);
       return { ok: true };
+    }
     case 'models.list':
       return listModels(req.connectionId);
     case 'artifact.get':
@@ -1282,14 +1363,17 @@ function scheduleResync(modId: string): void {
 }
 
 async function resyncOne(modId: string): Promise<void> {
-  if (!userScriptsAvailable()) return;
+  // Under the content-script engine nothing is registered ahead of time: a mod's code and its GM
+  // values are built when a document claims it, so the next page to load already has the new value
+  // and there is nothing here to refresh.
+  if (exec.engine !== 'user-scripts' || !userScriptsAvailable()) return;
   try {
     const mod = (await loadMods()).find((m) => m.id === modId);
     const registered = (await chrome.userScripts.getScripts({ ids: [modId] })).length > 0;
     const plan = resyncPlan(mod, registered);
     if (plan === 'none') return;
     if (plan === 'full') return void (await syncRegistrations());
-    await chrome.userScripts.update([{ id: modId, js: [{ code: buildRegisteredCode(mod!, await loadGmValues(modId)) }] }]);
+    await exec.refresh(mod!, await loadGmValues(modId));
   } catch (e) {
     console.warn('[usermods] resync', modId, e);
   }
@@ -1297,45 +1381,12 @@ async function resyncOne(modId: string): Promise<void> {
 
 // ---------- live GM value changes (CONTRACT C3) ----------
 
-/**
- * Open ports, per mod. A registered script in the USER_SCRIPT world connects as `gm:<modId>`;
- * when one frame writes a value, every OTHER frame running that mod is told, so
- * GM_addValueChangeListener fires with remote: true the way Tampermonkey's does.
+/*
+ * When one frame writes a GM value, every OTHER frame running that mod is told, so
+ * GM_addValueChangeListener fires with remote: true the way Tampermonkey's does. Which ports carry
+ * that is engine-specific, one per mod on Chrome and one per document on Safari, so it lives behind
+ * exec.broadcast() in lib/exec/adapter.ts.
  */
-const gmPorts = new Map<string, Set<chrome.runtime.Port>>();
-
-function registerGmPort(port: chrome.runtime.Port): void {
-  const modId = port.name.slice('gm:'.length);
-  if (!modId) return;
-  let set = gmPorts.get(modId);
-  if (!set) gmPorts.set(modId, (set = new Set()));
-  set.add(port);
-  port.onDisconnect.addListener(() => {
-    const current = gmPorts.get(modId);
-    if (!current) return;
-    current.delete(port);
-    if (!current.size) gmPorts.delete(modId);
-  });
-}
-
-function broadcastValueChange(modId: string, key: string, oldValue: unknown, newValue: unknown, from: chrome.runtime.Port | null): void {
-  for (const port of gmPorts.get(modId) ?? []) {
-    if (port === from) continue;
-    try {
-      port.postMessage({ type: 'gm.valueChanged', key, oldValue, newValue, remote: true });
-    } catch {
-      /* the frame went away; onDisconnect will clean it up */
-    }
-  }
-}
-
-/** The port belonging to the frame this message came from, so it is not told about its own write. */
-function portForSender(modId: string, sender: chrome.runtime.MessageSender): chrome.runtime.Port | null {
-  for (const port of gmPorts.get(modId) ?? []) {
-    if (port.sender?.tab?.id === sender.tab?.id && port.sender?.frameId === sender.frameId) return port;
-  }
-  return null;
-}
 
 async function handleGm(msg: GmMessage, sender: chrome.runtime.MessageSender): Promise<unknown> {
   switch (msg.type) {
@@ -1348,7 +1399,7 @@ async function handleGm(msg: GmMessage, sender: chrome.runtime.MessageSender): P
       if (msg.type === 'gm.setValue') values[name] = msg.value;
       else delete values[name];
       await chrome.storage.local.set({ [key]: values });
-      broadcastValueChange(msg.modId, name, oldValue, msg.type === 'gm.setValue' ? msg.value : undefined, portForSender(msg.modId, sender));
+      exec.broadcast(msg.modId, name, oldValue, msg.type === 'gm.setValue' ? msg.value : undefined, sender);
       scheduleResync(msg.modId);
       return true;
     }
@@ -1408,39 +1459,123 @@ async function handleGm(msg: GmMessage, sender: chrome.runtime.MessageSender): P
 
 // ---------- subscription sign-in (device code) ----------
 
-const logins = new Map<OAuthKind, { state: OAuthLoginState; controller: AbortController }>();
-
 /**
- * lib/oauth, loaded on demand. Every call site is behind `if (STORE_BUILD)`, so the bundler drops
+ * lib/oauth, loaded on demand. Every call site is behind `if (SUBSCRIPTIONS_OFF)`, so the bundler drops
  * this import — and the vendor auth endpoints it reaches — from the store build. See lib/buildflags.
  */
 function oauthModule() {
   return import('@/lib/oauth');
 }
 
+/**
+ * The outcome of a sign-in that has already finished, kept only until the surface that asked reads
+ * it once.
+ *
+ * Everything still IN FLIGHT lives in storage (lib/pendinglogin.ts) and is deliberately not held
+ * here — that is the whole point of this branch's rework, because on Safari this worker is an event
+ * page the system suspends whenever the popup closes, which on iOS is the moment the user opens the
+ * verification tab. A Map is fine for the terminal state because it is read within a tick or two of
+ * being written, and because losing it is harmless: `oauth.poll` falls back to reading storage,
+ * where a success has already written real tokens and a cleared pending record. The worst a lost
+ * entry costs is that the popup learns "signed in" from `oauth.status` instead of from a 'done'.
+ */
+const finished = new Map<OAuthKind, OAuthLoginState>();
+
+/**
+ * Begin a device-code sign-in, and persist everything needed to finish it from cold.
+ *
+ * The write to storage happens BEFORE this returns, so by the time the popup has a user code to
+ * show — and certainly by the time it opens the verification tab and is dismissed — the flow is
+ * already recoverable by anything that can read storage.
+ */
 async function startLogin(kind: OAuthKind): Promise<OAuthLoginState> {
-  logins.get(kind)?.controller.abort();
-  const controller = new AbortController();
-  const entry = { state: { status: 'idle' } as OAuthLoginState, controller };
-  logins.set(kind, entry);
+  const pl = await import('@/lib/pendinglogin');
+  finished.delete(kind);
+  await pl.clearPending(kind);
   try {
     const o = await oauthModule();
     const login = kind === 'chatgpt' ? await o.startChatgptLogin() : await o.startXaiLogin();
-    entry.state = { status: 'pending', userCode: login.userCode, verificationUri: login.verificationUri, expiresAt: login.expiresAt };
-    void login
-      .poll(controller.signal)
-      .then(async (tokens) => {
-        await o.saveTokens(kind, tokens);
-        entry.state = { status: 'done' };
-      })
-      .catch((e: unknown) => {
-        if (controller.signal.aborted) return;
-        entry.state = { status: 'error', message: e instanceof Error ? e.message : String(e) };
-      });
+    const pending = pl.pendingFrom(kind, login, Date.now());
+    await pl.savePending(pending);
+    // Poll once in the background straight away, in case approval is instant, but do not make the
+    // caller wait for it: the user needs the code on screen now.
+    void stepLogin(kind).catch(() => {});
+    return { status: 'pending', userCode: pending.userCode, verificationUri: pending.verificationUri, expiresAt: pending.expiresAt };
   } catch (e) {
-    entry.state = { status: 'error', message: e instanceof Error ? e.message : String(e) };
+    const message = e instanceof Error ? e.message : String(e);
+    return { status: 'error', message };
   }
-  return entry.state;
+}
+
+/**
+ * Advance a pending sign-in by at most one poll, and report where it stands.
+ *
+ * This is the whole state machine's only moving part, and it is idempotent and re-entrant by
+ * design: it reads the record from storage, asks lib/pendinglogin whether a poll is due, does at
+ * most one, folds the answer back in and writes it. Called from the popup's 2s tick, from the
+ * worker waking, and from `startLogin` — at any rate, from any surface, after any number of
+ * suspends — it never polls faster than the vendor's interval, because "when did we last poll" is
+ * in the record rather than in a timer.
+ */
+async function stepLogin(kind: OAuthKind): Promise<OAuthLoginState> {
+  const pl = await import('@/lib/pendinglogin');
+  const now = Date.now();
+  const pending = await pl.loadPending(kind);
+  if (!pending) return finished.get(kind) ?? { status: 'idle' };
+
+  if (pl.isExpired(pending, now)) {
+    await pl.clearPending(kind);
+    const state: OAuthLoginState = { status: 'error', message: pl.expiredMessage(kind) };
+    finished.set(kind, state);
+    return state;
+  }
+
+  if (!pl.shouldPoll(pending, now)) {
+    return { status: 'pending', userCode: pending.userCode, verificationUri: pending.verificationUri, expiresAt: pending.expiresAt };
+  }
+
+  const o = await oauthModule();
+  const outcome = await o.pollOnce(pending);
+  const effect = pl.applyOutcome(pending, outcome, Date.now());
+  if (effect.store === 'keep') {
+    await pl.savePending(effect.next);
+    return { status: 'pending', userCode: effect.next.userCode, verificationUri: effect.next.verificationUri, expiresAt: effect.next.expiresAt };
+  }
+
+  await pl.clearPending(kind);
+  let state: OAuthLoginState;
+  switch (outcome.kind) {
+    case 'success':
+      await o.saveTokens(kind, outcome.tokens as Awaited<ReturnType<typeof o.getValidTokens>>);
+      state = { status: 'done' };
+      break;
+    case 'expired':
+      state = { status: 'error', message: pl.expiredMessage(kind) };
+      break;
+    case 'denied':
+    case 'fatal':
+      state = { status: 'error', message: outcome.message };
+      break;
+    default:
+      state = { status: 'idle' };
+  }
+  finished.set(kind, state);
+  return state;
+}
+
+/**
+ * Pick up any sign-in that was in flight when this worker last died.
+ *
+ * On Safari the worker is torn down and rebuilt constantly, and each rebuild runs the top level of
+ * this file. Stepping each pending vendor on startup means an approval that landed while nothing
+ * was running is noticed at the next wake — a message, a tab change, an alarm-less nudge of any
+ * kind — rather than waiting for the user to reopen the popup and look.
+ */
+async function resumePendingLogins(): Promise<void> {
+  if (SUBSCRIPTIONS_OFF) return;
+  const pl = await import('@/lib/pendinglogin');
+  const all = await pl.loadAllPending();
+  for (const kind of Object.keys(all) as OAuthKind[]) await stepLogin(kind).catch(() => {});
 }
 
 /**
@@ -1476,15 +1611,15 @@ async function listModels(connectionId: string): Promise<ModelListResult> {
   if (!conn) throw new Error('That provider was removed.');
   const target: ModelListTarget = { kind: conn.kind, baseUrl: conn.baseUrl, apiKey: conn.apiKey.trim() };
   // Outside the fallback: "not available in this build" is not a listing failure to paper over.
-  if (STORE_BUILD && isSubscriptionProvider(target.kind)) throw new Error(unavailableProviderMessage(target.kind));
+  if (SUBSCRIPTIONS_OFF && isSubscriptionProvider(target.kind)) throw new Error(unavailableProviderMessage(target.kind));
   const cache = (models: ModelCache) => mutateConnections((state) => updateConnection(state, connectionId, { models }));
   try {
     const result = await listWithFallback(target.kind, async () => {
       let auth: Record<string, string> = {};
-      if (!STORE_BUILD && target.kind === 'chatgpt') {
+      if (!SUBSCRIPTIONS_OFF && target.kind === 'chatgpt') {
         const o = await oauthModule();
         auth = o.chatgptHeaders(await o.getValidTokens('chatgpt'));
-      } else if (!STORE_BUILD && target.kind === 'xai') {
+      } else if (!SUBSCRIPTIONS_OFF && target.kind === 'xai') {
         const o = await oauthModule();
         auth = o.xaiProxyHeaders('', (await o.getValidTokens('xai')).access);
       }
@@ -1514,87 +1649,15 @@ function userScriptsAvailable(): boolean {
   }
 }
 
-function userScriptsStatus(): { available: boolean; message: string } {
-  if (userScriptsAvailable()) return { available: true, message: '' };
-  const version = Number(navigator.userAgent.match(/Chrom(?:e|ium)\/(\d+)/)?.[1] ?? 0);
-  const message =
-    version >= 138
-      ? 'usermods needs the "Allow User Scripts" toggle.\n1. Open chrome://extensions\n2. Click Details on usermods\n3. Turn on "Allow User Scripts"'
-      : 'usermods needs Developer Mode.\n1. Open chrome://extensions\n2. Turn on "Developer mode" (top right)';
-  return { available: false, message };
-}
-
-async function syncRegistrations(): Promise<void> {
-  if (!userScriptsAvailable()) return;
-  const mods = await loadMods();
-  const existing = await chrome.userScripts.getScripts();
-  if (existing.length) await chrome.userScripts.unregister({ ids: existing.map((s) => s.id) });
-  // register() rejects a script with neither matches nor includeGlobs, which would take the whole
-  // batch down with it, so those are dropped here.
-  const enabled = mods.filter((m) => m.enabled && (m.matches.length || m.includeGlobs.length));
-  if (!enabled.length) return;
-  const scripts = await Promise.all(
-    enabled.map(async (m) => ({
-      id: m.id,
-      js: [{ code: buildRegisteredCode(m, await loadGmValues(m.id)) }],
-      ...(m.matches.length ? { matches: m.matches } : {}),
-      ...(m.excludeMatches.length ? { excludeMatches: m.excludeMatches } : {}),
-      ...(m.includeGlobs.length ? { includeGlobs: m.includeGlobs } : {}),
-      ...(m.excludeGlobs.length ? { excludeGlobs: m.excludeGlobs } : {}),
-      runAt: m.runAt,
-      world: m.world,
-      allFrames: m.allFrames,
-    })),
-  );
-  await chrome.userScripts.register(scripts);
-}
-
 /**
- * Everything the injected wrapper puts around the model's code, split so the line offset of the
- * user's first line is a computable constant rather than a guess. mapStack() needs that offset to
- * report a thrown error at the line the model wrote, not the line the wrapper landed on.
- *
- * The observer is the answer to "the script reported nothing, did it do anything?": a script whose
- * only effect is `forEach((e) => e.remove())` has no return value, and without a count of what it
- * moved the model has no evidence it worked and goes back to inspecting the page.
+ * Re-register every enabled mod. What that means depends on the engine, so the work is the
+ * adapter's; this stays as the one name the rest of the background calls after any change to the
+ * mod list.
  */
-function wrapForExecution(code: string, runId: string): { wrapped: string; lineOffset: number } {
-  const preamble = `(async () => {
-    const __logs = [];
-    const __fmt = (a) => a.map((x) => { try { return typeof x === 'string' ? x : JSON.stringify(x); } catch { return String(x); } }).join(' ');
-    const __console = globalThis.console;
-    const console = { ...__console, log: (...a) => { __logs.push(__fmt(a)); __console.log(...a); }, info: (...a) => { __logs.push(__fmt(a)); __console.info(...a); }, warn: (...a) => { __logs.push('warn: ' + __fmt(a)); __console.warn(...a); }, error: (...a) => { __logs.push('error: ' + __fmt(a)); __console.error(...a); } };
-    const __dom = { added: 0, removed: 0, attributes: 0 };
-    let __obs = null;
-    try {
-      __obs = new MutationObserver((records) => {
-        for (const r of records) {
-          if (r.type === 'attributes') __dom.attributes++;
-          else { __dom.added += r.addedNodes.length; __dom.removed += r.removedNodes.length; }
-        }
-      });
-      __obs.observe(document.documentElement, { childList: true, subtree: true, attributes: true });
-    } catch {}
-    let __out;
-    try {
-      const __r = await (async () => {`;
-  const epilogue = `
-      })();
-      // One microtask turn and one frame, so a removal the page does in a rAF callback is counted.
-      await new Promise((r) => { try { requestAnimationFrame(() => r()); setTimeout(r, 50); } catch { r(); } });
-      try { __obs && __obs.takeRecords().forEach((r) => { if (r.type === 'attributes') __dom.attributes++; else { __dom.added += r.addedNodes.length; __dom.removed += r.removedNodes.length; } }); } catch {}
-      let __s; try { __s = typeof __r === 'string' ? __r : JSON.stringify(__r); } catch { __s = String(__r); }
-      __out = { ok: true, returnedValue: __r !== undefined, result: __s === undefined ? 'undefined' : String(__s).slice(0, 4000), dom: __dom, logs: __logs };
-    } catch (e) {
-      __out = { ok: false, error: (e && e.stack) ? String(e.stack).slice(0, 4000) : String(e), dom: __dom, logs: __logs };
-    }
-    try { __obs && __obs.disconnect(); } catch {}
-    try { chrome.runtime.sendMessage({ type: 'usermods:run-result', runId: ${JSON.stringify(runId)}, ...__out }); } catch {}
-    return __out;
-  })()`;
-  // The user's first line begins on the line after the preamble's last newline.
-  return { wrapped: `${preamble} ${code}${epilogue}`, lineOffset: preamble.split('\n').length - 1 };
+async function syncRegistrations(): Promise<void> {
+  await exec.sync(await loadMods(), loadGmValues);
 }
+
 
 /**
  * Run code once in a tab, in the USER_SCRIPT world. The wrapper captures console output, the
@@ -1610,7 +1673,7 @@ async function executeInTab(
   opts: { world?: Mod['world']; timeoutMs?: number; raw?: boolean } = {},
 ): Promise<RunResult> {
   const { world = 'USER_SCRIPT', timeoutMs = 20_000, raw = false } = opts;
-  const status = userScriptsStatus();
+  const status = exec.status();
   if (!status.available) throw new Error(status.message);
 
   let source = code;
@@ -1623,7 +1686,7 @@ async function executeInTab(
   }
 
   const runId = crypto.randomUUID();
-  const { wrapped, lineOffset } = wrapForExecution(source, runId);
+  const { wrapped, lineOffset } = wrapForExecution(source, runId, exec.reportTransport);
   const codeLines = source.split('\n').length;
 
   // Watching the tab is how a lost result stops looking like a timeout. The wrapper reports over
@@ -1635,7 +1698,7 @@ async function executeInTab(
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      chrome.runtime.onUserScriptMessage.removeListener(listener);
+      exec.removeResultListener(listener);
       chrome.tabs.onUpdated.removeListener(onUpdated);
       chrome.tabs.onRemoved.removeListener(onRemoved);
       resolve(r);
@@ -1661,7 +1724,7 @@ async function executeInTab(
         finish({ outcome: { kind: 'threw', error: mapStack(stack, lineOffset, codeLines) }, logs });
       }
     };
-    chrome.runtime.onUserScriptMessage.addListener(listener);
+    exec.addResultListener(listener);
 
     const onUpdated = (id: number, change: chrome.tabs.OnUpdatedInfo, tab: chrome.tabs.Tab) => {
       if (id !== tabId || change.status !== 'loading') return;
@@ -1675,8 +1738,8 @@ async function executeInTab(
     chrome.tabs.onRemoved.addListener(onRemoved);
 
     // An injection that never starts is its own failure, and saying "timed out" for it is a lie.
-    chrome.userScripts
-      .execute({ target: { tabId }, js: [{ code: wrapped }], world })
+    exec
+      .injectOnce(tabId, wrapped, world)
       .catch((e: unknown) => finish({ outcome: { kind: 'injection-failed', reason: e instanceof Error ? e.message : String(e) }, logs: [] }));
   });
 

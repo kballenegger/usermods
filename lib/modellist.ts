@@ -30,7 +30,7 @@
 //
 // .ts extensions and type-only imports of ./types: this module is unit tested under
 // node --experimental-strip-types, whose resolver does not guess extensions.
-import { CHATGPT_CODEX_BASE, STORE_BUILD, XAI_PROXY_BASE } from './buildflags.ts';
+import { CHATGPT_CODEX_BASE, SUBSCRIPTIONS_OFF, XAI_PROXY_BASE } from './buildflags.ts';
 import type { ProviderKind } from './types';
 
 /**
@@ -58,8 +58,8 @@ export interface ModelListTarget {
 const DEFAULT_BASE: Record<ProviderKind, string> = {
   anthropic: 'https://api.anthropic.com',
   'openai-compatible': 'https://api.openai.com/v1',
-  chatgpt: STORE_BUILD ? '' : CHATGPT_CODEX_BASE,
-  xai: STORE_BUILD ? '' : XAI_PROXY_BASE,
+  chatgpt: SUBSCRIPTIONS_OFF ? '' : CHATGPT_CODEX_BASE,
+  xai: SUBSCRIPTIONS_OFF ? '' : XAI_PROXY_BASE,
 };
 
 /** `base` + `path`, with `query` appended whether or not the base already carries a query string. */
@@ -201,7 +201,7 @@ export function listFailureMessage(status: number, bodyText: string): string {
  * models nobody here can guess — a local server, a proxy — and inventing names for it would be worse
  * than saying it could not be listed.
  */
-export const FALLBACK_MODELS: Readonly<Record<'chatgpt' | 'xai', readonly string[]>> = STORE_BUILD
+export const FALLBACK_MODELS: Readonly<Record<'chatgpt' | 'xai', readonly string[]>> = SUBSCRIPTIONS_OFF
   ? // A store build has no subscription providers to list for, so it carries no list either.
     { chatgpt: [], xai: [] }
   : {

@@ -1,0 +1,99 @@
+/*
+ * The Mac popover's size, before anything renders.
+ *
+ * This file exists for one reason, and it is a chicken-and-egg problem in how Safari presents a
+ * toolbar popover on macOS: the popover is sized FROM the document, not the other way round. There
+ * is no window whose width the page can fill. At the first layout pass the document has whatever
+ * size its own CSS gives it, and whatever that is becomes the popover.
+ *
+ * So the size cannot be decided by anything that has to run first. React mounting, a media query
+ * on the measured width, a resize listener, a state update — all of them are downstream of a
+ * layout that has already happened, and all of them were tried by the version of this branch that
+ * shipped a popover collapsed to a ~470x90 sliver: popupLayout() gated 'roomy' on
+ * `width >= 360`, the first paint had no meaningful width, the document got the compact rule
+ * (`height: 100dvh`, no width) which is a percentage of a window that is itself waiting for the
+ * content, nothing ever gave the document a size, and the width never reached 360 so it never
+ * flipped. A deadlock, and it renders, so nothing but eyes catches it.
+ *
+ * The fix is to state the size statically, in a stylesheet the popup document links synchronously,
+ * keyed off nothing but the pointer. `(pointer: fine)` is a media query the engine can answer
+ * during the first style resolution without measuring anything, which is exactly the property the
+ * width gate did not have.
+ *
+ * iOS and iPadOS report `(pointer: coarse)` for the primary pointer even with a trackpad attached,
+ * so they never match the `(pointer: fine)` rule: the iPhone sheet keeps 100dvh and its safe areas
+ * and is not pinned to a desktop window size. The iPad is not a sheet, which was found out on a
+ * real one; it has a rule of its own, above the Mac's.
+ *
+ * The numbers must agree with the `[data-layout='roomy']` rule in mobile.css, which takes over once
+ * React has mounted and put the attribute on. test/popupshell.test.ts asserts they are equal;
+ * disagreeing would make the popover resize itself the moment the app appeared.
+ */
+/*
+ * The iPad popover's size, for the same reason and by the same means.
+ *
+ * On iPhone Safari presents the popup as a sheet the system sizes, so a document that says
+ * `height: 100dvh` fills it. On iPad it presents a POPOVER sized from the document, exactly as on a
+ * Mac, and an iPad reports a coarse pointer, so the rule below this one never reaches it: the
+ * compact document had a height that was a percentage of a window waiting for its content, no
+ * width at all, and the owner's iPad Pro opened a tiny panel that could not be resized. Same
+ * deadlock, second platform.
+ *
+ * What tells an iPad from an iPhone here has to be answerable at the first style resolution and
+ * must not be the popover's own width, which is this document's output coming back round. That
+ * leaves the SCREEN: `device-width` is a fact about the hardware. On iOS it is the portrait width
+ * in both orientations, every iPhone is at most 440pt, and the narrowest iPad (mini) is 744pt, so
+ * 700px divides them with room on both sides. Nothing here looks at min-width or max-width.
+ *
+ * The height is tiered by that same number, because the screen's portrait WIDTH is its landscape
+ * HEIGHT, and landscape is where a popover hanging off the toolbar runs out of room:
+ *
+ *   744 (iPad mini)               600px   of a 744px-tall landscape screen, less Safari's toolbar
+ *   768 to 834 (iPad, Air, Pro 11) 660px
+ *   1024 and up (the 13-inch)      720px
+ *
+ * 440px wide: a little more than the Mac's 420, because the controls in the compact shell are
+ * thumb-sized. The size is published as custom properties rather than only applied, so that
+ * mobile.css can restate THE SAME numbers once React has put `data-layout` on and its
+ * `height: 100dvh` rule would otherwise take them away (test/popupshell.test.ts holds the two
+ * together). A popover Safari clamps smaller than this, or an iPad that presents the popup as a
+ * sheet instead (Split View, Slide Over), is handled after mount by App.tsx adopting the viewport
+ * it was actually given: tabletPopupSize in lib/compactshell.ts. That step can only ever replace
+ * this size with another real one, never with nothing.
+ */
+@media (pointer: coarse) and (min-device-width: 700px) {
+  :root {
+    --popover-w: 440px;
+    --popover-h: 600px;
+  }
+
+  html,
+  body,
+  #root {
+    width: var(--popover-w);
+    height: var(--popover-h);
+    min-height: 0;
+  }
+}
+
+@media (pointer: coarse) and (min-device-width: 760px) {
+  :root {
+    --popover-h: 660px;
+  }
+}
+
+@media (pointer: coarse) and (min-device-width: 1000px) {
+  :root {
+    --popover-h: 720px;
+  }
+}
+
+@media (pointer: fine) {
+  html,
+  body,
+  #root {
+    width: 420px;
+    height: 560px;
+    min-height: 0;
+  }
+}

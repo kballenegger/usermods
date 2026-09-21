@@ -114,6 +114,22 @@ export default defineContentScript({
      *   - the label is an ink block with lime text at 16.1:1, which is legible against anything, and
      *     it takes a hard lime offset shadow so its own edge does not vanish on a dark page.
      */
+    /**
+     * Is this a screen you point at with a finger?
+     *
+     * `(pointer: coarse)` asks about the PRIMARY pointer, so a laptop with a touchscreen still reads
+     * as fine and keeps the mouse picker exactly as it was. A phone reads as coarse, and gets the
+     * two-step picker below. The check is also re-made on the first real touch, so a device that
+     * reports itself oddly still ends up with a way to cancel.
+     */
+    function touchPrimary(): boolean {
+      try {
+        return window.matchMedia('(pointer: coarse)').matches;
+      } catch {
+        return false;
+      }
+    }
+
     function startPicker(): () => void {
       const overlay = document.createElement('div');
       Object.assign(overlay.style, {
@@ -145,36 +161,155 @@ export default defineContentScript({
         textOverflow: 'ellipsis',
         whiteSpace: 'nowrap',
       } satisfies Partial<CSSStyleDeclaration>);
-      document.documentElement.append(overlay, label);
+      /*
+       * The touch bar: what replaces hover and the Escape key.
+       *
+       * On a mouse the picker is one gesture, move to preview and click to take it, and neither half
+       * has an equivalent on a touch screen. There is no hover, so a tap would have to both preview
+       * and confirm, which means picking whatever your finger happened to land on with no chance to
+       * look at it first. And there is no Escape key, so a picker started by accident on a phone
+       * would have no way out at all.
+       *
+       * So on touch the gesture splits: tap (or drag) to preview, then confirm here. The bar sits at
+       * the bottom, where a thumb reaches, carries the selector it is about to take, and is the exit
+       * as well as the confirmation. Built here rather than in the popup because the popup is not on
+       * screen while you are picking: the sheet closes as soon as you touch the page.
+       *
+       * It exists on touch only. A mouse never sees it and its behaviour is untouched.
+       */
+      const bar = document.createElement('div');
+      Object.assign(bar.style, {
+        position: 'fixed',
+        left: '0',
+        right: '0',
+        bottom: '0',
+        zIndex: '2147483647',
+        display: touchPrimary() ? 'flex' : 'none',
+        alignItems: 'center',
+        gap: '8px',
+        boxSizing: 'border-box',
+        padding: '10px 12px calc(10px + env(safe-area-inset-bottom))',
+        background: '#030B16', // --brand-ink
+        borderTop: '2px solid #AEFF24', // --brand-lime
+        font: "500 13px/1.4 -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+        color: '#AEFF24',
+      } satisfies Partial<CSSStyleDeclaration>);
+      const barText = document.createElement('span');
+      Object.assign(barText.style, {
+        flex: '1 1 auto',
+        minWidth: '0',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+        font: "500 13px/1.4 'IBM Plex Mono', ui-monospace, monospace",
+      } satisfies Partial<CSSStyleDeclaration>);
+      barText.textContent = 'Tap an element on the page';
+      // 44px tall, Apple's minimum, and both buttons are the same size so neither is the easy one to
+      // hit by mistake. Cancel is the quieter of the two but not smaller.
+      const barButton = (text: string, primary: boolean) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.textContent = text;
+        Object.assign(b.style, {
+          flex: 'none',
+          minHeight: '44px',
+          minWidth: '72px',
+          padding: '0 14px',
+          borderRadius: '2px',
+          border: '2px solid #AEFF24',
+          background: primary ? '#AEFF24' : 'transparent',
+          color: primary ? '#030B16' : '#AEFF24',
+          font: "600 13px/1 -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+          textTransform: 'uppercase',
+          letterSpacing: '0.04em',
+          cursor: 'pointer',
+        } satisfies Partial<CSSStyleDeclaration>);
+        // Set apart because TypeScript's CSSStyleDeclaration has no name for it: without it, Safari
+        // paints a grey box over the button on every tap.
+        b.style.setProperty('-webkit-tap-highlight-color', 'transparent');
+        return b;
+      };
+      const useButton = barButton('Use', true);
+      useButton.disabled = true;
+      useButton.style.opacity = '0.45';
+      const cancelButton = barButton('Cancel', false);
+      bar.append(barText, useButton, cancelButton);
+
+      document.documentElement.append(overlay, label, bar);
       let current: Element | null = null;
 
-      const onMove = (e: MouseEvent) => {
-        const el = document.elementFromPoint(e.clientX, e.clientY);
-        if (!el || el === overlay || el === label) return;
+      /** Move the highlight to whatever is at this point. Shared by the mouse and the finger. */
+      const preview = (x: number, y: number) => {
+        const el = document.elementFromPoint(x, y);
+        if (!el || el === overlay || el === label || bar.contains(el)) return;
         current = el;
         const r = el.getBoundingClientRect();
         Object.assign(overlay.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
-        label.textContent = selectorFor(el);
+        const sel = selectorFor(el);
+        label.textContent = sel;
         label.style.left = `${Math.max(0, r.left)}px`;
         // Above the highlight when there is room for the pill, otherwise just below it.
         label.style.top = `${r.top > 28 ? r.top - 26 : r.bottom + 6}px`;
+        barText.textContent = sel;
+        useButton.disabled = false;
+        useButton.style.opacity = '1';
       };
+      const onMove = (e: MouseEvent) => preview(e.clientX, e.clientY);
       const finish = (ev?: ContentEvent) => {
         document.removeEventListener('mousemove', onMove, true);
         document.removeEventListener('click', onClick, true);
         document.removeEventListener('keydown', onKey, true);
+        document.removeEventListener('touchstart', onTouch, true);
+        document.removeEventListener('touchmove', onTouch, true);
         overlay.remove();
         label.remove();
+        bar.remove();
         picking = null;
         if (ev) chrome.runtime.sendMessage(ev).catch(() => {});
       };
-      const onClick = (e: MouseEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
+      /** Take what is highlighted. Reached by a mouse click, or by the Use button on touch. */
+      const take = () => {
         if (!current) return finish({ type: 'pick-cancelled' });
         const html = current.outerHTML.length > 4000 ? snapshot({ root: current, maxChars: 4000 }) : current.outerHTML;
         finish({ type: 'picked', element: { selector: selectorFor(current), html, label: labelFor(current) } });
       };
+      const onClick = (e: MouseEvent) => {
+        // The bar is the picker's own UI, so its buttons handle their own clicks.
+        if (e.target instanceof Node && bar.contains(e.target)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        // A tap fires a click too, and on touch a click must not confirm: the whole point of the bar
+        // is that you see what you are about to take before you take it. The tap has already moved
+        // the highlight, so swallowing the click here costs nothing and prevents the page's own
+        // handler from running, which is what the mouse path swallows it for as well.
+        if (touched) return;
+        take();
+      };
+      /*
+       * Drag to aim. Non-passive, because the preview is useless if the page scrolls out from under
+       * the finger while you are choosing, so the scroll is prevented for as long as the picker is
+       * up, and the picker is up only when the user asked for it.
+       */
+      let touched = false;
+      const onTouch = (e: TouchEvent) => {
+        if (e.target instanceof Node && bar.contains(e.target)) return;
+        const t = e.touches[0];
+        if (!t) return;
+        touched = true;
+        bar.style.display = 'flex';
+        e.preventDefault();
+        preview(t.clientX, t.clientY);
+      };
+      useButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        take();
+      });
+      cancelButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        finish({ type: 'pick-cancelled' });
+      });
       const onKey = (e: KeyboardEvent) => {
         if (e.key === 'Escape') {
           e.preventDefault();
@@ -184,6 +319,8 @@ export default defineContentScript({
       document.addEventListener('mousemove', onMove, true);
       document.addEventListener('click', onClick, true);
       document.addEventListener('keydown', onKey, true);
+      document.addEventListener('touchstart', onTouch, { capture: true, passive: false });
+      document.addEventListener('touchmove', onTouch, { capture: true, passive: false });
       return () => finish();
     }
   },

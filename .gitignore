@@ -8,3 +8,7 @@ stats-*.json
 .env
 .env.*
 .claude/worktrees/
+
+# The Safari extension's web resources, copied here from .output/safari-mv3 by
+# scripts/safari-xcode.mjs so the Xcode build has a fixed path to read. Build output, not source.
+safari/Extension/Resources/

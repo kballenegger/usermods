@@ -1,0 +1,387 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		1A0000000000000000000401 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000301 /* AppDelegate.swift */; };
+		1A0000000000000000000402 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000302 /* ViewController.swift */; };
+		1A0000000000000000000405 /* MacAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000310 /* MacAppDelegate.swift */; };
+		1A0000000000000000000406 /* MacViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000311 /* MacViewController.swift */; };
+		1A0000000000000000000403 /* SafariWebExtensionHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000304 /* SafariWebExtensionHandler.swift */; };
+		1A0000000000000000000407 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000315 /* Assets.xcassets */; };
+		1A0000000000000000000404 /* usermods-extension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 1A0000000000000000000209 /* usermods-extension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		1A0000000000000000000112 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 1A0000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1A0000000000000000000201;
+			remoteInfo = "usermods-extension";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		1A0000000000000000000105 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				1A0000000000000000000404 /* usermods-extension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		1A0000000000000000000109 /* usermods.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = usermods.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		1A0000000000000000000209 /* usermods-extension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "usermods-extension.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
+		1A0000000000000000000301 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		1A0000000000000000000302 /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
+		1A0000000000000000000303 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		1A0000000000000000000304 /* SafariWebExtensionHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafariWebExtensionHandler.swift; sourceTree = "<group>"; };
+		1A0000000000000000000305 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		1A0000000000000000000310 /* MacAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacAppDelegate.swift; sourceTree = "<group>"; };
+		1A0000000000000000000311 /* MacViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacViewController.swift; sourceTree = "<group>"; };
+		1A0000000000000000000312 /* Info-macOS.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info-macOS.plist"; sourceTree = "<group>"; };
+		1A0000000000000000000313 /* usermods-macOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "usermods-macOS.entitlements"; sourceTree = "<group>"; };
+		1A0000000000000000000314 /* usermods-extension-macOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "usermods-extension-macOS.entitlements"; sourceTree = "<group>"; };
+		1A0000000000000000000315 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		1A0000000000000000000306 /* Shared.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shared.xcconfig; sourceTree = "<group>"; };
+		1A0000000000000000000307 /* App.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = App.xcconfig; sourceTree = "<group>"; };
+		1A0000000000000000000308 /* Extension.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Extension.xcconfig; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		1A0000000000000000000103 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1A0000000000000000000203 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		1A0000000000000000000002 = {
+			isa = PBXGroup;
+			children = (
+				1A0000000000000000000309 /* Config */,
+				1A0000000000000000000110 /* App */,
+				1A0000000000000000000210 /* Extension */,
+				1A0000000000000000000003 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		1A0000000000000000000003 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				1A0000000000000000000109 /* usermods.app */,
+				1A0000000000000000000209 /* usermods-extension.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		1A0000000000000000000309 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				1A0000000000000000000306 /* Shared.xcconfig */,
+				1A0000000000000000000307 /* App.xcconfig */,
+				1A0000000000000000000308 /* Extension.xcconfig */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
+		1A0000000000000000000110 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				1A0000000000000000000301 /* AppDelegate.swift */,
+				1A0000000000000000000302 /* ViewController.swift */,
+				1A0000000000000000000310 /* MacAppDelegate.swift */,
+				1A0000000000000000000311 /* MacViewController.swift */,
+				1A0000000000000000000315 /* Assets.xcassets */,
+				1A0000000000000000000303 /* Info.plist */,
+				1A0000000000000000000312 /* Info-macOS.plist */,
+				1A0000000000000000000313 /* usermods-macOS.entitlements */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		1A0000000000000000000210 /* Extension */ = {
+			isa = PBXGroup;
+			children = (
+				1A0000000000000000000304 /* SafariWebExtensionHandler.swift */,
+				1A0000000000000000000305 /* Info.plist */,
+				1A0000000000000000000314 /* usermods-extension-macOS.entitlements */,
+			);
+			path = Extension;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		1A0000000000000000000101 /* usermods */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1A0000000000000000000106 /* Build configuration list for PBXNativeTarget "usermods" */;
+			buildPhases = (
+				1A0000000000000000000102 /* Sources */,
+				1A0000000000000000000103 /* Frameworks */,
+				1A0000000000000000000104 /* Resources */,
+				1A0000000000000000000105 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				1A0000000000000000000111 /* PBXTargetDependency */,
+			);
+			name = usermods;
+			productName = usermods;
+			productReference = 1A0000000000000000000109 /* usermods.app */;
+			productType = "com.apple.product-type.application";
+		};
+		1A0000000000000000000201 /* usermods-extension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1A0000000000000000000206 /* Build configuration list for PBXNativeTarget "usermods-extension" */;
+			buildPhases = (
+				1A0000000000000000000202 /* Sources */,
+				1A0000000000000000000203 /* Frameworks */,
+				1A0000000000000000000204 /* Resources */,
+				1A0000000000000000000205 /* Stage the built web extension */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "usermods-extension";
+			productName = "usermods-extension";
+			productReference = 1A0000000000000000000209 /* usermods-extension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		1A0000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1540;
+				LastUpgradeCheck = 1540;
+				TargetAttributes = {
+					1A0000000000000000000101 = {
+						CreatedOnToolsVersion = 15.4;
+					};
+					1A0000000000000000000201 = {
+						CreatedOnToolsVersion = 15.4;
+					};
+				};
+			};
+			buildConfigurationList = 1A0000000000000000000004 /* Build configuration list for PBXProject "usermods" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 1A0000000000000000000002;
+			productRefGroup = 1A0000000000000000000003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				1A0000000000000000000101 /* usermods */,
+				1A0000000000000000000201 /* usermods-extension */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		1A0000000000000000000104 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1A0000000000000000000407 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1A0000000000000000000204 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		1A0000000000000000000205 /* Stage the built web extension */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Stage the built web extension";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -euo pipefail\n\n# Put the built web extension inside the .appex bundle.\n#\n# The web side is built by npm (`npm run build:safari`), which emits a directory tree whose file\n# names carry content hashes. That cannot be a fixed list of files in a Copy Bundle Resources phase,\n# so it is staged to safari/Extension/Resources and copied here instead. This phase runs last,\n# before code signing, which is what makes writing into the bundle safe.\n\nSTAGE=\"$SRCROOT/Extension/Resources\"\n\nif [ ! -f \"$STAGE/manifest.json\" ]; then\n  echo \"error: no web extension staged at $STAGE\" >&2\n  echo \"note: run 'node scripts/safari-xcode.mjs stage' from the repository root, then build again.\" >&2\n  exit 1\nfi\n\nDEST=\"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH\"\nmkdir -p \"$DEST\"\n\n# rsync --delete would be wrong here: on iOS this destination is the bundle root, which also holds\n# Info.plist, the executable and _CodeSignature. Drop the names the stage directory owns instead, so\n# a hashed file that has left the web build does not linger in the bundle and outlive its seal.\nfor staged in \"$STAGE\"/*; do\n  [ -e \"$staged\" ] || continue\n  rm -rf \"$DEST/${staged##*/}\"\ndone\n\nrsync -a --exclude '.DS_Store' \"$STAGE/\" \"$DEST/\"\necho \"staged web extension from $STAGE into $DEST\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		1A0000000000000000000102 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1A0000000000000000000401 /* AppDelegate.swift in Sources */,
+				1A0000000000000000000402 /* ViewController.swift in Sources */,
+				1A0000000000000000000405 /* MacAppDelegate.swift in Sources */,
+				1A0000000000000000000406 /* MacViewController.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1A0000000000000000000202 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1A0000000000000000000403 /* SafariWebExtensionHandler.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		1A0000000000000000000111 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 1A0000000000000000000201 /* usermods-extension */;
+			targetProxy = 1A0000000000000000000112 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		1A0000000000000000000005 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		1A0000000000000000000006 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		1A0000000000000000000107 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 1A0000000000000000000307 /* App.xcconfig */;
+			buildSettings = {
+			};
+			name = Debug;
+		};
+		1A0000000000000000000108 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 1A0000000000000000000307 /* App.xcconfig */;
+			buildSettings = {
+			};
+			name = Release;
+		};
+		1A0000000000000000000207 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 1A0000000000000000000308 /* Extension.xcconfig */;
+			buildSettings = {
+			};
+			name = Debug;
+		};
+		1A0000000000000000000208 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 1A0000000000000000000308 /* Extension.xcconfig */;
+			buildSettings = {
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		1A0000000000000000000004 /* Build configuration list for PBXProject "usermods" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1A0000000000000000000005 /* Debug */,
+				1A0000000000000000000006 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		1A0000000000000000000106 /* Build configuration list for PBXNativeTarget "usermods" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1A0000000000000000000107 /* Debug */,
+				1A0000000000000000000108 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		1A0000000000000000000206 /* Build configuration list for PBXNativeTarget "usermods-extension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1A0000000000000000000207 /* Debug */,
+				1A0000000000000000000208 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 1A0000000000000000000001 /* Project object */;
+}

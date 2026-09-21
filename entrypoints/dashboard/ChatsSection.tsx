@@ -15,7 +15,7 @@ import {
   type ChatHandoff,
 } from '@/lib/dashboard';
 import { rpc } from '@/lib/rpc';
-import { openChatPlan, PANEL_PATH, resolveScope } from '@/lib/sidepanel';
+import { openChatPlan, PANEL_PATH, resolveScope, sidePanelAvailable } from '@/lib/sidepanel';
 import type { Artifact } from '@/lib/artifact';
 import type { ChatItem, Settings, SidePanelScope } from '@/lib/types';
 import { TranscriptPreview, transcriptText } from './TranscriptPreview';
@@ -218,7 +218,13 @@ export function ChatsSection({ chats, loaded, onChanged }: { chats: Chat[]; load
     }
     const plan = openChatPlan(scope, myTabId, newTab);
     try {
-      if (plan.tabPanel) {
+      // Safari has no side panel, so there is nothing to attach and nothing to open: the page still
+      // opens and the handoff below is still written, which is what the popup reads when it comes up
+      // on that page. Asking first rather than letting the TypeError land in the catch, because the
+      // catch is meant for a gesture that expired, not for a browser that was never going to work.
+      if (!sidePanelAvailable()) {
+        /* nothing to open */
+      } else if (plan.tabPanel) {
         chrome.sidePanel.setOptions({ tabId: plan.tabPanel.tabId, path: PANEL_PATH, enabled: true }).catch(() => {});
         const p = chrome.sidePanel.open({ tabId: plan.tabPanel.tabId });
         if (p && typeof p.catch === 'function') p.catch(() => {});

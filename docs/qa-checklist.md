@@ -361,7 +361,9 @@ actually run on a page load. That is what steps 5-7 below are for.
    **Install userscript** page (`install.html#https://…`), showing "Fetching from `<url>`" then a
    full preview card: name, version chip, description, "Runs on (N)" chips, Permissions, "Can
    request" (if it has `@connect`), "Loads N libraries" (if `@require`), Resources (if
-   `@resource`), "Runs at `<run-at>`", and a **Show full source** disclosure.
+   `@resource`), "Runs at `<run-at>`", and a **Show full source** disclosure. In Safari on iOS, the
+   tabs-API fallback may let the raw source flash before the install page replaces it; the
+   declarative redirect rule alone is not enough there.
    **If it fails:** page console on the install tab; note the exact URL that didn't redirect.
 2. Click **Install**.
    **Expected:** an "Installed" card confirming the name is installed and enabled, with a

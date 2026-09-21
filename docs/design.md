@@ -534,6 +534,59 @@ the gap between mark and word, and the mark's own `flex: none` are unscoped, and
 compact 28px geometry and its icon-only breakpoint stay scoped to it. The first mod card to use one
 rendered with the icon jammed against its label, because all three rules lived one selector away.
 
+### The compact chat shell (Safari on iPhone and iPad)
+The one place the same parts are arranged differently rather than resized. A phone is read far more
+than it is operated, so the chat view keeps on screen only what reading and sending need: a **44px
+top bar**, the **transcript**, a **one-row composer**, and a **44px draft pill** while a draft
+exists. Everything else is one tap away in a bottom sheet. With the long fixture the transcript went
+from 35.5% of a 390x844 screen to 82.1%, and from 6.4% to 69.8% with the keyboard up; the numbers,
+the sheets and why there is no bottom navigation are in [safari.md](safari.md#the-compact-shell-content-first).
+
+- **The top bar** is the chat's: the site in mono at 11px over the chat's title in the text face at
+  15px semibold, as one button that opens the Chats sheet; the model as a hairline chip; the Menu
+  mark. On Mods and Settings it is `‹ Chat` in the primary text tone and the view's name. No pixel
+  face: that stays the wordmark's.
+- **The draft pill** is the draft panel and the editing line in one line: name (the last thing to
+  give up width, as in the panel), version in mono primary, and one word of status. `editing` is
+  the one status in the primary tone and semibold, because it is the one that changes what the
+  button beside it does to a mod running on real pages. It keeps the panel's 2px primary rail so it
+  reads as the same object. Its button is a filled primary, which bends "one primary per screen":
+  Send is the other. They rarely compete, since Send is flat and disabled until something is typed
+  and the pill's goes flat the moment the mod holds this version, and when both are live the
+  hierarchy is size: Send is the 44px square by the thumb, the pill's is 32px.
+- **The composer's two buttons** are 44px squares with a 16px mark each. Send is the one primary
+  (fill, bright edge, hard shadow); Stop in the same spot is the danger outline; `+` is secondary.
+- **Small to look at, 44px to hit.** A tool row is 36px, the pill's button 32px, a text link its own
+  line height. Each carries its target on a `::before` that reaches into the gap around it, sized
+  so neighbours' targets meet and never overlap (tool rows are 36px on an 8px gap: 4px each way).
+  Fewer targets rather than smaller ones: the proposal card loses "Open in draft" on a phone
+  (the pill is the way to the draft), and a mod card's five buttons become one and a "more".
+- **Folded steps.** Three or more consecutive tool rows fold into one row with the same rail and
+  dot. The dot is the worst state in the run and the line counts failures, so folding can never hide
+  that something went wrong; while a step is running the line names it.
+
+### Bottom sheets
+The compact shell's only overlay, and one component (`components/Sheet.tsx`). The panel's rule that
+nothing is a modal (above) is a rule about a 420px column beside a page you are looking at; a phone
+has no beside, and a sheet is the platform's own answer.
+
+- `--surface-1` with a 1px `--border-card` top edge and the card radius on the top corners only. No
+  shadow: the scrim does the separating. The scrim is `--bg-app` at 72%, the page tone rather than a
+  fixed ink, for the reason the lightbox gives: a near-black scrim turns the day theme into a
+  darkroom.
+- A 36x4 grabber in `--border-control`, a title in the text face at 15px semibold, and a 44px close
+  button, always. The gesture is a shortcut, never the only way out.
+- Content is **rows, not buttons**: `--surface-2` blocks with hairlines between, 48px rows, the label
+  at 15px medium, the current value right-aligned in mono `--text-3`. Where you already are takes a
+  3px inset primary edge and a semibold label; lime stays for *alive*. Destructive rows are
+  `--error-text` and sit in a block of their own. Section labels are the usual uppercase label.
+- At most 85% of the visible height, content scrolls inside, it sits on the keyboard, and it pads
+  for the home indicator (dropped while the keyboard is up). 200ms slide and 160ms fade, both off
+  under `prefers-reduced-motion`.
+- The panel's own components go inside unchanged and drop their frames: the draft panel loses its
+  rail and border (the sheet is the frame), the model picker draws its list in place with 44px
+  options and no popover, the mod picker loses its own header row.
+
 ### Dashboard list / detail / editor
 Header card with the wordmark in the display face, stat tiles whose numbers are big pixel type in
 `--text-1` (not lime — a count of archived chats is not alive), section tabs matching the panel's,

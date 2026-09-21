@@ -133,7 +133,7 @@ pairings to 7:1, which `test/contrast.test.ts` enforces against the token file.
 
 ## Install (from source)
 
-Requires Node 22+ and Chrome 135+.
+Requires Node 22+ and Chrome 135+. For Safari, see [Safari on iOS and macOS](#safari-on-ios-and-macos).
 
 ```sh
 npm install
@@ -145,6 +145,51 @@ Then in Chrome:
 1. Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked**, and pick `.output/chrome-mv3`.
 2. Click **Details** on usermods and turn on **Allow User Scripts**. Chrome requires this toggle for any extension that runs user scripts, including Tampermonkey.
 3. Click the usermods icon to open the side panel **on that tab**. Go to **Settings**, click a preset under **Add provider**, and paste a key (or a local server URL). It saves as you type. Back in **Chat**, the model is the dropdown under the message box.
+
+### Safari on iOS and macOS
+
+One app, one extension, two platforms. The execution layer differs from Chrome's, because Safari has
+no `chrome.userScripts`, and the UI is a toolbar popup rather than a side panel: a small window with
+tabs under the header on a Mac, and on iPhone and iPad a content-first chat (a slim top bar, the
+conversation, a one-row message box) with the chat list, the model, the draft and navigation each
+one tap away in a bottom sheet. Building either needs a full Xcode.
+
+```sh
+npm install
+node scripts/safari-xcode.mjs doctor      # what is installed, and what that allows
+node scripts/safari-xcode.mjs simulator   # iOS: build, boot a simulator, install, launch
+node scripts/safari-xcode.mjs mac         # macOS: build the app with the extension inside it
+```
+
+On iOS, turn the extension on in **Settings > Apps > Safari > Extensions > usermods** and allow it
+on the sites you want. Safari asks per website and grants nothing by default, so **All Websites >
+Allow** is worth doing up front: without it, requests to a provider fail in a way that looks like a
+dead network. This has been built, installed and seen running saved mods in Mobile Safari on the
+iPhone 15 simulator (iOS 17.5). The owner has since run it on his own iPhone and iPad Pro; what he
+reported from them (a chat view too crowded to read on the phone, a tiny popover on the iPad) is
+what the compact shell and the iPad popover size answer, and neither fix has been seen on those
+devices yet.
+
+On macOS, copy the built `usermods.app` somewhere permanent (Safari finds the extension through the
+app, so a build directory is not good enough), open it, then turn usermods on in **Safari >
+Settings > Extensions**. A build signed locally rather than with a Developer ID does not appear in
+that list until Safari is told to show unsigned extensions, which is two Safari-wide developer
+settings a person has to turn on themselves: **Safari > Settings > Advanced > Show features for web
+developers**, then **Develop > Allow unsigned extensions**. The Mac app builds, signs, sandboxes and
+launches, and the popup lays out correctly in Safari 26.6; it has not been seen running as a loaded
+extension, because that needs those two settings.
+
+The Safari build has every provider the GitHub Chrome build has, **including ChatGPT and SuperGrok
+subscription sign-in**. Those device-code flows needed real work to survive the platform — Safari
+suspends the background aggressively, and on iPhone opening the verification page dismisses the
+popup — so the pending sign-in is persisted and resumed rather than held in memory; see
+[docs/safari.md](docs/safari.md). Only a storefront build drops subscriptions:
+`npm run build:safari:store` is the App Store variant, matching `npm run build:store` for Chrome.
+
+[docs/safari.md](docs/safari.md) has the device build, the isolation guarantees, the limitations
+(page-world mods and site CSP, the ignored install redirect rule, what `localhost` means on each
+platform), the four-way build matrix, the manual steps for checking a real subscription sign-in on
+each device, and a row-by-row account of what was seen running and what was not.
 
 ### Where the panel opens
 
@@ -160,7 +205,7 @@ this setting existed. The change takes effect on the next click of the toolbar i
 The toolbar icon only opens the panel; Chrome gives extensions no way to close one, so closing is
 the ✕ in the panel's own header.
 
-For development, `npm run dev` starts WXT with hot reload and opens a Chrome profile with the extension loaded. `npm run typecheck` type-checks, and `npm test` runs the header/backup parser tests (Node's built-in runner, no browser needed).
+For development, `npm run dev` starts WXT with hot reload and opens a Chrome profile with the extension loaded. `npm run typecheck` type-checks, and `npm test` runs the Node test suite, including Safari execution and security coverage (no browser or API key needed).
 
 `npm run screenshots` regenerates the images above, and `npm run smoke` runs the same flow headless as an end-to-end check of the chat loop. Both build the extension, load it into Playwright's Chromium, and drive the real side panel against `scripts/mock-llm.mjs` — a local server that plays scripted conversations over the OpenAI wire protocol, so neither needs an API key or a live model. The page-inspection tools run for real against live pages, and the smoke run asserts that the reply streams, that `get_page`, `find_elements` and `get_styles` all succeed, that the proposal card appears with the expected name and match pattern, and that saving it writes a userscript to storage. A second scripted conversation covers the agent's guardrails: it makes four page reads in a row and then proposes an untested mod, and the smoke reads the mock's recorded requests back from `GET /__requests` to prove the read-budget nudge and the propose-time refusal actually reached the model. A third (`npm run smoke:wait`) drives every `wait_for` condition against a fixture page the mock server serves itself, where content arrives 800ms late, an element is revealed by editing a CSS rule and nothing else, the route changes by `pushState`, and a region mutates for 1.5s and then settles — asserting from the recorded requests that an already-true condition returned in under 100ms, that the style-only reveal was noticed promptly (which only the polling floor can do), that a deliberate timeout carried diagnostics and was not flagged as an error, and that Stop ends a 20-second wait within 500ms leaving no observer behind. A fourth (`npm run smoke:images`) covers attachments end to end: it pastes a generated PNG into the composer through a real `ClipboardEvent` carrying a `File`, drops a 6000×6000 one onto the transcript, checks it was downscaled rather than refused, watches an SVG be turned away with a note, removes one, sends, and then reads the mock's recorded requests to prove that exactly one `image_url` part reached the wire, as JPEG, at 1568×1568, *before* the text of its message and with its caption beside it — then opens the full-size overlay out of the chat's blob store, closes it on Escape and reloads the panel to confirm the thumbnail is still there. A fifth (`npm run smoke:vision`) is the only flow that drives the real `screenshot` tool, and reads the wire twice: against an ordinary mock it asserts the capture arrived as an `image_url` part in the user message *after* the `tool` message that answers the call — an arrangement the mock's validator now enforces the adjacency rules for, because only a real backend would otherwise catch it — and against a mock that answers 400 to any request carrying a picture, it asserts the run still finishes, that the refused request was re-sent immediately without the image, that the panel said why, and that not one later request carried an image. See the comments at the top of `scripts/screenshots.mjs` for how the panel page is driven in an ordinary tab standing in for the real panel — and, in the panel-scope flow, how the real panel is opened and observed instead.
 
@@ -529,6 +574,7 @@ available again from Settings → *Review data notice*. The full policy is in
 - Mod sharing: export is there; a gallery is not.
 - CSS-only mods via a `@usermods-style` header, so pure restyles need no JavaScript.
 - Firefox, once its side panel story is settled.
+- A signed and notarized Safari build, so neither platform needs a developer toggle to install it.
 
 ## Contributing
 

@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { appendTurn } from '../lib/chats.ts';
 import { checkConnect, connectFromSource, connectOf, hostsFromMatchPatterns } from '../lib/connect.ts';
-import { isInstallableUrl, scriptIdentity, scriptUrlFromLocation } from '../lib/installurl.ts';
+import { installPageUrl, isInstallableUrl, isUserScriptUrl, scriptIdentity, scriptUrlFromLocation } from '../lib/installurl.ts';
 import { findByName, sameModName } from '../lib/modmatch.ts';
 import { resyncPlan } from '../lib/resync.ts';
 import { compareVersions, shouldUpdate } from '../lib/version.ts';
@@ -41,6 +41,32 @@ test('finding 1: only http(s) URLs are installable', () => {
   assert.equal(isInstallableUrl('data:text/javascript,alert(1)'), false);
   assert.equal(isInstallableUrl('file:///tmp/a.user.js'), false);
   assert.equal(isInstallableUrl('not a url'), false);
+});
+
+test('finding 1: the Safari navigation target preserves the whole script URL', () => {
+  const script = 'https://evil.example/pwn.user.js?x=1&url=https://good.example/a.user.js#section';
+  assert.equal(
+    installPageUrl('safari-web-extension://extension/install.html', script),
+    `safari-web-extension://extension/install.html#${script}`,
+  );
+});
+
+test('finding 1: the Safari navigation watcher matches what the redirect rule would have matched', () => {
+  // iOS Safari stores the declarativeNetRequest rule, reports no error against it, and still shows
+  // the raw script text. The background watches navigations there instead, and has to reach the
+  // same verdict the rule's regexFilter would have reached.
+  assert.equal(isUserScriptUrl('https://example.com/a.user.js'), true);
+  assert.equal(isUserScriptUrl('http://example.com/a.user.js'), true);
+  assert.equal(isUserScriptUrl('https://example.com/a.user.js?v=2'), true);
+  assert.equal(isUserScriptUrl('https://example.com/a.user.js#top'), true);
+  assert.equal(isUserScriptUrl('https://example.com/A.USER.JS'), true);
+  // The install page carries the script URL in its own fragment. If that counted as a userscript
+  // navigation the watcher would redirect the install page to itself, forever.
+  assert.equal(isUserScriptUrl('safari-web-extension://a1b2/install.html#https://e.com/a.user.js'), false);
+  assert.equal(isUserScriptUrl('https://example.com/a.user.js.html'), false);
+  assert.equal(isUserScriptUrl('https://example.com/?x=a.user.js'), false);
+  assert.equal(isUserScriptUrl('https://example.com/page#a.user.js'), false);
+  assert.equal(isUserScriptUrl(''), false);
 });
 
 // ---------- 4: a provider error must not discard the chat ----------
