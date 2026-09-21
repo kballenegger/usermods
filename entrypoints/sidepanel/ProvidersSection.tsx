@@ -11,6 +11,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { SAFARI_BUILD, SUBSCRIPTIONS_OFF, isSubscriptionProvider } from '@/lib/buildflags';
 import { isLocalBaseUrl, localBaseUrlNote } from '@/lib/mobile';
+import { useShell } from './shell';
 import { usePointerEnvironment } from './usePointer';
 import { relativeTime } from '@/lib/chats';
 import {
@@ -74,11 +75,14 @@ export function ProvidersSection({ view, onSaving }: { view: ConnectionsView; on
 
   const unavailable = state.list.filter((c) => connectionStatus(c, signedIn) === 'unavailable');
 
+  // Where the chat keeps its model control: under the message box in the panel and the Mac popover,
+  // a chip in the top bar of the compact (iPhone, iPad) shell.
+  const modelWhere = useShell().compact ? 'from the model name at the top' : 'under the message box';
   return (
     <section className="providers" data-testid="providers">
       <div className="label">Providers</div>
       <p className="providers-intro">
-        Connect as many as you like. The model is chosen in the chat itself, under the message box, from every provider
+        Connect as many as you like. The model is chosen in the chat itself, {modelWhere}, from every provider
         that is connected — and can be changed at any point in a conversation.
       </p>
 

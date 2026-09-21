@@ -53,6 +53,8 @@ export function ModelPicker({
   disabled,
   onSelect,
   onManage,
+  inline = false,
+  onDone,
 }: {
   state: ConnectionsState;
   signedIn: SignedIn;
@@ -65,8 +67,18 @@ export function ModelPicker({
   disabled?: boolean;
   onSelect: (selection: ModelSelection, typed: boolean) => void;
   onManage: () => void;
+  /**
+   * Draw the list in place, always open, with no button: the compact shell (iPhone, iPad) raises
+   * the picker as a bottom sheet of its own, and the sheet is what opens and closes. Same groups,
+   * same filter, same typed id. The filter does not take focus by itself here, because on a phone
+   * focus means the keyboard comes up over the list you opened the sheet to read.
+   */
+  inline?: boolean;
+  /** Inline only: a model was picked, or Manage providers was pressed; the sheet can go. */
+  onDone?: () => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [openState, setOpen] = useState(false);
+  const open = inline || openState;
   const [filter, setFilter] = useState('');
   const [active, setActive] = useState(0);
   const [refreshing, setRefreshing] = useState<ReadonlySet<string>>(() => new Set());
@@ -100,6 +112,12 @@ export function ModelPicker({
   const current: ModelSelection | null = resolved.ok ? resolved.selection : null;
 
   function close(returnFocus: boolean) {
+    if (inline) {
+      // The sheet owns opening, closing and where focus goes back to.
+      setFilter('');
+      onDone?.();
+      return;
+    }
     setOpen(false);
     setFilter('');
     if (returnFocus) buttonRef.current?.focus();
@@ -129,8 +147,15 @@ export function ModelPicker({
   }
 
   useEffect(() => {
-    if (open) inputRef.current?.focus();
-  }, [open]);
+    if (open && !inline) inputRef.current?.focus();
+  }, [open, inline]);
+
+  // Inline, there is no button press to hang the opening work on, so mounting is the opening:
+  // start on the model in use and refetch any listing that is missing or stale.
+  useEffect(() => {
+    if (inline) openPicker();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inline]);
 
   // Keep the active option inside the list as the filter narrows it, and in view as it moves.
   useEffect(() => {
@@ -142,14 +167,14 @@ export function ModelPicker({
   // A click anywhere else, or focus leaving, closes it. Focus moving WITHIN it (field → Refresh)
   // does not.
   useEffect(() => {
-    if (!open) return;
+    if (!open || inline) return;
     const onDown = (e: MouseEvent) => {
       if (rootRef.current && !rootRef.current.contains(e.target as Node)) close(false);
     };
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, inline]);
 
   function pick(o: Option) {
     onSelect({ connectionId: o.connectionId, model: o.model, label: o.label }, o.typed);
@@ -186,6 +211,8 @@ export function ModelPicker({
         break;
       }
       case 'Escape':
+        // Inline, Escape belongs to the sheet around this, which is listening further up.
+        if (inline) break;
         e.preventDefault();
         e.stopPropagation();
         close(true);
@@ -216,10 +243,17 @@ export function ModelPicker({
         data-model={o.model}
         data-connection={o.connectionId}
         // mousedown, not click: the field's blur would close the list before a click landed.
-        onMouseDown={(e) => {
-          e.preventDefault();
-          pick(o);
-        }}
+        // Inline (a sheet on a touch screen) there is no blur to race, and a plain click is what a
+        // tap that was not a scroll produces.
+        onMouseDown={
+          inline
+            ? undefined
+            : (e) => {
+                e.preventDefault();
+                pick(o);
+              }
+        }
+        onClick={inline ? () => pick(o) : undefined}
         onMouseMove={() => setActive(i)}
       >
         <span className="model-check" aria-hidden="true">{selected ? '●' : ''}</span>
@@ -230,14 +264,14 @@ export function ModelPicker({
 
   return (
     <div
-      className="model-line"
+      className={`model-line${inline ? ' inline' : ''}`}
       ref={rootRef}
       data-testid="model-line"
       onBlur={(e) => {
-        if (open && !e.currentTarget.contains(e.relatedTarget as Node | null)) close(false);
+        if (open && !inline && !e.currentTarget.contains(e.relatedTarget as Node | null)) close(false);
       }}
     >
-      <button
+      {!inline && <button
         ref={buttonRef}
         type="button"
         className={`model-button${current ? '' : ' unset'}`}
@@ -259,7 +293,7 @@ export function ModelPicker({
         <span className="model-name">{buttonText}</span>
         {current?.label && <span className="model-provider">{current.label}</span>}
         <span className="model-caret" aria-hidden="true">▾</span>
-      </button>
+      </button>}
       {(problem || note) && (
         <span className={`model-note${problem ? ' problem' : ''}`} data-testid="model-note" role={problem ? 'alert' : 'status'}>
           {problem || note}

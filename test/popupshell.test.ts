@@ -24,10 +24,17 @@ test('the popup shell publishes the layout it picked', () => {
   assert.match(app, /const layout = popupLayout\(pointer\)/);
 });
 
-test('the navigation moves in the DOM, not with CSS order', () => {
-  // Under the header on a Mac, across the bottom on a phone. Reordering visually with `order`
-  // would leave the tab sequence saying something different from the screen.
-  assert.match(app, /\{layout === 'roomy' && nav\}\s*<div className="popup-body">\{views\}<\/div>\s*\{layout === 'compact' && nav\}/);
+test('the Mac has its tabs under the header, and the phone has no navigation bar at all', () => {
+  // Under the header on a Mac, in the DOM rather than with CSS `order`, so the tab sequence says
+  // what the screen says.
+  assert.match(app, /\{layout === 'roomy' && nav\}\s*<div className="popup-body">\{views\}<\/div>/);
+  // The phone used to carry the same three across the bottom, permanently, under the composer.
+  // On a 844px screen with the keyboard up that row was part of why the transcript had 32px. It
+  // is now behind the menu in the compact top bar, and must not come back as a bar.
+  assert.doesNotMatch(app, /layout === 'compact' && nav/);
+  assert.doesNotMatch(css.replace(/\/\*[\s\S]*?\*\//g, ''), /\[data-layout='compact'\] \.popup-nav/);
+  assert.match(app, /data-action="menu"/);
+  assert.match(app, /data-action="back-to-chat"/);
 });
 
 test('the keyboard inset is measured on the phone only', () => {
@@ -39,7 +46,7 @@ test('the keyboard inset is measured on the phone only', () => {
 test('every thumb-sized rule is scoped to the phone', () => {
   // The numbers a thumb needs and a mouse does not: Apple's 44px, the 48px nav row, the 48x28
   // switch, the 16px field size that stops iOS zooming, and 100dvh.
-  const thumb = /(min-height: 4[48]px|min-width: 44px|width: 48px|max\(16px|100dvh)/;
+  const thumb = /(min-height: (4[48]|52)px|min-width: 44px|\bheight: 44px|width: 4[48]px|max\(16px|\d+dvh)/;
   // Comments first: they quote these numbers while explaining them, and a comment is not a rule.
   const rules = css.replace(/\/\*[\s\S]*?\*\//g, '').split('}');
   let checked = 0;
@@ -51,7 +58,44 @@ test('every thumb-sized rule is scoped to the phone', () => {
     assert.match(selector, /data-layout='compact'/, `unscoped thumb sizing on: ${selector.trim()}`);
   }
   // A typo in the regex above would pass this file while checking nothing.
-  assert.ok(checked >= 6, `only ${checked} thumb-sized rules found; the scan has gone blind`);
+  assert.ok(checked >= 20, `only ${checked} thumb-sized rules found; the scan has gone blind`);
+});
+
+test('every rule that draws the compact shell is scoped to it', () => {
+  // The content-first shell is a different TREE in compact (a top bar, a draft pill, a one-row
+  // composer, bottom sheets). None of those elements are mounted anywhere else, but a rule for
+  // one of them without the scope is one refactor away from restyling the Mac popover, so the
+  // scope is asserted rather than assumed. Same for the rules that tighten the shared views.
+  const shell = /\.(cbar|cbtn|sheet|draft-pill|composer-row|composer\.compact|compact-note|steps-fold|note-x|mod-foot|mod-more)\b/;
+  const shared = /(\.messages|\.msg\b|\.tool\b|\.card\.hero|\.activity\b|\.artifact|\.model-line|\.modpicker|button\.linklike|(^|[\s,])select\b)/;
+  const rules = css.replace(/\/\*[\s\S]*?\*\//g, '').split('}');
+  let checked = 0;
+  for (const rule of rules) {
+    const head = (rule.split('{')[0] ?? '').replace(/@media[^{]*$/, '');
+    for (const selector of head.split(',')) {
+      const sel = selector.trim();
+      if (!sel || sel.startsWith('@') || sel === 'from' || sel === 'to') continue;
+      if (!shell.test(sel) && !shared.test(sel)) continue;
+      // `.view, .messages` momentum scrolling is the one shared rule that is for both layouts.
+      if (/^\.app\[data-surface='popup'\] \.(view|messages)$/.test(sel)) continue;
+      checked += 1;
+      assert.match(sel, /\[data-layout='compact'\]/, `compact-shell rule without the compact scope: ${sel}`);
+    }
+  }
+  assert.ok(checked >= 60, `only ${checked} compact-shell selectors found; the scan has gone blind`);
+});
+
+test('the compact shell is a different tree only in compact', () => {
+  // Chat, Mods and the draft panel branch on `compact` from the shell context, which App only
+  // ever sets for the popup on a coarse pointer. The default is the panel's: nothing compact.
+  const shellCtx = readFileSync(root + 'entrypoints/sidepanel/shell.ts', 'utf8');
+  assert.match(shellCtx, /PANEL_SHELL: Shell = \{ compact: false/);
+  assert.match(app, /const compact = surface === 'popup' && layout === 'compact';/);
+  assert.match(app, /compact \? \{ compact, barSlot, sheetHost \} : PANEL_SHELL/);
+  const sheet = readFileSync(root + 'entrypoints/sidepanel/components/Sheet.tsx', 'utf8');
+  // A sheet with nowhere to be portalled (any shell but compact) renders nothing.
+  assert.match(sheet, /if \(!sheetHost\) return null;/);
+  assert.match(sheet, /role="dialog" aria-modal="true" aria-labelledby=\{titleId\}/);
 });
 
 test('the Mac popup has a window size, because there is no viewport to fill', () => {
@@ -129,23 +173,77 @@ test('the layout decision does not read a width the layout itself produces', () 
   assert.match(pointer, /useState<PointerEnvironment>\(read\)/);
 });
 
-test('the Mac navigation is shorter than the phone navigation', () => {
-  const compact = /\.app\[data-surface='popup'\]\[data-layout='compact'\] \.popup-nav button \{([\s\S]*?)\}/.exec(css)?.[1] ?? '';
+test('the Mac navigation keeps a mouse-sized row', () => {
   const roomy = /\.app\[data-surface='popup'\]\[data-layout='roomy'\] \.popup-nav button \{([\s\S]*?)\}/.exec(css)?.[1] ?? '';
-  // The roomy row is for a mouse in a 560px window. If it inherits the phone's 48px target, the
-  // content loses space and the desktop popup reads like a shrunk sheet.
-  assert.match(compact, /min-height: 48px/);
+  // The roomy row is for a mouse in a 560px window. A thumb-sized target there costs the content
+  // space and makes the desktop popup read like a shrunk sheet.
   assert.match(roomy, /min-height: 34px/);
-  assert.ok(!/min-height: 48px/.test(roomy), 'phone navigation height leaked into roomy layout');
+  assert.ok(!/min-height: 4[48]px/.test(roomy), 'a phone-sized target leaked into the roomy navigation');
 });
 
-test('the two navigation positions each carry their own hairline', () => {
-  // A bar at the bottom is separated by its top edge and one under the header by its bottom edge.
-  // Both borders at once is a boxed-in strip; neither is a row of buttons floating in the body.
-  const compact = /\[data-layout='compact'\] \.popup-nav \{([\s\S]*?)\}/.exec(css)?.[1] ?? '';
+test('the Mac navigation is separated from the content by its bottom edge', () => {
   const roomy = /\[data-layout='roomy'\] \.popup-nav \{([\s\S]*?)\}/.exec(css)?.[1] ?? '';
-  assert.match(compact, /border-top: var\(--border-width\)/);
-  assert.match(compact, /border-bottom: 0/);
   assert.match(roomy, /border-bottom: var\(--border-width\)/);
   assert.match(roomy, /border-top: 0/);
+});
+
+// ---------------------------------------------------------------------------
+// The iPad popover
+// ---------------------------------------------------------------------------
+//
+// Found on the owner's iPad Pro: a tiny popover that could not be resized. Safari on iPad shows the
+// popup as a popover sized from the document, as on a Mac, but an iPad has a coarse pointer, so
+// the Mac's pre-mount rule never reached it. It has its own, keyed off the SCREEN.
+
+const bare = preMount.replace(/\/\*[\s\S]*?\*\//g, '');
+const TABLET = '(pointer: coarse) and (min-device-width: 700px)';
+
+test('the iPad gets a size before anything runs, from the screen and nothing else', () => {
+  assert.ok(bare.includes(`@media ${TABLET} {`), 'popup-size.css has no iPad rule');
+  const block = /@media \(pointer: coarse\) and \(min-device-width: 700px\) \{([\s\S]*?)\n\}/.exec(bare)?.[1] ?? '';
+  for (const sel of ['html', 'body', '#root']) assert.ok(new RegExp(`(^|[,{\\s])${sel}\\s*[,{]`).test(block), `${sel} is not sized by the iPad rule`);
+  assert.match(block, /--popover-w: 440px/);
+  assert.match(block, /width: var\(--popover-w\)/);
+  assert.match(block, /height: var\(--popover-h\)/);
+  // Nothing in the whole file may depend on the viewport: inside a content-sized popover every
+  // viewport unit and every width query is the document's own output coming back round.
+  assert.doesNotMatch(bare, /\d(vw|vh|dvh|dvw|svh|lvh)\b/);
+  assert.doesNotMatch(bare, /@media[^{]*\((min|max)-(width|height)\b/);
+});
+
+test('the iPad rule never reaches a phone, and never reaches a fine pointer', () => {
+  // Every rule in the file that is not the Mac's names a coarse pointer AND a tablet's screen.
+  const queries = [...bare.matchAll(/@media ([^{]+)\{/g)].map((m) => m[1]!.trim());
+  assert.ok(queries.length >= 4);
+  for (const q of queries) {
+    if (q === '(pointer: fine)') continue;
+    assert.match(q, /^\(pointer: coarse\) and \(min-device-width: (\d+)px\)$/, `unexpected query: ${q}`);
+    const floor = Number(/min-device-width: (\d+)px/.exec(q)![1]);
+    // The widest iPhone screen is 440pt and the narrowest iPad (mini) is 744pt.
+    assert.ok(floor > 440 && floor >= 700, `${q} would match an iPhone`);
+  }
+  // And the first tier has to admit the iPad mini.
+  assert.ok(700 <= 744);
+});
+
+test('the iPad heights rise with the screen and stay under it', () => {
+  const tiers = [...bare.matchAll(/min-device-width: (\d+)px\) \{[\s\S]*?--popover-h: (\d+)px/g)].map((m) => ({ screen: Number(m[1]), height: Number(m[2]) }));
+  assert.deepEqual(tiers.map((t) => t.height), [600, 660, 720]);
+  for (const t of tiers) {
+    // device-width is the portrait width, which is the landscape HEIGHT: the popover has to fit
+    // under Safari's toolbar on a screen that tall.
+    assert.ok(t.height <= t.screen - 100, `${t.height}px does not fit a ${t.screen}px-tall landscape screen`);
+  }
+});
+
+test('the app keeps the iPad size the stylesheet stated, and marks the device the same way', () => {
+  const tablet = /html:has\(\.app\[data-surface='popup'\]\[data-layout='compact'\]\[data-device='tablet'\]\)[\s\S]*?\{([\s\S]*?)\}/.exec(css)?.[1] ?? '';
+  // The same custom properties, so the two cannot drift; --tablet-* is the post-mount adoption.
+  assert.match(tablet, /width: var\(--tablet-w, var\(--popover-w, 440px\)\)/);
+  assert.match(tablet, /height: var\(--tablet-h, var\(--popover-h, 660px\)\)/);
+  // The hook's query is the stylesheet's, to the letter.
+  assert.ok(pointer.includes(`'${TABLET}'`), 'usePointer.ts and popup-size.css disagree about what an iPad is');
+  assert.match(app, /data-device=\{compact && pointer\.tablet \? 'tablet' : undefined\}/);
+  // It is still the compact layout: thumb-sized targets and the content-first shell.
+  assert.doesNotMatch(readFileSync(root + 'lib/mobile.ts', 'utf8'), /'tablet'/);
 });

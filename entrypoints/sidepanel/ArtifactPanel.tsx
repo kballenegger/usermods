@@ -34,6 +34,7 @@ export function ArtifactPanel({
   onRollback,
   editingModName,
   openDashboard,
+  expanded = false,
 }: {
   artifact: Artifact;
   /** A run is in flight in this chat: Save and Rollback would race the version it is writing. */
@@ -57,8 +58,15 @@ export function ArtifactPanel({
    */
   editingModName?: string;
   openDashboard: () => void;
+  /**
+   * Always open, with no chevron. The compact shell (iPhone, iPad) shows the draft as a one-line
+   * pill above the composer and raises THIS panel in a bottom sheet when the pill is tapped, so
+   * there the collapsed state is the pill's job and the panel has only its open one.
+   */
+  expanded?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [openState, setOpen] = useState(false);
+  const open = expanded || openState;
   const [showDiff, setShowDiff] = useState(false);
   /** The draft name while it is being edited inline, or null when it is a heading again. */
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -100,15 +108,17 @@ export function ArtifactPanel({
         {/* Identity and actions are separate groups so the buttons never shrink and the name is
             always the thing that gives up width. See artifact.css. */}
         <div className="artifact-ident">
-          <button
-            className="artifact-chevron"
-            onClick={() => setOpen((v) => !v)}
-            aria-expanded={open}
-            title={open ? 'Collapse the draft' : 'Show the draft, its versions and its diff'}
-            data-testid="artifact-toggle"
-          >
-            {open ? '▾' : '▸'}
-          </button>
+          {!expanded && (
+            <button
+              className="artifact-chevron"
+              onClick={() => setOpen((v) => !v)}
+              aria-expanded={open}
+              title={open ? 'Collapse the draft' : 'Show the draft, its versions and its diff'}
+              data-testid="artifact-toggle"
+            >
+              {open ? '▾' : '▸'}
+            </button>
+          )}
           {/* Each separator is named for the thing it precedes, so hiding that thing at a
               breakpoint hides its separator with it. Positional selectors could not do this:
               nth-of-type counts spans, and every part of this bar is a span. */}

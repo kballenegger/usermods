@@ -70,6 +70,28 @@ html:has(.app[data-surface='popup'][data-layout='roomy']) #root {
 }
 
 /*
+ * The iPad popover's size, once the app is up.
+ *
+ * An iPad is 'compact' (a thumb drives it) but Safari shows the popup there the way it does on a
+ * Mac: as a popover sized FROM the document. `height: 100dvh` with no width is therefore the same
+ * deadlock the Mac had, and the popover comes out tiny. popup-size.css states a size before React
+ * mounts, as --popover-w and --popover-h, picked by the SCREEN's width so that nothing in the
+ * decision is a measurement the popover itself produces. This rule is the one that holds that
+ * size once `data-layout` is on and the rule above would otherwise take it away again.
+ *
+ * --tablet-w and --tablet-h are App.tsx adopting the viewport the system actually settled on (a
+ * popover Safari clamped, or a sheet in Split View); unset, the static size stands. See
+ * tabletPopupSize in lib/compactshell.ts for why that cannot collapse the popover.
+ */
+html:has(.app[data-surface='popup'][data-layout='compact'][data-device='tablet']),
+html:has(.app[data-surface='popup'][data-layout='compact'][data-device='tablet']) body,
+html:has(.app[data-surface='popup'][data-layout='compact'][data-device='tablet']) #root {
+  width: var(--tablet-w, var(--popover-w, 440px));
+  height: var(--tablet-h, var(--popover-h, 660px));
+  min-height: 0;
+}
+
+/*
  * No rubber-band behind the sheet. `contain` keeps a scroll gesture that reaches the end of the
  * transcript from turning into a scroll of the document behind it, which on iOS is what makes an
  * in-app scroller feel like it is fighting you. `none` would also kill pull-to-dismiss, which is a
@@ -155,25 +177,6 @@ html:has(.app[data-surface='popup'][data-layout='roomy']) #root {
   gap: var(--sp-1);
 }
 
-/* 44px, and the label hidden: at this size two icons and a chip are all the header has room for. */
-.app[data-surface='popup'][data-layout='compact'] .popup-head-actions .tab-action,
-.app[data-surface='popup'][data-layout='compact'] .popup-head-actions button {
-  min-width: 44px;
-  min-height: 44px;
-  justify-content: center;
-}
-
-.app[data-surface='popup'][data-layout='compact'] .popup-head-actions .tab-action-label {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
 /* ---------------------------------------------------------------------------
  * Body
  * ------------------------------------------------------------------------ */
@@ -219,9 +222,10 @@ html:has(.app[data-surface='popup'][data-layout='roomy']) #root {
  * Three destinations in a bar of equal thirds, text labels rather than icons: Chat, Mods and
  * Settings have no icons anybody would guess, and three unlabelled glyphs would be a quiz.
  *
- * Where the bar sits is the layouts' business. App.tsx puts it after the body on a phone and before
- * it on a Mac, so the two rules below only have to agree with the DOM about which edge carries the
- * hairline.
+ * This bar is the Mac's. The phone used to carry the same three across the bottom of the screen,
+ * permanently, under the composer; it now reaches them from the menu in its top bar, because on a
+ * phone that row was 48px of every screen spent on something done a few times a session. See "The
+ * compact shell" at the end of this file.
  */
 .app[data-surface='popup'] .popup-nav {
   flex: none;
@@ -236,25 +240,6 @@ html:has(.app[data-surface='popup'][data-layout='roomy']) #root {
   flex: 1 1 0;
   border-radius: 0;
   font-size: var(--fs-label);
-}
-
-/*
- * The phone: across the bottom, the platform convention and the reachable part of the screen.
- * Full-width targets a third of the screen each, 48px tall, which clears Apple's 44px with the
- * margin a moving thumb needs. `border-radius: 0` above because a pill inside a bar at this size
- * reads as a floating button rather than a tab.
- */
-.app[data-surface='popup'][data-layout='compact'] .popup-nav {
-  padding-bottom: env(safe-area-inset-bottom);
-  padding-left: env(safe-area-inset-left);
-  padding-right: env(safe-area-inset-right);
-  border-bottom: 0;
-  border-top: var(--border-width) solid var(--border-hair);
-}
-
-.app[data-surface='popup'][data-layout='compact'] .popup-nav button {
-  min-height: 48px;
-  padding: var(--sp-2) var(--sp-1);
 }
 
 /*
@@ -343,25 +328,6 @@ html:has(.app[data-surface='popup'][data-layout='roomy']) #root {
   font-size: max(16px, var(--fs-body));
 }
 
-/*
- * The composer, with room to read what you wrote.
- *
- * `field-sizing: content` grows the box with its text on Chrome; Safari 16-18 does not have it, so
- * on iOS the box is whatever min-height says and scrolls past it. 96px is about four lines, which is
- * enough to review a prompt before sending it rather than typing into a letterbox. The 40dvh cap
- * from styles.css still applies, so a long paste cannot take the sheet over.
- */
-.app[data-surface='popup'][data-layout='compact'] .composer {
-  padding: var(--sp-2) var(--sp-3) var(--sp-3);
-  padding-left: max(var(--sp-3), env(safe-area-inset-left));
-  padding-right: max(var(--sp-3), env(safe-area-inset-right));
-}
-
-.app[data-surface='popup'][data-layout='compact'] .composer textarea {
-  min-height: 96px;
-  padding: 12px;
-}
-
 /* Code you are reviewing on a phone: wrap it. A horizontal scroller inside a vertical one is a
    gesture fight, and a diff you have to swipe sideways through does not get read. */
 .app[data-surface='popup'] pre,
@@ -389,5 +355,1092 @@ html:has(.app[data-surface='popup'][data-layout='roomy']) #root {
 
   .app[data-surface='popup'] .popup-nav button:active {
     background: var(--surface-well);
+  }
+}
+
+/* ===========================================================================
+ * The compact shell: the chat view on a phone, content first
+ *
+ * The owner's report from a real iPhone: the chat could not be seen for everything stacked above
+ * and below it. Measured (scripts/safari-preview.mjs --measure), the transcript had 300px of an
+ * 844px screen, and 32px with the keyboard up. The shell this section draws keeps three things on
+ * screen in the chat view: one 44px bar, the transcript, and a one-row composer, with a one-line
+ * pill for the draft when there is one. Everything else is one tap away in a bottom sheet.
+ *
+ * Every rule below is scoped to [data-layout='compact']. The Mac popover and the side panel do not
+ * mount any of these elements and cannot match any of these selectors, and test/popupshell.test.ts
+ * fails if a rule for one of them turns up here without that scope.
+ * ======================================================================== */
+
+/* ---------------------------------------------------------------------------
+ * The top bar
+ * ------------------------------------------------------------------------ */
+
+/*
+ * 44px, plus the notch. It replaces two rows: the header that named the page and the chat bar
+ * with its switcher and three icon buttons. On the chat view Chat.tsx fills the slot with the
+ * site, the chat's title (the way into the chat sheet) and the model; on Mods and Settings it is a
+ * way back to the chat and the view's name. The menu button is always last.
+ */
+.app[data-surface='popup'][data-layout='compact'] .cbar {
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  min-height: 44px;
+  padding-top: env(safe-area-inset-top);
+  padding-left: max(var(--sp-1), env(safe-area-inset-left));
+  padding-right: max(var(--sp-1), env(safe-area-inset-right));
+  background: var(--surface-1);
+  border-bottom: var(--border-width) solid var(--border-hair);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .cbar-slot {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+}
+
+/* Nothing mounted to fill it (the first-run notice): the bar falls back to naming the page. */
+.app[data-surface='popup'][data-layout='compact'] .cbar-slot:empty {
+  display: none;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .cbar-slot:not(:empty) + .cbar-site {
+  display: none;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .cbar-site {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 0 var(--sp-2);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .cbar-host {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .cbar-site .cbar-host {
+  font-size: var(--fs-body);
+  color: var(--text-1);
+}
+
+/* The chat's title, two lines in 44px: the site above in mono, the title below in the text face. */
+.app[data-surface='popup'][data-layout='compact'] .cbar-chat {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 1px;
+  padding: 0 var(--sp-2);
+  background: none;
+  border: 0;
+  border-radius: var(--r-field);
+  color: var(--text-1);
+  text-align: left;
+  cursor: pointer;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .cbar-chat-site {
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--text-3);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .cbar-chat-title {
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font: var(--fw-label) var(--fs-title) / 20px var(--font-ui);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .cbar-chat-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .cbar-chat-title .ico {
+  flex: none;
+  color: var(--text-3);
+}
+
+/*
+ * The model, as a chip. It is small to look at and 44px to hit: the button is the full height of
+ * the bar and the chip is drawn inside it. Two taps to change model (the chip, then a model).
+ */
+.app[data-surface='popup'][data-layout='compact'] .cbar-model {
+  flex: 0 1 auto;
+  min-width: 44px;
+  max-width: 32%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--sp-1);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .cbar-model-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 3px 6px;
+  border: var(--border-width) solid var(--border-hair);
+  border-radius: var(--r-pill);
+  font: 400 11px / 14px var(--font-mono);
+  color: var(--text-2);
+}
+
+/* No usable model: amber and the words, never the colour alone. */
+.app[data-surface='popup'][data-layout='compact'] .cbar-model.unset .cbar-model-name {
+  border-color: var(--warn);
+  color: var(--warn-text);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .cbar-btn {
+  flex: none;
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: var(--r-field);
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .cbar-btn:active,
+.app[data-surface='popup'][data-layout='compact'] .cbar-chat:active,
+.app[data-surface='popup'][data-layout='compact'] .cbar-model:active .cbar-model-name {
+  background: var(--surface-well);
+}
+
+/* "‹ Chat": the way back is a word, not only an arrow, so it is obvious where it goes. */
+.app[data-surface='popup'][data-layout='compact'] .cbar-back {
+  padding: 0 var(--sp-2) 0 var(--sp-1);
+  font: var(--fw-label) var(--fs-ui) / 1 var(--font-ui);
+  color: var(--primary-text);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .cbar-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  align-self: center;
+  margin: 0;
+  padding: 0 var(--sp-2);
+  font: var(--fw-label) var(--fs-title) / 20px var(--font-ui);
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-1);
+}
+
+/* ---------------------------------------------------------------------------
+ * The transcript
+ * ------------------------------------------------------------------------ */
+
+/* Tighter all round: on a 390px screen the panel's 16px gutters are an eighth of the width. */
+.app[data-surface='popup'][data-layout='compact'] .messages {
+  padding: 10px var(--sp-3);
+  padding-left: max(var(--sp-3), env(safe-area-inset-left));
+  padding-right: max(var(--sp-3), env(safe-area-inset-right));
+  gap: var(--sp-2);
+}
+
+/* A point up from the panel's 13px: this is read at arm's length, not at a desk. */
+.app[data-surface='popup'][data-layout='compact'] .msg.user,
+.app[data-surface='popup'][data-layout='compact'] .msg.assistant {
+  font-size: var(--fs-ui);
+  line-height: 1.5;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .msg.user {
+  padding: 6px 10px;
+}
+
+/*
+ * A tool row is ONE line on a phone: dot, name, and whatever of its detail fits. It is 36px to look
+ * at and 44px to hit (the ::before reaches 4px into the 8px gap on either side, so neighbours'
+ * targets meet and never overlap). Opened, the name wraps again and the detail shows.
+ */
+.app[data-surface='popup'][data-layout='compact'] .tool {
+  padding: 0 0 0 10px;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .tool > summary,
+.app[data-surface='popup'][data-layout='compact'] .steps-fold > summary {
+  position: relative;
+  min-height: 36px;
+  align-items: center;
+  font-size: var(--fs-meta);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .tool > summary::before,
+.app[data-surface='popup'][data-layout='compact'] .steps-fold > summary::before {
+  content: '';
+  position: absolute;
+  inset: -4px 0;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .tool > summary .dot,
+.app[data-surface='popup'][data-layout='compact'] .steps-fold > summary .dot {
+  align-self: center;
+  margin-top: 0;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .tool:not([open]) > summary > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .tool[open] {
+  padding-bottom: var(--sp-2);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .tool pre {
+  margin-top: 0;
+  max-height: 160px;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .tool pre + pre {
+  margin-top: var(--sp-1);
+}
+
+/* A folded run of tool rows: the same rail and dot, a count, and a chevron that turns when open. */
+.app[data-surface='popup'][data-layout='compact'] .steps-fold {
+  border-left: var(--border-width) solid var(--border-hair);
+  padding-left: 10px;
+  color: var(--text-2);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .steps-fold.error {
+  border-left-color: var(--error);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .steps-fold > summary {
+  cursor: pointer;
+  list-style: none;
+  display: grid;
+  grid-template-columns: 7px 1fr 16px;
+  gap: var(--sp-2);
+  font-family: var(--font-mono);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .steps-fold > summary::-webkit-details-marker {
+  display: none;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .steps-fold-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .steps-fold > summary .ico {
+  color: var(--text-3);
+  transition: transform 120ms ease;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .steps-fold[open] > summary .ico {
+  transform: rotate(180deg);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .steps-fold-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-1) 0 var(--sp-2);
+}
+
+/*
+ * The proposal card, compact: what it is called, one line of what it does, where it runs, and the
+ * two things you do with it. The code stays behind its disclosure, and the full description, the
+ * versions and the diff are in the draft sheet, one tap from the pill under the transcript.
+ */
+.app[data-surface='popup'][data-layout='compact'] .card.hero {
+  padding: 10px var(--sp-3);
+  gap: 6px;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .card.hero h4 {
+  margin: 0;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .card.hero .desc {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  overflow: hidden;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .card.hero > .row:has(> .chip) {
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .card.hero > .row > .chip {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .card.hero > details > summary {
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .card.hero > .row:has(> .btn) {
+  flex-wrap: nowrap;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .card.hero > .row > .btn {
+  padding-left: var(--sp-3);
+  padding-right: var(--sp-3);
+  white-space: nowrap;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .card.hero > .row > .btn.primary {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Errors, the resume row and notices: the same words in less room. */
+.app[data-surface='popup'][data-layout='compact'] .messages .error {
+  padding: var(--sp-2) 10px;
+  font-size: var(--fs-body);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .notice {
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3);
+  font-size: var(--fs-meta);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .empty {
+  padding: var(--sp-4) var(--sp-3);
+}
+
+/* The activity line: one slim row. Its Stop stays a full-height target. */
+.app[data-surface='popup'][data-layout='compact'] .activity {
+  min-height: 32px;
+  padding: 0 var(--sp-3);
+  padding-left: max(var(--sp-3), env(safe-area-inset-left));
+  padding-right: max(var(--sp-3), env(safe-area-inset-right));
+}
+
+.app[data-surface='popup'][data-layout='compact'] .activity button.activity-action {
+  position: relative;
+  min-height: 28px;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .activity button.activity-action::before {
+  content: '';
+  position: absolute;
+  inset: -8px -6px;
+}
+
+/* ---------------------------------------------------------------------------
+ * The draft pill
+ * ------------------------------------------------------------------------ */
+
+/*
+ * The draft panel and the "EDITING" line, as one 44px line, and only while a draft exists:
+ * "Wider comments · v2 · editing", with the one action a draft is for on the line itself. The name
+ * side opens the whole panel in a sheet. It keeps the panel's blue rail, which is what makes it
+ * read as the same object.
+ */
+.app[data-surface='popup'][data-layout='compact'] .draft-pill {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 44px;
+  padding-left: max(var(--sp-1), env(safe-area-inset-left));
+  padding-right: max(var(--sp-3), env(safe-area-inset-right));
+  background: var(--surface-1);
+  border-top: var(--border-width) solid var(--border-hair);
+  box-shadow: inset 2px 0 0 var(--primary-fill);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .draft-pill-open {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 var(--sp-2);
+  background: none;
+  border: 0;
+  color: var(--text-2);
+  font: 400 var(--fs-body) / 1.3 var(--font-ui);
+  text-align: left;
+  cursor: pointer;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .draft-pill-open:active {
+  background: var(--surface-well);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .draft-pill-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--fw-label);
+  color: var(--text-1);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .draft-pill-sep,
+.app[data-surface='popup'][data-layout='compact'] .draft-pill-v,
+.app[data-surface='popup'][data-layout='compact'] .draft-pill-status,
+.app[data-surface='popup'][data-layout='compact'] .draft-pill-open .ico {
+  flex: none;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .draft-pill-sep,
+.app[data-surface='popup'][data-layout='compact'] .draft-pill-open .ico {
+  color: var(--text-3);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .draft-pill-v {
+  font-family: var(--font-mono);
+  color: var(--primary-text);
+}
+
+/* Saving writes over a mod that is running on real pages, so "editing" is the word that stands out. */
+.app[data-surface='popup'][data-layout='compact'] .draft-pill[data-status='editing'] .draft-pill-status {
+  font-weight: var(--fw-label);
+  color: var(--primary-text);
+}
+
+/* 32px to look at, the full height of the pill to hit. */
+.app[data-surface='popup'][data-layout='compact'] .draft-pill .draft-pill-save {
+  position: relative;
+  flex: none;
+  min-height: 32px;
+  padding: 0 var(--sp-3);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .draft-pill .draft-pill-save::before {
+  content: '';
+  position: absolute;
+  inset: -6px -4px;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .artifact-status {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  padding: 6px var(--sp-1) 6px var(--sp-3);
+}
+
+/* The dismiss on a note that only reports something already done. */
+.app[data-surface='popup'][data-layout='compact'] .note-x {
+  flex: none;
+  min-width: 44px;
+  min-height: 44px;
+  margin: -10px 0 -10px auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 0;
+  color: var(--text-3);
+  cursor: pointer;
+}
+
+/* ---------------------------------------------------------------------------
+ * The composer
+ * ------------------------------------------------------------------------ */
+
+/*
+ * One row: "+", the message box, Send. The box starts at one line and grows with its text (Chat.tsx
+ * sets its height; Safari does not have field-sizing everywhere this ships), up to about five
+ * lines, then scrolls. The row aligns to the bottom, so the buttons stay by the thumb while the
+ * box grows upward.
+ *
+ * It pads itself clear of the home indicator, and stops doing that while the keyboard is up: the
+ * indicator is under the keyboard then, and env(safe-area-inset-bottom) does not know.
+ */
+.app[data-surface='popup'][data-layout='compact'] .composer.compact {
+  gap: 6px;
+  padding: var(--sp-2);
+  padding-left: max(var(--sp-2), env(safe-area-inset-left));
+  padding-right: max(var(--sp-2), env(safe-area-inset-right));
+  padding-bottom: max(var(--sp-2), env(safe-area-inset-bottom));
+}
+
+html[data-keyboard] .app[data-surface='popup'][data-layout='compact'] .composer.compact {
+  padding-bottom: var(--sp-2);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .composer-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .composer.compact textarea {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  min-height: 44px;
+  height: 44px;
+  max-height: min(132px, 30dvh);
+  padding: 10px var(--sp-3);
+  line-height: 22px;
+  field-sizing: fixed;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .composer.compact textarea::placeholder {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The two buttons beside the box: 44px squares, a mark each, a real name on each for VoiceOver. */
+.app[data-surface='popup'][data-layout='compact'] .cbtn {
+  flex: none;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: var(--surface-2);
+  border: var(--border-width) solid var(--border-control);
+  border-radius: var(--r-field);
+  color: var(--text-1);
+  cursor: pointer;
+  transition: transform 80ms ease, background 120ms ease;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .cbtn:active:not(:disabled) {
+  transform: translate(1px, 1px);
+  background: var(--surface-well);
+}
+
+/* Send is the screen's one primary: the fill, the bright edge and the hard shadow. */
+.app[data-surface='popup'][data-layout='compact'] .cbtn.send {
+  background: var(--btn-primary-bg);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-raise);
+  color: var(--btn-primary-fg);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .cbtn.send:active:not(:disabled) {
+  background: var(--primary-fill-press);
+  box-shadow: var(--shadow-press);
+}
+
+/* Stop is the danger outline, as it is in the panel. */
+.app[data-surface='popup'][data-layout='compact'] .cbtn.send.stop {
+  background: none;
+  border-color: var(--error);
+  box-shadow: none;
+  color: var(--error-text);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .cbtn:disabled {
+  cursor: default;
+  background: var(--surface-well);
+  border-color: var(--border-hair);
+  box-shadow: none;
+  color: var(--btn-disabled-fg);
+}
+
+/* A line above the row, for the two things about the model that cannot wait for a sheet. */
+.app[data-surface='popup'][data-layout='compact'] .compact-note {
+  display: block;
+  width: 100%;
+  padding: 0 var(--sp-1);
+  background: none;
+  border: 0;
+  font: 400 var(--fs-meta) / 1.4 var(--font-ui);
+  color: var(--text-2);
+  text-align: left;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .compact-note.problem {
+  min-height: 44px;
+  color: var(--error-text);
+  cursor: pointer;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .compact-note-act {
+  color: var(--primary-text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .composer.compact .attach-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+}
+
+/* ---------------------------------------------------------------------------
+ * Bottom sheets
+ * ------------------------------------------------------------------------ */
+
+/*
+ * One component (components/Sheet.tsx), one look. The root covers what is visible: it stops at the
+ * keyboard when there is one, so a sheet with a field in it (rename, the model filter) sits on the
+ * keyboard the way the composer does. The panel is at most 85% of that, and scrolls inside.
+ */
+.app[data-surface='popup'][data-layout='compact'] .sheet-root {
+  position: fixed;
+  inset: 0 0 var(--keyboard-inset, 0px) 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+/* The scrim follows the theme (the page tone, not a fixed ink), for the reason the lightbox gives. */
+.app[data-surface='popup'][data-layout='compact'] .sheet-backdrop {
+  position: absolute;
+  inset: 0 0 calc(-1 * var(--keyboard-inset, 0px)) 0;
+  background: color-mix(in srgb, var(--bg-app) 72%, transparent);
+  touch-action: none;
+  animation: sheet-fade 160ms ease-out;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .sheet {
+  position: relative;
+  max-height: 85%;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  background: var(--surface-1);
+  border-top: var(--border-width) solid var(--border-card);
+  border-radius: var(--r-card) var(--r-card) 0 0;
+  outline: none;
+  animation: sheet-up 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: transform 160ms ease;
+}
+
+html[data-keyboard] .app[data-surface='popup'][data-layout='compact'] .sheet {
+  padding-bottom: 0;
+}
+
+/* The head is the drag handle: touch-action none, so a downward drag moves the sheet, not the page. */
+.app[data-surface='popup'][data-layout='compact'] .sheet-head {
+  flex: none;
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 52px;
+  padding: var(--sp-2) var(--sp-1) 0 var(--sp-4);
+  touch-action: none;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .sheet-grabber {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  width: 36px;
+  height: 4px;
+  margin-left: -18px;
+  border-radius: 2px;
+  background: var(--border-control);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .sheet-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: var(--fw-label) var(--fs-title) / 1.3 var(--font-ui);
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-1);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .sheet-close {
+  flex: none;
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: var(--r-field);
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .sheet-close:active {
+  background: var(--surface-well);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .sheet-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-1) var(--sp-3) var(--sp-3);
+}
+
+/* A group of rows: one outlined block, hairlines between, like a list in Settings on the phone. */
+.app[data-surface='popup'][data-layout='compact'] .sheet-list {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-2);
+  border: var(--border-width) solid var(--border-hair);
+  border-radius: var(--r-card);
+  overflow: hidden;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .sheet-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 6px var(--sp-3);
+  background: none;
+  border: 0;
+  border-top: var(--border-width) solid var(--border-hair);
+  color: var(--text-1);
+  font: 500 var(--fs-title) / 1.3 var(--font-ui);
+  text-align: left;
+  cursor: pointer;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .sheet-list > .sheet-row:first-child {
+  border-top: 0;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .sheet-row:active:not(:disabled) {
+  background: var(--surface-well);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .sheet-row:disabled {
+  cursor: default;
+  color: var(--btn-disabled-fg);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .sheet-row.danger {
+  color: var(--error-text);
+}
+
+/* Where you already are: the primary edge and a heavier label. Lime stays for "alive". */
+.app[data-surface='popup'][data-layout='compact'] .sheet-row.current {
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .sheet-row.current .sheet-row-label {
+  font-weight: var(--fw-label);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .sheet-row-icon {
+  flex: none;
+  width: 16px;
+  display: inline-flex;
+  justify-content: center;
+  color: var(--text-2);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .sheet-row.danger .sheet-row-icon {
+  color: inherit;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .sheet-row-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .sheet-row-value {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 55%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 400 var(--fs-meta) / 1.3 var(--font-mono);
+  color: var(--text-3);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .sheet-label {
+  padding: 10px var(--sp-3) 6px;
+  border-top: var(--border-width) solid var(--border-hair);
+  font: var(--fw-label) var(--fs-label) / 1.3 var(--font-ui);
+  letter-spacing: var(--lbl-tracking);
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .sheet-list > .sheet-label:first-child {
+  border-top: 0;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .sheet-text {
+  font-size: var(--fs-ui);
+  line-height: 1.5;
+  color: var(--text-2);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .sheet-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .sheet-form input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 var(--sp-3);
+  background: var(--surface-well);
+  border: var(--border-width) solid var(--border-control);
+  border-radius: var(--r-field);
+  color: var(--text-1);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .sheet-form input:focus-visible {
+  border-color: var(--focus-ring);
+  outline: none;
+}
+
+/* ---- What goes in the sheets: the panel's own components, let out of the panel's constraints ---- */
+
+/* The draft panel, always open. The sheet is the frame, so the panel drops its own. */
+.app[data-surface='popup'][data-layout='compact'] .sheet .artifact {
+  max-height: none;
+  overflow: visible;
+  border-top: 0;
+  box-shadow: none;
+  background: none;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .sheet .artifact-bar,
+.app[data-surface='popup'][data-layout='compact'] .sheet .artifact-editing,
+.app[data-surface='popup'][data-layout='compact'] .sheet .artifact-body {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .sheet .artifact-bar {
+  flex-wrap: wrap;
+  padding-top: 0;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .sheet .artifact-bar button.btn {
+  padding: 0 var(--sp-3);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .sheet .artifact-body {
+  overflow: visible;
+  max-height: none;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .sheet .artifact-vchip,
+.app[data-surface='popup'][data-layout='compact'] .sheet .artifact-difftoggle {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .sheet .artifact-title,
+.app[data-surface='popup'][data-layout='compact'] .sheet .artifact-editing button.linklike,
+.app[data-surface='popup'][data-layout='compact'] .sheet .artifact-note button.linklike,
+.app[data-surface='popup'][data-layout='compact'] .sheet .artifact-foot button.linklike {
+  min-height: 44px;
+}
+
+/* The model picker, drawn in place: no popover, no second frame, rows a thumb can hit. */
+.app[data-surface='popup'][data-layout='compact'] .sheet .model-line.inline {
+  display: block;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .sheet .model-line.inline .model-pop {
+  position: static;
+  max-height: none;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .sheet .model-line.inline .model-filter {
+  min-height: 44px;
+  margin: 0 0 var(--sp-2);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .sheet .model-line.inline .model-list {
+  overflow: visible;
+  background: var(--surface-2);
+  border: var(--border-width) solid var(--border-hair);
+  border-radius: var(--r-card);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .sheet .model-line.inline .model-option {
+  min-height: 44px;
+  align-items: center;
+  font-size: var(--fs-ui);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .sheet .model-line.inline .model-note {
+  display: block;
+  margin-bottom: var(--sp-2);
+}
+
+.app[data-surface='popup'][data-layout='compact'] .sheet .model-line.inline .model-foot {
+  margin-top: var(--sp-2);
+  padding: 0;
+  border-top: 0;
+  background: none;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .sheet .model-line.inline .model-foot button.linklike {
+  min-height: 44px;
+}
+
+/* The mod picker: the sheet already has a title and a close, so its own header row goes. */
+.app[data-surface='popup'][data-layout='compact'] .sheet .modpicker {
+  max-height: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .sheet .modpicker > .row:first-child {
+  display: none;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .sheet .modpicker-row {
+  min-height: 48px;
+}
+
+/* ---------------------------------------------------------------------------
+ * Mods and Settings on a phone
+ * ------------------------------------------------------------------------ */
+
+/*
+ * Fields are 44px like everything else you press.
+ *
+ * A select is drawn by this stylesheet rather than by the platform (`appearance: none`, with the
+ * caret as two gradients in currentColor so it follows the theme). Tapping it still opens the
+ * native iOS picker, which is the better control and the reason it stays a <select>. The native
+ * DRAWING is what goes: WebKit's themed pop-up button ignores min-height and padding, so left to
+ * the platform it is whatever height the platform likes, and on desktop WebKit that is 23px.
+ */
+.app[data-surface='popup'][data-layout='compact'] input:not([type='checkbox']):not([type='radio']):not([type='file']),
+.app[data-surface='popup'][data-layout='compact'] select {
+  min-height: 44px;
+}
+
+.app[data-surface='popup'][data-layout='compact'] select {
+  -webkit-appearance: none;
+  appearance: none;
+  padding: 9px 32px 9px 11px;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: calc(100% - 17px) 50%, calc(100% - 12px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+/*
+ * Text links and disclosures stay the size of their words and are hit at 44px: the target is a
+ * ::before reaching past the text, so nothing in a sentence or a card has to grow to be pressable.
+ */
+.app[data-surface='popup'][data-layout='compact'] button.linklike,
+.app[data-surface='popup'][data-layout='compact'] .card details > summary,
+.app[data-surface='popup'][data-layout='compact'] .disclose {
+  position: relative;
+}
+
+.app[data-surface='popup'][data-layout='compact'] button.linklike::before,
+.app[data-surface='popup'][data-layout='compact'] .card details > summary::before,
+.app[data-surface='popup'][data-layout='compact'] .disclose::before {
+  content: '';
+  position: absolute;
+  inset: -14px -4px;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .popup-body > .view {
+  padding: var(--sp-3);
+  padding-left: max(var(--sp-3), env(safe-area-inset-left));
+  padding-right: max(var(--sp-3), env(safe-area-inset-right));
+  padding-bottom: max(var(--sp-4), env(safe-area-inset-bottom));
+}
+
+/* A mod card's foot: the switch, the one thing you do most, and everything else behind "more". */
+.app[data-surface='popup'][data-layout='compact'] .mod-foot {
+  flex-wrap: nowrap;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .mod-foot .mod-more {
+  min-width: 44px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(24%);
+    opacity: 0;
+  }
+}
+
+@keyframes sheet-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app[data-surface='popup'][data-layout='compact'] .sheet,
+  .app[data-surface='popup'][data-layout='compact'] .sheet-backdrop {
+    animation: none;
+    transition: none;
   }
 }

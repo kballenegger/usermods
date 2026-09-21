@@ -26,13 +26,27 @@ import { useEffect, useState } from 'react';
 export interface PointerEnvironment {
   /** The primary pointer is a finger. True on iPhone and iPad, false on a Mac. */
   coarsePointer: boolean;
+  /**
+   * A touch device with a tablet's SCREEN: an iPad. It wears the same compact shell as a phone,
+   * but Safari shows the popup there as a popover sized from the document rather than as a sheet
+   * the system sizes, so the document needs a size of its own (entrypoints/popup/popup-size.css).
+   *
+   * The screen, not the window: `device-width` is a fact about the hardware that the engine can
+   * answer at first style resolution, whereas the window's width inside a content-sized popover is
+   * the layout's own output. This is the same query the pre-mount stylesheet uses, to the letter,
+   * and test/popupshell.test.ts holds the two together.
+   */
+  tablet: boolean;
 }
 
 const COARSE = '(pointer: coarse)';
+export const TABLET_QUERY = '(pointer: coarse) and (min-device-width: 700px)';
 
 function read(): PointerEnvironment {
-  const coarsePointer = typeof window.matchMedia === 'function' ? window.matchMedia(COARSE).matches : false;
-  return { coarsePointer };
+  const has = typeof window.matchMedia === 'function';
+  const coarsePointer = has ? window.matchMedia(COARSE).matches : false;
+  const tablet = has ? window.matchMedia(TABLET_QUERY).matches : false;
+  return { coarsePointer, tablet };
 }
 
 export function usePointerEnvironment(): PointerEnvironment {

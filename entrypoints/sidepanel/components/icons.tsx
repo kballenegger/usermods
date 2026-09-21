@@ -251,3 +251,133 @@ export function DeleteIcon() {
     </svg>
   );
 }
+
+/*
+ * The compact shell's marks (the Safari popup on iPhone and iPad).
+ *
+ * A phone's controls are icon-only far more often than the panel's, because one row has to hold a
+ * message box and the two buttons beside it. Same rules as everything above: a 16px grid, whole
+ * pixels, currentColor, aria-hidden, and a real accessible name on the button that carries them.
+ * Diagonals are stepped with overlapping rows, for the reason given at the pencil.
+ */
+
+function Mark({ children }: { children: React.ReactNode }) {
+  return (
+    <svg className="ico" viewBox="0 0 16 16" width="16" height="16" shapeRendering="crispEdges" aria-hidden="true" focusable="false">
+      {children}
+    </svg>
+  );
+}
+
+/** Add: a plus. */
+export function PlusIcon() {
+  return (
+    <Mark>
+      <rect x="7" y="2" width="2" height="12" fill="currentColor" />
+      <rect x="2" y="7" width="12" height="2" fill="currentColor" />
+    </Mark>
+  );
+}
+
+/** Send: an arrow pointing up, the direction a message leaves a phone's composer. */
+export function SendIcon() {
+  return (
+    <Mark>
+      <rect x="7" y="3" width="2" height="11" fill="currentColor" />
+      <rect x="6" y="4" width="4" height="1" fill="currentColor" />
+      <rect x="5" y="5" width="6" height="1" fill="currentColor" />
+      <rect x="4" y="6" width="2" height="1" fill="currentColor" />
+      <rect x="10" y="6" width="2" height="1" fill="currentColor" />
+      <rect x="3" y="7" width="2" height="1" fill="currentColor" />
+      <rect x="11" y="7" width="2" height="1" fill="currentColor" />
+      <rect x="7" y="2" width="2" height="1" fill="currentColor" />
+    </Mark>
+  );
+}
+
+/** Queue: the send arrow under a bar, i.e. "goes up when its turn comes". */
+export function QueueIcon() {
+  return (
+    <Mark>
+      <rect x="3" y="2" width="10" height="2" fill="currentColor" opacity="0.55" />
+      <rect x="7" y="6" width="2" height="8" fill="currentColor" />
+      <rect x="6" y="7" width="4" height="1" fill="currentColor" />
+      <rect x="5" y="8" width="6" height="1" fill="currentColor" />
+      <rect x="4" y="9" width="2" height="1" fill="currentColor" />
+      <rect x="10" y="9" width="2" height="1" fill="currentColor" />
+    </Mark>
+  );
+}
+
+/** Stop: a square. */
+export function StopIcon() {
+  return (
+    <Mark>
+      <rect x="4" y="4" width="8" height="8" fill="currentColor" />
+    </Mark>
+  );
+}
+
+/** Menu: three bars. */
+export function MenuIcon() {
+  return (
+    <Mark>
+      <rect x="2" y="3" width="12" height="2" fill="currentColor" />
+      <rect x="2" y="7" width="12" height="2" fill="currentColor" />
+      <rect x="2" y="11" width="12" height="2" fill="currentColor" />
+    </Mark>
+  );
+}
+
+/** More: three dots in a row, the overflow of one row's actions. */
+export function MoreIcon() {
+  return (
+    <Mark>
+      <rect x="2" y="7" width="2" height="2" fill="currentColor" />
+      <rect x="7" y="7" width="2" height="2" fill="currentColor" />
+      <rect x="12" y="7" width="2" height="2" fill="currentColor" />
+    </Mark>
+  );
+}
+
+/** Close: a cross, stepped. */
+export function CloseIcon() {
+  return (
+    <Mark>
+      {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => (
+        <rect key={`a${i}`} x={3 + i} y={3 + i} width="2" height="1" fill="currentColor" />
+      ))}
+      {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => (
+        <rect key={`b${i}`} x={11 - i} y={3 + i} width="2" height="1" fill="currentColor" />
+      ))}
+    </Mark>
+  );
+}
+
+/** Back: a chevron pointing left. */
+export function BackIcon() {
+  return (
+    <Mark>
+      {[0, 1, 2, 3, 4].map((i) => (
+        <rect key={`a${i}`} x={9 - i} y={3 + i} width="2" height="1" fill="currentColor" />
+      ))}
+      {[0, 1, 2, 3, 4].map((i) => (
+        <rect key={`b${i}`} x={5 + i} y={8 + i} width="2" height="1" fill="currentColor" />
+      ))}
+    </Mark>
+  );
+}
+
+/** Disclosure: a small chevron pointing down, for a title that opens something. */
+export function ChevronDownIcon() {
+  return (
+    <Mark>
+      {[0, 1, 2, 3].map((i) => (
+        <rect key={`a${i}`} x={4 + i} y={6 + i} width="2" height="1" fill="currentColor" />
+      ))}
+      {[0, 1, 2, 3].map((i) => (
+        <rect key={`b${i}`} x={10 - i} y={6 + i} width="2" height="1" fill="currentColor" />
+      ))}
+    </Mark>
+  );
+}

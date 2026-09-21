@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Activity } from './Activity';
 import { openDashboard } from './App';
 import { ArtifactPanel } from './ArtifactPanel';
@@ -12,7 +13,11 @@ import { ModPicker } from './components/ModPicker';
 import { IDLE_ACTIVITY, activityFromEvent, allDisconnected, withActivity, withoutActivity, type ChatActivity } from '@/lib/activity';
 import { putBlobs } from '@/lib/blobs';
 import { archivedChats, isArchived, liveChats, loadItems, pickChatToShow, relativeTime, saveItems, titleFromText, type Chat as ChatRecord } from '@/lib/chats';
-import { ArchiveIcon, DeleteIcon, EditModIcon, RenameIcon, UnarchiveIcon } from './components/icons';
+import { ArchiveIcon, ChevronDownIcon, CloseIcon, DashboardIcon, DeleteIcon, EditModIcon, PlusIcon, QueueIcon, RenameIcon, SendIcon, StopIcon, UnarchiveIcon } from './components/icons';
+import { Sheet, SheetRow } from './components/Sheet';
+import { useShell } from './shell';
+import { SEND_LABEL, draftPill, foldToolRows, nextSheet, sendMode, stepsSummary, type ChatSheet, type SheetEvent } from '@/lib/compactshell';
+import { targetChip } from '@/lib/mobile';
 import { mutateConnections, rememberModel, resolveSelection, sameSelection, saveModelChoice, selectionForChat, type ModelSelection } from '@/lib/connections';
 import { exportFilename, HANDOFF_KEY, resolveHandoff, type ChatHandoff } from '@/lib/dashboard';
 import { ACCEPT_ATTR, MAX_IMAGES_PER_MESSAGE, capNote, emptyTextFor, type AttachedImage, type ImageThumb } from '@/lib/images';
@@ -143,6 +148,22 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
    */
   const [duplicate, setDuplicate] = useState<{ id: string; name: string } | null>(null);
   const [picking, setPicking] = useState(false);
+  /**
+   * The compact shell (the Safari popup on iPhone and iPad). There the chat view keeps only the
+   * transcript and a one-row composer on screen; the switcher, the model, the draft and the
+   * attachments are each one tap away in a bottom sheet. `sheet` is which one is up, and every
+   * change to it goes through nextSheet (lib/compactshell.ts). Always null in the side panel and
+   * the Mac popover, which render exactly as they did before any of this existed.
+   */
+  const shell = useShell();
+  const compact = shell.compact;
+  const [sheet, setSheet] = useState<ChatSheet | null>(null);
+  const titleBtnRef = useRef<HTMLButtonElement>(null);
+  const modelChipRef = useRef<HTMLButtonElement>(null);
+  const addBtnRef = useRef<HTMLButtonElement>(null);
+  const pillRef = useRef<HTMLButtonElement>(null);
+  /** Which control the model sheet hands focus back to: the chip in the bar, or "+". */
+  const modelOpenerRef = useRef<React.RefObject<HTMLButtonElement | null>>(modelChipRef);
   /** The draft title while the switcher is in rename mode, or null when it is a select again. */
   const [renaming, setRenaming] = useState<string | null>(null);
   const renameRef = useRef<HTMLInputElement>(null);
@@ -1277,6 +1298,56 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
     }
   }
 
+  // ---- the compact shell's sheets (iPhone, iPad); inert everywhere else ----
+
+  function sheetDo(event: SheetEvent) {
+    setSheet((cur) => nextSheet(cur, event, { hasDraft: !!artifact }));
+  }
+  const closeSheet = () => sheetDo({ type: 'close' });
+
+  // A sheet about "this chat" must not outlive the chat it was opened on, the draft sheet must not
+  // outlive its draft, and the save that stopped to ask takes over from whatever was up.
+  useEffect(() => {
+    setSheet((cur) => nextSheet(cur, { type: 'chat-changed' }, { hasDraft: true }));
+    // Leaving a chat ends its rename, which in the compact shell lives in the chat sheet.
+  }, [chatId]);
+  useEffect(() => {
+    if (!artifact) setSheet((cur) => (cur === 'draft' ? null : cur));
+  }, [artifact]);
+  useEffect(() => {
+    if (duplicate) setSheet(null);
+  }, [duplicate]);
+
+  /**
+   * Grow the compact message box with its text. `field-sizing: content` does this on Chrome; the
+   * Safari versions this ships to do not all have it, and on a phone the box starts at ONE line,
+   * so without this a second sentence would scroll out of sight inside a 44px slot. The cap is in
+   * mobile.css (max-height), and past it the text scrolls inside the box.
+   */
+  useLayoutEffect(() => {
+    if (!compact) return;
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    // scrollHeight leaves the borders out and the box is border-box, so they are added back.
+    el.style.height = `${el.scrollHeight + (el.offsetHeight - el.clientHeight)}px`;
+  }, [compact, text, chatId, loaded]);
+
+  /**
+   * Which transcript rows fold into an "N steps" line on a phone: the first row of each folded run
+   * maps to the whole run, the rest of the run to 'folded' (drawn inside the first). Empty outside
+   * the compact shell, where every tool row is drawn as it always has been.
+   */
+  const folds = useMemo(() => {
+    const map = new Map<number, number[] | 'folded'>();
+    if (!compact) return map;
+    for (const block of foldToolRows(items)) {
+      if (block.kind !== 'steps') continue;
+      block.indices.forEach((index, k) => map.set(index, k === 0 ? block.indices : 'folded'));
+    }
+    return map;
+  }, [compact, items]);
+
   const unsupported = !pageUrl || /^(chrome|edge|about|chrome-extension|devtools):/.test(pageUrl);
   /**
    * The installed mods that run on the page in front of the user, for the empty state's shortcuts.
@@ -1298,6 +1369,14 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
   /** The visible chat's stopped-short run, if it has one and is not already going again. */
   const resumeState = chatId && !busy ? resumable.get(chatId) : undefined;
   const lastIsError = items[items.length - 1]?.kind === 'error';
+  // The compact shell's derived values. Cheap, and unused outside it.
+  const pill = compact && artifact ? draftPill(artifact, editingModName) : null;
+  const mode = sendMode({ busy, hasContent: !!text.trim() || images.length > 0 });
+  const site = targetChip(pageUrl);
+  function openModelSheet(opener: React.RefObject<HTMLButtonElement | null>) {
+    modelOpenerRef.current = opener;
+    sheetDo({ type: 'open', sheet: 'model' });
+  }
   /**
    * The Resume affordance. It belongs to the error it follows, so it renders INSIDE the last error
    * row when there is one (the error text stays exactly where it was, above the button), and as a
@@ -1314,7 +1393,7 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
 
   return (
     <div className="chat">
-      {!unsupported && host && chats.length > 0 && (
+      {!compact && !unsupported && host && chats.length > 0 && (
         <div className="chatbar">
           {renaming !== null ? (
             <input
@@ -1468,6 +1547,10 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
           </div>
         )}
         {items.map((it, i) => {
+          // A phone folds a long run of tool rows into one line (see `folds` above).
+          const fold = folds.get(i);
+          if (fold === 'folded') return null;
+          if (fold) return <StepsRow key={i} tools={fold.map((n) => items[n]).filter((t): t is ToolItem => t?.kind === 'tool')} />;
           switch (it.kind) {
             case 'user':
               return (
@@ -1499,18 +1582,7 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
             case 'tool':
               // The dot carries the state the glyphs used to: volt when it came back clean, amber
               // while it is still running, coral when it failed. Only volt glows.
-              return (
-                <details key={i} className={`tool${it.isError ? ' error' : ''}`}>
-                  <summary>
-                    {/* A wait_for that timed out takes the amber dot, not the coral one: the page
-                        did not do the thing, which is a result, not a failure. */}
-                    <span className={`dot${toolDotClass(toolDotState(it))}`} aria-hidden="true" />
-                    <span>{toolRowTitle(it.name, it.input)}</span>
-                  </summary>
-                  {typeof it.input.code === 'string' && <pre>{it.input.code}</pre>}
-                  {it.summary && <pre>{it.summary}</pre>}
-                </details>
-              );
+              return <ToolRow key={i} item={it} />;
             case 'proposal': {
               // The hero of this screen: the one card that takes the glow.
               //
@@ -1567,7 +1639,7 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
                     >
                       {proposalCardLabel(cardState)}
                     </button>
-                    {version && artifact ? (
+                    {version && artifact && !compact ? (
                       <button
                         className="linklike"
                         onClick={() => setShownVersion(version)}
@@ -1598,11 +1670,11 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
         )}
         <div ref={bottomRef} />
       </div>
-      {pickingMod && <ModPicker mods={mods} pageUrl={pageUrl} onPick={(m) => void editMod(m)} onCancel={() => setPickingMod(false)} />}
+      {pickingMod && !compact && <ModPicker mods={mods} pageUrl={pageUrl} onPick={(m) => void editMod(m)} onCancel={() => setPickingMod(false)} />}
       {/* The save that stopped to ask. Neither button is destructive and neither is the default:
           updating rewrites a mod the user may not have meant, keeping both leaves two mods running
           on the same page, and only they know which they wanted. */}
-      {duplicate && (
+      {duplicate && !compact && (
         <div className="artifact-dupe" data-testid="artifact-duplicate">
           <div>
             “{duplicate.name}” is already installed with the same name and the same match patterns. Update it, or keep both?
@@ -1623,7 +1695,7 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
       {/* The draft, pinned. It is a row of the chat column — not an item in the transcript — so it
           appears and disappears without moving the messages or their scroll position, exactly as
           the activity line does. */}
-      {artifact && chatId && (
+      {artifact && chatId && !compact && (
         <ArtifactPanel
           artifact={artifact}
           busy={busy}
@@ -1640,9 +1712,58 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
           openDashboard={() => void openDashboard()}
         />
       )}
+      {/* The same draft on a phone: one line, and only when there is a draft. The name, the
+          version and what it is (editing an installed mod, saved, a draft) open the full panel in
+          a sheet; the one thing you do to a draft most, saving it, is on the line itself. */}
+      {compact && artifact && chatId && pill && (
+        <div className="draft-pill" data-testid="draft-pill" data-status={pill.status}>
+          <button
+            ref={pillRef}
+            type="button"
+            className="draft-pill-open"
+            data-action="draft-sheet"
+            aria-haspopup="dialog"
+            aria-expanded={sheet === 'draft'}
+            aria-label={pill.label}
+            onClick={() => sheetDo({ type: 'open', sheet: 'draft' })}
+          >
+            <span className="draft-pill-name">{pill.name}</span>
+            <span className="draft-pill-sep" aria-hidden="true">·</span>
+            <span className="draft-pill-v">{pill.version}</span>
+            <span className="draft-pill-sep" aria-hidden="true">·</span>
+            <span className="draft-pill-status">{pill.status}</span>
+            <ChevronDownIcon />
+          </button>
+          <button
+            type="button"
+            className="btn primary draft-pill-save"
+            data-testid="draft-pill-save"
+            onClick={() => void saveArtifact()}
+            disabled={busy || pill.upToDate}
+            aria-label={
+              pill.upToDate
+                ? 'Saved: the mod holds this version'
+                : editingModName
+                  ? `Update the installed mod “${editingModName}” with this draft`
+                  : pill.action === 'Update'
+                    ? 'Update the mod this chat created with this draft'
+                    : 'Save this draft as a mod and enable it'
+            }
+          >
+            {pill.upToDate ? 'Saved' : pill.action}
+          </button>
+        </div>
+      )}
       {artifact && artifactNote && (
         <div className="artifact-status" data-testid="artifact-status">
           {artifactNote}
+          {/* On a phone this line costs transcript, and it only ever reports something that has
+              already happened, so it can be sent away. */}
+          {compact && (
+            <button type="button" className="note-x" onClick={() => setArtifactNote('')} aria-label="Dismiss this note">
+              <CloseIcon />
+            </button>
+          )}
         </div>
       )}
       <Activity
@@ -1659,55 +1780,83 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
         onStop={abort}
         onRetry={() => void retry()}
       />
-      <div className={`composer${dragging ? ' dragging' : ''}`} onPaste={onPaste} onDrop={onDrop} onDragOver={onDragOver} onDragLeave={() => setDragging(false)}>
-        {(refs.length > 0 || images.length > 0) && (
-          <div className="row">
-            {refs.map((r) => (
-              <span key={r.token} className="chip ref" title={r.selector}>
-                @{r.token} · {r.label}{' '}
-                <button className="chip-x" onClick={() => removeRef(r.token)} title="Remove reference">×</button>
-              </span>
-            ))}
-            <PendingStrip images={images} onRemove={removeImage} />
+      {/* The phone's composer: one row. "+" on the left holds everything that is not typing
+          (point at an element, attach an image, the model, a new chat), the message box grows
+          with its text, and the one button on the right is Send, Queue or Stop by turns
+          (sendMode in lib/compactshell.ts). Chips appear above the row only when there are any. */}
+      {compact && (
+        <div className={`composer compact${dragging ? ' dragging' : ''}`} onPaste={onPaste} onDrop={onDrop} onDragOver={onDragOver} onDragLeave={() => setDragging(false)}>
+          {swapWaits && (
+            <div className="compact-note" data-testid="model-note" role="status">
+              {NEXT_TURN_NOTE}
+            </div>
+          )}
+          {providers.ready && !modelResolved.ok && (
+            <button type="button" className="compact-note problem" data-testid="model-problem" onClick={() => openModelSheet(addBtnRef)}>
+              {modelResolved.message} <span className="compact-note-act">Choose a model</span>
+            </button>
+          )}
+          {(refs.length > 0 || images.length > 0) && (
+            <div className="row">
+              {refs.map((r) => (
+                <span key={r.token} className="chip ref" title={r.selector}>
+                  @{r.token} · {r.label}{' '}
+                  <button className="chip-x" onClick={() => removeRef(r.token)} aria-label={`Remove the reference @${r.token}`}>×</button>
+                </span>
+              ))}
+              <PendingStrip images={images} onRemove={removeImage} />
+            </div>
+          )}
+          {attachNote && (
+            <div className="attach-note">
+              {attachNote}
+              <button type="button" className="note-x" onClick={() => setAttachNote(null)} aria-label="Dismiss this note">
+                <CloseIcon />
+              </button>
+            </div>
+          )}
+          <div className="composer-row">
+            <button
+              ref={addBtnRef}
+              type="button"
+              className="cbtn"
+              data-action="add"
+              aria-haspopup="dialog"
+              aria-expanded={sheet === 'add'}
+              aria-label="Add: point at an element, attach an image, change the model, new chat"
+              onClick={() => sheetDo({ type: 'open', sheet: 'add' })}
+            >
+              <PlusIcon />
+            </button>
+            <textarea
+              ref={textareaRef}
+              rows={1}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  void send();
+                }
+              }}
+              enterKeyHint="send"
+              aria-label="Message"
+              placeholder={unsupported ? 'Open a web page first' : picking ? 'Tap an element on the page…' : 'What should this page do?'}
+              disabled={unsupported}
+            />
+            <button
+              type="button"
+              className={`cbtn send ${mode}`}
+              data-action="send"
+              data-mode={mode}
+              aria-label={SEND_LABEL[mode]}
+              title={mode !== 'stop' && !modelReady && providers.ready && !modelResolved.ok ? modelResolved.message : undefined}
+              onClick={() => (mode === 'stop' ? abort() : void send())}
+              disabled={mode === 'stop' ? false : (!text.trim() && !images.length) || unsupported || !modelReady}
+            >
+              {mode === 'stop' ? <StopIcon /> : mode === 'queue' ? <QueueIcon /> : <SendIcon />}
+            </button>
           </div>
-        )}
-        {attachNote && <div className="attach-note">{attachNote}</div>}
-        <textarea
-          ref={textareaRef}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              void send();
-            }
-          }}
-          placeholder={unsupported ? 'open a web page first' : 'what should this page do differently? paste or drop an image, or point at elements'}
-          disabled={unsupported}
-        />
-        {providers.ready && (
-          <ModelPicker
-            state={providers.state}
-            signedIn={providers.signedIn}
-            selection={selection}
-            resolved={modelResolved}
-            note={swapWaits ? NEXT_TURN_NOTE : undefined}
-            onSelect={chooseModel}
-            onManage={() => onOpenSettings?.()}
-          />
-        )}
-        <div className="row">
-          <button className="btn" onClick={() => void pick()} disabled={picking || unsupported || tabId == null} title="Click an element on the page to reference it in your message">
-            {picking ? 'click an element…' : 'Point at element'}
-          </button>
-          <button
-            className="btn"
-            onClick={() => fileRef.current?.click()}
-            disabled={unsupported || images.length >= MAX_IMAGES_PER_MESSAGE}
-            title={`Attach a screenshot or mockup (PNG, JPEG, WebP or GIF; up to ${MAX_IMAGES_PER_MESSAGE})`}
-          >
-            Attach image
-          </button>
           <input
             ref={fileRef}
             type="file"
@@ -1716,16 +1865,336 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
             hidden
             onChange={(e) => {
               void attach(Array.from(e.target.files ?? []));
-              // Cleared so picking the same file twice in a row fires onChange the second time.
               e.target.value = '';
             }}
           />
-          <button className="btn" onClick={newChat} disabled={unsupported || !host || (!chatId && items.length === 0)}>New chat</button>
-          <span className="grow" />
-          {busy && <button className="btn danger" onClick={abort}>Stop</button>}
-          <button className="btn primary" onClick={() => void send()} disabled={(!text.trim() && !images.length) || unsupported || !modelReady} title={modelReady || !providers.ready || modelResolved.ok ? undefined : modelResolved.message}>{busy ? 'Queue' : 'Send'}</button>
         </div>
-      </div>
+      )}
+      {!compact && (
+        <div className={`composer${dragging ? ' dragging' : ''}`} onPaste={onPaste} onDrop={onDrop} onDragOver={onDragOver} onDragLeave={() => setDragging(false)}>
+          {(refs.length > 0 || images.length > 0) && (
+            <div className="row">
+              {refs.map((r) => (
+                <span key={r.token} className="chip ref" title={r.selector}>
+                  @{r.token} · {r.label}{' '}
+                  <button className="chip-x" onClick={() => removeRef(r.token)} title="Remove reference">×</button>
+                </span>
+              ))}
+              <PendingStrip images={images} onRemove={removeImage} />
+            </div>
+          )}
+          {attachNote && <div className="attach-note">{attachNote}</div>}
+          <textarea
+            ref={textareaRef}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                void send();
+              }
+            }}
+            placeholder={unsupported ? 'open a web page first' : 'what should this page do differently? paste or drop an image, or point at elements'}
+            disabled={unsupported}
+          />
+          {providers.ready && (
+            <ModelPicker
+              state={providers.state}
+              signedIn={providers.signedIn}
+              selection={selection}
+              resolved={modelResolved}
+              note={swapWaits ? NEXT_TURN_NOTE : undefined}
+              onSelect={chooseModel}
+              onManage={() => onOpenSettings?.()}
+            />
+          )}
+          <div className="row">
+            <button className="btn" onClick={() => void pick()} disabled={picking || unsupported || tabId == null} title="Click an element on the page to reference it in your message">
+              {picking ? 'click an element…' : 'Point at element'}
+            </button>
+            <button
+              className="btn"
+              onClick={() => fileRef.current?.click()}
+              disabled={unsupported || images.length >= MAX_IMAGES_PER_MESSAGE}
+              title={`Attach a screenshot or mockup (PNG, JPEG, WebP or GIF; up to ${MAX_IMAGES_PER_MESSAGE})`}
+            >
+              Attach image
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept={ACCEPT_ATTR}
+              multiple
+              hidden
+              onChange={(e) => {
+                void attach(Array.from(e.target.files ?? []));
+                // Cleared so picking the same file twice in a row fires onChange the second time.
+                e.target.value = '';
+              }}
+            />
+            <button className="btn" onClick={newChat} disabled={unsupported || !host || (!chatId && items.length === 0)}>New chat</button>
+            <span className="grow" />
+            {busy && <button className="btn danger" onClick={abort}>Stop</button>}
+            <button className="btn primary" onClick={() => void send()} disabled={(!text.trim() && !images.length) || unsupported || !modelReady} title={modelReady || !providers.ready || modelResolved.ok ? undefined : modelResolved.message}>{busy ? 'Queue' : 'Send'}</button>
+          </div>
+        </div>
+      )}
+      {/* ---- the compact shell: what the chat puts in the top bar, and its sheets ---- */}
+      {compact && shell.barSlot && !unsupported &&
+        createPortal(
+          <>
+            <button
+              ref={titleBtnRef}
+              type="button"
+              className="cbar-chat"
+              data-action="chat-sheet"
+              aria-haspopup="dialog"
+              aria-expanded={sheet === 'chat'}
+              aria-label={`${current?.title ?? 'New chat'}, on ${site.live ? site.host : site.fallback}. Chats and chat actions`}
+              title={pageUrl}
+              onClick={() => sheetDo({ type: 'open', sheet: 'chat' })}
+            >
+              <span className="cbar-chat-site">
+                {site.live && <span className="dot" aria-hidden="true" />}
+                <span className="cbar-host">{site.live ? site.host : site.fallback}</span>
+              </span>
+              <span className="cbar-chat-title">
+                <span className="cbar-chat-name">{current?.title ?? 'New chat'}</span>
+                <ChevronDownIcon />
+              </span>
+            </button>
+            {providers.ready && (
+              <button
+                ref={modelChipRef}
+                type="button"
+                className={`cbar-model${modelResolved.ok ? '' : ' unset'}`}
+                data-action="model-chip"
+                data-testid="model-chip"
+                aria-haspopup="dialog"
+                aria-expanded={sheet === 'model'}
+                aria-label={modelResolved.ok ? `Model: ${modelResolved.selection.model}, on ${modelResolved.selection.label ?? 'a provider'}. Change model` : 'No model chosen. Choose a model'}
+                onClick={() => openModelSheet(modelChipRef)}
+              >
+                <span className="cbar-model-name">{modelResolved.ok ? modelResolved.selection.model : 'No model'}</span>
+              </button>
+            )}
+          </>,
+          shell.barSlot,
+        )}
+      {compact && sheet === 'chat' && (
+        <Sheet
+          title={renaming !== null ? 'Rename chat' : 'Chats'}
+          onClose={() => {
+            setRenaming(null);
+            closeSheet();
+          }}
+          returnFocus={titleBtnRef}
+          testId="sheet-chat"
+        >
+          {renaming !== null ? (
+            <form
+              className="sheet-form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void commitRename();
+                closeSheet();
+              }}
+            >
+              <input ref={renameRef} value={renaming} onChange={(e) => setRenaming(e.target.value)} placeholder="Name this chat" aria-label="Chat name" enterKeyHint="done" />
+              <div className="row">
+                <button type="submit" className="btn primary" data-action="save-name" disabled={!renaming.trim()}>
+                  Save
+                </button>
+                <button type="button" className="btn" onClick={() => setRenaming(null)}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          ) : (
+            <>
+              <div className="sheet-list">
+                <SheetRow
+                  label="New chat"
+                  icon={<PlusIcon />}
+                  action="new-chat"
+                  disabled={!host || (!chatId && items.length === 0)}
+                  onClick={() => {
+                    closeSheet();
+                    newChat();
+                  }}
+                />
+              </div>
+              {chats.length > 0 && (
+                <div className="sheet-list" role="group" aria-label={`Chats on ${host}`}>
+                  <div className="sheet-label">Chats on {host}</div>
+                  {live.map((c) => (
+                    <SheetRow key={c.id} label={chatRowLabel(c)} value={relativeTime(c.updatedAt)} current={c.id === chatId} testId="chat-row" onClick={() => (c.id === chatId ? closeSheet() : switchTo(c.id))} />
+                  ))}
+                  {archived.length > 0 && <div className="sheet-label">Archived</div>}
+                  {archived.map((c) => (
+                    <SheetRow key={c.id} label={chatRowLabel(c)} value={relativeTime(c.updatedAt)} current={c.id === chatId} testId="chat-row" onClick={() => (c.id === chatId ? closeSheet() : switchTo(c.id))} />
+                  ))}
+                </div>
+              )}
+              {chatId && (
+                <div className="sheet-list" role="group" aria-label="This chat">
+                  <div className="sheet-label">This chat</div>
+                  <SheetRow label="Rename" icon={<RenameIcon />} action="rename" onClick={startRename} />
+                  {viewingArchived ? (
+                    <>
+                      <SheetRow
+                        label="Unarchive"
+                        icon={<UnarchiveIcon />}
+                        action="unarchive"
+                        onClick={() => {
+                          closeSheet();
+                          void setArchived(chatId, false);
+                        }}
+                      />
+                      <SheetRow
+                        label="Delete"
+                        icon={<DeleteIcon />}
+                        action="delete"
+                        danger
+                        onClick={() => {
+                          closeSheet();
+                          void removeChat();
+                        }}
+                      />
+                    </>
+                  ) : (
+                    <SheetRow
+                      label="Archive"
+                      icon={<ArchiveIcon />}
+                      action="archive"
+                      onClick={() => {
+                        closeSheet();
+                        void setArchived(chatId, true);
+                      }}
+                    />
+                  )}
+                </div>
+              )}
+              <div className="sheet-list">
+                <SheetRow label="Edit a mod…" icon={<EditModIcon />} action="edit-mod" testId="edit-a-mod" onClick={() => sheetDo({ type: 'open', sheet: 'editmod' })} />
+                <SheetRow
+                  label="Open dashboard"
+                  icon={<DashboardIcon />}
+                  action="dashboard"
+                  onClick={() => {
+                    closeSheet();
+                    void openDashboard();
+                  }}
+                />
+              </div>
+            </>
+          )}
+        </Sheet>
+      )}
+      {compact && sheet === 'editmod' && (
+        <Sheet title="Edit a mod" onClose={closeSheet} returnFocus={titleBtnRef} testId="sheet-editmod">
+          <ModPicker
+            mods={mods}
+            pageUrl={pageUrl}
+            onPick={(m) => {
+              closeSheet();
+              void editMod(m);
+            }}
+            onCancel={closeSheet}
+          />
+        </Sheet>
+      )}
+      {compact && sheet === 'add' && (
+        <Sheet title="Add" onClose={closeSheet} returnFocus={addBtnRef} testId="sheet-add">
+          <div className="sheet-list">
+            <SheetRow
+              label={picking ? 'Tap an element on the page…' : 'Point at element'}
+              action="pick"
+              disabled={picking || unsupported || tabId == null}
+              title="Pick an element on the page to reference it in your message"
+              onClick={() => {
+                closeSheet();
+                void pick();
+              }}
+            />
+            <SheetRow
+              label="Attach image"
+              value={images.length ? `${images.length} of ${MAX_IMAGES_PER_MESSAGE}` : 'PNG, JPEG, WebP, GIF'}
+              action="attach"
+              disabled={unsupported || images.length >= MAX_IMAGES_PER_MESSAGE}
+              onClick={() => {
+                // The file input first: it has to be opened inside the tap that asked for it.
+                fileRef.current?.click();
+                closeSheet();
+              }}
+            />
+            {providers.ready && (
+              <SheetRow
+                label="Model"
+                value={modelResolved.ok ? `${modelResolved.selection.model}${modelResolved.selection.label ? ` · ${modelResolved.selection.label}` : ''}` : 'Choose a model'}
+                action="model"
+                onClick={() => openModelSheet(addBtnRef)}
+              />
+            )}
+            <SheetRow
+              label="New chat"
+              action="new-chat"
+              disabled={unsupported || !host || (!chatId && items.length === 0)}
+              onClick={() => {
+                closeSheet();
+                newChat();
+              }}
+            />
+          </div>
+        </Sheet>
+      )}
+      {compact && sheet === 'model' && providers.ready && (
+        <Sheet title="Model" onClose={closeSheet} returnFocus={modelOpenerRef.current} testId="sheet-model">
+          <ModelPicker
+            inline
+            state={providers.state}
+            signedIn={providers.signedIn}
+            selection={selection}
+            resolved={modelResolved}
+            note={swapWaits ? NEXT_TURN_NOTE : undefined}
+            onSelect={chooseModel}
+            onManage={() => onOpenSettings?.()}
+            onDone={closeSheet}
+          />
+        </Sheet>
+      )}
+      {compact && sheet === 'draft' && artifact && chatId && (
+        <Sheet title="Draft" onClose={closeSheet} returnFocus={pillRef} testId="sheet-draft">
+          <ArtifactPanel
+            expanded
+            artifact={artifact}
+            busy={busy}
+            canTry={tabId != null}
+            selected={shownVersion ?? artifact.current}
+            onSelect={setShownVersion}
+            onTry={tryArtifact}
+            onSave={() => saveArtifact()}
+            onDetach={detachArtifact}
+            onExport={exportArtifact}
+            onRename={renameArtifact}
+            onRollback={rollbackArtifact}
+            editingModName={editingModName}
+            openDashboard={() => void openDashboard()}
+          />
+        </Sheet>
+      )}
+      {compact && duplicate && (
+        <Sheet title="Already installed" onClose={() => setDuplicate(null)} returnFocus={pillRef} testId="sheet-duplicate">
+          <div className="sheet-text" data-testid="artifact-duplicate">
+            “{duplicate.name}” is already installed with the same name and the same match patterns. Update it, or keep both?
+          </div>
+          <div className="sheet-list">
+            <SheetRow label="Update the existing mod" testId="artifact-duplicate-update" onClick={() => void saveArtifact(duplicate.id)} />
+            <SheetRow label="Keep both" testId="artifact-duplicate-keep" onClick={() => void saveArtifact(NEW_MOD)} />
+            <SheetRow label="Cancel" testId="artifact-duplicate-cancel" onClick={() => setDuplicate(null)} />
+          </div>
+        </Sheet>
+      )}
       {viewing && <Lightbox chatId={chatId} image={viewing} onClose={() => setViewing(null)} />}
     </div>
   );
@@ -1809,4 +2278,54 @@ function uniqueToken(base: string, taken: string[]): string {
 
 function escapeRe(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+type ToolItem = Extract<ChatItem, { kind: 'tool' }>;
+
+/**
+ * One tool call: a rail, a status dot and the tool's name in mono, opening to its code and result.
+ *
+ * The dot carries the state the glyphs used to: volt when it came back clean, amber while it is
+ * still running, coral when it failed. Only volt glows. A wait_for that timed out takes the amber
+ * dot, not the coral one: the page did not do the thing, which is a result, not a failure.
+ */
+function ToolRow({ item }: { item: ToolItem }) {
+  return (
+    <details className={`tool${item.isError ? ' error' : ''}`}>
+      <summary>
+        <span className={`dot${toolDotClass(toolDotState(item))}`} aria-hidden="true" />
+        <span>{toolRowTitle(item.name, item.input)}</span>
+      </summary>
+      {typeof item.input.code === 'string' && <pre>{item.input.code}</pre>}
+      {item.summary && <pre>{item.summary}</pre>}
+    </details>
+  );
+}
+
+/**
+ * A run of tool calls folded into one line, for a phone: "4 steps", with the dot showing the worst
+ * of them and the line naming a step that is still running or counting the ones that failed
+ * (stepsSummary in lib/compactshell.ts). It opens to the same rows the panel draws.
+ */
+function StepsRow({ tools }: { tools: ToolItem[] }) {
+  const summary = stepsSummary(tools);
+  return (
+    <details className={`steps-fold${summary.state === 'error' ? ' error' : ''}`} data-testid="steps" data-steps={tools.length}>
+      <summary>
+        <span className={`dot${toolDotClass(summary.state)}`} aria-hidden="true" />
+        <span className="steps-fold-label">{summary.label}</span>
+        <ChevronDownIcon />
+      </summary>
+      <div className="steps-fold-rows">
+        {tools.map((t) => (
+          <ToolRow key={t.id} item={t} />
+        ))}
+      </div>
+    </details>
+  );
+}
+
+/** A chat's row in the compact chat sheet: its title, and the mod it is editing if it is. */
+function chatRowLabel(c: ChatRecord): string {
+  return c.editingModName ? `${c.title} · editing ${c.editingModName}` : c.title;
 }

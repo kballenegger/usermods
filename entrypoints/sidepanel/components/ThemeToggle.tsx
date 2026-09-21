@@ -15,7 +15,7 @@ import { saveThemeChoice } from '@/lib/settings';
 import { THEME_LABEL, applyTheme, currentTheme, nextTheme, storedTheme } from '@/lib/theme';
 import type { ThemeChoice } from '@/lib/types';
 
-export function ThemeToggle() {
+export function ThemeToggle({ row = false }: { /** Draw it as a row of a compact-shell sheet: the word "Theme" and the current choice, full width. */ row?: boolean } = {}) {
   /**
    * Seeded from the document rather than from storage.
    *
@@ -66,6 +66,23 @@ export function ThemeToggle() {
     applyTheme(next); // instant: the panel restyles under the cursor
     await saveThemeChoice(next);
   };
+
+  if (row) {
+    return (
+      <button
+        type="button"
+        className="sheet-row"
+        onClick={() => void cycle()}
+        aria-label={`Theme: ${THEME_LABEL[theme]}. Tap for ${THEME_LABEL[nextTheme(theme)]}.`}
+        data-action="theme"
+        data-theme-choice={theme}
+      >
+        <span className="sheet-row-icon" aria-hidden="true">◐</span>
+        <span className="sheet-row-label">Theme</span>
+        <span className="sheet-row-value">{THEME_LABEL[theme]}</span>
+      </button>
+    );
+  }
 
   return (
     <button

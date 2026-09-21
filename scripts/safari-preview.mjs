@@ -114,8 +114,10 @@ const STORAGE = {
   connections: {
     v: 1,
     list: [
-      { id: 'conn-1', kind: 'anthropic', label: 'Anthropic', baseUrl: '', apiKey: 'sk-ant-preview-not-a-real-key' },
-      { id: 'conn-2', kind: 'openai-compatible', label: 'LM Studio', baseUrl: 'http://localhost:1234/v1', apiKey: '' },
+      // Each carries a fresh model listing, as a connection that has been used does, so the model
+      // picker has rows in it and does not go looking for a background worker to refresh them.
+      { id: 'conn-1', kind: 'anthropic', label: 'Anthropic', baseUrl: '', apiKey: 'sk-ant-preview-not-a-real-key', models: { ids: ['claude-opus-5', 'claude-sonnet-5', 'claude-haiku-4-5-20251001'], fetchedAt: Date.now() } },
+      { id: 'conn-2', kind: 'openai-compatible', label: 'LM Studio', baseUrl: 'http://localhost:1234/v1', apiKey: '', models: { ids: ['qwen3-coder-30b', 'gemma-3-12b-it'], fetchedAt: Date.now() } },
     ],
   },
   modelChoice: { connectionId: 'conn-1', model: 'claude-opus-5', label: 'Anthropic' },
@@ -310,8 +312,12 @@ function stubSource() {
   if (wanted && wanted !== 'chat') {
     let tries = 0;
     const tick = setInterval(() => {
-      const el = document.querySelector('.popup-nav [data-view="' + wanted + '"]');
+      // A Mac has the three views as tabs. A phone has them behind the menu in its top bar, so
+      // there it is two presses: the menu, then the row.
+      const el = document.querySelector('.popup-nav [data-view="' + wanted + '"]') || document.querySelector('.sheet [data-action="view-' + wanted + '"]');
+      const menu = document.querySelector('[data-action="menu"]');
       if (el) { el.click(); clearInterval(tick); }
+      else if (menu && !document.querySelector('.sheet')) menu.click();
       else if (++tries > 100) { clearInterval(tick); console.error('preview: no ' + wanted + ' button'); }
     }, 50);
   }
@@ -559,6 +565,7 @@ async function measurePopoverSize() {
     fail('playwright is not installed', 'npm install, then `npx playwright install webkit`.');
   }
 
+  const ipad = playwright.devices['iPad Pro 11'];
   // Each case is a window, a pointer, and what the document should make of them.
   const cases = [
     {
@@ -577,6 +584,54 @@ async function measurePopoverSize() {
       context: playwright.devices['iPhone 14'],
       expect: { layout: 'compact', notPinned: true },
     },
+    {
+      // The largest iPhone screen there is (440pt). The iPad rule must not reach it either.
+      label: 'coarse pointer, 440x956 phone screen (the largest iPhone)',
+      context: { ...playwright.devices['iPhone 14'], viewport: { width: 440, height: 956 }, screen: { width: 440, height: 956 } },
+      expect: { layout: 'compact', notPinned: true },
+    },
+    // The iPad. Safari shows the popup there as a popover sized from the document, as on a Mac,
+    // and the owner's iPad Pro opened a tiny one. `screen` is what makes these an iPad to the
+    // engine: device-width follows it, and without it Playwright reports the window as the screen.
+    // The windows are the same two useless ones the Mac cases use, because a content-sized popover
+    // has nothing better to offer the page at first layout.
+    {
+      label: 'iPad Pro 13 (screen 1032x1376), 100x50 window',
+      context: { ...ipad, viewport: { width: 100, height: 50 }, screen: { width: 1032, height: 1376 } },
+      expect: { width: 440, height: 720, layout: 'compact', device: 'tablet' },
+    },
+    {
+      label: 'iPad Air 11 (screen 820x1180), 470x90 window (the sliver)',
+      context: { ...ipad, viewport: { width: 470, height: 90 }, screen: { width: 820, height: 1180 } },
+      expect: { width: 440, height: 660, layout: 'compact', device: 'tablet' },
+    },
+    {
+      label: 'iPad mini (screen 744x1133), 100x50 window',
+      context: { ...ipad, viewport: { width: 100, height: 50 }, screen: { width: 744, height: 1133 } },
+      expect: { width: 440, height: 600, layout: 'compact', device: 'tablet' },
+    },
+    {
+      // Landscape keeps the portrait device-width on iOS; Playwright models that by leaving
+      // `screen` alone, which is what is done here. The size must not change with orientation.
+      label: 'iPad Pro 13 in landscape, 100x50 window',
+      context: { ...ipad, viewport: { width: 100, height: 50 }, screen: { width: 1032, height: 1376 }, isLandscape: true },
+      expect: { width: 440, height: 720, layout: 'compact', device: 'tablet' },
+    },
+    {
+      // Split View or Slide Over: the iPad presents the popup as a sheet the SYSTEM sizes, narrower
+      // than the popover would be. A fixed 440px there would overflow sideways; the document
+      // adopts the window instead, after mount.
+      label: 'iPad in Slide Over, 320x900 system-sized sheet',
+      context: { ...ipad, viewport: { width: 320, height: 900 }, screen: { width: 1032, height: 1376 } },
+      expect: { lateWidth: 320, lateHeight: 900, layout: 'compact', device: 'tablet', noOverflow: true },
+    },
+    {
+      // A popover Safari clamped shorter than asked (a short landscape screen): the document
+      // shrinks to it, so the composer is not drawn below the popover's bottom edge.
+      label: 'iPad mini, popover clamped to 440x560',
+      context: { ...ipad, viewport: { width: 440, height: 560 }, screen: { width: 744, height: 1133 } },
+      expect: { lateWidth: 440, lateHeight: 560, layout: 'compact', device: 'tablet', noOverflow: true },
+    },
   ];
 
   const browser = await playwright.webkit.launch();
@@ -584,6 +639,20 @@ async function measurePopoverSize() {
   try {
     for (const c of cases) {
       const context = await browser.newContext(c.context);
+
+      // With no script at all. `load` fires after the module has run, so "before mount" below is
+      // only as early as the harness can look at a live page; this is the document as its
+      // stylesheets alone lay it out, which is the thing a popover is first measured from.
+      const bare = await context.newPage();
+      await bare.route('**/*.js', (route) => route.abort());
+      await bare.goto(`http://127.0.0.1:${port}/popup.html`, { waitUntil: 'load' });
+      const unscripted = await bare.evaluate(() => {
+        const r = document.documentElement.getBoundingClientRect();
+        return { mounted: !!document.querySelector('.app'), width: Math.round(r.width), height: Math.round(r.height) };
+      });
+      await bare.close();
+      if (unscripted.mounted) failures.push(`${c.label}: the script-free load still mounted the app, so it measured nothing`);
+
       const page = await context.newPage();
       await page.goto(`http://127.0.0.1:${port}/popup.html`, { waitUntil: 'load' });
 
@@ -598,13 +667,18 @@ async function measurePopoverSize() {
         const r = document.documentElement.getBoundingClientRect();
         return {
           layout: document.querySelector('.app').getAttribute('data-layout'),
+          device: document.querySelector('.app').getAttribute('data-device'),
+          innerWidth: window.innerWidth,
+          innerHeight: window.innerHeight,
           width: Math.round(r.width),
           height: Math.round(r.height),
+          overflow: document.documentElement.scrollWidth > window.innerWidth || document.documentElement.scrollHeight > window.innerHeight,
         };
       });
 
       console.log(`[preview] ${c.label}`);
       console.log(`[preview]   (pointer: fine) ${early.fine}`);
+      console.log(`[preview]   no script       <html> ${unscripted.width}x${unscripted.height}`);
       console.log(`[preview]   before mount    <html> ${early.width}x${early.height}`);
       console.log(`[preview]   after mount     <html> ${late.width}x${late.height}  data-layout=${late.layout}`);
 
@@ -614,15 +688,22 @@ async function measurePopoverSize() {
       if (c.expect.width) {
         // Both measurements, because a size that only appears after React mounts is a size the
         // popover was never offered.
-        for (const [when, got] of [['before mount', early], ['after mount', late]]) {
+        for (const [when, got] of [['with no script', unscripted], ['before mount', early], ['after mount', late]]) {
           if (got.width !== c.expect.width || got.height !== c.expect.height) {
             failures.push(`${c.label}: ${when} the document is ${got.width}x${got.height}, expected ${c.expect.width}x${c.expect.height}`);
           }
         }
       }
-      if (c.expect.notPinned && (late.width === 420 || late.height === 560)) {
-        failures.push(`${c.label}: the sheet was pinned to the Mac window size (${late.width}x${late.height})`);
+      // A phone's sheet is the system's size, so the document must be exactly its window: not the
+      // Mac's size, not the iPad's, and not marked as a tablet.
+      if (c.expect.notPinned && (late.device || late.width !== late.innerWidth || late.height !== late.innerHeight)) {
+        failures.push(`${c.label}: the sheet was pinned to a popover size (${late.width}x${late.height} in a ${late.innerWidth}x${late.innerHeight} window, data-device=${late.device})`);
       }
+      if ((c.expect.device ?? null) !== late.device) failures.push(`${c.label}: data-device is ${late.device}, expected ${c.expect.device ?? null}`);
+      if (c.expect.lateWidth && (late.width !== c.expect.lateWidth || late.height !== c.expect.lateHeight)) {
+        failures.push(`${c.label}: after mount the document is ${late.width}x${late.height}, expected it to adopt ${c.expect.lateWidth}x${c.expect.lateHeight}`);
+      }
+      if (c.expect.noOverflow && late.overflow) failures.push(`${c.label}: the document overflows the window it was given`);
       await page.close();
       await context.close();
     }
@@ -630,7 +711,7 @@ async function measurePopoverSize() {
     await browser.close();
   }
   if (failures.length) fail(`the popup document would size a popover wrongly:\n  ${failures.join('\n  ')}`);
-  console.log('[preview] every case as expected: a content-sized popover would get 420x560 on a Mac, and the sheet is untouched.');
+  console.log('[preview] every case as expected: a content-sized popover would get 420x560 on a Mac and 440x600/660/720 on an iPad, and the iPhone sheet is untouched.');
 }
 
 /**
@@ -653,9 +734,10 @@ const MEASURE_CASES = [
   { name: 'iphone-390x844', width: 390, height: 844, keyboard: 0, min: 0.7 },
   { name: 'iphone-430x932', width: 430, height: 932, keyboard: 0, min: 0.7 },
   { name: 'iphone-390x844-keyboard', width: 390, height: 844, keyboard: 500, min: 0.45 },
-  // An iPad shows the popup as a popover rather than a full-screen sheet. Its exact size is
-  // Safari's, not ours; this is the compact shell in a window of about that shape, to look at.
-  { name: 'ipad-popover-400x640', width: 400, height: 640, keyboard: 0, min: 0.6, ipad: true },
+  // An iPad shows the popup as a popover, sized from the document (popup-size.css): 440x660 on an
+  // 11-inch. This is the compact shell at that size, with an iPad's screen behind it so the engine
+  // takes the iPad rule, to be looked at as much as measured.
+  { name: 'ipad-popover-440x660', width: 440, height: 660, keyboard: 0, min: 0.7, ipad: true, screen: { width: 820, height: 1180 } },
 ];
 
 async function measureTranscript(dir, label) {
@@ -672,8 +754,8 @@ async function measureTranscript(dir, label) {
   try {
     for (const c of MEASURE_CASES) {
       for (const theme of ['dark', 'light']) {
-        const descriptor = c.ipad ? playwright.devices['iPad Mini'] : playwright.devices['iPhone 14'];
-        const context = await browser.newContext({ ...descriptor, viewport: { width: c.width, height: c.height }, screen: { width: c.width, height: c.height } });
+        const descriptor = c.ipad ? playwright.devices['iPad Pro 11'] : playwright.devices['iPhone 14'];
+        const context = await browser.newContext({ ...descriptor, viewport: { width: c.width, height: c.height }, screen: c.screen ?? { width: c.width, height: c.height } });
         const page = await context.newPage();
         const q = `fixture=long&theme=${theme}${c.keyboard ? `&keyboard=${c.keyboard}` : ''}`;
         await page.goto(`http://127.0.0.1:${port}/popup.html?${q}`, { waitUntil: 'load' });
@@ -721,9 +803,158 @@ async function measureTranscript(dir, label) {
   if (failures.length) fail(`the compact chat view is not what it should be:\n  ${failures.join('\n  ')}`);
 }
 
-/** Filled in once the compact shell exists; the `before` run never reaches it. */
-async function compactShellChecks() {
-  return [];
+/**
+ * What the compact shell promises, asserted in the engine Safari ships.
+ *
+ * A content-first phone UI is mostly things that are NOT on screen, which is exactly what a
+ * screenshot cannot vouch for. So this opens every sheet the chat view has the way a thumb would,
+ * and checks the parts that fail quietly: that each is a real modal dialog with a name, that focus
+ * goes in and comes back out to the control that opened it, that the page behind is inert, that
+ * nothing taller than 85% of the screen is drawn, that every control has an accessible name that
+ * does not depend on a hover tooltip, and that every target is 44px where a thumb lands on it.
+ * It saves a PNG of each sheet on the way, because they are also the screens nobody sees otherwise.
+ */
+async function compactShellChecks(page, dir, label) {
+  const problems = [];
+  const shot = (name) => page.screenshot({ path: path.join(dir, `${label}-sheet-${name}.png`) });
+
+  // Names and target sizes, for whatever is on screen right now.
+  const audit = async (where) => {
+    const found = await page.evaluate(() => {
+      const out = [];
+      const scope = document.querySelector('.sheet') ?? document.querySelector('.app');
+      const visible = (el) => {
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden' && !el.closest('[inert]');
+      };
+      for (const el of scope.querySelectorAll('button, summary, select, textarea, input:not([type=hidden]):not([hidden]), a[href], [role=option]')) {
+        if (!visible(el)) continue;
+        // Inside a closed <details> only the summary is real.
+        const closed = el.closest('details:not([open])');
+        if (closed && el.tagName !== 'SUMMARY') continue;
+        if (closed && el.tagName === 'SUMMARY' && el.parentElement !== closed) continue;
+        const what = `${el.tagName.toLowerCase()}${el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/).join('.') : ''}`;
+        // The accessible name, WITHOUT title: a name that only exists as a tooltip is a name that
+        // only exists on hover, and a phone has no hover.
+        const labelled = el.getAttribute('aria-labelledby');
+        const name = (el.getAttribute('aria-label') || (labelled && document.getElementById(labelled)?.textContent) || el.labels?.[0]?.textContent || el.textContent || el.getAttribute('placeholder') || '').trim();
+        if (!name) out.push(`${what}: no accessible name`);
+        // A switch inside its <label> is pressed by pressing the label, so the label is the target.
+        const r = (el.matches('input[type=checkbox]') && el.closest('label') ? el.closest('label') : el).getBoundingClientRect();
+        let h = r.height;
+        let w = r.width;
+        // A control drawn small and hit large carries its target on ::before.
+        const before = getComputedStyle(el, '::before');
+        if (before.content !== 'none' && before.position === 'absolute') {
+          h += -(parseFloat(before.top) || 0) - (parseFloat(before.bottom) || 0);
+          w += -(parseFloat(before.left) || 0) - (parseFloat(before.right) || 0);
+        }
+        if (h < 43.5 || w < 43.5) out.push(`${what} "${name.slice(0, 30)}": target is ${Math.round(w)}x${Math.round(h)}, under 44px`);
+      }
+      return out;
+    });
+    for (const f of found) problems.push(`${where}: ${f}`);
+  };
+
+  if (await page.locator('.popup-nav').count()) problems.push('the compact shell still has a bottom navigation bar');
+  await audit('chat view');
+
+  const sheetState = () =>
+    page.evaluate(() => {
+      const el = document.querySelector('.sheet');
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      const root = document.querySelector('.sheet-root');
+      const others = Array.from(root.parentElement.children).filter((c) => c !== root);
+      return {
+        role: el.getAttribute('role'),
+        modal: el.getAttribute('aria-modal'),
+        title: (document.getElementById(el.getAttribute('aria-labelledby') ?? '')?.textContent ?? '').trim(),
+        focusInside: el.contains(document.activeElement),
+        behindInert: others.length > 0 && others.every((c) => c.inert),
+        share: r.height / window.innerHeight,
+        bottom: Math.round(window.innerHeight - r.bottom),
+      };
+    });
+
+  /** Open a sheet from `opener`, check it, close it with `how`, check where focus went. */
+  const roundTrip = async (name, opener, how, returnsTo = opener) => {
+    await page.locator(opener).click();
+    const opened = await page.locator('.sheet').waitFor({ state: 'visible', timeout: 5000 }).then(() => true, () => false);
+    // The slide-up first, so the sheet is measured, and photographed, at rest.
+    await page.waitForTimeout(260);
+    const st = opened ? await sheetState() : null;
+    if (!st) {
+      problems.push(`${name}: no sheet opened from ${opener}`);
+      return;
+    }
+    if (st.role !== 'dialog' || st.modal !== 'true') problems.push(`${name}: not a modal dialog (role=${st.role}, aria-modal=${st.modal})`);
+    if (!st.title) problems.push(`${name}: the dialog has no name`);
+    if (!st.focusInside) problems.push(`${name}: focus did not move into the sheet`);
+    if (!st.behindInert) problems.push(`${name}: the shell behind the sheet is not inert`);
+    if (st.share > 0.851) problems.push(`${name}: ${(st.share * 100).toFixed(0)}% of the screen, over the 85% cap`);
+    if (st.bottom !== 0) problems.push(`${name}: the sheet floats ${st.bottom}px above the bottom edge`);
+    await audit(name);
+    // Tab must stay inside, however many times it is pressed.
+    for (let i = 0; i < 12; i++) await page.keyboard.press('Tab');
+    if (!(await page.evaluate(() => document.querySelector('.sheet')?.contains(document.activeElement)))) problems.push(`${name}: Tab left the sheet`);
+    await shot(name);
+    if (how === 'escape') await page.keyboard.press('Escape');
+    else if (how === 'backdrop') await page.locator('.sheet-backdrop').click({ position: { x: 20, y: 20 } });
+    else await page.locator('.sheet-close').click();
+    await page.locator('.sheet').waitFor({ state: 'detached', timeout: 5000 }).catch(() => problems.push(`${name}: did not close on ${how}`));
+    const back = await page.evaluate((sel) => document.activeElement === document.querySelector(sel), returnsTo);
+    if (!back) problems.push(`${name}: focus did not return to ${returnsTo} after ${how}`);
+  };
+
+  await roundTrip('chats', '[data-action="chat-sheet"]', 'escape');
+  await roundTrip('model', '[data-action="model-chip"]', 'close');
+  await roundTrip('add', '[data-action="add"]', 'backdrop');
+  await roundTrip('draft', '[data-action="draft-sheet"]', 'escape');
+  await roundTrip('menu', '[data-action="menu"]', 'close');
+
+  // A sheet opened from a sheet replaces it, and closing lands on the chat with focus on "+".
+  await page.locator('[data-action="add"]').click();
+  await page.locator('.sheet [data-action="model"]').click();
+  const stacked = await page.locator('.sheet').count();
+  const title = await page.locator('.sheet-title').first().textContent();
+  if (stacked !== 1 || title?.trim() !== 'Model') problems.push(`"+" then Model: expected one sheet called Model, got ${stacked} called "${title}"`);
+  await page.keyboard.press('Escape');
+  await page.locator('.sheet').waitFor({ state: 'detached', timeout: 5000 }).catch(() => problems.push('"+" then Model: did not close'));
+  if (!(await page.evaluate(() => document.activeElement === document.querySelector('[data-action="add"]')))) problems.push('"+" then Model: focus did not return to "+"');
+
+  // Picking a model is two taps from the chat: the chip, then the model.
+  await page.locator('[data-action="model-chip"]').click();
+  await page.locator('.sheet [data-testid="model-option"][data-model="claude-sonnet-5"]').click();
+  await page.locator('.sheet').waitFor({ state: 'detached', timeout: 5000 }).catch(() => problems.push('model: picking a model did not close the sheet'));
+  const chip = (await page.locator('[data-testid="model-chip"]').textContent())?.trim();
+  if (chip !== 'claude-sonnet-5') problems.push(`model: the chip says "${chip}" after picking claude-sonnet-5`);
+
+  // The way to Mods and back is the menu and then "Chat" in the bar.
+  await page.locator('[data-action="menu"]').click();
+  await page.locator('.sheet [data-action="view-mods"]').click();
+  await page.locator('[data-action="back-to-chat"]').waitFor({ state: 'visible', timeout: 5000 }).catch(() => problems.push('menu: Mods has no way back to the chat in its bar'));
+  await page.waitForTimeout(200);
+  await audit('mods view');
+  await page.screenshot({ path: path.join(dir, `${label}-view-mods.png`) });
+  const more = page.locator('[data-action="mod-more"]').first();
+  if (await more.count()) {
+    await more.click();
+    await page.locator('.sheet').waitFor({ state: 'visible', timeout: 5000 }).catch(() => problems.push('mods: the overflow did not open a sheet'));
+    await page.waitForTimeout(260);
+    await audit('mod actions');
+    await shot('mod-actions');
+    await page.keyboard.press('Escape');
+  } else problems.push('mods: a mod card has no overflow button');
+  await page.locator('[data-action="menu"]').click();
+  await page.locator('.sheet [data-action="view-settings"]').click();
+  await page.waitForTimeout(300);
+  await audit('settings view');
+  await page.screenshot({ path: path.join(dir, `${label}-view-settings.png`) });
+  await page.locator('[data-action="back-to-chat"]').click();
+  await page.locator('.composer.compact').waitFor({ state: 'visible', timeout: 5000 }).catch(() => problems.push('back: "Chat" did not return to the chat view'));
+
+  return problems;
 }
 
 /**
