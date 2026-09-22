@@ -35,7 +35,7 @@ You do not need a real model at all for the tests or the smoke run — both use 
 | `npm run typecheck` | `tsc --noEmit`. |
 | `npm test` | Node's built-in runner over `test/*.test.ts`, via `--experimental-strip-types`. No bundler, no browser, fast. |
 | `npm run smoke` | Builds to `.output/test-chrome-mv3`, then drives the real side panel headless in Playwright against `scripts/mock-llm.mjs`, asserting the whole chat loop end to end. |
-| `npm run screenshots` | Regenerates the README images through the same harness. |
+| `npm run screenshots` | Regenerates the README and [docs/screenshots.md](docs/screenshots.md) images through the same harness. |
 | `npm run store-assets` | Regenerates the Chrome Web Store screenshots and promo tiles into `docs/store/assets/`. |
 | `npm run styleguide` | Rebuilds and recaptures the living style guide into `docs/design/`, which `docs/design.md` embeds. |
 
@@ -62,7 +62,7 @@ a trick or two.
 
 ## Architecture, in the order you will need it
 
-The README's [How it works](README.md#how-it-works) has the diagram. The short version of where
+[docs/architecture.md](docs/architecture.md) has the diagram and the agent loop in detail. The short version of where
 things live:
 
 - **`entrypoints/background.ts`** — the service worker. The RPC endpoint for the panel, the agent's

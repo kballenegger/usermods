@@ -279,7 +279,7 @@ a given build, and `docs/safari.md` should be updated with it.
 2. Fully quit and relaunch Chrome (Chrome menu → Quit, not just closing the window), reopen the
    same page, open the side panel.
    **Expected:** the chat transcript for that site survives (chat history is `chrome.storage.
-  session`-backed per the README's session note — confirm it actually does survive a full
+  session`-backed per the old README session note — confirm it actually does survive a full
    restart; if it does not, that's a real finding worth reporting, not a checklist bug).
    **If it fails:** side panel DevTools — note whether the chat list is empty or just the
    selected transcript is empty.
@@ -562,7 +562,7 @@ GM_addValueChangeListener('qaSeen', (key, oldV, newV, remote) => {
    loads).
    **If it fails:** page console; service worker console for the write RPC.
 4. With both tabs open and loaded, reload just one of them.
-   **Expected:** per the README, the *other*, still-open tab's title gets `:remote-update`
+   **Expected:** per [gm-api.md](gm-api.md), the *other*, still-open tab's title gets `:remote-update`
    appended shortly after — confirms writes are "pushed live to the script's other open tabs" via
    `GM_addValueChangeListener`.
    **If it fails:** page console in the tab that should have received the remote update; service
@@ -609,7 +609,7 @@ GM_xmlhttpRequest({
    **If it fails:** page console, service worker console.
 4. Try a script with `// @connect self` whose `@match` is `https://example.com/*` only, requesting
    `https://example.com/get` vs `https://sub.example.com/get`.
-   **Expected:** both succeed — per the README, `self` covers the script's own `@match`/
+   **Expected:** both succeed — per [gm-api.md](gm-api.md), `self` covers the script's own `@match`/
    `@include` domain and its subdomains.
    **If it fails:** page console; copy the exact refusal text if one host is unexpectedly
    blocked.
@@ -638,10 +638,10 @@ document.title = 'pageworld:' + (typeof unsafeWindow === 'undefined' ? 'isolated
    **If it fails:** page console.
 3. Try a `GM_setValue` call in a `@grant none` script (add `GM_setValue('x', 1)` to the body
    above) and reload the page twice.
-   **Expected:** per the README, this updates only the in-page copy and **cannot be persisted**
+   **Expected:** per [gm-api.md](gm-api.md), this updates only the in-page copy and **cannot be persisted**
    — confirm the value does *not* survive a reload (unlike section 6's isolated-world script).
    **If it fails:** page console; this is documented, expected behavior, not a bug, but confirm
-   it matches so the README claim is accurate.
+   it matches so the documented claim is accurate.
 
 ---
 
@@ -689,7 +689,7 @@ You need a Tampermonkey install (or another Chrome profile with it) to produce r
    scripts found in that archive.", copy the exact message plus the tool/version you used to
    create the ZIP.
 5. Re-import the *same* JSON or ZIP a second time (same scripts, no version bump).
-   **Expected:** per the README, matching is by `@downloadURL` (or `@namespace`+`@name`), so a
+   **Expected:** per [guide.md](guide.md#migrating-from-tampermonkey), matching is by `@downloadURL` (or `@namespace`+`@name`), so a
    duplicate mod should NOT appear — it should update the existing one in place, keeping its
    registration and id, and merge in the backup's values rather than creating a second copy.
    **If it fails:** side panel DevTools — count the mods in the list before and after; report if

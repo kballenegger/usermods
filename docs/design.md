@@ -507,7 +507,7 @@ rail** — the same device the open chip uses, because a state may not rest on c
 transitioned property alone. The row's label (`Thinking`) is `--text-3` mono, and the label and the
 level names are the whole explanation: there is **no help sentence**. The one tooltip, on the group,
 says what the scale is ("How much the model reasons before it answers"); what each provider does
-with it on the wire is the README's job, not a line every chat pays for.
+with it on the wire is [guide.md](guide.md#how-much-the-model-thinks)'s job, not a line every chat pays for.
 
 *Don't* use this for a long scale, an unordered set, or values that need explaining individually —
 that is the dropdown above. *Don't* draw a disabled row to show a control exists.
