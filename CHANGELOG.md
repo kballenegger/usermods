@@ -44,6 +44,36 @@ All notable changes to usermods are recorded here. The format follows
 
 No new permissions: the Chrome manifest is byte-for-byte unchanged.
 
+### The model's replies are rendered as markdown
+
+- **Replies are formatted instead of showing their punctuation.** Reported as "also need to render
+  markdown better", with a screenshot of a reply reading `**bold**` with the asterisks still in it.
+  Models write markdown whether or not they are asked to, and the transcript was showing it verbatim
+  — so a snippet arrived as a wall of unindented prose and a table as a row of pipes. Assistant
+  prose now renders paragraphs, bold, italic, strikethrough, inline code, fenced code blocks,
+  ordered and nested lists, headings, blockquotes, GFM tables, links, horizontal rules and hard line
+  breaks. The dashboard's stored-transcript preview renders the same way, so a chat reads the same
+  live and afterwards. **Your own messages stay plain** — typing `*` still shows an asterisk — as do
+  the model-written chat titles and tool summaries.
+- **Fenced blocks name their language and have a Copy button.** The model usually shows a snippet
+  before it proposes it, and copying it meant selecting text inside a transcript that was still
+  growing. Code scrolls rather than wraps, so its indentation survives, and both it and a wide table
+  scroll inside their own frame rather than moving the rest of the conversation.
+- **Nothing in a reply is louder than the interface around it.** Headings are capped below the
+  panel's own title size, bold uses the interface's one bold weight, and the pattern introduces no
+  new colour: code sits on the inset well in the mono face, tables are drawn with the existing
+  border tones, and both themes pass the contrast gate unchanged.
+- **Formatting no longer flickers while a reply streams in.** Text arrives a few characters at a
+  time, so a reply passes through moments with a half-typed `**` or an unclosed code fence. Those
+  are completed before rendering while the row is still being written, so a snippet is a code block
+  from its first character instead of appearing as a paragraph and then jumping into place.
+- **A reply cannot make the panel fetch or run anything.** The text is written by a model, from
+  whatever it read on the page, so it is treated as untrusted: embedded HTML is removed before
+  parsing (code blocks and `` `<div>` `` spans excepted — that is the model naming an element),
+  links are limited to `http`, `https` and `mailto` and open in a new tab, a `javascript:` or
+  `data:` link keeps its text but stops being a link at all, and a markdown image is shown as a link
+  rather than loaded — an image URL the model chose and the panel fetches is a tracking pixel.
+
 ### Thinking: how hard the model reasons, per chat
 
 - **A Thinking level next to the model**, mapped onto each provider's own reasoning knob. The levels

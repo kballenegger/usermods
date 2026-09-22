@@ -80,6 +80,67 @@ export const IMAGES_MARKER = 'IMAGESMARKER-4c7b';
 export const ARTIFACT_MARKER = 'ARTIFACTMARKER-7e21';
 
 /**
+ * The smoke flow's markdown reply: one message holding every construct the transcript renders, and
+ * the three it must refuse.
+ *
+ * It lives in the flow that runs on EVERY `npm run smoke` rather than in a flow of its own, because
+ * the regression it guards is not exotic — it is what the owner saw the first time they read a
+ * reply: `**bold**` with the asterisks still in it. A model writes markdown in ordinary answers, so
+ * the ordinary conversation is where this belongs.
+ *
+ * Exported so scripts/screenshots.mjs asserts against the exact text the server sent rather than
+ * against a second copy that could drift from it — the same rule the isolation markers follow.
+ *
+ * What each part is here to prove, reading down: bold/italic/strikethrough and inline code; a
+ * nested unordered list and an ordered one; a fenced block with a language, which is what Copy is
+ * attached to; a GFM table, which is the construct that has to scroll rather than stretch the
+ * panel; a blockquote, a heading, a rule and a link. Then the three refusals — an image that must
+ * become a link rather than a fetch, a `javascript:` href that must lose its href entirely, and a
+ * raw <img> tag that must survive neither as markup nor as visible text.
+ */
+export const MARKDOWN_REPLY = `## What I found
+
+The container is capped at ~1600px with the sidebar reserving space on the left. Hiding it and
+lifting the cap gives the article the **full window**, and the change is *purely visual* —
+~~no scripts~~ one stylesheet, injected via \`document.head\`.
+
+Two things are in the way:
+
+- the pinned table of contents
+  - \`#vector-toc-pinned-container\`
+  - \`.vector-column-start\`
+- the width cap on \`.mw-page-container\`
+
+So the plan is:
+
+1. hide the sidebar
+2. lift the cap
+3. let the prose reflow
+
+\`\`\`js
+const el = document.querySelector('#vector-toc-pinned-container');
+if (el) el.style.display = 'none';
+\`\`\`
+
+| Selector | Property | New value |
+| --- | --- | --- |
+| \`.mw-page-container\` | max-width | none |
+| \`.vector-body\` | max-width | none |
+| \`.vector-column-start\` | display | none |
+
+> The skin reserves the sidebar's width with a padding, so both have to go.
+
+---
+
+Reference: [the Vector 2022 notes](https://www.mediawiki.org/wiki/Skin:Vector).
+
+![a screenshot of the sidebar](https://example.invalid/pixel.png)
+
+[do not click me](javascript:alert(1))
+
+<img src="https://example.invalid/tracker.gif">`;
+
+/**
  * The resume flow's markers and prompts. Four conversations, one per thing that can go wrong: a
  * stream that drops once, an outage that outlasts the retries, a service worker killed mid-run and
  * a panel closed mid-run. Each `done` marker appears only in that conversation's LAST step, so
@@ -199,7 +260,16 @@ const SCRIPTS = [
         ],
       },
       {
-        text: "The container is capped at ~1600px with the sidebar reserving space on the left. Hiding the sidebar and lifting the cap gives the article the full window.",
+        // Deliberately written in MARKDOWN, and deliberately in the flow every run exercises.
+        //
+        // Models write markdown whether or not they were asked to, so the transcript renders it
+        // (entrypoints/sidepanel/Markdown.tsx) and the smoke flow asserts that what reaches the DOM
+        // is <strong>, <ul>, <pre><code> and <table> rather than the literal asterisks the owner
+        // reported. Every construct here is one the renderer claims to support; the last three
+        // lines are the ones the SANITISER has to refuse, and the flow checks those too — an <img>
+        // is a tracking pixel a model could aim at the page it just read, and a `javascript:` href
+        // would run in the panel's own origin, which is where the API keys live.
+        text: MARKDOWN_REPLY,
         calls: [
           {
             name: 'propose_mod',

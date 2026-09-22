@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { currentVersion, lineCount, toSource, type Artifact } from '@/lib/artifact';
 import { exportFilename } from '@/lib/dashboard';
 import { SentImages } from '../sidepanel/Attachments';
+import { Markdown } from '../sidepanel/Markdown';
 import { modelRowText, toolRowTitle } from '@/lib/transcript';
 import type { ChatItem } from '@/lib/types';
 
@@ -56,9 +57,13 @@ export function TranscriptPreview({ items, artifact }: { items: ChatItem[]; arti
               </div>
             );
           case 'assistant':
+            // The same renderer the side panel uses, so a reply reads identically in the live
+            // transcript and in this stored one. Never `streaming`: a stored transcript is
+            // finished text, and repairing an unterminated ** here would be inventing content the
+            // model did not send.
             return (
               <div key={i} className="msg assistant">
-                {it.text}
+                <Markdown text={it.text} />
               </div>
             );
           case 'note':

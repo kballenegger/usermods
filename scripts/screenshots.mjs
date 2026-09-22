@@ -71,7 +71,7 @@
 
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
-import { ARTIFACT_V1, ARTIFACT_V2, ARTIFACT_V3, COMPACT_MARKER, EDITMOD_PROMPTS, editModSource, FAST_MARKER, IMAGES_MARKER, MODELS, RESUME as RESUME_CONV, SLOW_MARKER, SUMMARY_MARKER, THINKING, VISION as VISION_CONV, WAIT_MARKER } from './mock-llm.mjs';
+import { ARTIFACT_V1, ARTIFACT_V2, ARTIFACT_V3, COMPACT_MARKER, EDITMOD_PROMPTS, editModSource, FAST_MARKER, IMAGES_MARKER, MARKDOWN_REPLY, MODELS, RESUME as RESUME_CONV, SLOW_MARKER, SUMMARY_MARKER, THINKING, VISION as VISION_CONV, WAIT_MARKER } from './mock-llm.mjs';
 import { extDir } from './build-dir.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -138,6 +138,15 @@ const STYLEGUIDE = process.argv.includes('--styleguide');
 const SETTINGS_SHOT = process.argv.includes('--settings-capture');
 /** Rewrite 12-model-picker.png alone, for the same reason. */
 const PICKER_SHOT = process.argv.includes('--picker-capture');
+
+/**
+ * Rewrite 13-markdown.png and 13-markdown-light.png alone.
+ *
+ * The markdown picture is a specimen rather than a moment in a flow: it exists to show every
+ * construct the transcript renders at once, so it is shot from a seeded transcript rather than from
+ * a conversation, and it is re-shot whenever the markdown styling changes and at no other time.
+ */
+const MARKDOWN_SHOT = process.argv.includes('--markdown-capture');
 
 /** True when this run is capturing screenshots rather than asserting behaviour (see MASK below). */
 const CAPTURING =
@@ -666,6 +675,67 @@ async function modelPickerShot(theme = 'dark', name = '12-model-picker.png') {
   }
 }
 
+/**
+ * 13 — a rendered assistant reply, holding every markdown construct at once.
+ *
+ * A specimen rather than a moment: no model writes a message that uses headings, nested lists, a
+ * fenced block, a table, a quote and a rule all at once, but the picture that shows the pattern has
+ * to. So the transcript is SEEDED rather than conversed — the same MARKDOWN_REPLY the smoke flow
+ * asserts against, written straight into storage — which also means the picture cannot drift from
+ * the text the tests check.
+ *
+ * The viewport grows to the transcript's full height, because the point of the shot is the whole
+ * document and a cropped one would cut the table off.
+ */
+async function markdownShot(theme = 'dark', name = '13-markdown.png') {
+  const b = await launch(theme);
+  try {
+    const now = Date.now();
+    const panel = await openPanel(b.ctx, b.extId, {
+      settings: { theme },
+      storage: {
+        chats: [
+          {
+            id: 'chat-md',
+            host: 'en.wikipedia.org',
+            url: 'https://en.wikipedia.org/wiki/Common_kingfisher',
+            title: 'hide the sidebar and widen the article',
+            createdAt: now - 60_000,
+            updatedAt: now,
+            turns: 1,
+          },
+        ],
+        'chat:chat-md:items': [
+          { kind: 'user', id: 'u1', text: 'hide the sidebar and make the article full width' },
+          { kind: 'assistant', text: MARKDOWN_REPLY },
+        ],
+      },
+    });
+    await openSite(b.ctx, 'https://en.wikipedia.org/wiki/Common_kingfisher');
+    // The rendered reply, waited for by a construct near the END of it: the table is the last big
+    // block, so seeing it means the whole document has laid out.
+    await panel.locator('.messages .msg.assistant .md table').first().waitFor({ timeout: 20_000 });
+    await panel.waitForTimeout(400);
+    // Grow to the transcript's full height so the shot holds the whole specimen.
+    const full = await panel.evaluate(() => {
+      const msgs = document.querySelector('.messages');
+      const bar = document.querySelector('.app > :first-child');
+      const composer = document.querySelector('.composer');
+      return Math.ceil(
+        (bar?.getBoundingClientRect().height ?? 0) +
+          msgs.scrollHeight +
+          (composer?.getBoundingClientRect().height ?? 0) +
+          32,
+      );
+    });
+    await panel.setViewportSize({ width: PANEL.width, height: Math.max(PANEL.height, Math.min(full, 1800)) });
+    await panel.waitForTimeout(400);
+    return await shot(panel, name);
+  } finally {
+    await b.close();
+  }
+}
+
 /** 05 — the install page for a real Greasy Fork script, fetched live. */
 async function install(theme = 'dark', name = '05-install.png') {
   const b = await launch(theme);
@@ -782,8 +852,96 @@ async function smoke() {
     if (!saved[0].source.includes('==UserScript==')) fail('saved mod has no userscript header');
     if (!saved[0].source.includes('vector-toc-pinned-container')) fail('the saved mod is not the script the card showed');
 
+    // ---------------------------------------------------------------------
+    // The reply is rendered as MARKDOWN, and rendered safely.
+    // ---------------------------------------------------------------------
+    //
+    // The third step of this conversation is written in markdown (MARKDOWN_REPLY in mock-llm.mjs),
+    // holding every construct the transcript claims to support plus the three it must refuse. The
+    // unit tests (test/markdown.test.ts) cover the rules as functions; this is the half that can
+    // only be checked in a browser — what actually reached the DOM.
+    const md = panel.locator('.messages .msg.assistant .md').last();
+    if (!(await md.count())) fail('the assistant reply was not rendered through the markdown renderer');
+
+    // The reported bug, stated directly: no literal markdown punctuation left in the rendered text.
+    const shown = (await md.innerText()) ?? '';
+    if (shown.includes('**')) fail(`the rendered reply still shows literal asterisks: ${JSON.stringify(shown.slice(0, 200))}`);
+    if (/^\s*##\s/m.test(shown)) fail('the rendered reply still shows a literal heading marker');
+    if (shown.includes('~~')) fail('the rendered reply still shows literal strikethrough markers');
+
+    // Each construct really became its element.
+    for (const [sel, what] of [
+      ['strong', 'bold'],
+      ['em', 'italic'],
+      ['del', 'strikethrough'],
+      ['code.md-inline', 'inline code'],
+      ['ul', 'an unordered list'],
+      ['ul ul', 'a nested list'],
+      ['ol', 'an ordered list'],
+      ['pre code', 'a fenced code block'],
+      ['table', 'a table'],
+      ['thead th', 'table headers'],
+      ['blockquote', 'a blockquote'],
+      ['h4', 'a heading'],
+      ['hr', 'a horizontal rule'],
+    ]) {
+      if (!(await md.locator(sel).count())) fail(`the reply rendered no ${what} (no ${sel} under .md)`);
+    }
+
+    // A heading in a reply must never out-shout the panel's own title (--fs-title, 15px).
+    const headingPx = await md.locator('h4').first().evaluate((e) => parseFloat(getComputedStyle(e).fontSize));
+    if (!(headingPx <= 15)) fail(`a reply heading renders at ${headingPx}px, larger than the panel's 15px title scale`);
+
+    // The code block names its language and offers Copy.
+    const lang = (await md.locator('.md-code-lang').first().textContent())?.trim();
+    if (lang !== 'js') fail(`the code block's language label read ${JSON.stringify(lang)}`);
+
+    // --- the sanitiser, in the browser ------------------------------------
+    //
+    // An <img> is a request the panel would make to a URL the MODEL chose, which is a tracking
+    // pixel with extra steps. There must be no img element at all — the markdown image became a
+    // link, and the raw <img> tag was stripped from the source before it was ever parsed.
+    if (await md.locator('img').count()) fail('the reply rendered an <img>: a model-chosen URL was fetched by the panel');
+    if (!(await md.locator('a.md-imglink').count())) fail('the markdown image did not become a link');
+    if (shown.includes('<img')) fail('the raw <img> tag is showing as literal text rather than having been stripped');
+
+    // A javascript: href would run in the panel's own origin, which holds the API keys. The text
+    // stays (hiding it would misreport what the model said); the href does not exist.
+    const hrefs = await md.locator('a').evaluateAll((els) => els.map((e) => e.getAttribute('href')));
+    for (const h of hrefs) {
+      if (/^\s*(javascript|data|vbscript|blob|chrome-extension|file):/i.test(h ?? '')) fail(`a link kept a dangerous href: ${h}`);
+    }
+    if (!(await md.locator('.md-deadlink').count())) fail('the javascript: link was not neutralised into an inert span');
+
+    // A real link opens in a new tab — a side panel that navigates away takes the conversation with
+    // it — and is protected against tabnabbing.
+    const real = md.locator('a[href^="https://www.mediawiki.org"]').first();
+    if (!(await real.count())) fail('the ordinary link did not survive');
+    if ((await real.getAttribute('target')) !== '_blank') fail('an ordinary link does not open in a new tab');
+    const rel = (await real.getAttribute('rel')) ?? '';
+    if (!rel.includes('noopener') || !rel.includes('noreferrer')) fail(`link rel was ${JSON.stringify(rel)}`);
+
+    // Copy writes the code block's contents to the clipboard.
+    await b.ctx.grantPermissions(['clipboard-read', 'clipboard-write']);
+    const expectedCode = (await md.locator('pre code').first().innerText()).trim();
+    await md.locator('[data-testid="md-copy"]').first().click();
+    await panel.locator('[data-testid="md-copy"]', { hasText: 'Copied' }).first().waitFor({ timeout: 5_000 });
+    const clip = (await panel.evaluate(() => navigator.clipboard.readText())).trim();
+    if (clip !== expectedCode) fail(`Copy wrote ${JSON.stringify(clip.slice(0, 120))}, expected ${JSON.stringify(expectedCode.slice(0, 120))}`);
+    // The source the mock sent is what the reader got, not a re-indented copy of it.
+    if (!MARKDOWN_REPLY.includes(clip.split('\n')[0])) fail('the copied code is not the code the model sent');
+
+    // A table wider than the panel scrolls inside its own wrapper rather than making the whole
+    // transcript scroll sideways.
+    const wrap = md.locator('.md-tablewrap').first();
+    if (!(await wrap.count())) fail('the table is not wrapped in a scroller');
+    const overflows = await panel.locator('.messages').evaluate((e) => e.scrollWidth > e.clientWidth + 1);
+    if (overflows) fail('the transcript scrolls sideways — a table escaped its wrapper');
+
     await assertNoViolations('smoke');
-    console.log('smoke: OK — streamed reply, 3 page-inspection tools, proposal card, draft at v1, save to storage, zero invalid requests');
+    console.log(
+      'smoke: OK — streamed reply rendered as markdown (bold, lists, fenced code with Copy, GFM table in a scroller, headings under the title scale), images and javascript: links refused, raw HTML stripped, 3 page-inspection tools, proposal card, draft at v1, save to storage, zero invalid requests',
+    );
   } finally {
     await b.close();
   }
@@ -5325,6 +5483,11 @@ async function main() {
     if (SETTINGS_SHOT) {
       await settings('dark', '04-settings.png');
       await settings('light', '04-settings-light.png');
+      return;
+    }
+    if (MARKDOWN_SHOT) {
+      await markdownShot('dark', '13-markdown.png');
+      await markdownShot('light', '13-markdown-light.png');
       return;
     }
     if (THEME) {

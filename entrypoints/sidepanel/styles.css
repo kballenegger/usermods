@@ -17,6 +17,11 @@
 
 @import './tokens.css';
 
+/* Assistant prose, rendered as markdown. Its own file because it is a self-contained pattern
+   (everything in it is scoped under `.md`) and because the dashboard loads this stylesheet too,
+   which is how a reply reads the same in the transcript and in a stored chat's preview. */
+@import './markdown.css';
+
 /* Bundled locally: an extension must never fetch a font from a remote origin. */
 @import '@fontsource/ibm-plex-mono/latin-400.css';
 @import '@fontsource/ibm-plex-mono/latin-500.css';
