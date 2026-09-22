@@ -14,7 +14,7 @@ USERMODS_REVIEWER_KEY='…' USERMODS_REVIEWER_BASE_URL='…' node scripts/review
 which prints the short version with both substituted, ready to paste.
 
 **The reviewer key is time-limited.** The current one is for an OpenAI-compatible endpoint (the
-reviewer endpoint, base URL kept in 1Password, Klaw vault, item "Ornith API - chrome-app-review -
+reviewer endpoint, base URL kept in 1Password, project vault, item "Ornith API - chrome-app-review -
 14 days"; model `ornith`) and **expires 2026-10-03**. If a review runs
 past that date the reviewer will hit an auth error, which is why the pasted text tells them to ask
 via the support URL rather than conclude the extension is broken. Re-issue the key and update the

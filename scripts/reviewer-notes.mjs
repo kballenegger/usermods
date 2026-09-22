@@ -6,7 +6,7 @@
 // Both values live only in the environment. docs/store/reviewer-notes.md keeps placeholders for
 // each, so the repository never carries the credential or the endpoint hostname, and this script
 // never has to be gitignored. The hostname is deliberately not written anywhere in this file
-// either — it is looked up from 1Password (Klaw vault, item "Ornith API - chrome-app-review - 14
+// either — it is looked up from 1Password (project vault, item "Ornith API - chrome-app-review - 14
 // days") when the notes need generating.
 //
 // The notes are read from the doc rather than duplicated here: two copies of the same text drift,
@@ -53,7 +53,7 @@ if (!baseUrl || !baseUrl.trim()) {
     'USERMODS_REVIEWER_BASE_URL is not set.\n' +
       "  Usage: USERMODS_REVIEWER_KEY='<the key>' USERMODS_REVIEWER_BASE_URL='<the base URL>' " +
       'node scripts/reviewer-notes.mjs | pbcopy\n' +
-      '  The base URL is the reviewer endpoint (kept in 1Password, Klaw vault, item "Ornith API - ' +
+      '  The base URL is the reviewer endpoint (kept in 1Password, project vault, item "Ornith API - ' +
       'chrome-app-review - 14 days").\n' +
       '  Do not paste it into docs/store/reviewer-notes.md — that file keeps the placeholder.',
   );

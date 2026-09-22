@@ -2,9 +2,9 @@
 
 ## Live submission status — 2026-09-22
 
-- Publisher: `kenneth@ballenegger.com` (`46adec1d-bb94-408a-99c8-7cc35d663a6f`).
+- Publisher: `kenneth@ballenegger.com` (publisher id kept out of the repo).
 - Created draft item: `dhmdjekbeinhhnfhcgnkgdpgdafpboic`.
-- [Developer dashboard](https://chrome.google.com/u/2/webstore/devconsole/46adec1d-bb94-408a-99c8-7cc35d663a6f/dhmdjekbeinhhnfhcgnkgdpgdafpboic/edit/listing).
+- [Developer dashboard](https://chrome.google.com/webstore/devconsole).
 - Uploaded the audited ZIP below, with its SHA-256 verified unchanged. Saved the description,
   category, language, icon, all five screenshots, both promo tiles, homepage and support URLs.
 - Saved privacy disclosures and permission justifications. Distribution is free, Public,
@@ -49,7 +49,7 @@ for the policy. Field names and limits checked against `developer.chrome.com` on
 | | |
 |---|---|
 | Developer account | Register at the [dashboard](https://chrome.google.com/webstore/devconsole) and pay the **one-time $5 USD** registration fee. Verify the account's email address, or publishing is blocked. |
-| Model API key | The reviewer key exists: an OpenAI-compatible endpoint (the reviewer endpoint, base URL kept in 1Password, Klaw vault, item "Ornith API - chrome-app-review - 14 days"), model `ornith`, **expiring 2026-10-03**. It goes in the reviewer-notes field via `scripts/reviewer-notes.mjs`, never into the repo. Revoke it once the review clears. |
+| Model API key | The reviewer key exists: an OpenAI-compatible endpoint (the reviewer endpoint, base URL kept in 1Password, project vault, item "Ornith API - chrome-app-review - 14 days"), model `ornith`, **expiring 2026-10-03**. It goes in the reviewer-notes field via `scripts/reviewer-notes.mjs`, never into the repo. Revoke it once the review clears. |
 | The package | `npm run zip:store` → upload `.output/usermods-0.1.0-chrome.zip`. Current build: 410,791 bytes, sha256 `8b7c23dd7e5fcd539be151328f13fec6ee33b9c9e6a38f79666ac3db2226c01b` (commit `12fc38a`). |
 
 **Upload the zip first.** The dashboard derives the item name and the permission-justification
@@ -256,7 +256,7 @@ Without a key the reviewer cannot exercise the chat at all, and the likeliest ou
 rejection for a feature that "does not work".
 
 **The reviewer key expires 2026-10-03.** It is for an OpenAI-compatible endpoint (the reviewer
-endpoint, base URL kept in 1Password, Klaw vault, item "Ornith API - chrome-app-review - 14 days";
+endpoint, base URL kept in 1Password, project vault, item "Ornith API - chrome-app-review - 14 days";
 model `ornith`), and the pasted notes tell the reviewer to
 request a fresh one via the support URL if it has lapsed. If a review is still open near that date,
 issue a new key and update this field in the dashboard.
