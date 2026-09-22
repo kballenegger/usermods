@@ -1,19 +1,23 @@
-// The model picker: a compact control under the composer that says which model this chat talks
-// to, and changes it.
+// The model picker: one chip in the chat bar that says which model this chat talks to (and how
+// hard it thinks), and a dropdown that changes both.
 //
-// It is the ARIA combobox-with-listbox pattern, opened from a button. Closed, it is one button
-// whose label is the model (and, where there is room, the provider). Open, focus sits in a single
-// text field that does two jobs — it filters the list, and whatever is typed into it can be used as
-// a model id on any connected provider, which is the only way to pick a model on an endpoint that
-// cannot list them. The options themselves never take focus: the field points at the active one
-// with aria-activedescendant, so typing and arrowing never fight over where the caret is.
+// It is the ARIA combobox-with-listbox pattern, opened from a button. Closed, it is one chip whose
+// label is the model (and, where there is room, the provider, and the Thinking level when it is not
+// the default). Open, focus sits in a single text field that does two jobs — it filters the list,
+// and whatever is typed into it can be used as a model id on any connected provider, which is the
+// only way to pick a model on an endpoint that cannot list them. The options themselves never take
+// focus: the field points at the active one with aria-activedescendant, so typing and arrowing
+// never fight over where the caret is. Under the list, the Thinking level is a small radio group,
+// and under that the footer.
 //
 //   ↑ / ↓        move through the options, across providers      Home / End   first / last
 //   Enter        pick the active option                          Escape       close, focus returns
-//   Tab          on to Refresh and Manage providers, then out, which closes it
+//   Tab          on to Thinking, Refresh and Manage providers, then out, which closes it
 //
-// It opens UPWARD, because the composer is the last thing in the panel, and it is as wide as the
-// composer rather than as wide as its button, so a long model id has the whole 320px to be read in.
+// It opens DOWNWARD from the chat bar, over the transcript, and it is as wide as the bar rather
+// than as wide as its chip, so a long model id has the whole 320px to be read in. Everything about
+// the model is behind this one control, because the model is not something you change often and
+// the composer is something you look at all the time.
 //
 // Everything it shows comes in as props, and everything it changes goes out through callbacks: it
 // reads no storage and sends no messages, apart from asking the background to refresh a listing.
@@ -37,13 +41,15 @@ import {
 } from '@/lib/thinking';
 import './modelpicker.css';
 
-/** What the closed button says when the chat has no usable model. Exported for the smoke flow's docs. */
+/** What the closed chip says when the chat has no usable model. Exported for the smoke flow's docs. */
 export const PICK_A_MODEL = 'Pick a model';
 export const NO_PROVIDER = 'No provider connected';
 export const NEXT_TURN_NOTE = 'Applies from the next turn. The reply in progress stays on the model it started with.';
 
-/** The Thinking row's label, and the line under it when a model has no reasoning knob to show. */
+/** The Thinking control's label. The level names beside it are the whole explanation. */
 export const THINKING_LABEL = 'Thinking';
+/** The one tooltip the Thinking control carries. */
+export const THINKING_TITLE = 'How much the model reasons before it answers';
 
 interface Option {
   key: string;
@@ -74,7 +80,10 @@ export function ModelPicker({
   selection: ModelSelection | null;
   /** That selection, resolved: either a connection and a model, or the reason there is none. */
   resolved: ResolvedSelection;
-  /** A line shown beside the button: that a swap waits for the next turn. */
+  /**
+   * A line shown with the inline picker: that a swap waits for the next turn. The side panel and
+   * the Mac popover say this above the message box instead (Chat.tsx), where the chip has no room.
+   */
   note?: string;
   disabled?: boolean;
   onSelect: (selection: ModelSelection, typed: boolean) => void;
@@ -84,7 +93,7 @@ export function ModelPicker({
   /** Omitted where there is nothing to change it on (a chat that does not exist yet). */
   onThinking?: (level: ThinkingLevel) => void;
   /**
-   * Draw the list in place, always open, with no button: the compact shell (iPhone, iPad) raises
+   * Draw the list in place, always open, with no chip: the compact shell (iPhone, iPad) raises
    * the picker as a bottom sheet of its own, and the sheet is what opens and closes. Same groups,
    * same filter, same typed id. The filter does not take focus by itself here, because on a phone
    * focus means the keyboard comes up over the list you opened the sheet to read.
@@ -128,11 +137,11 @@ export function ModelPicker({
   const current: ModelSelection | null = resolved.ok ? resolved.selection : null;
 
   /**
-   * What the chosen model does with a Thinking level, and therefore which levels the row offers.
-   * Computed from the RESOLVED connection, so the per-connection "Reasoning field" setting is what
-   * decides whether an OpenAI-compatible endpoint shows the row at all. A model with nothing to
-   * offer (a plain gpt-4o, an xAI -fast variant, an unguessable local id) hides the row entirely
-   * rather than showing one that cannot be used.
+   * What the chosen model does with a Thinking level, and therefore which levels the control
+   * offers. Computed from the RESOLVED connection, so the per-connection "Reasoning field" setting
+   * is what decides whether an OpenAI-compatible endpoint shows the control at all. A model with
+   * nothing to offer (a plain gpt-4o, an xAI -fast variant, an unguessable local id) hides it
+   * entirely rather than showing one that cannot be used.
    */
   const capability = useMemo(
     () =>
@@ -146,6 +155,8 @@ export function ModelPicker({
     [resolved],
   );
   const showThinking = !!capability && supportsThinking(capability) && !!onThinking;
+  /** The level rides on the chip only when it is doing something: Default is the silent case. */
+  const chipThinking = showThinking && thinking !== 'default' ? thinkingLabel(thinking).toLowerCase() : '';
 
   function close(returnFocus: boolean) {
     if (inline) {
@@ -200,8 +211,8 @@ export function ModelPicker({
     document.getElementById(`${listId}-o${Math.min(active, options.length - 1)}`)?.scrollIntoView({ block: 'nearest' });
   }, [open, active, options.length, listId]);
 
-  // A click anywhere else, or focus leaving, closes it. Focus moving WITHIN it (field → Refresh)
-  // does not.
+  // A click anywhere else, or focus leaving, closes it. Focus moving WITHIN it (field → Thinking →
+  // Refresh) does not.
   useEffect(() => {
     if (!open || inline) return;
     const onDown = (e: MouseEvent) => {
@@ -246,19 +257,13 @@ export function ModelPicker({
         if (o) pick(o);
         break;
       }
-      case 'Escape':
-        // Inline, Escape belongs to the sheet around this, which is listening further up.
-        if (inline) break;
-        e.preventDefault();
-        e.stopPropagation();
-        close(true);
-        break;
     }
   }
 
   const connected = pickerGroups(state, signedIn, '');
   // "No provider connected" only when that is the whole story. A chat whose own provider was
-  // removed still says "Pick a model", with the reason beside it, even if nothing else is connected.
+  // removed still says "Pick a model", with the reason above the message box, even if nothing else
+  // is connected.
   const buttonText = current ? current.model : !resolved.ok && resolved.problem === 'no-providers' ? NO_PROVIDER : PICK_A_MODEL;
   const problem = resolved.ok ? '' : resolved.message;
   let index = -1;
@@ -306,63 +311,53 @@ export function ModelPicker({
       onBlur={(e) => {
         if (open && !inline && !e.currentTarget.contains(e.relatedTarget as Node | null)) close(false);
       }}
+      // Escape closes from anywhere inside — the field, a Thinking level, the footer — and puts
+      // focus back on the chip. Inline, Escape belongs to the sheet around this, which is
+      // listening further up.
+      onKeyDown={(e) => {
+        if (e.key !== 'Escape' || inline || !open) return;
+        e.preventDefault();
+        e.stopPropagation();
+        close(true);
+      }}
     >
-      {!inline && <button
-        ref={buttonRef}
-        type="button"
-        className={`model-button${current ? '' : ' unset'}`}
-        data-testid="model-button"
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        aria-controls={open ? listId : undefined}
-        aria-label={current ? `Model: ${current.model}, on ${current.label ?? 'a provider'}. Change model` : `${buttonText}. Choose a model`}
-        title={current ? `${current.model} · ${current.label ?? ''}` : buttonText}
-        disabled={disabled}
-        onClick={() => (open ? close(true) : openPicker())}
-        onKeyDown={(e) => {
-          if (!open && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
-            e.preventDefault();
-            openPicker();
+      {!inline && (
+        <button
+          ref={buttonRef}
+          type="button"
+          className={`model-button${current ? '' : ' unset'}`}
+          data-testid="model-button"
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          aria-controls={open ? listId : undefined}
+          aria-label={
+            current
+              ? `Model: ${current.model}, on ${current.label ?? 'a provider'}${chipThinking ? `, thinking ${chipThinking}` : ''}. Change the model or how much it thinks`
+              : `${buttonText}. Choose a model`
           }
-        }}
-      >
-        <span className="model-name">{buttonText}</span>
-        {current?.label && <span className="model-provider">{current.label}</span>}
-        <span className="model-caret" aria-hidden="true">▾</span>
-      </button>}
-      {/*
-        The Thinking row: one radio group under the chosen model, showing only the levels this model
-        actually accepts. Radios rather than a select, because the whole scale is three to six short
-        words and seeing them all is the point — "which of these does this model even have" is half
-        the question being asked. Hidden entirely when the model supports none, so a row that could
-        only say "Default" never appears.
-      */}
-      {showThinking && capability && (
-        <div className="thinking-row" data-testid="thinking-row" role="radiogroup" aria-label={`${THINKING_LABEL}: how much the model reasons before answering`}>
-          <span className="thinking-label">{THINKING_LABEL}</span>
-          <span className="thinking-levels">
-            {capability.levels.map((level) => (
-              <button
-                key={level}
-                type="button"
-                role="radio"
-                aria-checked={level === thinking}
-                className={`thinking-level${level === thinking ? ' selected' : ''}`}
-                data-testid="thinking-level"
-                data-level={level}
-                disabled={disabled}
-                onClick={() => onThinking?.(level)}
-              >
-                {thinkingLabel(level)}
-              </button>
-            ))}
-          </span>
-          <span className="thinking-help" data-testid="thinking-help">
-            {capability.help}
-          </span>
-        </div>
+          title={current ? `${current.model} · ${current.label ?? ''}${chipThinking ? ` · thinking ${chipThinking}` : ''}` : buttonText}
+          disabled={disabled}
+          onClick={() => (open ? close(true) : openPicker())}
+          onKeyDown={(e) => {
+            if (!open && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+              e.preventDefault();
+              openPicker();
+            }
+          }}
+        >
+          <span className="model-name">{buttonText}</span>
+          {current?.label && <span className="model-provider">{current.label}</span>}
+          {/* The level rides on the chip only when it is NOT the default, so it is discoverable
+              without a row of its own and silent for the chat that never touched it. */}
+          {chipThinking && (
+            <span className="model-thinking" data-testid="model-button-thinking">
+              {chipThinking}
+            </span>
+          )}
+          <span className="model-caret" aria-hidden="true">▾</span>
+        </button>
       )}
-      {(problem || note) && (
+      {inline && (problem || note) && (
         <span className={`model-note${problem ? ' problem' : ''}`} data-testid="model-note" role={problem ? 'alert' : 'status'}>
           {problem || note}
         </span>
@@ -436,6 +431,36 @@ export function ModelPicker({
             )}
             {typed && options.length === 0 && connected.length > 0 && <div className="model-group-none">No match. A model id cannot contain spaces.</div>}
           </div>
+          {/*
+            The Thinking level, under the list it applies to: one radio group showing only the
+            levels this model actually accepts. Radios rather than a select, because the whole
+            scale is three to six short words and seeing them all is the point — "which of these
+            does this model even have" is half the question being asked. Hidden entirely when the
+            model supports none, so a control that could only say "Default" never appears. The
+            label and the level names are the whole explanation; the one tooltip is on the group.
+          */}
+          {showThinking && capability && (
+            <div className="thinking-row" data-testid="thinking-row" role="radiogroup" aria-label={`${THINKING_LABEL}: ${THINKING_TITLE.toLowerCase()}`} title={THINKING_TITLE}>
+              <span className="thinking-label">{THINKING_LABEL}</span>
+              <span className="thinking-levels">
+                {capability.levels.map((level) => (
+                  <button
+                    key={level}
+                    type="button"
+                    role="radio"
+                    aria-checked={level === thinking}
+                    className={`thinking-level${level === thinking ? ' selected' : ''}`}
+                    data-testid="thinking-level"
+                    data-level={level}
+                    disabled={disabled}
+                    onClick={() => onThinking?.(level)}
+                  >
+                    {thinkingLabel(level)}
+                  </button>
+                ))}
+              </span>
+            </div>
+          )}
           <div className="model-foot">
             <button
               type="button"

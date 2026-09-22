@@ -1,31 +1,43 @@
 /*
- * The model picker (ModelPicker.tsx): one line under the composer's text box.
+ * The model picker (ModelPicker.tsx): a chip in the chat bar, and the dropdown it opens.
  *
  * Its own stylesheet, like activity.css and artifact.css, so the component can be read, restyled or
  * removed in one place. Role tokens only — no hexes, no display face, no blurred shadow; it is in
  * test/contrast.test.ts's SHEETS list, which holds it to the same rules as the rest of the panel.
  *
- * The pattern, for docs/design.md §7 "Menus": a quiet trigger that reads as a VALUE rather than as
- * an action (mono, sentence case, no uppercase label — it is showing you an identifier), and a
- * popover that is a bordered panel with no shadow, because nothing in this system lifts except the
- * primary button and the hero card. The popover's edge is --border-strong, a step up from a card's,
- * which is what separates it from the transcript it opens over.
+ * The pattern, for docs/design.md §7 "Dropdown menus": a quiet trigger that reads as a VALUE rather
+ * than as an action (mono, sentence case, no uppercase label — it is showing you an identifier),
+ * and a popover that is a bordered panel with no shadow, because nothing in this system lifts
+ * except the primary button and the hero card. The popover's edge is --border-strong, a step up
+ * from a card's, which is what separates it from the transcript it opens over.
+ *
+ * It used to be a line under the message box, with the Thinking level as a second row under it.
+ * Both now live behind the chip: the model is a property of the chat, so it sits in the chat's
+ * bar, and everything about it that is changed rarely is one click away instead of two rows of
+ * chrome every chat carried.
  */
 
 .model-line {
   position: relative;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: var(--sp-2);
   min-width: 0;
-  /* The Thinking row sits UNDER the model button rather than beside it, so the line wraps. Without
-   * this the row would be squeezed into whatever the model id left over, which on a 320px panel is
-   * nothing. */
-  flex-wrap: wrap;
 }
 
 /*
- * The trigger. It may take the whole line and no more: a model id like
+ * In the chat bar the chip is one of the bar's items: it gives way to the switcher but never to
+ * nothing, and the popover is positioned by the BAR (static here, relative on .chatbar), so the
+ * list opens as wide as the bar rather than as wide as a chip.
+ */
+.chatbar .model-line {
+  position: static;
+  flex: 0 1 auto;
+  max-width: 45%;
+}
+
+/*
+ * The trigger. Mono for the id, the provider in the text face a tone back, the Thinking level as a
+ * small pill, then the caret. It may take half the bar and no more: a model id like
  * "anthropic/claude-opus-5-20260401" is longer than a 320px panel, so the name truncates and the
  * provider — the less important half — gives way first (it shrinks ten times as fast, then hides).
  */
@@ -34,8 +46,8 @@
   min-width: 0;
   max-width: 100%;
   display: inline-flex;
-  align-items: baseline;
-  gap: var(--sp-2);
+  align-items: center;
+  gap: 6px;
   min-height: 28px;
   padding: var(--sp-1) var(--sp-2);
   border: var(--border-width) solid var(--border-control);
@@ -65,7 +77,7 @@
   border-color: var(--border-hair);
 }
 
-/* Nothing usable is selected: the button is asking for something, so it carries the warn edge and
+/* Nothing usable is selected: the chip is asking for something, so it carries the warn edge and
    the words "Pick a model" — never the colour alone. */
 .model-button.unset {
   border-color: var(--warn);
@@ -90,14 +102,47 @@
   font-family: var(--font-ui);
 }
 
+/*
+ * The provider is the first thing to go: below 640px of bar the chip is the model id alone, so the
+ * switcher keeps room for a title. 640 rather than the bar's own 520px breakpoint, because at 520
+ * the bar has just spent its width on its buttons' words (about 300px of them) and a provider name
+ * beside the id would take the title back down to a stub. Hidden by default and REVEALED above the
+ * breakpoint, the way the bar's labels are, so an engine without container queries keeps the
+ * narrow chip, which fits everywhere. The full pair is always on the chip's title and its
+ * accessible name, and in the dropdown's group labels.
+ */
+.chatbar .model-provider {
+  display: none;
+}
+
+@container chatbar (min-width: 640px) {
+  .chatbar .model-provider {
+    display: inline;
+  }
+}
+
+/*
+ * The Thinking level, when it is not the default. A second, quieter pill after the model id: it is a
+ * modifier of the thing next to it, so it is smaller and muted rather than another equal chip, and
+ * it never truncates — the words are three to six characters and the model id gives way first.
+ */
+.model-thinking {
+  flex: none;
+  padding: 1px 5px;
+  border-radius: var(--r-pill);
+  background: var(--surface-well);
+  font: 400 11px / 14px var(--font-mono);
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
 .model-caret {
   flex: none;
   color: var(--text-2);
 }
 
-/* What the line says beside the button: prose, so the UI face in sentence case. */
+/* What the panel says about the model when the chip cannot: prose, so the UI face in sentence case. */
 .model-note {
-  flex: 1 1 0;
   min-width: 0;
   font: 400 var(--fs-meta) / 1.4 var(--font-ui);
   color: var(--text-2);
@@ -107,25 +152,21 @@
   color: var(--error-text);
 }
 
-/* A problem is a sentence and the button is short, so on a narrow panel the sentence gets its own
-   line under the button rather than a two-word column beside it. */
-.model-line:has(.model-note.problem) {
-  flex-wrap: wrap;
-}
-
-.model-line:has(.model-note.problem) .model-note {
-  flex-basis: 100%;
-}
-
 /* ---------------------------------------------------------------------------
  * The popover
  * ------------------------------------------------------------------------ */
 
+/*
+ * It opens DOWNWARD from the chat bar, over the transcript, and spans the bar's content width. The
+ * containing block is the bar (position: relative in styles.css), not the chip, which is what lets
+ * a 60-character model id be read at 320px.
+ */
 .model-pop {
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: calc(100% + var(--sp-1));
+  top: 100%;
+  left: var(--sp-4);
+  right: var(--sp-4);
+  margin-top: var(--sp-1);
   z-index: 20;
   display: flex;
   flex-direction: column;
@@ -270,57 +311,30 @@
 }
 
 /* ---------------------------------------------------------------------------
- * The transcript's "switched to …" marker
+ * The Thinking level (lib/thinking.ts), inside the popover
  * ------------------------------------------------------------------------ */
 
 /*
- * A rule with a label set into it, not a note row: it is a fact about the rows BELOW it, so it reads
- * as a divider. Muted, mono for the identifier, and it is a sentence ("switched to …"), so the state
- * is in words.
- */
-.model-marker {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  font: 400 var(--fs-meta) / 1.4 var(--font-mono);
-  color: var(--text-3);
-}
-
-.model-marker::before,
-.model-marker::after {
-  content: '';
-  flex: 1;
-  height: 0;
-  border-top: var(--border-width) solid var(--border-hair);
-}
-
-.model-marker span {
-  min-width: 0;
-  overflow-wrap: anywhere;
-  text-align: center;
-}
-
-/* ---------------------------------------------------------------------------
- * The Thinking row (lib/thinking.ts)
- * ------------------------------------------------------------------------ */
-
-/*
- * How much the model reasons before it answers, under the model it applies to. It takes the whole
- * width of the line so it always starts a row of its own, and it is only ever drawn for a model
- * that has the knob — a row that could say nothing but "Default" is not shown at all.
+ * How much the model reasons before it answers, under the list of models it applies to and above
+ * the footer, on the footer's surface so the two read as the popover's settings strip. It is only
+ * ever drawn for a model that has the knob — a row that could say nothing but "Default" is not
+ * shown at all.
  *
  * A segmented radio group rather than a select: the whole scale is three to six short words, and
  * which levels a model even HAS is half of what the row is telling you. Same quiet-value reading as
- * the model button above it (mono, meta size, sentence case), because it shows a setting, not an
- * action.
+ * the chip (mono, meta size, sentence case), because it shows a setting, not an action. The label
+ * and the level names are the whole explanation; there is no help sentence.
  */
 .thinking-row {
-  flex: 1 0 100%;
+  flex: none;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: var(--sp-1) var(--sp-2);
   min-width: 0;
+  padding: var(--sp-2) var(--sp-3);
+  border-top: var(--border-width) solid var(--border-hair);
+  background: var(--surface-1);
 }
 
 .thinking-label {
@@ -354,7 +368,7 @@
 }
 
 /* Chosen is a state, so it does not rest on colour alone (design.md §5): the inset rule is the
- * same device the open model button uses. */
+ * same device the open chip uses. */
 .thinking-level.selected {
   border-color: var(--primary);
   color: var(--text-1);
@@ -367,12 +381,33 @@
   color: var(--btn-disabled-fg);
 }
 
-/* One line of help, naming what the knob actually is on this backend. It wraps to its own row so a
- * sentence never squeezes the levels it explains. */
-.thinking-help {
-  flex: 1 0 100%;
-  min-width: 0;
-  font: 400 var(--fs-meta) / 1.4 var(--font-sans);
+/* ---------------------------------------------------------------------------
+ * The transcript's "switched to …" marker
+ * ------------------------------------------------------------------------ */
+
+/*
+ * A rule with a label set into it, not a note row: it is a fact about the rows BELOW it, so it reads
+ * as a divider. Muted, mono for the identifier, and it is a sentence ("switched to …"), so the state
+ * is in words.
+ */
+.model-marker {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font: 400 var(--fs-meta) / 1.4 var(--font-mono);
   color: var(--text-3);
+}
+
+.model-marker::before,
+.model-marker::after {
+  content: '';
+  flex: 1;
+  height: 0;
+  border-top: var(--border-width) solid var(--border-hair);
+}
+
+.model-marker span {
+  min-width: 0;
   overflow-wrap: anywhere;
+  text-align: center;
 }

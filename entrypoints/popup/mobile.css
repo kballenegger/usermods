@@ -1364,6 +1364,23 @@ html[data-keyboard] .app[data-surface='popup'][data-layout='compact'] .sheet {
   min-height: 44px;
 }
 
+/*
+ * The Thinking levels in the Model sheet: the picker draws them at the panel's 24px, and a thumb
+ * needs 44. Raised in place rather than with a ::before reach, because the row wraps freely and
+ * neighbouring reaches would overlap.
+ */
+.app[data-surface='popup'][data-layout='compact'] .sheet .model-line.inline .thinking-row {
+  padding-left: 0;
+  padding-right: 0;
+  background: none;
+}
+
+.app[data-surface='popup'][data-layout='compact'] .sheet .model-line.inline .thinking-level {
+  min-width: 44px;
+  min-height: 44px;
+  font-size: var(--fs-body);
+}
+
 /* The mod picker: the sheet already has a title and a close, so its own header row goes. */
 .app[data-surface='popup'][data-layout='compact'] .sheet .modpicker {
   max-height: none;

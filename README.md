@@ -13,10 +13,10 @@ Userscripts, userstyles, usermods.
 ## Why
 
 - **Any backend.** Anthropic's API, OpenAI, OpenRouter, or anything OpenAI-compatible: Ollama, LM Studio, vLLM, mlx_lm. Your key, your machine, no account, no hosted service.
-- **Several at once, and switch mid-conversation.** Connect as many providers as you use. The model is picked in the chat itself, from a dropdown under the message box that lists every connected provider's models, and you can change it at any point: the next turn goes to the new model with the whole conversation, tool calls included. [Details](#choosing-the-model-in-the-chat).
+- **Several at once, and switch mid-conversation.** Connect as many providers as you use. The model is picked in the chat itself, from a chip in the chat bar that opens every connected provider's models, and you can change it at any point: the next turn goes to the new model with the whole conversation, tool calls included. [Details](#choosing-the-model-in-the-chat).
 - **Use the subscription you already pay for.** Sign in with ChatGPT (Plus, Pro, Team) or SuperGrok / X Premium+ straight from Settings. No API key, no local proxy, no per-token bill. [Details](#using-a-subscription-instead-of-an-api-key).
 - **The model actually sees the page.** It has tools to read a pruned DOM, list elements, read computed styles, take screenshots, and run scripts to test its work before proposing anything. Screenshots reach any vision model, whichever protocol its backend speaks; a text-only endpoint is detected once and told to work structurally instead. [Details](#screenshots-and-models-that-cannot-see-them).
-- **Show it what you mean.** Paste or drop a screenshot or a mockup into the composer, or pick one with *Attach image*. Images are shrunk and re-encoded in the panel before they go anywhere, up to four per message. [Details](#attaching-images).
+- **Show it what you mean.** Paste or drop a screenshot or a mockup into the composer, or pick one from the **+** menu beside the message box. Images are shrunk and re-encoded in the panel before they go anywhere, up to four per message. [Details](#attaching-images).
 - **One-off tasks too.** "Scroll to the bottom, open every carousel, and give me download links for all the photos" runs as a script, no mod required.
 - **Portable.** Mods are plain userscripts with a `==UserScript==` header. Nothing proprietary.
 - **MIT.**
@@ -31,7 +31,7 @@ Early. The core loop works end to end: chat, page inspection, live testing, prop
   <tr>
     <td width="50%" valign="top">
       <img src="docs/screenshots/02-chat-refs.png" alt="The composer holding an @img.mw-file-element chip produced by the element picker.">
-      <sub><b>Point at an element.</b> Clicking one on the page drops an <code>@reference</code> into your message, so you can say "this" and mean it.</sub>
+      <sub><b>Point at an element.</b> <b>+</b> → <i>Point at element</i>, then click one on the page: an <code>@reference</code> drops into your message, so you can say "this" and mean it.</sub>
     </td>
     <td width="50%" valign="top">
       <img src="docs/screenshots/06-migrate.png" alt="The Migrate from Tampermonkey card expanded, showing the four export steps.">
@@ -54,8 +54,8 @@ Early. The core loop works end to end: chat, page inspection, live testing, prop
       <sub><b>Installing an outside script.</b> A <code>.user.js</code> link shows what it matches, what it is granted and what it loads, before anything is saved.</sub>
     </td>
     <td width="50%" valign="top">
-      <img src="docs/screenshots/12-model-picker.png" alt="The model picker open under the message box: a filter field, then the models of two connected providers, Anthropic and Ollama, grouped under their names, with Refresh models and Manage providers at the bottom.">
-      <sub><b>Pick the model in the chat.</b> Every connected provider's models, under the message box. Change it mid-conversation and the next turn goes to the new one.</sub>
+      <img src="docs/screenshots/12-model-picker.png" alt="The model dropdown open from the chip in the chat bar: a filter field, the models of two connected providers, Anthropic and Ollama, grouped under their names, a Thinking row of Default, Off, Low, Medium and High, and Refresh models and Manage providers at the bottom. Under the transcript the composer is one row: a plus button, the message box and a send button.">
+      <sub><b>Pick the model in the chat.</b> One chip in the chat bar holds every connected provider's models and the Thinking level. Change it mid-conversation and the next turn goes to the new one.</sub>
     </td>
   </tr>
 </table>
@@ -144,7 +144,7 @@ Then in Chrome:
 
 1. Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked**, and pick `.output/chrome-mv3`.
 2. Click **Details** on usermods and turn on **Allow User Scripts**. Chrome requires this toggle for any extension that runs user scripts, including Tampermonkey.
-3. Click the usermods icon to open the side panel **on that tab**. Go to **Settings**, click a preset under **Add provider**, and paste a key (or a local server URL). It saves as you type. Back in **Chat**, the model is the dropdown under the message box.
+3. Click the usermods icon to open the side panel **on that tab**. Go to **Settings**, click a preset under **Add provider**, and paste a key (or a local server URL). It saves as you type. Back in **Chat**, the model is the chip in the chat bar, after the chat switcher.
 
 ### Safari on iOS and macOS
 
@@ -302,16 +302,17 @@ picker if they are a day old.
   finishes on the model it started with. A message queued behind it uses the new one.
 - **An endpoint that cannot list its models** (plenty of local servers) still works: type the model
   id into the picker's field and choose *Use "…" on* that provider. It is remembered.
-- **If a chat's provider is removed or signed out**, the chat says so under the message box and
+- **If a chat's provider is removed or signed out**, the chat says so above the message box and
   waits for you to pick another model. It never quietly sends your page to a different provider.
 - Titles and compaction summaries use the chat's model too. The context budget is one setting for
   every provider, so set it for the smallest context window you use.
 
 ### How much the model thinks
 
-Under the model is **Thinking**: how hard this chat asks the model to reason before it answers,
-mapped onto whatever knob that provider actually has. It shows only the levels the chosen model
-accepts, and it is not shown at all for a model that has none.
+In the model dropdown, under the models, is **Thinking**: how hard this chat asks the model to
+reason before it answers, mapped onto whatever knob that provider actually has. It shows only the
+levels the chosen model accepts, and it is not shown at all for a model that has none. When it is
+not Default the chip in the chat bar says so (`claude-opus-5 · high`).
 
 - **Default changes nothing.** Every chat starts there, and a chat left on Default sends exactly
   the request it always did. The other levels are **Off**, **Low**, **Medium**, **High** and
@@ -410,7 +411,7 @@ usermods runs ordinary userscripts, so you can bring in scripts from Greasy Fork
 ### Attaching images
 
 Paste an image into the composer (a screenshot copied with ⌘⌃⇧4 works), drop one onto the panel, or
-use **Attach image**. PNG, JPEG, WebP and GIF are accepted; SVG is refused with a note, because an
+use **+ → Attach image**. PNG, JPEG, WebP and GIF are accepted; SVG is refused with a note, because an
 SVG is a document rather than a picture and rasterizing one here would mean running it.
 
 Everything happens in the panel before anything leaves it. Each image is decoded, scaled so its

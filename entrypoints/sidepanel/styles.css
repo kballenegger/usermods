@@ -323,6 +323,8 @@ button.pill,
 .chatbar {
   container-type: inline-size;
   container-name: chatbar;
+  /* The model picker's popover is positioned by the bar, so it opens as wide as the bar. */
+  position: relative;
   flex: none;
   display: flex;
   gap: var(--sp-2);
@@ -339,10 +341,16 @@ button.pill,
  * title ellipsised while the actions sat at their full intrinsic size. `flex: none` on the actions
  * states the priority outright — the title is the content, the actions are chrome. Below the
  * breakpoint they are three 28px squares, so what they take is a constant the title can plan for.
+ *
+ * A basis of 0 rather than auto, since the model chip joined the bar: with `auto` the select's
+ * basis was its full title, so it and the chip shrank in proportion and a 420px bar showed
+ * "claude…" beside a title that had room to spare. Now the chip keeps its id whole wherever the
+ * bar can afford it, the title takes what is left, and only under the 64px floor — a 320px panel —
+ * does the chip start giving up characters too.
  */
 .chatbar select {
-  flex: 1 1 auto;
-  min-width: 0;
+  flex: 1 1 0;
+  min-width: 64px;
   font: 400 var(--fs-meta) / 1.4 var(--font-ui);
   color: var(--text-1);
   background: var(--surface-well);
@@ -659,12 +667,36 @@ button.pill,
 }
 
 /*
+ * One row: "+", the message box, Send — the phone's composer (mobile.css, `.composer.compact`),
+ * adapted to a pointer. Everything below is scoped to `:not(.compact)` so the phone keeps exactly
+ * the rules it had; the two share the row's class names and the send button's, and nothing else.
+ *
+ * The bar is its own query container, on the same 520px breakpoint the top bar and the chat bar
+ * use, so the send button can show its word where the panel is wide enough for it and stay a mark
+ * everywhere else. The measure is the same one and the reason is the same: the side panel is a
+ * width the user drags.
+ */
+.composer:not(.compact) {
+  container-type: inline-size;
+  container-name: composer;
+  padding: var(--sp-2) var(--sp-4);
+  gap: 6px;
+}
+
+/* The row aligns to the bottom, so the buttons stay by the caret's line while the box grows upward. */
+.composer-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+/*
  * What you type is prose, so the composer is a text surface: UI face, body size, flat well.
  *
- * It grows with what is in it. `field-sizing: content` makes the box as tall as its text — typed,
- * pasted, or restored from a draft, with no script measuring anything — and it goes back to the
- * minimum by itself the moment a send empties it. (Chrome 123+; the manifest's minimum is 135, so
- * there is no JS fallback to keep in step with it.)
+ * It starts at ONE line and grows with what is in it. `field-sizing: content` makes the box as tall
+ * as its text — typed, pasted, or restored from a draft, with no script measuring anything — and it
+ * goes back to the minimum by itself the moment a send empties it. (Chrome 123+; the manifest's
+ * minimum is 135. WebKit without it gets the same growth from Chat.tsx, which measures the box.)
  *
  * The cap is whichever is smaller: about ten lines, or 40% of the panel's height. Past it the text
  * scrolls inside the box. The second half is what keeps a long paste from taking the panel over on
@@ -683,11 +715,236 @@ button.pill,
   border-radius: var(--r-field);
   padding: 10px 12px;
   field-sizing: content;
-  min-height: 64px;
-  /* 10 lines of 1.5 line-height, plus the vertical padding and the two borders. */
-  max-height: min(40dvh, calc(10 * 1.5em + 20px + 2 * var(--border-width)));
   overflow-y: auto;
   transition: border-color 120ms ease;
+}
+
+/*
+ * The one-line box: 20px of line inside 7px of padding and a 1px edge is 36px, the height of the
+ * buttons beside it. The cap keeps the same shape it had — ten lines, or 40% of the panel — with
+ * this box's own line height and padding.
+ */
+.composer:not(.compact) textarea {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  min-height: 36px;
+  padding: 7px 10px;
+  line-height: 20px;
+  max-height: min(40dvh, calc(10 * 20px + 14px + 2 * var(--border-width)));
+}
+
+/* One line has no room for a placeholder to wrap into: it ends in an ellipsis instead. */
+.composer:not(.compact) textarea::placeholder {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * The two buttons beside the box: 36px squares, a 16px mark each, a real name on each. "+" is
+ * secondary; Send is the screen's one primary (the fill, the bright edge and the hard shadow);
+ * Stop in the same spot is the danger outline; Queue is Send wearing a different mark. The word
+ * beside the mark is clipped away below the breakpoint the visually-hidden way — never
+ * `display: none`, which would take it out of the accessible name too — and revealed above it,
+ * so an engine without container queries keeps the compact button, which fits everywhere.
+ */
+.composer:not(.compact) .cbtn {
+  flex: none;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-1);
+  padding: 0;
+  background: var(--surface-2);
+  border: var(--border-width) solid var(--border-control);
+  border-radius: var(--r-field);
+  color: var(--text-1);
+  font-family: var(--font-ui);
+  font-size: var(--fs-btn);
+  font-weight: var(--fw-label);
+  line-height: 1;
+  letter-spacing: var(--lbl-tracking);
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: transform 80ms ease, box-shadow 80ms ease, background 120ms ease, border-color 120ms ease;
+}
+
+.composer:not(.compact) .cbtn:hover:not(:disabled) {
+  background: var(--surface-well);
+  border-color: var(--primary);
+}
+
+.composer:not(.compact) .cbtn:active:not(:disabled) {
+  transform: translate(1px, 1px);
+}
+
+/* Open is a state, so it does not rest on the transitioned border alone (design.md §5). */
+.composer:not(.compact) .cbtn[aria-expanded='true'] {
+  border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+
+/*
+ * Send, Queue and Stop are one button changing STATE, so its colours are not transitioned: a
+ * capture taken as a run ended once caught the Stop outline half-way back to Send's (design.md §5,
+ * a state must not rest on a transitioned property). The press still travels.
+ */
+.composer:not(.compact) .cbtn.send {
+  background: var(--btn-primary-bg);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-raise);
+  color: var(--btn-primary-fg);
+  transition: transform 80ms ease, box-shadow 80ms ease;
+}
+
+.composer:not(.compact) .cbtn.send:hover:not(:disabled) {
+  background: var(--primary-fill-hover);
+  border-color: var(--border-strong);
+}
+
+/* The press: the block travels down-right onto its own shadow, as the primary button does. */
+.composer:not(.compact) .cbtn.send:active:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow: var(--shadow-press);
+}
+
+.composer:not(.compact) .cbtn.send.stop,
+.composer:not(.compact) .cbtn.send.stop:hover {
+  background: none;
+  border-color: var(--error);
+  box-shadow: none;
+  color: var(--error-text);
+}
+
+.composer:not(.compact) .cbtn.send.stop:active {
+  transform: translate(1px, 1px);
+}
+
+/* Disabled flattens, as every button does: no shadow, a quiet edge, a legible label. Never a fade. */
+.composer:not(.compact) .cbtn:disabled {
+  cursor: default;
+  background: var(--surface-well);
+  border-color: var(--border-hair);
+  box-shadow: none;
+  color: var(--btn-disabled-fg);
+  transform: none;
+}
+
+.composer:not(.compact) .cbtn .ico {
+  flex: none;
+  display: block;
+}
+
+.composer:not(.compact) .cbtn-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+@container composer (min-width: 520px) {
+  .composer:not(.compact) .cbtn.send {
+    width: auto;
+    padding: 0 var(--sp-3);
+  }
+
+  .composer:not(.compact) .cbtn-label {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip-path: none;
+  }
+}
+
+/*
+ * What the panel says about the model when the chip in the chat bar cannot: a swap that waits for
+ * the next turn, or why nothing can be sent. One line above the row, only while it is true.
+ */
+.composer-note {
+  padding: 0 var(--sp-1);
+}
+
+/* ---------------------------------------------------------------------------
+ * Menus (components/Menu.tsx)
+ *
+ * A short list of actions opened from a button: the composer's "+". A bordered panel with no
+ * shadow, like the model picker's popover and for the same reason. It opens UPWARD from its
+ * button, because the composer is the last thing in the panel, and it is as wide as its words.
+ * ------------------------------------------------------------------------ */
+
+.menu-anchor {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+
+.menu {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + var(--sp-1));
+  z-index: 20;
+  min-width: 180px;
+  padding: var(--sp-1);
+  background: var(--surface-2);
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--r-card);
+}
+
+.menu:focus-visible {
+  outline: none;
+}
+
+/* A menu item is a full-width row: a mark, a word, and the shortcut in mono a tone back. */
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  min-height: 28px;
+  padding: var(--sp-1) var(--sp-2);
+  background: none;
+  border: 0;
+  border-radius: var(--r-field);
+  color: var(--text-1);
+  font: 400 var(--fs-body) / 1.4 var(--font-ui);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+/* Hover and keyboard focus are the same state: the well, and a rail — never colour alone. */
+.menu-item:hover:not(:disabled),
+.menu-item:focus-visible {
+  background: var(--surface-well);
+  box-shadow: inset 2px 0 0 var(--primary);
+  outline: none;
+}
+
+.menu-item:disabled {
+  cursor: default;
+  color: var(--btn-disabled-fg);
+}
+
+.menu-item-label {
+  flex: 1 1 auto;
+}
+
+.menu-item-shortcut {
+  flex: none;
+  font: 400 var(--fs-meta) / 1.4 var(--font-mono);
+  color: var(--text-3);
 }
 
 .composer textarea::placeholder {

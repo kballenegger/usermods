@@ -333,7 +333,7 @@ that: the chat view is a different arrangement of the same parts, described unde
 | | compact | roomy |
 |---|---|---|
 | where | iPhone, iPad | Mac |
-| chrome | one 44px top bar; everything else in bottom sheets | header, tabs, chat bar, draft panel, composer with its buttons |
+| chrome | one 44px top bar; everything else in bottom sheets | header, tabs, chat bar (with the model chip), draft panel, one-row composer |
 | navigation | the Menu button in the top bar; `‹ Chat` on Mods and Settings | under the header, 34px rows |
 | controls | 44px, switch 48x28 | the panel's own sizes, switch 32x18 |
 | fields | 16px minimum, which is what stops iOS zooming on focus | the panel's sizes |
@@ -455,7 +455,7 @@ The compact chat view now keeps three things on screen, plus one line while a dr
 | On screen | One tap away |
 |---|---|
 | **Top bar**, 44px: the site and the chat's title (one button), the model as a small chip, Menu | **Chats** sheet from the title: New chat, this site's chats (archived grouped), Rename, Archive (or Unarchive and Delete), Edit a mod…, Open dashboard |
-| | **Model** sheet from the chip: provider groups, filter, typed id, the **Thinking** row for the chosen model, Refresh models, Manage providers…. Changing model is two taps |
+| | **Model** sheet from the chip: provider groups, filter, typed id, the **Thinking** row for the chosen model (no help sentence), Refresh models, Manage providers…. Changing model is two taps |
 | | **Menu** sheet: Chat, Mods, Settings, Open dashboard, Theme |
 | **Transcript** | tool rows are one line each; three or more in a row fold into "N steps", which names a running step and counts failures |
 | **Draft pill**, 44px, only with a draft: `Wider comments · v2 · editing`, and **Save** / **Update** / **Saved** | **Draft** sheet from the pill: the whole draft panel (versions, Diff, Try, Update mod, Export, rename, roll back, Save as a new mod instead, Copy, Edit in dashboard) |
@@ -474,7 +474,9 @@ Decisions worth recording:
   run (`stopAlways`), not only once a run has stalled as it does in the panel.
 - **The model is a chip in the top bar,** not a line under the composer. The model is a property of
   the chat, the bar is about the chat, and up there it costs no height. It reads "No model" in
-  amber when the chat has none, and a line above the composer says why and opens the sheet.
+  amber when the chat has none, and a line above the composer says why and opens the sheet. The
+  side panel and the Mac popover since took the same decision: their chip is in the chat bar, and
+  their composer is one row too (see design.md, "The composer").
 - **The Thinking level rides in the Model sheet**, under the models, and on the chip only when it is
   not Default — a second, quieter pill after the model id. The same component draws the row here and
   in the panel (`ModelPicker.tsx`, `inline`), so the levels a model offers cannot drift between the

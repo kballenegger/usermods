@@ -6,6 +6,39 @@ All notable changes to usermods are recorded here. The format follows
 
 ## [Unreleased]
 
+### The side panel and the Mac popup: a one-row composer
+
+From the owner, with a picture of the panel at 420px: "this UI is getting unwieldy. Clean it up,
+the mobile compact UI is better, with the model controls hidden behind a drop-down since it's not
+something we change often."
+
+- **The composer is one row**, as it is on the phone: **+**, the message box, **Send**. The box
+  starts at one line and grows with its text; Enter sends and Shift+Enter breaks the line, as
+  before. **+** is a menu of Point at element, Attach image and New chat (a keyboard menu: arrows,
+  Home/End, Escape). The one button on the right is Send, then **Queue** while a run is going and
+  there is something typed, and **Stop** while there is not; the activity line carries its own
+  Stop for the whole run, so typing never puts it out of reach. Reference and image chips still
+  appear above the box when there are any. At 520px of composer the send button gains its word.
+- **Everything about the model is behind one chip in the chat bar**, after the chat switcher:
+  `claude-opus-5 ▾`, with the provider once the bar is 640px wide, and the Thinking level on it
+  only when it is not Default (`claude-opus-5 · high`). It opens a dropdown over the transcript
+  with the provider groups, the filter and typed-id field, the **Thinking** row under the models,
+  and Refresh models and Manage providers…. Same keyboard and ARIA as before; Escape closes from
+  anywhere inside it and returns focus to the chip. The chat bar is on screen whenever there is a
+  page to act on, not only once a chat exists, so the chip always has a home.
+- **The Thinking control lost its help sentence** ("Sets the reasoning effort. Off answers without
+  a reasoning pass." and the five like it), everywhere: the dropdown, and the phone's Model sheet.
+  The label and the level names are the explanation; the one tooltip on the row says what the
+  scale is. What each provider does with it on the wire is in the README.
+- The notes the composer still needs — a swap that waits for the next turn, a chat with no usable
+  model — are one line above the box, only while true.
+- **Measured** with `node scripts/screenshots.mjs --composer-height`, over a finished conversation
+  with its draft panel and nothing typed, in an 820px panel: the composer went from **243, 205 and
+  167px** at 320, 420 and 640px wide to **53px** at all three; everything under the transcript from
+  305, 267 and 204px to 115, 115 and 90px; the transcript from 50.5%, 55.1% and 62.8% of the panel
+  to 73.7%, 73.7% and 76.7%.
+- The phone's compact shell is unchanged apart from the help sentence.
+
 ### Fixed, from user reports on the Chrome build
 
 - **A deleted chat could come back.** Reported as "deleting it does nothing. It shows up again if I

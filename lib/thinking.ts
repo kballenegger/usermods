@@ -92,12 +92,10 @@ export interface ThinkingCapability {
   style: ThinkingStyle;
   /** The levels the picker offers, always including 'default' first. Length 1 means "hide the row". */
   levels: ThinkingLevel[];
-  /** One line under the row, naming what the knob actually is on this backend. */
-  help: string;
 }
 
 /** A capability that offers nothing: the row is not drawn at all. */
-const NO_THINKING: ThinkingCapability = { style: 'none', levels: ['default'], help: '' };
+const NO_THINKING: ThinkingCapability = { style: 'none', levels: ['default'] };
 
 /** Whether a model supports any level beyond 'default' — i.e. whether to draw the row. */
 export function supportsThinking(cap: ThinkingCapability): boolean {
@@ -230,7 +228,6 @@ export function thinkingCapability({ kind, model, reasoningField = 'auto' }: Cap
         return {
           style: 'anthropic-effort',
           levels: ['default', ...(canDisable ? (['off'] as ThinkingLevel[]) : []), 'low', 'medium', 'high', 'max'],
-          help: 'Sets Claude’s effort level. Higher means more thinking and more tokens.',
         };
       }
       if (!m) return NO_THINKING;
@@ -239,19 +236,17 @@ export function thinkingCapability({ kind, model, reasoningField = 'auto' }: Cap
       return {
         style: 'anthropic-budget',
         levels: ['default', 'off', 'low', 'medium', 'high'],
-        help: 'Sets the thinking token budget for this older Claude model.',
       };
     }
     case 'chatgpt':
       return {
         style: 'responses-effort',
         levels: ['default', 'off', 'low', 'medium', 'high'],
-        help: 'Sets the reasoning effort. Off answers without a reasoning pass.',
       };
     case 'xai':
       // The -fast and non-reasoning variants reject the field entirely; the rest cannot stop.
       return xaiSupportsReasoning(m)
-        ? { style: 'responses-effort', levels: ['default', 'low', 'medium', 'high'], help: 'Sets Grok’s reasoning effort. This model always reasons.' }
+        ? { style: 'responses-effort', levels: ['default', 'low', 'medium', 'high'] }
         : NO_THINKING;
     case 'openai-compatible': {
       const field = reasoningField === 'auto' ? guessReasoningField(m) : reasoningField;
@@ -259,7 +254,6 @@ export function thinkingCapability({ kind, model, reasoningField = 'auto' }: Cap
         return {
           style: 'chat-effort',
           levels: ['default', 'off', 'low', 'medium', 'high'],
-          help: 'Sends reasoning_effort with the request.',
         };
       }
       if (field === 'enable_thinking') {
@@ -267,7 +261,6 @@ export function thinkingCapability({ kind, model, reasoningField = 'auto' }: Cap
         return {
           style: 'chat-template',
           levels: ['default', 'off', 'high'],
-          help: 'Switches thinking through the chat template (enable_thinking).',
         };
       }
       return NO_THINKING;
