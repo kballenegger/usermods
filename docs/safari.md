@@ -376,22 +376,50 @@ have. That check is the point of the script rather than a formality — the mark
 16x16 grid, and its one failure mode is interpolation, which produces an icon that looks almost
 right and shows up in no diff and no build log.
 
-Two consequences of that grid are worth recording, because both were found by the check rather than
-by eye:
+Three things about that grid and the platforms are worth recording:
 
-- **The macOS tile is 12/16 of the canvas, not Apple's 824/1024.** A tile of N pixels draws each
-  block at N/16, so blocks stay whole only when N is a multiple of 16; 0.805 of 1024 is 824, which
-  is not, and the first renders came out with ten invented colours each. 0.75 is the nearest ratio
-  that keeps every tile on the grid and still leaves a whole-pixel margin. The margin is slightly
-  wider than the system's, which is much cheaper than a blurred mark. Below 64px even 0.75 has no
-  whole blocks to give, so the 16 and 32 rasters are full bleed.
-- **No CSS rounding is applied on either platform.** `assets/icon.svg` already takes one grid block
-  out of each corner — a pixel-art bevel, the BBS-era way of saying "rounded" at this size. A
-  `border-radius` on top of it rounds a shape that is already cut, and the result has a visible
-  notch at every corner. It was rendered and looked at before this was written down. macOS therefore
-  gets the margin and the artwork's own bevel; iOS gets the full-bleed square and the system applies
-  its own superellipse mask, which is what iOS expects and why a pre-rounded iOS icon shows pale
-  corners inside the mask.
+- **Both platforms get a full-bleed square, and macOS only recently started wanting one.** Through
+  macOS 15 the system masked nothing: the icon was drawn as supplied, the convention was a rounded
+  rectangle inset in a transparent margin (Apple's grid is 824/1024), and this script rendered the
+  macOS tile at 12/16 of the canvas to match while keeping blocks whole. **macOS 26 (Tahoe) ended
+  that.** Under Liquid Glass the system draws every app icon in its own rounded-square container and
+  clips the artwork to it, exactly as iOS always has — and artwork that still carries its own
+  transparent margin is not recognised as pre-shaped, it is just centred inside the system's
+  container, so the mark reads as small and the Dock's grey shows around it. That is what the owner
+  reported as "mac app icon doesn't fill". The fix is the one Apple's current guidance and the
+  community's diagnoses agree on: supply an opaque full-bleed square and let the system clip it.
+  Sources are cited in the script's header — the [HIG on app
+  icons](https://developer.apple.com/design/human-interface-guidelines/app-icons), [Configuring your
+  app icon using an asset
+  catalog](https://developer.apple.com/documentation/xcode/configuring-your-app-icon), and
+  [Spotty#261](https://github.com/aladh/Spotty/pull/261), which fixed the same symptom by flattening
+  transparent padding "so Tahoe clips a clean squircle itself".
+- **The mark, not the tile, gets the breathing room — and that needs no scaling.** The u spans grid
+  units 2..14 of 16, so drawing the artwork at the full canvas size already lands the mark at 75% of
+  the width, inside two units of its own blue. That is the 70–80% a native macOS 26 icon occupies
+  inside its squircle, and `render-app-icon.mjs` asserts the measured span rather than trusting it.
+  Scaling the artwork down instead would put the mark at 0.75 × 12/16 = 56% — the floating-mark look
+  one layer in — and would reintroduce the split-block problem. Because nothing is scaled, **there
+  is no small-size exception any more**: every macOS raster from 16 to 1024 is whole blocks, so the
+  no-new-colours check applies unweakened at every slot.
+- **The macOS rasters drop the artwork's bevel; the iOS one keeps it.** `assets/icon.svg` takes one
+  grid block out of each corner — a pixel-art bevel, the BBS-era way of saying "rounded" at this
+  size. Under a system mask that bevel is harmful: those corner blocks are transparent, so they
+  punch four notches out of the navy right where the squircle needs opaque colour. macOS therefore
+  gets the tile colour painted edge to edge underneath, and the generator fails the build on a
+  single transparent pixel in a macOS raster. iOS keeps the artwork as-is, because its superellipse
+  cuts further in than the bevel does and those corners are never seen. No CSS rounding is applied
+  on either platform: the system does the rounding, and a `border-radius` would only antialias an
+  arc that gets clipped away, breaking the no-new-colours rule for nothing.
+
+**Icon Composer was considered and not used.** Xcode 27 ships Icon Composer and supports a `.icon`
+bundle in the asset catalog, and it is the right answer for artwork with real layers, which get the
+Liquid Glass specular and shadow passes for free. It is the wrong answer here: a `.icon` is a
+layered-vector document whose whole value is that the system relights and reblurs those layers, and
+this mark is four flat pixel-art paths whose entire point is that nothing resamples or shades it.
+Adopting one would also mean checking in a binary bundle no script can regenerate, or writing an
+emitter for a format Apple has not documented as stable. Full-bleed PNGs through the appiconset get
+the same system squircle with none of that.
 
 `test/safari-mac.test.ts` pins the wiring — the catalog's file type, its presence in the app target's
 Resources phase (not the extension's), the ten macOS slots and the one iOS entry — because every one

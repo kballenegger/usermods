@@ -10,7 +10,8 @@
 //   npm test
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
+import { colourKey, decodePNG } from '../scripts/lib/png.mjs';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -269,7 +270,7 @@ test('the icon set covers both platforms the app builds for', () => {
   assert.equal(ios[0]?.idiom, 'universal');
 
   // macOS: every (size, scale) slot, because macOS does not derive them and a missing one falls
-  // back to a scaled neighbour.
+  // back to a scaled neighbour. Since macOS 26 these are full-bleed squares too — see below.
   const mac = images.filter((i) => i.idiom === 'mac');
   const slots = mac.map((i) => `${i.size}@${i.scale}`).sort();
   assert.deepEqual(slots, [
@@ -298,4 +299,57 @@ test('the icon is generated from the vector, not hand-exported', () => {
   // carries its own bevel and nothing is rounded in CSS. If a slack band comes back, the strict
   // no-new-colours rule has been weakened and this should be reconsidered rather than silently so.
   assert.doesNotMatch(script, /cornerSlack/);
+});
+
+// macOS 26 (Tahoe) draws every app icon inside its own rounded-square container and clips the
+// supplied artwork to it, the way iOS always has. The rasters used to be a 0.75 tile floating in a
+// transparent margin, which was right through macOS 15 and is exactly what Tahoe wraps in a grey
+// frame — the owner's report was "mac app icon doesn't fill". These two tests pin the fix at the
+// level it actually fails: a transparent pixel anywhere in a macOS raster is a hole the Dock shows
+// grey through, and it is invisible in every build log.
+/**
+ * Read one of the generated icons back through the generator's own decoder. Using the same module
+ * the generator verifies with means one decoder rather than two that could drift apart.
+ */
+function pixels(rel: string): { width: number; height: number; px: Buffer } {
+  return decodePNG(root + 'safari/App/Assets.xcassets/AppIcon.appiconset/' + rel);
+}
+
+/** How many pixels in a raster are fully transparent. */
+function transparentCount(im: { width: number; height: number; px: Buffer }): number {
+  let n = 0;
+  for (let i = 0; i < im.width * im.height; i++) if (colourKey(im.px, i * 4) === 'transparent') n++;
+  return n;
+}
+
+test('every macOS raster is opaque edge to edge', () => {
+  const dir = root + 'safari/App/Assets.xcassets/AppIcon.appiconset/';
+  const macs = readdirSync(dir).filter((f) => f.startsWith('mac-') && f.endsWith('.png'));
+  assert.ok(macs.length >= 7, `expected every macOS raster, found ${macs.length}`);
+
+  for (const file of macs) {
+    const transparent = transparentCount(pixels(file));
+    assert.equal(
+      transparent,
+      0,
+      `${file} has ${transparent} transparent pixel(s); macOS 26 masks the icon itself and shows ` +
+        'its own grey frame through any gap, which is the bug this replaced',
+    );
+  }
+});
+
+test('the iOS raster stays full bleed with its bevel corners clear', () => {
+  // iOS is NOT given the macOS treatment: its superellipse mask cuts further in than the artwork's
+  // pixel-art bevel, so those four corner blocks are never seen and painting them would be filling
+  // in pixels nobody looks at. The corners staying transparent is what says the two platforms are
+  // still rendered differently on purpose.
+  const im = pixels('ios-1024.png');
+  assert.ok(transparentCount(im) > 0, 'the iOS icon lost its bevel corners');
+  assert.equal(colourKey(im.px, 0), 'transparent', 'the top-left bevel block should be transparent');
+  // But the edges between the bevels must be opaque tile, or it is not full bleed at all.
+  assert.notEqual(
+    colourKey(im.px, (im.width / 2) * 4),
+    'transparent',
+    'the iOS icon is not full bleed along its top edge',
+  );
 });
