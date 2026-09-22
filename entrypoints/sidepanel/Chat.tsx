@@ -23,6 +23,7 @@ import { exportFilename, HANDOFF_KEY, resolveHandoff, type ChatHandoff } from '@
 import { ACCEPT_ATTR, MAX_IMAGES_PER_MESSAGE, capNote, emptyTextFor, type AttachedImage, type ImageThumb } from '@/lib/images';
 import { rpc, type AgentPortRequest } from '@/lib/rpc';
 import { INTERRUPTED_TEXT, RESUME_HINT, RESUME_LABEL, type ResumableRun } from '@/lib/runstate';
+import { tombstone } from '@/lib/storagequeue';
 import { lastModel, modelRowText, reduceItems, repairRowGap, settleInterrupted, toolDotClass, toolDotState, toolRowTitle, unqueuedItem } from '@/lib/transcript';
 import type { AgentEvent, ChatItem, ContentEvent, ElementRef, Mod, ModProposal } from '@/lib/types';
 
@@ -1079,13 +1080,37 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
     else newChat();
   }
 
+  /**
+   * Delete the chat on screen.
+   *
+   * The ordering here is the panel's half of the resurrection fix (lib/storagequeue.ts holds the
+   * background's). Deleting used to `detach()` first, which FLUSHES the pending transcript write
+   * for the very chat about to be deleted and leaves an entry in the offscreen write chain for it
+   * — so the delete removed 'chat:<id>:items' and then one of those writes put it back. The chat
+   * was gone from the index but its transcript was not, and the next thing to touch the index from
+   * a snapshot taken before the delete brought the row back to match.
+   *
+   * So: tombstone first (saveItems in lib/chats drops writes for a tombstoned id, in this context
+   * as well as in the background), then drop this chat's pending and offscreen writes outright,
+   * and only then leave the chat. Nothing is flushed for a chat that is being deleted — the
+   * transcript is about to be removed, so writing it first is pure waste and a chance to lose.
+   */
   async function removeChat() {
     if (!chatId) return;
     const current = chats.find((c) => c.id === chatId);
     if (!confirm(`Delete "${current?.title ?? 'this chat'}"?`)) return;
+    const doomed = chatId;
+    tombstone(doomed);
+    const pending = pendingSaveRef.current;
+    if (pending?.chatId === doomed) {
+      clearTimeout(pending.timer);
+      pendingSaveRef.current = null;
+    }
+    offscreenWritesRef.current.delete(doomed);
     detach();
-    await rpc({ type: 'chats.delete', id: chatId });
-    const rest = chats.filter((c) => c.id !== chatId);
+    offscreenWritesRef.current.delete(doomed); // detach's handOff re-adds it; it must not survive
+    await rpc({ type: 'chats.delete', id: doomed });
+    const rest = chats.filter((c) => c.id !== doomed);
     setChats(rest);
     fallBackTo(rest);
   }

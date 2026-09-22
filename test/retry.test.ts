@@ -4,7 +4,7 @@
 //   npm test
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { DEFAULT_RETRY_POLICY, abortableSleep, backoffDelay, classifyError, resolvePolicy, withRetry, type RetryNotice } from '../lib/agent/retry.ts';
+import { DEFAULT_RETRY_POLICY, abortableSleep, backoffDelay, classifyError, isContextLengthError, resolvePolicy, withRetry, type RetryNotice } from '../lib/agent/retry.ts';
 import { ProviderError, parseRetryAfter, streamIncomplete } from '../lib/providers/errors.ts';
 import { toProviderError } from '../lib/providers/anthropic.ts';
 import Anthropic from '@anthropic-ai/sdk';
@@ -275,4 +275,84 @@ test('Stop while waiting to come back online ends the wait', async () => {
     onOffline: () => setTimeout(() => ac.abort(), 5),
   });
   await assert.rejects(p, (e: unknown) => (e as Error).name === 'AbortError');
+});
+
+// ---------------------------------------------------------------------------
+// "It breaks in long sessions": the provider's window is smaller than the budget
+// ---------------------------------------------------------------------------
+//
+// contextBudget defaults to 120,000 tokens for EVERY provider, and compaction first runs at 70% of
+// it. A model with a 32k window therefore overflows long before anything shrinks the history, and
+// the 400 that comes back is — correctly — not retryable as-is. isContextLengthError is what tells
+// the loop that this particular 400 becomes retryable once the history is smaller.
+//
+// There is no status or code that means "too long" everywhere, so this reads the message. Every
+// string below is one a real backend sends.
+
+test('a context overflow is recognised from every phrasing a real backend sends', () => {
+  const overflows = [
+    // OpenAI and every OpenAI-compatible gateway that copies its wording.
+    "400 Bad Request: {\"error\":{\"message\":\"This model's maximum context length is 8192 tokens. However, your messages resulted in 9101 tokens. Please reduce the length of the messages.\",\"code\":\"context_length_exceeded\"}}",
+    // Azure OpenAI.
+    '400 Bad Request: {"error":{"code":"context_length_exceeded","message":"maximum context length"}}',
+    // Anthropic.
+    '400 Bad Request: {"type":"error","error":{"type":"invalid_request_error","message":"prompt is too long: 215000 tokens > 200000 maximum"}}',
+    // llama.cpp / LM Studio, which is exactly the local-model case the default budget breaks on.
+    '400 Bad Request: the request exceeds the available context size, try increasing it',
+    // Ollama.
+    '400 Bad Request: {"error":"too many tokens for the context window"}',
+    // vLLM and TGI.
+    '400 Bad Request: This model\'s maximum context length is 4096 tokens. However, you requested 5000 tokens, which is longer than the maximum',
+    '422 Unprocessable Entity: Input validation error: `inputs` must have less than 4096 tokens',
+    // Gemini-compatible endpoints.
+    '400 Bad Request: The input token count exceeds the maximum number of tokens allowed',
+  ];
+  for (const message of overflows) {
+    assert.equal(isContextLengthError(new ProviderError(message, { kind: 'http', status: 400 })), true, message.slice(0, 60));
+  }
+});
+
+test('failures that only LOOK like an overflow are not treated as one', () => {
+  // Compacting in response to any of these would throw away the conversation for nothing.
+  const notOverflows: Array<[string, number]> = [
+    // A token rate limit. Mentions tokens, is a 429, already has its own handling.
+    ['429 Too Many Requests: Rate limit reached for gpt-4 in organization org-x on tokens per minute (TPM)', 429],
+    // A reply-length setting, not the conversation's size.
+    ['400 Bad Request: max_tokens must be less than or equal to 4096', 400],
+    ['400 Bad Request: max_completion_tokens is too large', 400],
+    // The ordinary failures.
+    ['401 Unauthorized: invalid api key', 401],
+    ['404 Not Found: model "gpt-9" does not exist', 404],
+    // A server falling over is never the request's own fault, whatever its body happens to say.
+    ['503 Service Unavailable: upstream context window pool exhausted', 503],
+    ['500 Internal Server Error: maximum context length', 500],
+  ];
+  for (const [message, status] of notOverflows) {
+    assert.equal(isContextLengthError(new ProviderError(message, { kind: 'http', status })), false, message.slice(0, 60));
+  }
+});
+
+test('an overflow is found through a wrapper error\'s cause chain', () => {
+  // The Anthropic SDK and undici both wrap, putting their own words on top — the same reason
+  // classifyError walks the chain for network failures.
+  const inner = new Error('prompt is too long: 215000 tokens > 200000 maximum');
+  const outer = new Error('Request failed', { cause: inner });
+  assert.equal(isContextLengthError(outer), true);
+});
+
+test('an overflow stays out of the ordinary retry policy', () => {
+  // It must NOT be retryable in the plain sense: sending the identical request again gets the
+  // identical 400, five more times, with backoff between each. The loop handles it separately,
+  // after compacting, which is a different request.
+  const e = new ProviderError("400: This model's maximum context length is 8192 tokens", { kind: 'http', status: 400 });
+  assert.equal(classifyError(e).retryable, false);
+  assert.equal(isContextLengthError(e), true);
+});
+
+test('a plain network blip is not mistaken for an overflow', () => {
+  assert.equal(isContextLengthError(new ProviderError('Failed to fetch', { kind: 'network' })), false);
+  assert.equal(isContextLengthError(streamIncomplete()), false);
+  assert.equal(isContextLengthError(abort()), false);
+  assert.equal(isContextLengthError(null), false);
+  assert.equal(isContextLengthError('a string'), false);
 });

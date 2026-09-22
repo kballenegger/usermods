@@ -2213,8 +2213,70 @@ async function chatsFlow() {
     if (finalRecord?.title !== MY_NAME) fail(`the stored title was changed after a user rename (now ${JSON.stringify(finalRecord?.title)})`);
     if (finalRecord?.titleSource !== 'user') fail(`titleSource fell back to ${JSON.stringify(finalRecord?.titleSource)} after a later turn`);
 
+    // --- 9. Deleting a chat, and it staying deleted.
+    //
+    // The user report this exists for: "deleting it does nothing. It shows up again if I reopen the
+    // window later or visit the site?" The index was nine unserialised read-modify-write cycles, so
+    // a delete that raced a background writer was overwritten by a snapshot taken before it — and a
+    // deleted chat came back, pointing at keys that had been removed. The unit tests park a writer
+    // mid-cycle to force that race; this proves the same thing through the real UI, including the
+    // part the unit tests cannot reach: that a reopened panel does not restore it.
+    //
+    // The delete goes in RIGHT AFTER a send, which is when the background is busiest with this
+    // chat's id — touchChat, the turn counter, the title call — so the window the bug lived in is
+    // as open as it gets.
+    await panel.locator('textarea').fill('one more change before I delete this');
+    await panel.locator('.composer button.btn.primary').click();
+    await panel.waitForTimeout(1500);
+
+    const beforeDelete = await panel.evaluate(async () => ((await chrome.storage.local.get('chats')).chats ?? []).map((c) => c.id));
+    if (beforeDelete.length !== 1) fail(`expected exactly one chat before the delete, found ${beforeDelete.length}`);
+    const doomedId = beforeDelete[0];
+
+    // Delete lives on an archived chat in the panel (Archive is the reversible primary action, and
+    // coral is kept for the one that is not), so archiving is how a user reaches it here. The
+    // archive is itself an index write landing on this id moments before the delete, which suits
+    // this test: it is one more writer in the window the bug lived in.
+    await panel.locator('.chatbar [data-action="archive"]').click({ timeout: 10_000 });
+    await panel.waitForTimeout(800);
+    const archivedOption = await panel.locator('.chatbar select optgroup[label="Archived"] option').first().getAttribute('value');
+    if (!archivedOption) fail('the chat did not reach the Archived group, so Delete is unreachable');
+    await panel.locator('.chatbar select').selectOption(archivedOption);
+    await panel.waitForTimeout(800);
+
+    panel.once('dialog', (d) => void d.accept());
+    await panel.locator('.chatbar [data-action="delete"].danger').click({ timeout: 10_000 });
+    // Long enough for the run's own writers (and the title call that follows 'done') to land, which
+    // is exactly what used to put the row back.
+    await panel.waitForTimeout(4000);
+
+    const afterDelete = await panel.evaluate(async (id) => {
+      const all = await chrome.storage.local.get(null);
+      return {
+        index: (all.chats ?? []).map((c) => c.id),
+        perChat: Object.keys(all).filter((k) => k.startsWith(`chat:${id}:`)),
+        runs: Object.keys(all.runs ?? {}),
+      };
+    }, doomedId);
+    if (afterDelete.index.includes(doomedId)) fail(`the deleted chat is back on the index: ${JSON.stringify(afterDelete.index)}`);
+    if (afterDelete.perChat.length) fail(`the deleted chat kept storage keys: ${JSON.stringify(afterDelete.perChat)}`);
+    if (afterDelete.runs.includes(doomedId)) fail(`the deleted chat kept a run record: ${JSON.stringify(afterDelete.runs)}`);
+
+    // "It shows up again if I reopen the window later or visit the site." Both halves, in order:
+    // a reopened panel must not restore it, and neither must coming back to the site afterwards.
+    await reopenPanel(panel);
+    if (await panel.locator('.messages .msg.user').count()) fail('reopening the panel restored the deleted chat');
+    // With the only chat on this host gone the switcher is not rendered at all, which is itself the
+    // right answer — so its absence counts, and its presence is only a failure if the chat is in it.
+    if (await panel.locator('.chatbar select').count()) {
+      const afterReopen = await switcherOptions(panel);
+      if (afterReopen.some((o) => o.includes(MY_NAME))) fail(`the deleted chat is back in the switcher: ${JSON.stringify(afterReopen)}`);
+    }
+    const stillGone = await panel.evaluate(async () => ((await chrome.storage.local.get('chats')).chats ?? []).map((c) => c.id));
+    if (stillGone.includes(doomedId)) fail('the deleted chat was written back to the index after the panel reopened');
+
     await assertNoViolations('chats');
-    console.log('chats: OK — model title live on the port, user rename sticks through a later turn, last chat restored on reopen, New chat not persisted, archive hides and unarchives on send');
+    console.log('chats: OK — model title live on the port, user rename sticks through a later turn, last chat restored on reopen, New chat not persisted, archive hides and unarchives on send, a delete right after a turn stays deleted with every key and run record gone');
   } finally {
     await b.close();
   }
