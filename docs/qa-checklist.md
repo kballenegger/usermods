@@ -87,9 +87,10 @@ first-run surfaces still look right — skip deeper testing here.
 
 ## 2. Element references (`@` picker)
 
-1. In Chat, click **⌖ Point at element**.
-   **Expected:** button label changes to **"Click an element…"**, and hovering the page now
-   highlights elements under the cursor.
+1. In Chat, click **+** beside the message box, then **Point at element**.
+   **Expected:** the menu closes, the message box's placeholder reads **"Click an element on the
+   page…"** (and the menu's item does too while it lasts), and hovering the page now highlights
+   elements under the cursor.
    **If it fails:** page console (the picker is a content-script overlay).
 2. Click a distinctive element (e.g. a heading or button on the page).
    **Expected:** the picker closes, an `@token` (e.g. `@h1.title`) is inserted into the composer
@@ -114,8 +115,9 @@ first-run surfaces still look right — skip deeper testing here.
 
 1. Send a message that will take a few tool calls to answer (e.g. "read the whole page, list all
    the buttons, then propose something").
-2. While it's still running (composer shows **Queue** button instead of **Send**, and a **Stop**
-   button is visible), type a second message and click **Queue**.
+2. While it's still running (the button beside the message box is **Stop** with nothing typed,
+   and the activity line above the composer carries its own **Stop**), type a second message.
+   **Expected:** the button becomes **Queue** as soon as there is text. Click **Queue**.
    **Expected:** the message appears in the transcript marked **"queued · will be sent between
    steps"**.
    **If it fails:** side panel DevTools.
@@ -124,9 +126,10 @@ first-run surfaces still look right — skip deeper testing here.
    point between tool calls (an `accepted` event un-queues it); it is answered without you doing
    anything further.
    **If it fails:** side panel DevTools, service worker console.
-4. Start another long-running message. This time click **Stop** while it's mid-run.
-   **Expected:** streaming stops promptly; the **Stop** button disappears and **Send** returns;
-   the transcript keeps whatever was produced so far (no crash, no stuck spinner).
+4. Start another long-running message. This time click **Stop** (beside the message box, or on
+   the activity line) while it's mid-run.
+   **Expected:** streaming stops promptly; the button beside the message box goes back to
+   **Send**; the transcript keeps whatever was produced so far (no crash, no stuck spinner).
    **If it fails:** side panel DevTools, service worker console.
 5. Repeat step 4, but this time queue a message *then* hit Stop before it's accepted.
    **Expected:** the queued (unaccepted) message is dropped back into the composer text box (an
@@ -176,7 +179,8 @@ several steps to answer ("read the whole page, list all the buttons, then propos
    **Expected:** the run continues from the last completed step and finishes; no new user bubble.
 9. Start a long run, **close the side panel**, wait ten seconds, reopen it while the run is still
    going.
-   **Expected:** the activity line, **Stop** and **Queue** are showing; the rows produced while the
+   **Expected:** the activity line with its **Stop** is showing, and the button beside the message
+   box reads **Queue** once something is typed; the rows produced while the
    panel was closed are in the transcript, no tool row is stuck on an amber dot once the run is
    over, and there is **no** "some rows from this run are not shown here …" note. That note now
    appears only when a stored transcript really is missing rows — a tool row with no result, or a
@@ -655,7 +659,7 @@ build.
    date. You can also type a model id." and the chat's model picker still offers that built-in
    list, labelled **built-in list**; if the backend names a newer minimum client version, bump
    `CHATGPT_CLIENT_VERSION` in `lib/modellist.ts`.
-5. Go to Chat, open the model button under the message box, pick one of the ChatGPT models, and
+5. Go to Chat, open the model chip in the chat bar, pick one of the ChatGPT models, and
    send a real one-line request on a real page.
    **Expected:** a real streamed response and (ideally) a working proposal, same shape as the
    mock-LLM smoke test but against the live ChatGPT backend. This exercises real API usage
@@ -759,8 +763,7 @@ same base URL with different model ids also works.
 **Part A — a vision model sees the screenshot.**
 
 1. Settings → **Add provider** → **Custom OpenAI API**, base URL set to your server. Leave
-   **Images** on **Auto**. In Chat, pick your vision model from the model button under the message
-   box.
+   **Images** on **Auto**. In Chat, pick your vision model from the model chip in the chat bar.
 2. Open the panel on a page with something visually distinctive above the fold — a coloured
    banner, a large hero image, a chart. Ask something that can only be answered by looking, and
    that is not in the DOM text: *"take a screenshot and tell me what colour the header is"*, or
@@ -836,10 +839,11 @@ OpenAI-compatible endpoint, and a ChatGPT sign-in as the third if you have one.
    **Connected**, and **Fetch models** on each reports a count.
 2. If you are upgrading a profile that had a single provider: **Expected:** it is already there
    as the first card, named after its preset or its host, with the key in place, and the chat's
-   model button already shows the model you were using. Nothing needed re-entering.
-3. In Chat, open the model button under the message box. **Expected:** both providers' models,
-   grouped under their names; typing filters; ↑/↓ and Enter pick; Escape closes and returns focus
-   to the button.
+   model chip in the chat bar already shows the model you were using. Nothing needed re-entering.
+3. In Chat, open the model chip in the chat bar. **Expected:** a dropdown over the transcript with
+   both providers' models, grouped under their names; typing filters; ↑/↓ and Enter pick; Escape
+   closes and returns focus to the chip. Under the models, a **Thinking** row of levels with no
+   help sentence, and none at all for a model that has no reasoning setting.
 4. Pick a model on provider A and ask for something that needs tools **and a screenshot**:
    *"take a screenshot, read the page, and tell me what the header looks like"*. Let it finish.
 5. Pick a model on provider B (the other protocol) and continue: *"now hide that header"*.
@@ -856,7 +860,7 @@ OpenAI-compatible endpoint, and a ChatGPT sign-in as the third if you have one.
    reasoning model is the interesting one: its own earlier reasoning is replayed to it, and no
    other model's is.
 7. Send something slow ("read the whole page carefully and summarise it") and **while it is
-   running** pick a different model. **Expected:** the line beside the model button reads
+   running** pick a different model. **Expected:** the line above the message box reads
    "Applies from the next turn. The reply in progress stays on the model it started with."; the
    running reply finishes normally; the next message goes to the new model and the transcript
    marks the switch there, not earlier.
@@ -864,7 +868,7 @@ OpenAI-compatible endpoint, and a ChatGPT sign-in as the third if you have one.
    on; a **New chat** starts on the last model you picked; the dashboard's chat rows show each
    chat's model and the preview shows the *switched to* lines.
 9. Settings → **Remove** the provider the current chat is on (confirm). Back in Chat:
-   **Expected:** the model button reads **Pick a model**, the line under it reads "The provider
+   **Expected:** the model chip reads **Pick a model**, the line above the message box reads "The provider
    this chat was using (`<name>`) was removed. Pick another model to continue.", and **Send** is
    disabled. Nothing is sent anywhere until you pick a model. **This must never silently continue
    on the other provider.**

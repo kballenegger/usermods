@@ -405,51 +405,94 @@ The toggle is a rounded track with a knob; on is a lime fill with an ink knob, p
 Its **border carries its boundary** — full lime on white is 1.23:1 — and the knob's travel is a
 second signal that does not depend on colour at all.
 
+### The composer
+One row: **+**, the message box, **Send**. The phone's composer (below), adapted to a pointer:
+36px controls instead of 44px, hover states, and a word beside the send mark once the composer is
+520px wide (the tab bar's container-query convention, reused). The box starts at one line
+(`min-height: 36px`, `field-sizing: content`) and grows with its text to ten lines or 40% of the
+panel, whichever is smaller; Enter sends, Shift+Enter breaks the line. Reference and image chips
+appear above the row only when there are any, and the two things about the model that cannot wait
+for the dropdown — a swap that waits for the next turn, a chat with no usable model — are one line
+above the row, only while true. **Send** is the screen's one primary; the same button is **Queue**
+while a run is going and there is something typed, and **Stop** while there is not (`sendMode()` in
+`lib/compactshell.ts`, shared with the phone). Stop is never out of reach: the activity line carries
+its own Stop for the whole run. Empty, the composer is 53px: a 36px row inside 8px of padding and
+its hairline. It was 205px at the panel's default width, and everything it lost the transcript
+gained.
+
+*Don't* put a control in this row that is not about the message being typed. The model is not: it
+is a property of the chat, and it lives in the chat bar.
+
+### Menus (the + button)
+The pattern for a short list of actions behind one button: `components/Menu.tsx`, the composer's
+**+** (Point at element, Attach image, New chat). The ARIA menu-button pattern: a trigger with
+`aria-haspopup="menu"` and `aria-expanded`, a `role="menu"` of `role="menuitem"` buttons; Enter,
+Space and ↓ open on the first item, ↑ on the last; ↑/↓ wrap, Home/End jump, Escape closes and
+returns focus, Tab closes and moves on, a press outside closes. Choosing an item closes the menu and
+returns focus *before* the action runs, so an action that moves focus elsewhere (the file chooser,
+the element picker) is not fought by the menu's clean-up; and it runs inside the click's own event,
+which is what a file input's `click()` needs to count as a gesture.
+
+A bordered panel on `--surface-2` with no shadow, like the dropdown below, opening **upward** from
+its button because the composer is the last thing in the panel, as wide as its words. Rows are the
+text face at body size, sentence case; hover and keyboard focus are one state — the well plus a 2px
+inset primary rail, never colour alone. A shortcut, when an item has one, sits at the right in mono
+`--text-3` and is informative only; none of the three current items has one. Disabled items stay in
+the list and recede by colour, so what the button *can* do is still visible.
+
+*Don't* use a menu for something done on every message. *Don't* draw a scrim: it is a menu, not a
+dialog, and the transcript behind it stays readable.
+
 ### Dropdown menus (the model picker)
 The pattern for choosing one value out of a long, grouped list where a native `<select>` cannot
-filter, group with status, or take a typed value. One instance so far: the model picker under the
-composer (`ModelPicker.tsx`, `modelpicker.css`).
+filter, group with status, or take a typed value. One instance so far: the model chip in the chat
+bar (`ModelPicker.tsx`, `modelpicker.css`), which also holds the Thinking level.
 
-**The trigger reads as a value, not an action.** Mono, sentence case, 12px, a 1px control outline and
-a `▾` — never the uppercase button label, because it is showing an identifier (`claude-opus-5`), not
-asking for a click. The secondary half (the provider) is the text face in `--text-2` and is the first
-thing to truncate; the whole trigger is capped at the line's width, so a 60-character model id
-ellipsises instead of widening a 320px panel. An unset trigger takes the warn edge **and the words**
-"Pick a model" — never the colour alone.
+**The trigger is a chip that reads as a value, not an action.** Mono, sentence case, 12px, a 1px
+control outline and a `▾` — never the uppercase button label, because it is showing an identifier
+(`claude-opus-5`), not asking for a click. It sits in the **chat bar**, after the switcher, because
+the model is a property of the chat rather than of the message being typed, and because it is
+changed rarely: the composer is looked at all the time and is kept to one row. The chip may take
+45% of the bar and no more; the id truncates, and the provider (the text face in `--text-2`) is
+shown only once the bar is 640px wide — at 520px the bar has just spent its width on its buttons'
+words. The Thinking level rides on the chip as a smaller muted pill (`· high`) **only when it is
+not Default**, so it is discoverable without a row of its own and silent for the chat that never
+touched it. An unset chip takes the warn edge **and the words** "Pick a model" — never the colour
+alone.
 
 **The popover is a bordered panel with no shadow.** Nothing lifts in this system except the primary
 button and the hero card, so the popover is separated from the transcript it opens over by
-`--border-strong` on `--surface-2`, not by depth. It opens **upward** (the composer is the last thing
-in the panel), spans the composer's width rather than its trigger's, and is capped at
-`min(420px, 55dvh)` with the list scrolling inside, so it can never reach under the tab bar.
+`--border-strong` on `--surface-2`, not by depth. It opens **downward** from the chat bar, spans
+the bar's content width rather than its chip's (the bar is its positioning context), and is capped
+at `min(420px, 55dvh)` with the list scrolling inside, so it never reaches the composer.
 
 **Anatomy, top to bottom:** one field that both filters and accepts a typed value; the list, grouped
 under section labels (text face, 600, uppercase, tracked — the same as a form label) with a quiet
 status beside a group's name when it needs one (`refreshing…`, `built-in list`, `could not list`, in
-the warn tone plus those words); then a footer of `linklike` actions on `--surface-1`
-(*Refresh models*, *Manage providers…*). A typed value is offered **after** every real match, as
-*Use "…" on <provider>*, so that Enter on a filter picks a real model.
+the warn tone plus those words); then the **Thinking** row (below); then a footer of `linklike`
+actions on `--surface-1` (*Refresh models*, *Manage providers…*). A typed value is offered **after**
+every real match, as *Use "…" on <provider>*, so that Enter on a filter picks a real model.
 
 **States.** The active option (where ↑/↓ is) takes the well **and a 2px inset `--primary` rail** — the
 rail is not optional, because in day the raised surface and the panel are the same white, and a state
 may not rest on colour or on a transitioned property alone. The selected option (the value in use)
 carries a lime `●` and the label weight, so active and selected stay distinguishable when they are
-different rows. Open is marked on the trigger by an inset ring as well as the border.
+different rows. Open is marked on the chip by an inset ring as well as the border.
 
 **Keyboard and ARIA.** Button with `aria-haspopup="listbox"` / `aria-expanded`; the field is
 `role="combobox"` with `aria-controls` and `aria-activedescendant`; the list is `role="listbox"` with
 `role="group"` + `aria-label` per section and `role="option"` + `aria-selected` rows. Focus never
 leaves the field while arrowing. ↑/↓ wrap across groups, Home/End jump when the field is empty, Enter
-picks, Escape closes and returns focus to the trigger, Tab walks on to the footer and then out, which
-closes it. Options pick on `mousedown`, because the field's blur would otherwise close the list
-before a click landed.
+picks, Escape closes from anywhere inside and returns focus to the chip, Tab walks on to the Thinking
+levels and the footer and then out, which closes it. Options pick on `mousedown`, because the
+field's blur would otherwise close the list before a click landed.
 
 *Don't* reach for this where a native `<select>` does the job — Theme and *Side panel opens* are
 three fixed options and stay native. *Don't* put a blurred shadow on it.
 
 ### Segmented level rows (the Thinking row)
 The pattern for choosing one value out of a **short, ordered scale whose available steps depend on
-something else on screen**. One instance so far: the Thinking row under the model picker
+something else on screen**. One instance so far: the Thinking row inside the model dropdown
 (`ModelPicker.tsx`, `modelpicker.css`), which offers only the levels the chosen model accepts.
 
 It is a row of small buttons in `role="radiogroup"`, not a `<select>`, and the reason is the
@@ -458,20 +501,20 @@ of what the row is saying. A select hides that behind a click — you cannot tel
 levels from one with two without opening it. When a model has no levels at all the row is **not
 drawn**, rather than drawn and disabled: a control whose only option is "Default" states nothing.
 
-Each level reads as a value, like the model trigger above it: mono, 12px, sentence case, a 1px
-control outline, no uppercase label. The chosen one takes `--primary` on its border **and a 1px
-inset rail** — the same device the open trigger uses, because a state may not rest on colour or on a
-transitioned property alone. The row's label (`Thinking`) and its one line of help are `--text-3`;
-the help is the text face, wraps to its own line, and names the knob in the provider's own words
-("Sets Claude's effort level"), so what the control actually does is never a guess.
+Each level reads as a value, like the chip above it: mono, 12px, sentence case, a 1px control
+outline, no uppercase label. The chosen one takes `--primary` on its border **and a 1px inset
+rail** — the same device the open chip uses, because a state may not rest on colour or on a
+transitioned property alone. The row's label (`Thinking`) is `--text-3` mono, and the label and the
+level names are the whole explanation: there is **no help sentence**. The one tooltip, on the group,
+says what the scale is ("How much the model reasons before it answers"); what each provider does
+with it on the wire is the README's job, not a line every chat pays for.
 
 *Don't* use this for a long scale, an unordered set, or values that need explaining individually —
 that is the dropdown above. *Don't* draw a disabled row to show a control exists.
 
-Beside the trigger, one line of prose (`--text-2`, or `--error-text` with `role="alert"` for a
-problem) says what the trigger alone cannot: that a swap waits for the next turn, or why there is no
-usable model. A problem sentence wraps onto its own line under the trigger rather than into a
-two-word column beside it.
+Above the message box, one line of prose (`--text-2`, or `--error-text` with `role="alert"` for a
+problem) says what the chip alone cannot: that a swap waits for the next turn, or why there is no
+usable model. It is drawn only while it is true, so the composer's resting state is the row alone.
 
 **The transcript's model marker** — *switched to claude-sonnet-5 · Anthropic* — is a hairline rule
 with a mono label set into it, in `--text-3`: it is a fact about the rows below it, so it reads as a
