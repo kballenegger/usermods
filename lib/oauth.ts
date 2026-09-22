@@ -108,6 +108,167 @@ export function fetchFailureMessage(kind: OAuthKind, safari: boolean): string {
   );
 }
 
+// ---------- what the server actually said ----------
+
+/**
+ * How much of a server's explanation is worth putting in a status line.
+ *
+ * The same cap lib/modellist.ts uses, for the same reason: past a sentence or two it stops being an
+ * explanation and starts being a wall, and a vendor edge that answers with a whole HTML page would
+ * otherwise pour it into the UI.
+ */
+const MAX_DETAIL = 300;
+
+/**
+ * A short sentence out of an HTML error page.
+ *
+ * Cloudflare, regional blocks and vendor edges answer with a document, not JSON, and the one useful
+ * sentence in it is the `<title>` ("Access denied", "Attention Required! | Cloudflare", "Error
+ * 1020") or the first heading. Everything else is markup, script and boilerplate. Tags are stripped
+ * rather than parsed: this runs in a service worker where DOMParser is not available, and a regex
+ * that only ever DELETES markup cannot be tricked into producing markup.
+ */
+function htmlDetail(text: string): string {
+  const pick = (re: RegExp): string => {
+    const m = re.exec(text);
+    if (!m?.[1]) return '';
+    return m[1]
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&amp;/gi, '&')
+      .replace(/&lt;/gi, '<')
+      .replace(/&gt;/gi, '>')
+      .replace(/&quot;/gi, '"')
+      .replace(/&#0*39;|&apos;/gi, "'")
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+  return pick(/<title[^>]*>([\s\S]*?)<\/title>/i) || pick(/<h1[^>]*>([\s\S]*?)<\/h1>/i) || pick(/<h2[^>]*>([\s\S]*?)<\/h2>/i);
+}
+
+/**
+ * What the server said about a failed sign-in step, from its response body.
+ *
+ * The sign-in flow used to surface a bare status — "ChatGPT device-code request failed: 403" — while
+ * the body of that 403 said exactly what had happened. The model-listing path already reads the body
+ * (lib/modellist.ts `errorDetail`); this is the same job for the auth steps, with two differences
+ * that matter here and not there:
+ *
+ *   - **HTML is read rather than discarded.** A model listing that answers HTML is a misconfigured
+ *     base URL and the page says nothing useful. A SIGN-IN that answers HTML is usually an edge —
+ *     Cloudflare, a regional block — and its title is the single most useful thing on screen.
+ *   - **`error_description` comes first.** These are OAuth endpoints, and RFC 6749 puts the human
+ *     sentence there; `error` beside it is a machine code like `invalid_grant`.
+ *
+ * Every shape either vendor has been seen to answer with is read: OAuth's
+ * `{error_description}` / `{error}`, OpenAI's and xAI's `{error:{message}}`, a bare `{message}` or
+ * `{detail}`, plain text, and an HTML page reduced to its title. A body that is none of those, or
+ * empty, yields '' and the caller falls back to naming the status alone.
+ *
+ * It never returns anything that was not in the body, so it cannot invent a cause — and the bodies
+ * it reads are error responses, which carry no token: the flows that DO return tokens are the ones
+ * that succeeded, and this is only ever called on a failure. See `redactDetail`.
+ */
+export function authErrorDetail(bodyText: string): string {
+  const text = (bodyText ?? '').trim();
+  if (!text) return '';
+  let detail = '';
+  const looksHtml = /^\s*(<!doctype|<html|<head|<body|<\?xml)/i.test(text) || /<html[\s>]/i.test(text.slice(0, 2000));
+  if (looksHtml) {
+    detail = htmlDetail(text);
+  } else {
+    try {
+      const j = JSON.parse(text) as Record<string, unknown>;
+      const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
+      const err = j.error;
+      const nested = err && typeof err === 'object' ? (err as Record<string, unknown>) : null;
+      detail =
+        str(j.error_description) ||
+        (nested ? str(nested.message) || str(nested.error_description) : '') ||
+        str(j.message) ||
+        str(j.detail) ||
+        // The machine code last: `invalid_grant` alone is thin, but it beats a bare number.
+        (nested ? str(nested.code) || str(nested.type) : str(err));
+    } catch {
+      // Not JSON. Plain text is the server talking, so it is shown — unless it is markup we did not
+      // recognise above, which is noise.
+      detail = /^\s*</.test(text) ? htmlDetail(text) : text;
+    }
+  }
+  return redactDetail(detail);
+}
+
+/**
+ * Tidy a detail for display, and make sure nothing secret rides along in it.
+ *
+ * The bodies this reads are failures, which do not carry tokens — but "does not today" is not a
+ * property worth relying on for a string that goes on screen and into a bug report. Anything
+ * shaped like a bearer token, a JWT, an OAuth code or a `?code=`/`token=` query value is replaced
+ * before the string is capped, so a vendor that ever does echo one back cannot leak it through this
+ * path. The device code and user code are not in these bodies at all (they are in the REQUEST), and
+ * nothing here reads a request.
+ */
+function redactDetail(raw: string): string {
+  let detail = (raw ?? '').replace(/\s+/g, ' ').trim();
+  if (!detail) return '';
+  detail = detail
+    // A JWT: three base64url segments. This is what an access or id token looks like.
+    .replace(/\b[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g, '[redacted]')
+    // `Bearer <something>`, and the vendors' key prefixes.
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/-]+=*/gi, 'Bearer [redacted]')
+    .replace(/\b(sk|xai|oai)-[A-Za-z0-9._-]{8,}/gi, '[redacted]')
+    // `code=…`, `token=…`, `device_code=…` in a URL or a form body echoed back at us.
+    .replace(/\b((?:access_|refresh_|id_|device_|user_)?(?:code|token))=[^\s&"']{6,}/gi, '$1=[redacted]');
+  return detail.length > MAX_DETAIL ? `${detail.slice(0, MAX_DETAIL - 1)}…` : detail;
+}
+
+/**
+ * The extra sentence a 403 from a vendor's edge has earned.
+ *
+ * A 403 on a sign-in step is almost never "you are not allowed to sign in" — the user has not
+ * identified themselves yet, so there is nobody to deny. It is the vendor's edge refusing the
+ * request before it reaches the API at all, and by far the most common reason is where the request
+ * came from: OpenAI and xAI do not serve every country, and a corporate or campus network can be
+ * refused the same way. The owner hit exactly this from Hong Kong and read it as a broken sign-in.
+ *
+ * So a 403 says what it usually means and what to try, and is careful to say "usually": the code
+ * cannot tell a regional block from a blocked network from a genuinely refused client, and claiming
+ * certainty would send someone to a VPN over a problem a VPN will not fix.
+ *
+ * ChatGPT's device-auth POLL is the one place a 403 means something else — OpenAI answers "not
+ * approved yet" with it — and that path returns `pending` before it ever reaches here.
+ */
+export const REGION_HINT =
+  'A 403 here usually means the provider is not serving your region or network rather than a problem with your account. Try a VPN or a different network.';
+
+/**
+ * The one-line failure a sign-in step shows: what we were doing, the status, what the server said,
+ * and — on a 403 — what that usually means.
+ *
+ * `step` is the human name of the request ("ChatGPT sign-in", "xAI token refresh"), so the sentence
+ * says which part of a multi-request flow gave up.
+ */
+export function authFailureMessage(step: string, status: number, bodyText: string): string {
+  const detail = authErrorDetail(bodyText);
+  const head = detail ? `${step} failed (${status}): ${detail}` : `${step} failed (${status}).`;
+  return status === 403 ? `${head} ${REGION_HINT}` : head;
+}
+
+/**
+ * Read a failed response's body once, without letting that read become the failure.
+ *
+ * A body can only be consumed once and `text()` can itself reject (a connection that died after the
+ * headers). Either way the caller still has a status to report, so this answers '' rather than
+ * throwing a second, less useful error over the first.
+ */
+export async function failureBody(res: Response): Promise<string> {
+  try {
+    return await res.text();
+  } catch {
+    return '';
+  }
+}
+
 // ---------- storage ----------
 
 const key = (k: OAuthKind) => `oauth:${k}`;
@@ -190,7 +351,7 @@ export async function startXaiLogin(): Promise<DeviceLogin> {
     headers: xaiAuthHeaders,
     body: new URLSearchParams({ client_id: XAI_CLIENT_ID, scope: XAI_SCOPE, referrer: 'usermods' }),
   });
-  if (!res.ok) throw new Error(`xAI device-code request failed: ${res.status} ${await res.text().catch(() => '')}`.slice(0, 300));
+  if (!res.ok) throw new Error(authFailureMessage('SuperGrok sign-in', res.status, await failureBody(res)));
   const d = (await res.json()) as {
     device_code: string;
     user_code: string;
@@ -234,8 +395,18 @@ async function pollXaiOnce(p: PendingLogin): Promise<PollOutcome> {
       return { kind: 'fatal', message: e instanceof Error ? e.message : String(e) };
     }
   }
-  const err = (await r.json().catch(() => ({}))) as { error?: string };
-  switch (err.error) {
+  // Read the body ONCE, as text, and parse it here: the RFC error code steers the flow, and the
+  // same bytes are what `authFailureMessage` turns into a sentence when the code is not one we
+  // know. Reading it twice is not possible, and reading only the JSON threw away the case where the
+  // body is an edge's HTML page rather than an OAuth error at all.
+  const body = await failureBody(r);
+  let code = '';
+  try {
+    code = String((JSON.parse(body) as { error?: unknown }).error ?? '');
+  } catch {
+    /* not JSON: an edge page or plain text. authFailureMessage reads it below. */
+  }
+  switch (code) {
     case 'authorization_pending':
       return { kind: 'pending' };
     case 'slow_down':
@@ -247,7 +418,7 @@ async function pollXaiOnce(p: PendingLogin): Promise<PollOutcome> {
     default:
       // A 5xx is the vendor having a bad minute, not a decision about this sign-in.
       if (r.status >= 500) return { kind: 'retry', message: `xAI answered ${r.status}.` };
-      return { kind: 'fatal', message: `SuperGrok sign-in failed: ${err.error ?? r.status}` };
+      return { kind: 'fatal', message: authFailureMessage('SuperGrok sign-in', r.status, body) };
   }
 }
 
@@ -266,12 +437,18 @@ async function refreshXai(t: OAuthTokens): Promise<OAuthTokens> {
     body: new URLSearchParams({ grant_type: 'refresh_token', client_id: XAI_CLIENT_ID, refresh_token: t.refresh }),
   });
   if (!r.ok) {
-    const err = (await r.json().catch(() => ({}))) as { error?: string };
-    if (err.error === 'invalid_grant' || err.error === 'invalid_client') {
+    const body = await failureBody(r);
+    let code = '';
+    try {
+      code = String((JSON.parse(body) as { error?: unknown }).error ?? '');
+    } catch {
+      /* see pollXaiOnce: the body may be an edge page rather than an OAuth error. */
+    }
+    if (code === 'invalid_grant' || code === 'invalid_client') {
       await saveTokens('xai', null);
       throw new Error('Your xAI session expired. Sign in again from Settings.');
     }
-    throw new Error(`xAI token refresh failed: ${err.error ?? r.status}`);
+    throw new Error(authFailureMessage('xAI token refresh', r.status, body));
   }
   const p = (await r.json()) as Record<string, unknown>;
   const next = xaiTokensFrom({ ...p, refresh_token: p.refresh_token ?? t.refresh });
@@ -307,7 +484,7 @@ export async function startChatgptLogin(): Promise<DeviceLogin> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ client_id: OAI_CLIENT_ID }),
   });
-  if (!res.ok) throw new Error(`ChatGPT device-code request failed: ${res.status}`);
+  if (!res.ok) throw new Error(authFailureMessage('ChatGPT sign-in', res.status, await failureBody(res)));
   const d = (await res.json()) as { device_auth_id: string; user_code?: string; usercode?: string; interval?: string | number };
   return {
     deviceCode: d.device_auth_id,
@@ -331,11 +508,13 @@ async function pollChatgptOnce(p: PendingLogin): Promise<PollOutcome> {
   } catch (e) {
     return { kind: 'retry', message: e instanceof Error ? e.message : String(e) };
   }
-  // OpenAI answers "not approved yet" with a status rather than an RFC error body.
+  // OpenAI answers "not approved yet" with a status rather than an RFC error body. This is the one
+  // place a 403 is NOT the regional refusal REGION_HINT describes, which is why it returns here,
+  // before authFailureMessage can offer that advice over an ordinary "keep waiting".
   if (r.status === 403 || r.status === 404) return { kind: 'pending' };
   if (r.status === 429) return { kind: 'slow_down' };
   if (r.status >= 500) return { kind: 'retry', message: `ChatGPT answered ${r.status}.` };
-  if (!r.ok) return { kind: 'fatal', message: `ChatGPT sign-in failed: ${r.status}` };
+  if (!r.ok) return { kind: 'fatal', message: authFailureMessage('ChatGPT sign-in', r.status, await failureBody(r)) };
   try {
     const code = (await r.json()) as { authorization_code: string; code_verifier: string };
     return { kind: 'success', tokens: await exchangeChatgptCode(code.authorization_code, code.code_verifier) };
@@ -373,7 +552,7 @@ async function exchangeChatgptCode(code: string, verifier: string): Promise<OAut
       code_verifier: verifier,
     }),
   });
-  if (!r.ok) throw new Error(`ChatGPT token exchange failed: ${r.status} ${(await r.text().catch(() => '')).slice(0, 200)}`);
+  if (!r.ok) throw new Error(authFailureMessage('ChatGPT token exchange', r.status, await failureBody(r)));
   return chatgptTokensFrom((await r.json()) as Record<string, unknown>);
 }
 
@@ -406,7 +585,7 @@ async function refreshChatgpt(t: OAuthTokens): Promise<OAuthTokens> {
       await saveTokens('chatgpt', null);
       throw new Error('Your ChatGPT session expired. Sign in again from Settings.');
     }
-    throw new Error(`ChatGPT token refresh failed: ${r.status}`);
+    throw new Error(authFailureMessage('ChatGPT token refresh', r.status, await failureBody(r)));
   }
   return chatgptTokensFrom((await r.json()) as Record<string, unknown>, t);
 }
