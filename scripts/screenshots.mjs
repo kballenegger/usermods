@@ -24,6 +24,12 @@
 //   node scripts/screenshots.mjs --dashboard-capture   that flow, also writing 07-dashboard.png
 //   node scripts/screenshots.mjs --tabbar-capture      the bar flow, also writing the bar at 360
 //                                                      and 640 into $TABBAR_SHOT_DIR
+//   node scripts/screenshots.mjs --composer-height [--label before|after]
+//                                                      measure, at 320, 420 and 640px wide, how
+//                                                      tall everything under the transcript is
+//                                                      (the composer alone, and with the draft
+//                                                      panel) and how much the transcript gets;
+//                                                      the numbers behind the one-row composer
 //
 // Every flow ends by asserting that the mock backend received zero structurally invalid requests
 // (see "History validity" below).
@@ -118,6 +124,12 @@ const RESUME = process.argv.includes('--resume');
 const COMPOSER = process.argv.includes('--composer');
 const MODELS_FLOW = process.argv.includes('--models');
 const THINKING_FLOW = process.argv.includes('--thinking');
+/** Print the composer's height at three panel widths (composerHeightFlow), before or after a change. */
+const COMPOSER_HEIGHT = process.argv.includes('--composer-height');
+const COMPOSER_HEIGHT_LABEL = (() => {
+  const i = process.argv.indexOf('--label');
+  return i === -1 ? 'after' : process.argv[i + 1] ?? 'after';
+})();
 
 /**
  * Where the tab bar's captures go when --tabbar is asked to write them (`--tabbar-capture`). These
@@ -143,7 +155,7 @@ const PICKER_SHOT = process.argv.includes('--picker-capture');
 const CAPTURING =
   !SMOKE && !CHATS && !ISOLATION && !COMPACTION && !DASHBOARD && !DASHBOARD_SHOT && !THEME &&
   !TABBAR && !TABBAR_SHOT && !WAIT && !IMAGES && !VISION && !STYLEGUIDE && !ARTIFACT && !ARTIFACT_SHOT &&
-  !PANELSCOPE && !RESUME && !EDITMOD && !COMPOSER && !MODELS_FLOW && !THINKING_FLOW;
+  !PANELSCOPE && !RESUME && !EDITMOD && !COMPOSER && !MODELS_FLOW && !THINKING_FLOW && !COMPOSER_HEIGHT;
 // --editmod-capture writes screenshots, so it wears the capture mask (the untested line is an
 // artefact of the automated profile, not of the product; see HIDE_UNTESTED_LINE).
 const CAPTURING_EDITMOD = EDITMOD_SHOT;
@@ -4725,6 +4737,58 @@ async function composerBox(panel) {
   });
 }
 
+/**
+ * How tall the composer is, in a real panel, at the three widths the panel is used at.
+ *
+ * The owner's words: "this UI is getting unwieldy". That is a number too: the pixels between the
+ * bottom of the transcript and the bottom of the panel, with nothing typed and no chips, which is
+ * the state the composer is in most of the time. Measured over a finished conversation (so the
+ * draft panel is present, as it is for most of a chat's life) and reported three ways: the
+ * composer alone, everything under the transcript (draft panel, editing line, composer), and what
+ * is left for the transcript. `--label before` on the branch point and `--label after` on the
+ * change give the pair the CHANGELOG quotes.
+ */
+const COMPOSER_HEIGHT_WIDTHS = [320, 420, 640];
+
+async function composerHeightFlow(label) {
+  const b = await launch('dark');
+  try {
+    const panel = await openPanel(b.ctx, b.extId, { settings: { theme: 'dark' } });
+    await openSite(b.ctx, 'https://en.wikipedia.org/wiki/Common_kingfisher');
+    await runConversation(panel, PROMPT, { refreshTitle: true });
+    const rows = [];
+    for (const width of COMPOSER_HEIGHT_WIDTHS) {
+      await panel.setViewportSize({ width, height: PANEL.height });
+      await panel.waitForTimeout(300);
+      const m = await panel.evaluate(() => {
+        const rect = (sel) => document.querySelector(sel)?.getBoundingClientRect() ?? null;
+        const messages = rect('.messages');
+        const composer = rect('.composer');
+        const draft = rect('[data-testid="artifact"]');
+        const comp = document.querySelector('.composer');
+        return {
+          viewport: window.innerHeight,
+          transcript: Math.round(messages.height),
+          belowTranscript: Math.round(window.innerHeight - messages.bottom),
+          composer: Math.round(composer.height),
+          draft: draft ? Math.round(draft.height) : 0,
+          chips: document.querySelectorAll('.composer .chip, .composer .attach').length,
+          composerOverflowsX: comp.scrollWidth > comp.clientWidth + 1,
+        };
+      });
+      rows.push({ width, ...m });
+    }
+    console.log(`composer-height (${label}): panel ${PANEL.height}px tall, a finished conversation with its draft panel, nothing typed`);
+    for (const r of rows) {
+      console.log(
+        `  ${String(r.width).padStart(3)}px wide: composer ${r.composer}px · under the transcript ${r.belowTranscript}px (draft panel ${r.draft}px) · transcript ${r.transcript}px of ${r.viewport}px (${((100 * r.transcript) / r.viewport).toFixed(1)}%)${r.chips ? ` · ${r.chips} chips` : ''}${r.composerOverflowsX ? ' · COMPOSER OVERFLOWS SIDEWAYS' : ''}`,
+      );
+    }
+  } finally {
+    await b.close();
+  }
+}
+
 async function composerFlow() {
   const fail = (m) => {
     throw new Error(`composer: ${m}`);
@@ -5308,6 +5372,10 @@ async function main() {
     }
     if (COMPOSER) {
       await composerFlow();
+      return;
+    }
+    if (COMPOSER_HEIGHT) {
+      await composerHeightFlow(COMPOSER_HEIGHT_LABEL);
       return;
     }
     if (MODELS_FLOW) {
