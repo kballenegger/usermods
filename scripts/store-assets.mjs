@@ -218,7 +218,7 @@ async function waitForComposer(panel, timeout = 30_000) {
 async function runConversation(panel, text) {
   await waitForComposer(panel);
   await panel.locator('textarea').fill(text);
-  await panel.locator('.composer button.btn.primary').click();
+  await panel.locator('.composer .cbtn.send').click();
   await panel.locator('.messages .card h4').first().waitFor({ timeout: 60_000 });
   await panel.waitForTimeout(700);
 }
@@ -380,8 +380,10 @@ async function shotRefs(b, composer) {
   await waitForComposer(panel);
   await runConversation(panel, 'hide the sidebar and make the article full width');
 
-  // The genuine element picker: the panel starts it, the content script broadcasts the pick.
-  await panel.locator('.composer button.btn', { hasText: 'Point at element' }).click();
+  // The genuine element picker: the panel starts it from the composer's "+" menu, the content
+  // script broadcasts the pick.
+  await panel.locator('[data-testid="composer-add"]').click();
+  await panel.locator('[data-testid="menu-point"]').click();
   await panel.waitForTimeout(400);
   const target = site.locator('.infobox, #mw-content-text table').first();
   await target.scrollIntoViewIfNeeded();

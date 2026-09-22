@@ -24,12 +24,16 @@
 //   node scripts/screenshots.mjs --dashboard-capture   that flow, also writing 07-dashboard.png
 //   node scripts/screenshots.mjs --tabbar-capture      the bar flow, also writing the bar at 360
 //                                                      and 640 into $TABBAR_SHOT_DIR
-//   node scripts/screenshots.mjs --composer-height [--label before|after]
+//   node scripts/screenshots.mjs --composer-capture   rewrite only the captures the composer is in:
+//                                                      01 (both themes), 02, 08, 09, 10, 11 and 12
+//   node scripts/screenshots.mjs --composer-height [--label before|after] [--shots dir]
 //                                                      measure, at 320, 420 and 640px wide, how
 //                                                      tall everything under the transcript is
 //                                                      (the composer alone, and with the draft
 //                                                      panel) and how much the transcript gets;
-//                                                      the numbers behind the one-row composer
+//                                                      the numbers behind the one-row composer.
+//                                                      --shots also writes the empty chat and each
+//                                                      width into dir, for looking at
 //
 // Every flow ends by asserting that the mock backend received zero structurally invalid requests
 // (see "History validity" below).
@@ -126,9 +130,21 @@ const MODELS_FLOW = process.argv.includes('--models');
 const THINKING_FLOW = process.argv.includes('--thinking');
 /** Print the composer's height at three panel widths (composerHeightFlow), before or after a change. */
 const COMPOSER_HEIGHT = process.argv.includes('--composer-height');
+/**
+ * Rewrite only the captures that show the composer or the model chip: 01 in both themes, 02, the
+ * two 08 images shots, 09 and 10 from the artifact flow, 11 and 12. Mods, Settings, the install
+ * page, the migration and the dashboard are untouched by a composer change, and hero-github.png
+ * is hand-captured and is never written from here.
+ */
+const COMPOSER_SHOT = process.argv.includes('--composer-capture');
 const COMPOSER_HEIGHT_LABEL = (() => {
   const i = process.argv.indexOf('--label');
   return i === -1 ? 'after' : process.argv[i + 1] ?? 'after';
+})();
+/** Where --composer-height writes its pictures, when asked to (`--shots dir`). */
+const COMPOSER_HEIGHT_SHOTS = (() => {
+  const i = process.argv.indexOf('--shots');
+  return i === -1 ? null : process.argv[i + 1] ?? null;
 })();
 
 /**
@@ -158,7 +174,7 @@ const CAPTURING =
   !PANELSCOPE && !RESUME && !EDITMOD && !COMPOSER && !MODELS_FLOW && !THINKING_FLOW && !COMPOSER_HEIGHT;
 // --editmod-capture writes screenshots, so it wears the capture mask (the untested line is an
 // artefact of the automated profile, not of the product; see HIDE_UNTESTED_LINE).
-const CAPTURING_EDITMOD = EDITMOD_SHOT;
+const CAPTURING_EDITMOD = EDITMOD_SHOT || COMPOSER_SHOT;
 
 /** See note 4: a first-run setup instruction, not the steady state the README should show. */
 const HIDE_SETUP_NOTICE = '.app > .notice, .dash-inner > .notice { display: none !important; }';
@@ -338,11 +354,32 @@ async function waitForComposer(panel, timeout = 30_000) {
   await panel.locator('textarea:not([disabled])').waitFor({ state: 'visible', timeout });
 }
 
+/**
+ * The composer's "+" menu: Point at element, Attach image and New chat live behind it (Chat.tsx,
+ * components/Menu.tsx), so the flows open it and pick, as a user does.
+ */
+async function pickFromAddMenu(panel, item) {
+  await panel.locator('[data-testid="composer-add"]').click();
+  await panel.locator(`[data-testid="${item}"]`).waitFor({ timeout: 5_000 });
+  await panel.locator(`[data-testid="${item}"]`).click();
+  await panel.locator('[data-testid="composer-add-menu"]').waitFor({ state: 'detached', timeout: 5_000 });
+}
+
+/** Start the element picker from the composer, the way a user does: "+", then Point at element. */
+async function pointAtElement(panel) {
+  await pickFromAddMenu(panel, 'menu-point');
+}
+
+/** The "+" menu's New chat. */
+async function clickNewChat(panel) {
+  await pickFromAddMenu(panel, 'menu-new-chat');
+}
+
 /** Send a message in the panel and wait for the proposal card. */
 async function runConversation(panel, text, { refreshTitle = false } = {}) {
   await waitForComposer(panel);
   await panel.locator('textarea').fill(text);
-  await panel.locator('.composer button.btn.primary').click();
+  await panel.locator('.composer .cbtn.send').click();
   await panel.locator('.messages .card h4').first().waitFor({ timeout: 60_000 });
   // Let the last streamed text settle before capturing.
   await panel.waitForTimeout(600);
@@ -452,7 +489,7 @@ async function chatRefs() {
     await runConversation(panel, 'hide the sidebar and make the article full width', { refreshTitle: true });
 
     // Start the picker, then click a real element: the article's infobox image.
-    await panel.locator('.composer button.btn', { hasText: 'Point at element' }).click();
+    await pointAtElement(panel);
     await panel.waitForTimeout(400);
 
     const target = site.locator('.infobox, #mw-content-text table').first();
@@ -642,11 +679,12 @@ async function settings(theme = 'dark', name = '04-settings.png') {
 }
 
 /**
- * 12 — the model picker, open over a finished conversation.
+ * 12 — the model dropdown, open from the chat bar's chip over a finished conversation.
  *
  * Two providers with their lists already cached (and fresh, so opening the picker fetches nothing):
  * the capture's "Anthropic", which is the mock, and a second one standing in for a local server,
- * which is the mock's other prefix. Nothing here can reach a real endpoint.
+ * which is the mock's other prefix. The first is told which reasoning field its endpoint takes, so
+ * the Thinking control is in the picture. Nothing here can reach a real endpoint.
  */
 async function modelPickerShot(theme = 'dark', name = '12-model-picker.png') {
   const b = await launch(theme);
@@ -658,7 +696,7 @@ async function modelPickerShot(theme = 'dark', name = '12-model-picker.png') {
         connections: {
           v: 1,
           list: [
-            { id: 'capture', kind: 'openai-compatible', label: 'Anthropic', baseUrl: BASE_URL, apiKey: '', extraModels: ['claude-opus-5'], models: { ids: ['claude-haiku-4-5', 'claude-opus-5', 'claude-sonnet-5'], fetchedAt: now } },
+            { id: 'capture', kind: 'openai-compatible', label: 'Anthropic', baseUrl: BASE_URL, apiKey: '', reasoningField: 'reasoning_effort', extraModels: ['claude-opus-5'], models: { ids: ['claude-haiku-4-5', 'claude-opus-5', 'claude-sonnet-5'], fetchedAt: now } },
             { id: 'capture-local', kind: 'openai-compatible', label: 'Ollama', baseUrl: `${CONTROL_BASE}/alt/v1`, apiKey: '', models: { ids: ['qwen3-coder:30b', 'llama3.3:70b', 'gemma3:27b'], fetchedAt: now } },
           ],
         },
@@ -668,6 +706,7 @@ async function modelPickerShot(theme = 'dark', name = '12-model-picker.png') {
     await openSite(b.ctx, 'https://en.wikipedia.org/wiki/Common_kingfisher');
     await runConversation(panel, PROMPT, { refreshTitle: true });
     await panel.locator('[data-testid="model-button"]').click();
+    await panel.locator('[data-testid="thinking-row"]').waitFor({ timeout: 10_000 });
     await panel.locator('[data-testid="model-option"][data-model="qwen3-coder:30b"]').waitFor({ timeout: 10_000 });
     // Rest the highlight on a model from the OTHER provider: the picture is about switching.
     await panel.locator('[data-testid="model-option"][data-model="qwen3-coder:30b"]').hover();
@@ -917,7 +956,7 @@ async function waitFlow() {
     })();
 
     await panel.locator('textarea').fill(WAIT_PROMPT);
-    await panel.locator('.composer button.btn.primary').click();
+    await panel.locator('.composer .cbtn.send').click();
 
     // The conversation ends with a text-only step carrying the marker.
     await panel
@@ -1005,7 +1044,7 @@ async function waitFlow() {
 
     // --- Stop during a long wait ends the run promptly, and leaves nothing behind.
     await panel.locator('textarea').fill(WAIT_STOP_PROMPT);
-    await panel.locator('.composer button.btn.primary').click();
+    await panel.locator('.composer .cbtn.send').click();
     // Wait until the run is genuinely inside the 20s wait before pressing Stop, so this measures
     // the cancellation and not the round trip to get there.
     await panel
@@ -1020,7 +1059,7 @@ async function waitFlow() {
     if (/stuck/.test(waitingLine)) fail(`the panel called a legitimate wait a stall: ${JSON.stringify(waitingLine)}`);
 
     const stoppedAt = Date.now();
-    await panel.locator('.composer button.btn.danger', { hasText: 'Stop' }).click();
+    await panel.locator('.composer .cbtn.send[data-mode="stop"]').click();
     await panel.locator('.activity').waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
     const stopTook = Date.now() - stoppedAt;
     // The whole complaint behind this work is an agent that sits there; a Stop that waits out a
@@ -1087,12 +1126,12 @@ async function requestForScript(script) {
 async function sendForVersion(panel, text, version) {
   await waitForComposer(panel);
   await panel.locator('textarea').fill(text);
-  await panel.locator('.composer button.btn.primary').click();
+  await panel.locator('.composer .cbtn.send').click();
   await panel.locator(`[data-testid="artifact"][data-version="${version}"]`).waitFor({ timeout: 60_000 });
   // The run is over when the composer offers Send again; asserting on a draft mid-run would race
   // whatever the turn does next.
   await panel.waitForFunction(
-    () => ![...document.querySelectorAll('.composer .btn')].some((b) => b.textContent?.trim() === 'Stop'),
+    () => document.querySelector('.composer .cbtn.send')?.getAttribute('data-mode') === 'send',
     null,
     { timeout: 60_000 },
   );
@@ -1903,7 +1942,7 @@ async function activityFlow() {
     const APPEAR_BUDGET_MS = 1_500;
     await panel.locator('textarea').fill(THINKING_PROMPT);
     const sentAt = Date.now();
-    await panel.locator('.composer button.btn.primary').click();
+    await panel.locator('.composer .cbtn.send').click();
     await indicator.waitFor({ timeout: 5_000 });
     const appearedIn = Date.now() - sentAt;
     if (appearedIn > APPEAR_BUDGET_MS) {
@@ -1917,7 +1956,7 @@ async function activityFlow() {
     // the tool label carries no "Ns", so readTimer came back null while the message printed the
     // stale label — "the line showed no elapsed timer (it said "waiting for model·0s")", which
     // accuses the timer of being absent and then quotes it.
-    const waitingText = (await indicator.textContent())?.trim() ?? '';
+    const waitingText = (await activityText(panel)) ?? '';
     if (!/waiting for model/i.test(waitingText)) fail(`the line did not say it was waiting for the model (it said ${JSON.stringify(waitingText)})`);
 
     const firstTimer = parseTimer(waitingText);
@@ -1976,9 +2015,26 @@ function parseTimer(text) {
   return m ? Number(m[1]) : null;
 }
 
+/**
+ * What the activity line SAYS, without the Stop (or Retry) button it carries: the button's word is
+ * a control, not part of the sentence, and read as one string it glued itself to the timer
+ * ("waiting for model · 0sStop") and hid the seconds from parseTimer.
+ */
+async function activityText(panel) {
+  return panel.evaluate(() => {
+    const el = document.querySelector('.activity');
+    if (!el) return null;
+    return [...el.childNodes]
+      .filter((n) => !(n instanceof HTMLElement && n.classList.contains('activity-action')))
+      .map((n) => n.textContent)
+      .join('')
+      .trim();
+  }).catch(() => null);
+}
+
 /** The elapsed seconds the line is showing right now, or null if it is not showing one. */
 async function readTimer(panel) {
-  return parseTimer(await panel.locator('.activity').textContent().catch(() => null));
+  return parseTimer(await activityText(panel));
 }
 
 /**
@@ -1992,7 +2048,14 @@ async function installActivityRecorder(panel) {
     globalThis.__activitySeen = seen;
     const sample = () => {
       const el = document.querySelector('.activity');
-      const text = el?.textContent?.trim();
+      // Without the Stop button's word, which is a control rather than part of what the line says.
+      const text = el
+        ? [...el.childNodes]
+            .filter((n) => !(n instanceof HTMLElement && n.classList.contains('activity-action')))
+            .map((n) => n.textContent)
+            .join('')
+            .trim()
+        : '';
       if (text && seen[seen.length - 1] !== text) seen.push(text);
     };
     new MutationObserver(sample).observe(document.body, { subtree: true, childList: true, characterData: true });
@@ -2129,9 +2192,9 @@ async function chatsFlow() {
     // Stop and Queue back on screen permanently, next to an activity line that had correctly gone
     // away. A chat that has stopped must offer Send.
     await panel.waitForTimeout(400);
-    const settled = await panel.locator('.composer .btn').allTextContents();
-    if (settled.includes('Stop')) fail(`the composer still offered Stop after the run finished and was renamed: ${settled.join(' | ')}`);
-    if (!settled.includes('Send')) fail(`the composer did not go back to Send after the run finished: ${settled.join(' | ')}`);
+    const settled = await panel.locator('.composer .cbtn.send').getAttribute('data-mode');
+    if (settled === 'stop') fail('the composer still offered Stop after the run finished and was renamed');
+    if (settled !== 'send') fail(`the composer did not go back to Send after the run finished: it offers ${JSON.stringify(settled)}`);
     if (await panel.locator('.activity').count()) fail('the activity line was still up after the run finished');
 
     // --- 2. Reopening the panel restores that chat with no click at all.
@@ -2143,7 +2206,7 @@ async function chatsFlow() {
     if (await panel.locator('.messages .empty').count()) fail('the empty state was showing even though a chat was restored');
 
     // --- 3. New chat is the only thing that empties the composer...
-    await panel.locator('.composer button.btn', { hasText: 'New chat' }).click();
+    await clickNewChat(panel);
     await panel.waitForTimeout(400);
     if (await panel.locator('.messages .msg.user').count()) fail('New chat left the previous transcript on screen');
     if (!(await panel.locator('.messages .empty').count())) fail('New chat did not show the empty state');
@@ -2209,7 +2272,7 @@ async function chatsFlow() {
 
     // --- 8. Sending in an archived chat brings it back to life — and the user's name survives it.
     await panel.locator('textarea').fill('and dim the images a little');
-    await panel.locator('.composer button.btn.primary').click();
+    await panel.locator('.composer .cbtn.send').click();
     await panel.waitForTimeout(1500);
     await panel.locator('.chatbar [data-action="archive"]').waitFor({ timeout: 20_000 }).catch(() => {});
     // Long enough for a title call to have landed, had the chat been eligible for one.
@@ -2239,7 +2302,7 @@ async function chatsFlow() {
     // chat's id — touchChat, the turn counter, the title call — so the window the bug lived in is
     // as open as it gets.
     await panel.locator('textarea').fill('one more change before I delete this');
-    await panel.locator('.composer button.btn.primary').click();
+    await panel.locator('.composer .cbtn.send').click();
     await panel.waitForTimeout(1500);
 
     const beforeDelete = await panel.evaluate(async () => ((await chrome.storage.local.get('chats')).chats ?? []).map((c) => c.id));
@@ -2360,10 +2423,10 @@ async function isolationFlow() {
     const tab1 = await openSite(b.ctx, 'https://en.wikipedia.org/wiki/Common_kingfisher');
     await waitForComposer(panel);
     await panel.locator('textarea').fill(SLOW_PROMPT);
-    await panel.locator('.composer button.btn.primary').click();
+    await panel.locator('.composer .cbtn.send').click();
 
     // The Stop button is the panel saying "the chat you are looking at is running".
-    await panel.locator('.composer button.btn.danger', { hasText: 'Stop' }).waitFor({ timeout: 10_000 });
+    await panel.locator('.composer .cbtn.send[data-mode="stop"]').waitFor({ timeout: 10_000 });
 
     // --- Tab 2 on a DIFFERENT host, while A is still waiting for its first byte.
     const tab2 = await openSite(b.ctx, 'https://example.com/');
@@ -2371,19 +2434,19 @@ async function isolationFlow() {
 
     const afterSwitch = await transcriptText(panel);
     if (afterSwitch.includes(SLOW_PROMPT)) fail(`switching hosts left chat A's message on screen: ${JSON.stringify(afterSwitch.slice(0, 200))}`);
-    if (await panel.locator('.composer button.btn.danger', { hasText: 'Stop' }).count()) {
+    if (await panel.locator('.composer .cbtn.send[data-mode="stop"]').count()) {
       fail('the new, empty chat B showed a Stop button: "busy" is still panel-wide rather than per chat');
     }
 
     // Stop in B must not touch A. There is nothing running in B, so this is the clean version of
     // the old bug where the button aborted whatever the port last started.
     await panel.locator('textarea').fill(FAST_PROMPT);
-    await panel.locator('.composer button.btn.primary').click();
+    await panel.locator('.composer .cbtn.send').click();
     // .first(): B's reply can render as more than one assistant bubble while it streams, and this
     // is only a wait for the answer to have arrived — the bleed assertions below do the real work.
     await panel.locator('.messages .msg.assistant', { hasText: FAST_MARKER }).first().waitFor({ timeout: 30_000 });
     // B has answered; pressing Stop here is the user tidying up their own chat.
-    const stopInB = panel.locator('.composer button.btn.danger', { hasText: 'Stop' });
+    const stopInB = panel.locator('.composer .cbtn.send[data-mode="stop"]');
     if (await stopInB.count()) await stopInB.click();
 
     const bText = await transcriptText(panel);
@@ -2465,24 +2528,24 @@ async function isolationFlow() {
     // --- Stop in B while A runs must not abort A. Run it again, for real this time.
     await tab2.bringToFront();
     await panel.waitForTimeout(1500);
-    await panel.locator('.composer button.btn', { hasText: 'New chat' }).click();
+    await clickNewChat(panel);
     await panel.waitForTimeout(400);
     await tab1.bringToFront();
     await panel.waitForTimeout(2000);
-    await panel.locator('.composer button.btn', { hasText: 'New chat' }).click();
+    await clickNewChat(panel);
     await panel.waitForTimeout(400);
     await panel.locator('textarea').fill(SLOW_PROMPT);
-    await panel.locator('.composer button.btn.primary').click();
-    await panel.locator('.composer button.btn.danger', { hasText: 'Stop' }).waitFor({ timeout: 10_000 });
+    await panel.locator('.composer .cbtn.send').click();
+    await panel.locator('.composer .cbtn.send[data-mode="stop"]').waitFor({ timeout: 10_000 });
 
     await tab2.bringToFront();
     await panel.waitForTimeout(1500);
     await panel.locator('textarea').fill(FAST_PROMPT);
-    await panel.locator('.composer button.btn.primary').click();
+    await panel.locator('.composer .cbtn.send').click();
     // .first(): B's reply can render as more than one assistant bubble while it streams, and this
     // is only a wait for the answer to have arrived — the bleed assertions below do the real work.
     await panel.locator('.messages .msg.assistant', { hasText: FAST_MARKER }).first().waitFor({ timeout: 30_000 });
-    const stopB = panel.locator('.composer button.btn.danger', { hasText: 'Stop' });
+    const stopB = panel.locator('.composer .cbtn.send[data-mode="stop"]');
     if (await stopB.count()) await stopB.click();
     await panel.waitForTimeout(1000);
 
@@ -2562,7 +2625,7 @@ async function compactionFlow() {
     // while the post-turn title call is still in flight.
     for (let i = 0; i < COMPACT_PROMPTS.length; i++) {
       await panel.locator('textarea').fill(COMPACT_PROMPTS[i]);
-      await panel.locator('.composer button.btn.primary').click();
+      await panel.locator('.composer .cbtn.send').click();
       await panel.locator('.messages .msg.assistant', { hasText: COMPACT_TURN_ENDS[i] }).last().waitFor({ timeout: 180_000 });
       await panel.waitForTimeout(1000);
     }
@@ -3888,7 +3951,7 @@ async function imagesFlow() {
     await waitForThumbs(panel, 1);
 
     // --- 4. Send, and read what the backend was handed -----------------------
-    await panel.locator('.composer button.btn.primary').click();
+    await panel.locator('.composer .cbtn.send').click();
     await panel.locator('.messages .msg.assistant', { hasText: IMAGES_MARKER }).waitFor({ timeout: 60_000 });
     await panel.waitForTimeout(400);
 
@@ -4032,7 +4095,7 @@ async function visionFlow() {
       await waitForComposer(panel);
 
       await panel.locator('.composer textarea').fill(VISION_CONV.sighted.prompt);
-      await panel.locator('.composer button.btn.primary').click();
+      await panel.locator('.composer .cbtn.send').click();
       await panel.locator('.messages .msg.assistant', { hasText: VISION_CONV.sighted.done }).waitFor({ timeout: 90_000 });
 
       const requests = await requestsFor('vision-sighted');
@@ -4088,7 +4151,7 @@ async function visionFlow() {
       await waitForComposer(panel);
 
       await panel.locator('.composer textarea').fill(VISION_CONV.blind.prompt);
-      await panel.locator('.composer button.btn.primary').click();
+      await panel.locator('.composer .cbtn.send').click();
       // The run completes. That is the headline: a text-only backend used to end the turn with a
       // red 400 the user had to decode.
       await panel.locator('.messages .msg.assistant', { hasText: VISION_CONV.blind.done }).waitFor({ timeout: 90_000 });
@@ -4253,32 +4316,51 @@ async function thinkingFlow() {
     await reloadPanel(panel);
     await waitForComposer(panel);
 
-    // --- 1. the row appears, and starts on Default -------------------------------------
-    const row = panel.locator('[data-testid="thinking-row"]');
+    // --- 1. the control appears inside the model dropdown, and starts on Default ----------
+    // The row is not in the composer any more: it lives in the popover the chat bar's model chip
+    // opens, under the list of models it applies to, with no help sentence.
+    await openModelPicker(panel);
+    const row = panel.locator('[data-testid="model-pop"] [data-testid="thinking-row"]');
     await row.waitFor({ timeout: 15_000 });
+    if (await panel.locator('[data-testid="thinking-help"]').count()) fail('the Thinking control still carries a help sentence');
+    if (await panel.locator('.composer [data-testid="thinking-row"], .composer [data-testid="thinking-level"]').count()) fail('the Thinking row is still drawn in the composer');
     const levels = await panel.locator('[data-testid="thinking-level"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-level')));
     if (JSON.stringify(levels) !== '["default","off","low","medium","high"]') fail(`the row offers ${JSON.stringify(levels)}`);
     const checked = async () => panel.locator('[data-testid="thinking-level"][aria-checked="true"]').getAttribute('data-level');
     if ((await checked()) !== 'default') fail(`the row starts on ${await checked()}, expected default`);
+    if (await panel.locator('[data-testid="model-button-thinking"]').count()) fail('the chip shows a Thinking level while it is on Default');
+    await panel.keyboard.press('Escape');
+    await panel.locator('[data-testid="model-pop"]').waitFor({ state: 'detached', timeout: 5_000 });
+    /** Pick a level the way a user does: open the dropdown, click, Escape, and read it off the chip. */
+    const pickLevel = async (level) => {
+      await openModelPicker(panel);
+      await panel.locator(`[data-testid="thinking-level"][data-level="${level}"]`).click();
+      await panel.waitForFunction((l) => document.querySelector('[data-testid="thinking-level"][aria-checked="true"]')?.getAttribute('data-level') === l, level, { timeout: 5_000 });
+      await panel.keyboard.press('Escape');
+      await panel.locator('[data-testid="model-pop"]').waitFor({ state: 'detached', timeout: 5_000 });
+      if (!(await panel.evaluate(() => document.activeElement === document.querySelector('[data-testid="model-button"]')))) fail('Escape from the Thinking control did not return focus to the chip');
+      const onChip = (await panel.locator('[data-testid="model-button-thinking"]').textContent().catch(() => null))?.trim() ?? null;
+      const want = level === 'default' ? null : level;
+      if (onChip !== want) fail(`after picking ${level} the chip shows ${JSON.stringify(onChip)}, expected ${JSON.stringify(want)}`);
+    };
 
     // --- 2. a first turn on Default sends no reasoning field at all ---------------------
     // The baseline that makes the rest meaningful: an untouched chat is exactly as it was before
     // the feature existed.
     await sendPrompt(panel, THINKING.turns[0].prompt);
     await panel.locator('.messages .msg.assistant', { hasText: THINKING.turns[0].done }).waitFor({ timeout: 60_000 });
-    await panel.locator('.composer button.btn.primary', { hasText: 'Send' }).waitFor({ timeout: 30_000 });
+    await panel.locator('.composer .cbtn.send[data-mode="send"]').waitFor({ timeout: 30_000 });
 
     const turn1 = await reasoningFor('thinking-1');
     if (!turn1.length || turn1.some((r) => r !== null)) fail(`a chat left on Default carried ${JSON.stringify(turn1)}; it should carry no reasoning field`);
     if (await panel.locator('[data-testid="model-marker"]').count()) fail('a chat that has changed nothing shows a marker');
 
     // --- 3. pick High mid-chat: the NEXT turn carries the field, and is marked ----------
-    await panel.locator('[data-testid="thinking-level"][data-level="high"]').click();
-    await panel.waitForFunction(() => document.querySelector('[data-testid="thinking-level"][aria-checked="true"]')?.getAttribute('data-level') === 'high', null, { timeout: 5_000 });
+    await pickLevel('high');
 
     await sendPrompt(panel, THINKING.turns[1].prompt);
     await panel.locator('.messages .msg.assistant', { hasText: THINKING.turns[1].done }).waitFor({ timeout: 60_000 });
-    await panel.locator('.composer button.btn.primary', { hasText: 'Send' }).waitFor({ timeout: 30_000 });
+    await panel.locator('.composer .cbtn.send[data-mode="send"]').waitFor({ timeout: 30_000 });
 
     const turn2 = await reasoningFor('thinking-2');
     if (!turn2.length || !turn2.every((r) => r && r.reasoning_effort === 'high')) fail(`after picking High the turn carried ${JSON.stringify(turn2)}`);
@@ -4296,12 +4378,11 @@ async function thinkingFlow() {
     await assertNoViolations('thinking (the level reaches the wire)');
 
     // --- 4. change to Off: the field changes, it is not dropped -------------------------
-    await panel.locator('[data-testid="thinking-level"][data-level="off"]').click();
-    await panel.waitForFunction(() => document.querySelector('[data-testid="thinking-level"][aria-checked="true"]')?.getAttribute('data-level') === 'off', null, { timeout: 5_000 });
+    await pickLevel('off');
 
     await sendPrompt(panel, THINKING.turns[2].prompt);
     await panel.locator('.messages .msg.assistant', { hasText: THINKING.turns[2].done }).waitFor({ timeout: 60_000 });
-    await panel.locator('.composer button.btn.primary', { hasText: 'Send' }).waitFor({ timeout: 30_000 });
+    await panel.locator('.composer .cbtn.send[data-mode="send"]').waitFor({ timeout: 30_000 });
 
     const turn3 = await reasoningFor('thinking-3');
     // Off is a VALUE ('none'), not the absence of the field: a backend told nothing would reason.
@@ -4312,13 +4393,12 @@ async function thinkingFlow() {
     // --- 5. a backend that refuses the field --------------------------------------------
     // Back to a level that sends something, then a standing fault: the server answers 400 to any
     // request carrying a reasoning field and answers normally to the same request without one.
-    await panel.locator('[data-testid="thinking-level"][data-level="low"]').click();
-    await panel.waitForFunction(() => document.querySelector('[data-testid="thinking-level"][aria-checked="true"]')?.getAttribute('data-level') === 'low', null, { timeout: 5_000 });
+    await pickLevel('low');
     await setFaults([{ kind: 'no-reasoning' }]);
 
     await sendPrompt(panel, THINKING.turns[3].prompt);
     await panel.locator('.messages .msg.assistant', { hasText: THINKING.turns[3].done }).waitFor({ timeout: 60_000 });
-    await panel.locator('.composer button.btn.primary', { hasText: 'Send' }).waitFor({ timeout: 30_000 });
+    await panel.locator('.composer .cbtn.send[data-mode="send"]').waitFor({ timeout: 30_000 });
 
     const turn4 = await requestsFor('thinking-4');
     if (turn4.length !== 2) fail(`the refused turn made ${turn4.length} requests, expected exactly two (the refusal and the retry)`);
@@ -4334,7 +4414,7 @@ async function thinkingFlow() {
     // --- 6. and it is remembered: the next turn does not pay for it again ----------------
     await sendPrompt(panel, THINKING.turns[4].prompt);
     await panel.locator('.messages .msg.assistant', { hasText: THINKING.turns[4].done }).waitFor({ timeout: 60_000 });
-    await panel.locator('.composer button.btn.primary', { hasText: 'Send' }).waitFor({ timeout: 30_000 });
+    await panel.locator('.composer .cbtn.send[data-mode="send"]').waitFor({ timeout: 30_000 });
     const turn5 = await requestsFor('thinking-5');
     if (turn5.length !== 1) fail(`the turn after the refusal made ${turn5.length} requests; the refusal should be remembered`);
     if (turn5[0].reasoning) fail(`it still carried ${JSON.stringify(turn5[0].reasoning)}`);
@@ -4343,6 +4423,8 @@ async function thinkingFlow() {
     // --- 7. the level survives a reload --------------------------------------------------
     await reloadPanel(panel);
     await waitForComposer(panel);
+    await panel.locator('[data-testid="model-button-thinking"]', { hasText: 'low' }).waitFor({ timeout: 15_000 });
+    await openModelPicker(panel);
     await panel.locator('[data-testid="thinking-row"]').waitFor({ timeout: 15_000 });
     await panel.waitForFunction(() => document.querySelector('[data-testid="thinking-level"][aria-checked="true"]')?.getAttribute('data-level') === 'low', null, { timeout: 10_000 });
     const storedLevel = await panel.evaluate(async () => ((await chrome.storage.local.get('chats')).chats ?? [])[0]?.thinking);
@@ -4354,10 +4436,13 @@ async function thinkingFlow() {
       const list = (r.connections?.list ?? []).map((c) => ({ ...c, reasoningField: 'none' }));
       await chrome.storage.local.set({ connections: { v: 1, list } });
     });
-    await panel.waitForFunction(() => !document.querySelector('[data-testid="thinking-row"]'), null, { timeout: 10_000 });
+    // The dropdown is still open from step 7: the control leaves it live, and the chip's suffix goes.
+    await panel.waitForFunction(() => document.querySelector('[data-testid="model-pop"]') && !document.querySelector('[data-testid="thinking-row"]'), null, { timeout: 10_000 });
+    await panel.keyboard.press('Escape');
+    if (await panel.locator('[data-testid="model-button-thinking"]').count()) fail('the chip still shows a level for a model with no reasoning knob');
     await assertNoViolations('thinking (the 400 fallback)');
     console.log(
-      'thinking: OK — a chat on Default sent no reasoning field and no marker, picking High put reasoning_effort:high on the next turn and marked the transcript "thinking: high" without claiming a model swap, Off sent "none" rather than dropping the field, the title call ran at the model\'s floor, a backend that answers 400 to the field was detected once, re-sent immediately without it, explained in the panel and remembered so the next turn cost one request, the level survived a reload, and a model with no reasoning knob hid the row entirely, zero invalid requests',
+      'thinking: OK — a chat on Default sent no reasoning field and no marker, picking High put reasoning_effort:high on the next turn and marked the transcript "thinking: high" without claiming a model swap, Off sent "none" rather than dropping the field, the title call ran at the model\'s floor, a backend that answers 400 to the field was detected once, re-sent immediately without it, explained in the panel and remembered so the next turn cost one request, the level survived a reload, the chip in the chat bar carried the level whenever it was not Default and the control lived inside the model dropdown with no help sentence, and a model with no reasoning knob hid the control entirely, zero invalid requests',
     );
   } finally {
     await b.close();
@@ -4474,7 +4559,7 @@ async function modelsFlow() {
     // --- 4. turn 1 on model A, swap, turn 2 on model B --------------------------------
     await sendPrompt(panel, MODELS.turns[0].prompt);
     await panel.locator('.messages .msg.assistant', { hasText: MODELS.turns[0].done }).waitFor({ timeout: 60_000 });
-    await panel.locator('.composer button.btn.primary', { hasText: 'Send' }).waitFor({ timeout: 30_000 });
+    await panel.locator('.composer .cbtn.send[data-mode="send"]').waitFor({ timeout: 30_000 });
     if (await panel.locator('[data-testid="model-marker"]').count()) fail('a chat that has not changed model shows a "switched to" marker');
 
     // The swap, by keyboard this time: open, filter, Enter.
@@ -4490,7 +4575,7 @@ async function modelsFlow() {
 
     await sendPrompt(panel, MODELS.turns[1].prompt);
     await panel.locator('.messages .msg.assistant', { hasText: MODELS.turns[1].done }).waitFor({ timeout: 60_000 });
-    await panel.locator('.composer button.btn.primary', { hasText: 'Send' }).waitFor({ timeout: 30_000 });
+    await panel.locator('.composer .cbtn.send[data-mode="send"]').waitFor({ timeout: 30_000 });
 
     const markers = await panel.locator('[data-testid="model-marker"]').allTextContents();
     if (markers.length !== 1 || !/switched to alt-large · Alt mock/.test(markers[0])) fail(`the transcript's model markers are ${JSON.stringify(markers)}`);
@@ -4520,7 +4605,9 @@ async function modelsFlow() {
 
     // --- 6. a swap DURING a run ------------------------------------------------------
     await sendPrompt(panel, MODELS.turns[2].prompt);
-    await panel.locator('.composer button.btn.primary', { hasText: 'Queue' }).waitFor({ timeout: 10_000 });
+    // The one button reads Stop while the run is going and nothing is typed; it becomes Queue the
+    // moment there is something to send (checked below).
+    await panel.locator('.composer .cbtn.send[data-mode="stop"]').waitFor({ timeout: 10_000 });
     await waitForRequests('models-3', 1);
     await pickModel(panel, 'legacy', 'demo-mini');
     const note = panel.locator('[data-testid="model-note"]');
@@ -4528,9 +4615,10 @@ async function modelsFlow() {
     if (!/next turn/i.test((await note.textContent()) ?? '')) fail(`a mid-run swap says ${JSON.stringify(await note.textContent())}`);
     // Queued behind the run, after the swap: it must use the model selected when IT starts.
     await panel.locator('textarea').fill(MODELS.turns[3].prompt);
-    await panel.locator('.composer button.btn.primary').click();
+    await panel.locator('.composer .cbtn.send[data-mode="queue"]').waitFor({ timeout: 5_000 });
+    await panel.locator('.composer .cbtn.send').click();
     await panel.locator('.messages .msg.assistant', { hasText: MODELS.turns[3].done }).waitFor({ timeout: 90_000 });
-    await panel.locator('.composer button.btn.primary', { hasText: 'Send' }).waitFor({ timeout: 30_000 });
+    await panel.locator('.composer .cbtn.send[data-mode="send"]').waitFor({ timeout: 30_000 });
     const turn3 = await requestsFor('models-3');
     const turn4 = await requestsFor('models-4');
     if (turn3.length !== 1 || turn3[0].model !== 'alt-large' || turn3[0].endpoint !== '/alt/v1') fail(`the turn that was already running went to ${turn3[0]?.endpoint} as ${turn3[0]?.model}; it should have finished on alt-large`);
@@ -4570,7 +4658,7 @@ async function modelsFlow() {
     if (!/Alt mock/.test(said) || !/was removed/.test(said) || !/Pick another model/.test(said)) fail(`with its provider removed the composer says ${JSON.stringify(said)}`);
     if ((await modelButtonText(panel)) !== 'Pick a model') fail(`the picker button says ${JSON.stringify(await modelButtonText(panel))}; it must not show another provider's model`);
     await panel.locator('textarea').fill('this must not be sent anywhere');
-    if (!(await panel.locator('.composer button.btn.primary').isDisabled())) fail('Send is enabled with no usable model');
+    if (!(await panel.locator('.composer .cbtn.send').isDisabled())) fail('Send is enabled with no usable model');
     const beforeCount = (await fetchRequests()).length;
     await panel.locator('textarea').press('Enter');
     await panel.waitForTimeout(800);
@@ -4604,8 +4692,10 @@ async function modelsFlow() {
     });
     if (!narrow.pop || narrow.pop.left < 0 || narrow.pop.right > 320) fail(`at 320px the popover spans ${narrow.pop?.left}–${narrow.pop?.right}`);
     if (narrow.pop.top < (narrow.bar?.bottom ?? 0) - 1) fail(`at 320px the popover's top (${narrow.pop.top}) runs under the tab bar (${narrow.bar?.bottom})`);
-    if (narrow.pop.bottom > narrow.button.top + 1) fail('the popover does not open upward from its button');
-    if (narrow.button.right > 320 || narrow.button.left < 0) fail(`at 320px the picker button spans ${narrow.button.left}–${narrow.button.right}`);
+    if (narrow.pop.top < narrow.button.bottom - 1) fail('the popover does not open downward from the chip in the chat bar');
+    if (narrow.pop.bottom > PANEL.height) fail(`the popover runs off the bottom of the panel (${narrow.pop.bottom})`);
+    if (narrow.button.right > 320 || narrow.button.left < 0) fail(`at 320px the picker chip spans ${narrow.button.left}–${narrow.button.right}`);
+    if (narrow.button.top < (narrow.bar?.bottom ?? 0) - 1) fail('the picker chip is not in the chat bar under the tab bar');
     if (narrow.composerOverflows || narrow.pageOverflows || narrow.popClips) fail(`at 320px something overflows sideways: ${JSON.stringify(narrow)}`);
     if (Math.round(narrow.bar.top) !== 0) fail('at 320px the tab bar has moved');
     await panel.keyboard.press('Escape');
@@ -4702,7 +4792,7 @@ function messageTextOf(m) {
 // is the only thing that would notice a browser, or a stylesheet change, quietly turning it back
 // into a fixed 64px well. It measures the real element in a real panel:
 //
-//   * empty: the minimum height;
+//   * empty: the minimum height, which is one line;
 //   * a few lines: taller, and NOT scrolling inside — that is "grows instead of overflowing";
 //   * a very long paste: stops at the cap (about ten lines, or 40% of the panel), scrolls inside,
 //     and the tab bar is still on screen and the page itself has not started scrolling;
@@ -4711,7 +4801,8 @@ function messageTextOf(m) {
 //   * a draft left in one chat is as tall as it was when you come back to it;
 //   * Shift+Enter adds a line and Enter sends, and a send puts the box back to the minimum.
 
-const COMPOSER_MIN = 64;
+/** One line: 20px of line-height inside 7px of padding and a 1px edge (styles.css). */
+const COMPOSER_MIN = 36;
 /** The line half of the cap. The stylesheet computes 10 × line-height + padding + borders. */
 const COMPOSER_LINES_CAP = 10;
 
@@ -4750,16 +4841,26 @@ async function composerBox(panel) {
  */
 const COMPOSER_HEIGHT_WIDTHS = [320, 420, 640];
 
-async function composerHeightFlow(label) {
+async function composerHeightFlow(label, shots = COMPOSER_HEIGHT_SHOTS) {
   const b = await launch('dark');
+  const snap = async (panel, name) => {
+    if (!shots) return;
+    fs.mkdirSync(shots, { recursive: true });
+    await panel.screenshot({ path: path.join(shots, `${label}-${name}.png`) });
+  };
   try {
     const panel = await openPanel(b.ctx, b.extId, { settings: { theme: 'dark' } });
     await openSite(b.ctx, 'https://en.wikipedia.org/wiki/Common_kingfisher');
+    await waitForComposer(panel);
+    await panel.waitForTimeout(400);
+    // The empty chat first: no transcript, no draft, the composer as a new user meets it.
+    await snap(panel, 'empty-420');
     await runConversation(panel, PROMPT, { refreshTitle: true });
     const rows = [];
     for (const width of COMPOSER_HEIGHT_WIDTHS) {
       await panel.setViewportSize({ width, height: PANEL.height });
       await panel.waitForTimeout(300);
+      await snap(panel, `chat-${width}`);
       const m = await panel.evaluate(() => {
         const rect = (sel) => document.querySelector(sel)?.getBoundingClientRect() ?? null;
         const messages = rect('.messages');
@@ -4856,7 +4957,7 @@ async function composerFlow() {
     // --- with chips above the box ----------------------------------------------
     await pasteImage(panel, { w: 640, h: 360, bg: '#224', fg: '#446', label: 'mock', name: 'mock.png' });
     await waitForThumbs(panel, 1);
-    await panel.locator('.composer button.btn', { hasText: 'Point at element' }).click();
+    await pointAtElement(panel);
     await panel.waitForTimeout(400);
     const target = site.locator('h1, p, div').first();
     const tb = await target.boundingBox();
@@ -4912,8 +5013,8 @@ async function composerFlow() {
 
     // --- the queued state: a long message queued behind a run shrinks the box too ---
     // Only while the first turn is still running, which depends on how fast the host is; the OK
-    // line says whether it was.
-    const busy = await panel.locator('.composer button.btn.primary', { hasText: 'Queue' }).count();
+    // line says whether it was. With nothing typed the one button reads Stop while a run is going.
+    const busy = await panel.locator('.composer .cbtn.send[data-mode="stop"]').count();
     if (busy) {
       await ta.fill(['also, while you are there', 'make the heading smaller', 'and the links grey'].join('\n'));
       await ta.press('Enter');
@@ -4921,7 +5022,7 @@ async function composerFlow() {
       queuedChecked = true;
       if (queuedBox.height !== COMPOSER_MIN) fail(`after queueing, the box is ${queuedBox.height}px rather than ${COMPOSER_MIN}px`);
     }
-    await panel.locator('.composer button.btn.primary', { hasText: 'Send' }).waitFor({ timeout: 90_000 });
+    await panel.locator('.composer .cbtn.send[data-mode="send"]').waitFor({ timeout: 90_000 });
 
     // --- with the draft panel and the EDITING line above the box ----------------------
     // The first turn proposed a mod, so the draft panel is pinned above the composer; saving it links
@@ -4942,7 +5043,7 @@ async function composerFlow() {
       assertShell(at, `${width}px with draft panel + EDITING line`);
       const clipped = await panel.evaluate(() => {
         const out = [];
-        for (const sel of ['.composer', '[data-testid="model-line"]', '[data-testid="artifact-editing"]', '[data-testid="artifact"]']) {
+        for (const sel of ['.composer', '.composer-row', '.chatbar', '[data-testid="model-line"]', '[data-testid="artifact-editing"]', '[data-testid="artifact"]']) {
           const el = document.querySelector(sel);
           if (!el) continue;
           const r = el.getBoundingClientRect();
@@ -4951,9 +5052,58 @@ async function composerFlow() {
         return out;
       });
       if (clipped.length) fail(`at ${width}px something is clipped or overflows sideways: ${clipped.join('; ')}`);
+      // One row each: the composer's row and the chat bar. Wrapping is detected by vertical
+      // overlap, as the tab bar flow does, since the controls are different heights.
+      const wrapped = await panel.evaluate(() => {
+        const rowsOf = (sel) => {
+          const bands = [];
+          for (const k of document.querySelectorAll(`${sel} > *`)) {
+            const kr = k.getBoundingClientRect();
+            if (!kr.width && !kr.height) continue;
+            const band = bands.find((bd) => kr.top < bd.bottom - 1 && kr.bottom > bd.top + 1);
+            if (band) {
+              band.top = Math.min(band.top, kr.top);
+              band.bottom = Math.max(band.bottom, kr.bottom);
+            } else bands.push({ top: kr.top, bottom: kr.bottom });
+          }
+          return bands.length;
+        };
+        return { composerRow: rowsOf('.composer-row'), chatbar: rowsOf('.chatbar') };
+      });
+      if (wrapped.composerRow !== 1) fail(`at ${width}px the composer row wrapped onto ${wrapped.composerRow} rows`);
+      if (wrapped.chatbar !== 1) fail(`at ${width}px the chat bar wrapped onto ${wrapped.chatbar} rows`);
     }
     await panel.setViewportSize(PANEL);
     await panel.waitForTimeout(200);
+
+    // --- the "+" menu: keyboard, Escape, and the file input behind Attach image ------------
+    await panel.locator('[data-testid="composer-add"]').focus();
+    await panel.keyboard.press('Enter');
+    await panel.locator('[data-testid="composer-add-menu"]').waitFor({ timeout: 5_000 });
+    const menuA11y = await panel.evaluate(() => {
+      const btn = document.querySelector('[data-testid="composer-add"]');
+      const menu = document.querySelector('[data-testid="composer-add-menu"]');
+      return {
+        haspopup: btn?.getAttribute('aria-haspopup'),
+        expanded: btn?.getAttribute('aria-expanded'),
+        controls: !!btn?.getAttribute('aria-controls') && document.getElementById(btn.getAttribute('aria-controls')) === menu,
+        role: menu?.getAttribute('role'),
+        items: [...(menu?.querySelectorAll('[role="menuitem"]') ?? [])].map((m) => m.textContent?.trim()),
+        focusedFirst: document.activeElement === menu?.querySelector('[role="menuitem"]:not([disabled])'),
+      };
+    });
+    if (menuA11y.haspopup !== 'menu' || menuA11y.expanded !== 'true' || !menuA11y.controls || menuA11y.role !== 'menu') fail(`the "+" button is not a menu button: ${JSON.stringify(menuA11y)}`);
+    if (JSON.stringify(menuA11y.items) !== JSON.stringify(['Point at element', 'Attach image', 'New chat'])) fail(`the "+" menu offers ${JSON.stringify(menuA11y.items)}`);
+    if (!menuA11y.focusedFirst) fail('opening the "+" menu from the keyboard did not focus its first item');
+    await panel.keyboard.press('ArrowDown');
+    if ((await panel.evaluate(() => document.activeElement?.getAttribute('data-testid'))) !== 'menu-attach') fail('ArrowDown did not move to Attach image');
+    await panel.keyboard.press('Escape');
+    await panel.locator('[data-testid="composer-add-menu"]').waitFor({ state: 'detached', timeout: 5_000 });
+    if (!(await panel.evaluate(() => document.activeElement?.getAttribute('data-testid') === 'composer-add'))) fail('Escape did not return focus to the "+" button');
+    // Attach image opens the file chooser: the click reaches the hidden input as a user gesture.
+    const chooser = panel.waitForEvent('filechooser', { timeout: 5_000 });
+    await pickFromAddMenu(panel, 'menu-attach');
+    await chooser;
 
     // --- a draft that comes back at the height it was left -----------------------
     await ta.fill(long);
@@ -4974,7 +5124,7 @@ async function composerFlow() {
     await b.close();
   }
   console.log(
-    `composer: OK — the box is 64px empty, grows with typed, wrapped and pasted text without scrolling inside, stops at min(10 lines, 40% of the panel) and scrolls from there, holds that cap under reference and image chips, under the draft panel and the EDITING line at 320, 360 and 420px wide, on a 420px-tall panel, never moves the tab bar or scrolls the page, takes Shift+Enter as a newline and Enter as send, returns to 64px after a send${queuedChecked ? ' and after a queue' : ''}, and restores a draft at the height it was left`,
+    `composer: OK — the box is one 36px line empty, the "+" menu is a keyboard menu (Point at element, Attach image, New chat) whose Attach opens the file chooser, the row and the chat bar stay one row at 320 and 360px, the box grows with typed, wrapped and pasted text without scrolling inside, stops at min(10 lines, 40% of the panel) and scrolls from there, holds that cap under reference and image chips, under the draft panel and the EDITING line at 320, 360 and 420px wide, on a 420px-tall panel, never moves the tab bar or scrolls the page, takes Shift+Enter as a newline and Enter as send, returns to one line after a send${queuedChecked ? ' and after a queue' : ''}, and restores a draft at the height it was left`,
   );
 }
 
@@ -5097,14 +5247,14 @@ async function toolRows(panel) {
 }
 
 async function startNewChat(panel) {
-  await panel.locator('.composer button.btn', { hasText: 'New chat' }).click();
+  await clickNewChat(panel);
   await panel.locator('.messages .empty').waitFor({ timeout: 10_000 });
 }
 
 async function sendPrompt(panel, text) {
   await waitForComposer(panel);
   await panel.locator('textarea').fill(text);
-  await panel.locator('.composer button.btn.primary').click();
+  await panel.locator('.composer .cbtn.send').click();
 }
 
 async function resumeFlow() {
@@ -5174,7 +5324,7 @@ async function resumeFlow() {
     const seenB = await recorded(panel);
     if (!seenB.some((t) => /attempt 3 of 3/.test(t))) fail(`b. the retries were not all announced. The line showed: ${JSON.stringify(seenB.filter((t) => /attempt/.test(t)))}`);
     if (await panel.locator('.activity').count()) fail('b. the activity line was still up after the run gave up');
-    if (((await panel.locator('.composer button.btn.primary').textContent()) ?? '').trim() !== 'Send') fail('b. the composer still thinks the chat is running');
+    if (((await panel.locator('.composer .cbtn.send').textContent()) ?? '').trim() !== 'Send') fail('b. the composer still thinks the chat is running');
 
     let rowsB = await toolRows(panel);
     if (rowsB.length !== 1 || !rowsB[0].title.includes('get_page') || rowsB[0].running) fail(`b. the progress row was lost or left running: ${JSON.stringify(rowsB)}`);
@@ -5279,8 +5429,11 @@ async function resumeFlow() {
     // The reopened panel shows a run in progress, not a finished-looking transcript.
     await panel.locator('.activity').waitFor({ timeout: 6_000 }).catch(() => {});
     if (!(await panel.locator('.activity').count())) fail('d. the reopened panel showed no activity line for a run that was still going');
-    if (!(await panel.locator('.composer button.btn.danger', { hasText: 'Stop' }).count())) fail('d. the reopened panel offered no Stop for a run that was still going');
-    if (((await panel.locator('.composer button.btn.primary').textContent()) ?? '').trim() !== 'Queue') fail('d. the reopened panel offered Send, not Queue, for a run that was still going');
+    if (!(await panel.locator('.composer .cbtn.send[data-mode="stop"]').count())) fail('d. the reopened panel offered no Stop for a run that was still going');
+    // One button: Stop with nothing typed, Queue the moment there is something to send.
+    await panel.locator('textarea').fill('still going?');
+    if ((await panel.locator('.composer .cbtn.send').getAttribute('data-mode')) !== 'queue') fail('d. the reopened panel offered Send, not Queue, for a run that was still going');
+    await panel.locator('textarea').fill('');
     // …and it already has what happened while it was closed.
     let rowsD = await toolRows(panel);
     if (JSON.stringify(rowsD.map((r) => r.title.split(' ')[0])) !== JSON.stringify(['get_page', 'find_elements'])) fail(`d. the step that ran while the panel was closed is missing from the transcript: ${JSON.stringify(rowsD)}`);
@@ -5376,6 +5529,16 @@ async function main() {
     }
     if (COMPOSER_HEIGHT) {
       await composerHeightFlow(COMPOSER_HEIGHT_LABEL);
+      return;
+    }
+    if (COMPOSER_SHOT) {
+      await chatProposal('dark', '01-chat-proposal.png');
+      await chatProposal('light', '01-chat-proposal-light.png');
+      await chatRefs();
+      await imagesFlow();
+      await artifactFlow({ capture: true });
+      await editingCapture('dark', '11-editing.png');
+      await modelPickerShot('dark', '12-model-picker.png');
       return;
     }
     if (MODELS_FLOW) {

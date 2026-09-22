@@ -14,6 +14,7 @@ import { IDLE_ACTIVITY, activityFromEvent, allDisconnected, withActivity, withou
 import { putBlobs } from '@/lib/blobs';
 import { archivedChats, isArchived, liveChats, loadItems, pickChatToShow, relativeTime, saveItems, titleFromText, type Chat as ChatRecord } from '@/lib/chats';
 import { ArchiveIcon, ChevronDownIcon, CloseIcon, DashboardIcon, DeleteIcon, EditModIcon, PlusIcon, QueueIcon, RenameIcon, SendIcon, StopIcon, UnarchiveIcon } from './components/icons';
+import { MenuButton } from './components/Menu';
 import { Sheet, SheetRow } from './components/Sheet';
 import { useShell } from './shell';
 import { SEND_LABEL, draftPill, foldToolRows, nextSheet, sendMode, stepsSummary, type ChatSheet, type SheetEvent } from '@/lib/compactshell';
@@ -29,6 +30,9 @@ import { lastModel, modelRowText, reduceItems, repairRowGap, settleInterrupted, 
 import type { AgentEvent, ChatItem, ContentEvent, ElementRef, Mod, ModProposal } from '@/lib/types';
 
 const SAVE_DEBOUNCE_MS = 400;
+
+/** Whether this engine sizes a textarea from its content by itself (Chrome 123+; not every WebKit). */
+const FIELD_SIZING = typeof CSS !== 'undefined' && typeof CSS.supports === 'function' && CSS.supports('field-sizing', 'content');
 
 /**
  * The answer "Keep both" gives to the duplicate question: save a NEW mod, do not ask again.
@@ -1378,13 +1382,15 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
   }, [compact, sheet]);
 
   /**
-   * Grow the compact message box with its text. `field-sizing: content` does this on Chrome; the
-   * Safari versions this ships to do not all have it, and on a phone the box starts at ONE line,
-   * so without this a second sentence would scroll out of sight inside a 44px slot. The cap is in
-   * mobile.css (max-height), and past it the text scrolls inside the box.
+   * Grow the message box with its text where CSS cannot. `field-sizing: content` does this on
+   * Chrome (styles.css); the Safari versions this ships to do not all have it, and the box starts
+   * at ONE line everywhere now, so without this a second sentence would scroll out of sight inside
+   * a one-line slot. The compact shell always sizes by hand (mobile.css pins `field-sizing:
+   * fixed`); the Mac popover does so only when the engine lacks the property. The cap is the
+   * stylesheet's max-height, and past it the text scrolls inside the box.
    */
   useLayoutEffect(() => {
-    if (!compact) return;
+    if (!compact && FIELD_SIZING) return;
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = 'auto';
@@ -1452,7 +1458,10 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
 
   return (
     <div className="chat">
-      {!compact && !unsupported && host && chats.length > 0 && (
+      {/* The chat bar: the switcher, the model, and what you do to this chat. It is on screen
+          whenever there is a page to act on — not only once a chat exists — because the model
+          chip lives here and a chat with no model yet is exactly the one that needs it. */}
+      {!compact && !unsupported && host && (
         <div className="chatbar">
           {renaming !== null ? (
             <input
@@ -1491,6 +1500,23 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
                 </optgroup>
               )}
             </select>
+          )}
+          {/* Which model this chat talks to, and how hard it thinks, as one chip that opens the
+              picker over the transcript. It is in this bar rather than in the composer because the
+              model is a property of the chat, not of the message being typed, and because it is
+              changed rarely: the composer is looked at all the time and is kept to one row. While
+              a rename is in progress the bar is the field and Save, nothing else. */}
+          {renaming === null && providers.ready && (
+            <ModelPicker
+              state={providers.state}
+              signedIn={providers.signedIn}
+              selection={selection}
+              resolved={modelResolved}
+              onSelect={chooseModel}
+              onManage={() => onOpenSettings?.()}
+              thinking={thinking}
+              onThinking={chooseThinking}
+            />
           )}
           {/* Editing a mod is a first-class way to start, so it sits with the chat's own actions
               rather than behind the Mods tab. It is enabled whether or not this chat has anything
@@ -1838,7 +1864,7 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
         retry={activity.retry}
         onStop={abort}
         onRetry={() => void retry()}
-        stopAlways={compact}
+        stopAlways
       />
       {/* The phone's composer: one row. "+" on the left holds everything that is not typing
           (point at an element, attach an image, the model, a new chat), the message box grows
@@ -1930,75 +1956,126 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
           />
         </div>
       )}
+      {/* The panel's and the Mac popover's composer: one row, like the phone's, adapted to a
+          pointer. "+" on the left is a menu of the things you do to a message now and then (point
+          at an element, attach an image, a new chat), the message box starts at one line and grows
+          with its text, and the one button on the right is Send, Queue or Stop by turns (sendMode
+          in lib/compactshell.ts) — Stop stays on the activity line for the whole run, so typing
+          never puts it out of reach. Chips appear above the row only when there are any, and the
+          two things about the model that cannot wait for the picker (a swap that waits for the
+          next turn, a chat with no usable model) are one line above the row, not a row of chrome
+          every chat carries. The model itself is the chip in the chat bar. */}
       {!compact && (
         <div className={`composer${dragging ? ' dragging' : ''}`} onPaste={onPaste} onDrop={onDrop} onDragOver={onDragOver} onDragLeave={() => setDragging(false)}>
+          {providers.ready && !modelResolved.ok ? (
+            <div className="model-note composer-note problem" data-testid="model-note" role="alert">
+              {modelResolved.message}
+            </div>
+          ) : providers.ready && swapWaits ? (
+            <div className="model-note composer-note" data-testid="model-note" role="status">
+              {NEXT_TURN_NOTE}
+            </div>
+          ) : null}
           {(refs.length > 0 || images.length > 0) && (
             <div className="row">
               {refs.map((r) => (
                 <span key={r.token} className="chip ref" title={r.selector}>
                   @{r.token} · {r.label}{' '}
-                  <button className="chip-x" onClick={() => removeRef(r.token)} title="Remove reference">×</button>
+                  <button className="chip-x" onClick={() => removeRef(r.token)} title="Remove reference" aria-label={`Remove the reference @${r.token}`}>×</button>
                 </span>
               ))}
               <PendingStrip images={images} onRemove={removeImage} />
             </div>
           )}
           {attachNote && <div className="attach-note">{attachNote}</div>}
-          <textarea
-            ref={textareaRef}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                void send();
-              }
-            }}
-            placeholder={unsupported ? 'open a web page first' : 'what should this page do differently? paste or drop an image, or point at elements'}
-            disabled={unsupported}
-          />
-          {providers.ready && (
-            <ModelPicker
-              state={providers.state}
-              signedIn={providers.signedIn}
-              selection={selection}
-              resolved={modelResolved}
-              note={swapWaits ? NEXT_TURN_NOTE : undefined}
-              onSelect={chooseModel}
-              onManage={() => onOpenSettings?.()}
-              thinking={thinking}
-              onThinking={chooseThinking}
+          <div className="composer-row">
+            <MenuButton
+              className="cbtn add"
+              testId="composer-add"
+              action="add"
+              label="Add: point at an element, attach an image, or start a new chat"
+              title="Point at an element, attach an image, or start a new chat"
+              menuLabel="Add"
+              icon={<PlusIcon />}
+              disabled={unsupported}
+              items={[
+                {
+                  id: 'point',
+                  label: picking ? 'Click an element on the page…' : 'Point at element',
+                  title: 'Click an element on the page to reference it in your message',
+                  disabled: picking || unsupported || tabId == null,
+                  onSelect: () => void pick(),
+                  testId: 'menu-point',
+                },
+                {
+                  id: 'attach',
+                  label: 'Attach image',
+                  title: `Attach a screenshot or mockup (PNG, JPEG, WebP or GIF; up to ${MAX_IMAGES_PER_MESSAGE}). Pasting or dropping one works too`,
+                  disabled: unsupported || images.length >= MAX_IMAGES_PER_MESSAGE,
+                  onSelect: () => fileRef.current?.click(),
+                  testId: 'menu-attach',
+                },
+                {
+                  id: 'new-chat',
+                  label: 'New chat',
+                  title: 'Start a fresh chat on this site. This one stays in the switcher',
+                  disabled: unsupported || !host || (!chatId && items.length === 0),
+                  onSelect: newChat,
+                  testId: 'menu-new-chat',
+                },
+              ]}
             />
-          )}
-          <div className="row">
-            <button className="btn" onClick={() => void pick()} disabled={picking || unsupported || tabId == null} title="Click an element on the page to reference it in your message">
-              {picking ? 'click an element…' : 'Point at element'}
-            </button>
-            <button
-              className="btn"
-              onClick={() => fileRef.current?.click()}
-              disabled={unsupported || images.length >= MAX_IMAGES_PER_MESSAGE}
-              title={`Attach a screenshot or mockup (PNG, JPEG, WebP or GIF; up to ${MAX_IMAGES_PER_MESSAGE})`}
-            >
-              Attach image
-            </button>
-            <input
-              ref={fileRef}
-              type="file"
-              accept={ACCEPT_ATTR}
-              multiple
-              hidden
-              onChange={(e) => {
-                void attach(Array.from(e.target.files ?? []));
-                // Cleared so picking the same file twice in a row fires onChange the second time.
-                e.target.value = '';
+            <textarea
+              ref={textareaRef}
+              rows={1}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  void send();
+                }
               }}
+              aria-label="Message"
+              placeholder={unsupported ? 'Open a web page first' : picking ? 'Click an element on the page…' : 'What should this page do differently?'}
+              disabled={unsupported}
             />
-            <button className="btn" onClick={newChat} disabled={unsupported || !host || (!chatId && items.length === 0)}>New chat</button>
-            <span className="grow" />
-            {busy && <button className="btn danger" onClick={abort}>Stop</button>}
-            <button className="btn primary" onClick={() => void send()} disabled={(!text.trim() && !images.length) || unsupported || !modelReady} title={modelReady || !providers.ready || modelResolved.ok ? undefined : modelResolved.message}>{busy ? 'Queue' : 'Send'}</button>
+            <button
+              type="button"
+              className={`cbtn send ${mode}`}
+              data-action="send"
+              data-mode={mode}
+              aria-label={SEND_LABEL[mode]}
+              title={
+                mode !== 'stop' && !modelReady && providers.ready && !modelResolved.ok
+                  ? modelResolved.message
+                  : mode === 'stop'
+                    ? 'Stop this run'
+                    : mode === 'queue'
+                      ? 'Queue: it goes to the model between its steps (Enter)'
+                      : 'Send (Enter; Shift+Enter for a new line)'
+              }
+              onClick={() => (mode === 'stop' ? abort() : void send())}
+              disabled={mode === 'stop' ? false : (!text.trim() && !images.length) || unsupported || !modelReady}
+            >
+              {mode === 'stop' ? <StopIcon /> : mode === 'queue' ? <QueueIcon /> : <SendIcon />}
+              {/* The word beside the mark, shown only where the composer is wide enough for it
+                  (the same container-query convention the tab bar uses for its labels). */}
+              <span className="cbtn-label">{mode === 'stop' ? 'Stop' : mode === 'queue' ? 'Queue' : 'Send'}</span>
+            </button>
           </div>
+          <input
+            ref={fileRef}
+            type="file"
+            accept={ACCEPT_ATTR}
+            multiple
+            hidden
+            onChange={(e) => {
+              void attach(Array.from(e.target.files ?? []));
+              // Cleared so picking the same file twice in a row fires onChange the second time.
+              e.target.value = '';
+            }}
+          />
         </div>
       )}
       {/* ---- the compact shell: what the chat puts in the top bar, and its sheets ---- */}
