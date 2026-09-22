@@ -439,6 +439,14 @@ export type ContentRequest =
   | { type: 'wait-cancel'; id: string }
   /** Turn on the wait module's leftover-observer counter. Test flag only; see lib/waitdom.ts. */
   | { type: 'wait-debug' }
+  /**
+   * Open (or drop) a keepalive port back to the background, for as long as a run is driving this
+   * tab. Safari only; see lib/keepalive.ts for the mechanism and lib/keepalive-holder.ts for this
+   * end of it. The background is the only thing that ever sends this, and it sends `hold: false`
+   * when the run ends — the port itself also carries a `release`, so a holder hears about the end
+   * of a run whichever of the two channels is still up.
+   */
+  | { type: 'keepalive'; hold: boolean }
   | { type: 'ping' };
 
 export type ContentEvent = { type: 'picked'; element: PickedElement } | { type: 'pick-cancelled' };

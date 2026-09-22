@@ -198,6 +198,78 @@ several steps to answer ("read the whole page, list all the buttons, then propos
 
 ---
 
+## 3b. Safari: a run that survives the popup being dismissed (iPhone/iPad, then Mac)
+
+**This is the one section nothing else can run.** Whether iOS honours an open `runtime.connect` port
+is a property of WebKit and of the iOS build on the device in front of you — see
+[docs/safari.md](safari.md#keeping-a-run-alive-when-the-popup-goes-away) for the mechanism, its
+sources and its limits. `npm run smoke` proves the *automatic resume* half under Chromium; it cannot
+prove the *keepalive* half at all. Only these steps can.
+
+Build and install the Safari app first (`node scripts/safari-xcode.mjs mac --team …` for the Mac, or
+the iOS scheme onto the device), enable the extension, and set it to **Allow on Every Website**.
+Use a provider and a prompt that take a while — "read the whole page, list every link, then propose
+something" against a large page is ideal, since the whole test is about elapsed time with the popup
+gone.
+
+**On the iPhone or iPad:**
+
+1. Open a big page (Wikipedia's "History of the Internet" is a good one), tap the usermods toolbar
+   item, and send a multi-step prompt. Wait until the first tool row has appeared.
+2. **Dismiss the popup** (tap the page behind it, or swipe the sheet down) and stay on the page.
+   Wait **60 seconds** without touching Safari's toolbar.
+   **Expected:** nothing visible happens — this is the point. The run is going with no UI attached.
+3. Reopen the popup.
+   **Expected (the keepalive worked):** the run is either still going — activity line, **Stop**, the
+   tool rows it produced while you were away — or has finished, with a complete transcript. There is
+   **no** Resume button and **no** "This run was interrupted."
+   **Expected (the keepalive did not hold, which is an acceptable outcome):** the run picked itself
+   up by itself. The transcript reads **"Resumed after Safari paused the extension."** and the run
+   continues or has finished. Still no Resume button, and no new user bubble.
+   **A failure** is: a **Resume** button with "This run was interrupted." on the first dismissal, or
+   the user's prompt appearing twice, or a tool row running a second time.
+   **If it fails:** connect the device to Safari's Web Inspector (Mac Safari → Develop → *device* →
+   the usermods background page) and copy the console; also read `chrome.storage.local` key `runs`.
+4. Repeat step 1–3, but this time wait **five minutes** with the popup dismissed.
+   **Expected:** the same two acceptable outcomes. If it resumed itself, it did so **once** — the
+   note appears once, not repeatedly, and the conversation is not restarted from the top.
+5. Start a run, dismiss the popup, and **navigate the page** (tap a link) while the run is going.
+   **Expected:** the run continues. The keepalive port moves to the new document by itself. Tools
+   that address the page now see the new page, which is expected — what must not happen is the run
+   stopping.
+6. Start a run, and **close the tab** it is working on.
+   **Expected:** the run ends with **"The tab this run was working on was closed, so the run
+   stopped."** No Resume button (there is nothing to resume).
+7. Start a run, dismiss the popup, reopen it and press **Stop**. Dismiss the popup again and wait a
+   minute, then reopen.
+   **Expected:** the run is still stopped. It does **not** resume itself, and there is no "Resumed
+   after Safari paused the extension." note. This is the clause that would be most annoying to get
+   wrong.
+8. Start a run on a page with a strict CSP that blocks content scripts (an `about:blank` tab, or a
+   site you know refuses injection), dismiss the popup for a minute, and reopen.
+   **Expected:** no port could be held, so this may well come back interrupted — and if it does, it
+   should have resumed itself once with the note, or be offering **Resume**. Either is correct; a
+   lost conversation is not.
+9. **Battery sanity:** with **no run going**, leave the popup dismissed and the extension idle for a
+   few minutes on a page. In Web Inspector's console for the background, confirm no keepalive port
+   traffic is happening. Nothing should be pinging when nothing is running.
+
+**On the Mac:**
+
+10. Open the popover from the toolbar, send a multi-step prompt, then **click outside the popover**
+    to close it. Wait a minute, and reopen.
+    **Expected:** exactly as step 3 — the run is going or finished, with no Resume button. The Mac's
+    background is suspended far less aggressively than iOS's, so this is the easy case; if it fails
+    here it will certainly fail on the phone.
+11. Repeat with **Stop** pressed before the popover is closed.
+    **Expected:** stopped, and stopped it stays.
+
+**What to record either way:** which of the two acceptable outcomes you saw at each wait length, on
+which iOS/macOS version. That is the only data anyone has about whether the port mechanism holds on
+a given build, and `docs/safari.md` should be updated with it.
+
+---
+
 ## 4. Chat persistence: panel reload, browser restart, second chat, archive/unarchive
 
 1. With an existing chat with a few messages, close and reopen the side panel (or switch tabs
@@ -668,6 +740,18 @@ build.
 6. Click **Sign out**.
    **Expected:** reverts to "Not signed in to ChatGPT."
    **If it fails:** side panel DevTools.
+7. **What a refused sign-in says.** If any step above fails with a status rather than succeeding —
+   or, to see it deliberately, run through the sign-in from a network or region the vendor does not
+   serve (the owner's case: a plain Hong Kong connection with the split proxy off).
+   **Expected:** the message is never a bare number. It names the step, the status, and whatever the
+   server's own body said, e.g. *"ChatGPT sign-in failed (400): client_version is required"* or
+   *"ChatGPT sign-in failed (403): Attention Required! | Cloudflare"*. A **403** additionally reads
+   *"A 403 here usually means the provider is not serving your region or network rather than a
+   problem with your account. Try a VPN or a different network."* An HTML block page is reduced to
+   its one-line title; no markup, no script text and no wall of HTML appears in the panel.
+   **Also check:** no token, key or code appears anywhere in the message.
+   **If it fails:** copy the message verbatim plus the service worker's Network entry for the failed
+   request (status and response body).
 
 ---
 

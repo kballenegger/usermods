@@ -14,6 +14,7 @@ import { shouldUpdate } from '@/lib/version';
 import { loadMods, modFromProposal, modFromSource, parseHeader, previewFromSource, upsertMod, deleteMod, saveMods } from '@/lib/mods';
 import { appendTurn, archiveChat, bulkChats, countTurns, createChat, deleteChat, getChat, hostFromUrl, isArchived, listChats, loadItems, loadMessages, markTitleRefreshed, renameChat, saveItems, saveMessages, setChatArtifact, setChatModel, setChatThinking, setModelTitle, touchChat } from '@/lib/chats';
 import { loadRuns, markInterrupted, pruneRuns, resumableRuns, saveRuns, type RunMap, type RunRecord } from '@/lib/runstate';
+import { AUTO_RESUMED_TEXT, autoResumable, countAutoResume, holdExpired, KEEPALIVE_MAX_HOLD_MS, KEEPALIVE_PORT, TAB_CLOSED_TEXT } from '@/lib/keepalive';
 import { isTombstoned, withKey } from '@/lib/storagequeue';
 import { collectBlobs } from '@/lib/blobs';
 import { QUOTA_PANEL_NOTE, bytesInUse, quotaWarningNote, shouldWarn } from '@/lib/quota';
@@ -87,6 +88,12 @@ export default defineBackground(() => {
   void applyPanelScope();
   // Any run the previous worker was in the middle of died with it. Say so in storage now, so the
   // panel can offer Resume the moment it asks (see recoverRuns and lib/runstate.ts).
+  //
+  // The Safari flag is primed here so `acquireHold` — which is called synchronously when a run
+  // starts and cannot await — has the real answer by the time any run could begin. recoverRuns
+  // awaits the same promise itself, so its automatic-resume half never reads a flag that has not
+  // landed. On a real Safari build the flag is a compile-time constant and neither ever waits.
+  void loadSafariMode();
   void recoverRuns();
 
   /**
@@ -145,6 +152,60 @@ export default defineBackground(() => {
     return true;
   });
 
+  /**
+   * A page holding this worker awake for a run (lib/keepalive.ts).
+   *
+   * There is nothing to do with the port's traffic: its EXISTENCE is the mechanism, and the ping
+   * coming down it is what Safari counts as the extension being busy. So this listener records the
+   * port against its tab, checks the ceiling, and lets the messages fall on the floor.
+   *
+   * A port whose tab is no longer being held is disconnected on arrival. That happens when a run
+   * ends while a reconnect is in flight, and letting it live would leave a page pinging for a run
+   * that is over.
+   */
+  chrome.runtime.onConnect.addListener((port) => {
+    if (port.name !== KEEPALIVE_PORT) return;
+    const tabId = port.sender?.tab?.id;
+    expireStaleHolds();
+    const held = typeof tabId === 'number' ? tabHolds.get(tabId) : undefined;
+    if (!held) {
+      try {
+        port.disconnect();
+      } catch {
+        /* already gone */
+      }
+      return;
+    }
+    held.port = port;
+    port.onDisconnect.addListener(() => {
+      void chrome.runtime.lastError;
+      if (held.port === port) held.port = null;
+      // The page reconnects by itself (lib/keepalive-holder.ts). A navigation is the common case:
+      // the new document's content script has not loaded yet, so it is asked again once it can
+      // answer, and the run carries on across the page changing under it.
+      if (typeof tabId === 'number' && tabHolds.get(tabId) === held && !held.expired) askTabToHold(tabId, true);
+    });
+  });
+
+  /**
+   * A tab closed under a run.
+   *
+   * Every tool the run has is addressed to that tab, so it cannot go on and there is nothing to
+   * resume — offering a Resume button here would produce a second failure on the first click. The
+   * run is aborted, the record cleared and the transcript told why, in one line.
+   */
+  chrome.tabs.onRemoved.addListener((tabId) => {
+    dropHold(tabId);
+    for (const chatId of sessions.ids()) {
+      if (sessions.get(chatId)?.tabId !== tabId || !sessions.isRunning(chatId)) continue;
+      postAgentEvent(chatId, { type: 'note', text: TAB_CLOSED_TEXT });
+      for (const id of sessions.abort(chatId)) postAgentEvent(chatId, { type: 'unqueued', id });
+      // Stop-like, so it is never picked up by the automatic resume: the tab is gone, and coming
+      // back to it is not something a retry can fix.
+      void markStopped(chatId);
+    }
+  });
+
   chrome.runtime.onConnect.addListener((port) => {
     // A mod's GM shim and the Safari runner both connect too; exec.install() registered their
     // listener, so anything that is not the panel's agent port is not ours to handle here.
@@ -163,6 +224,11 @@ export default defineBackground(() => {
       if (req.type === 'abort') {
         // Only this chat. Stop used to abort whatever the port last started, which meant pressing
         // Stop in the chat you were reading killed a run belonging to a different tab.
+        //
+        // The record is marked stopped BEFORE the abort, not after: it is the whole guard against
+        // Safari suspending the worker in between and the next one resuming what the user just
+        // ended. See markStopped.
+        void markStopped(req.chatId);
         for (const id of sessions.abort(req.chatId)) postAgentEvent(req.chatId, { type: 'unqueued', id });
         return;
       }
@@ -366,6 +432,26 @@ function setRun(chatId: string, patch: Pick<RunRecord, 'state' | 'tabId'> & { er
   });
 }
 
+/**
+ * Mark a run as ended by the user, so the Safari auto-resume leaves it alone.
+ *
+ * Stop clears the record outright on the normal path (the run's own `clearRuns` at the end of
+ * `runChat`), and that is enough on Chrome. It is NOT enough on Safari: between the click and the
+ * run noticing its signal, Safari may suspend the worker, and the next one would find a 'running'
+ * record with nothing behind it, call it interrupted, and start it again — the exact behaviour Stop
+ * exists to prevent. Writing the intent down first makes the decision survive the worker that took
+ * it. The record is still cleared moments later by the normal path; this is only ever read in the
+ * window where it is not.
+ */
+function markStopped(chatId: string): Promise<void> {
+  if (isTombstoned(chatId)) return Promise.resolve();
+  return updateRuns((runs) => {
+    const prev = runs[chatId];
+    if (!prev || prev.stoppedByUser) return runs;
+    return { ...runs, [chatId]: { ...prev, stoppedByUser: true, updatedAt: Date.now() } };
+  });
+}
+
 function clearRuns(ids: string[]): Promise<void> {
   return updateRuns((runs) => {
     if (!ids.some((id) => id in runs)) return runs;
@@ -386,7 +472,47 @@ function recoverRuns(): Promise<void> {
     const chats = await listChats().catch(() => null);
     const existing = chats ? new Set(chats.map((c) => c.id)) : null;
     await updateRuns((runs) => markInterrupted(existing ? pruneRuns(runs, existing) : runs, (id) => sessions.isRunning(id)).runs);
+    await autoResumeInterrupted();
   })().catch((e) => console.warn('[usermods] recoverRuns', e));
+}
+
+/**
+ * Safari's safety net: pick a run back up once, by itself, when Safari paused the extension.
+ *
+ * The keepalive above is a mitigation, not a guarantee — iOS can kill the background under memory
+ * pressure, a page may not be able to hold a port, and nothing survives Safari itself being killed.
+ * When it does happen, the state the user is left in is a Resume button for something they never
+ * stopped, which is what the owner asked to be rid of. So on Safari the run resumes itself, and the
+ * panel says so instead of asking.
+ *
+ * Every guard is in `shouldAutoResume` (lib/keepalive.ts), where it is a pure rule with a test:
+ * Safari only, never over a live session, only 'interrupted' (not 'failed'), never after Stop, and
+ * at most MAX_AUTO_RESUMES times — the count living on the stored record, because the worker that
+ * has to respect the bound is not the worker that spent the attempt.
+ *
+ * Chrome keeps the manual button. Its worker eviction is rare, its keepalive is documented and
+ * works, and silently re-sending a model request there is a behaviour nobody asked for.
+ *
+ * Called from `recoverRuns`, so it runs at every wake the panel or the worker's own startup
+ * produces — and a keepalive port reconnecting is itself a wake.
+ */
+async function autoResumeInterrupted(): Promise<void> {
+  await loadSafariMode();
+  if (!safariMode) return;
+  const runs = await loadRuns().catch(() => ({}) as RunMap);
+  const ids = autoResumable(runs, (id) => sessions.isRunning(id), safariMode);
+  for (const chatId of ids) {
+    // The attempt is spent the moment it is taken, not when it succeeds: a resume that dies the
+    // same way must not be able to take another. Written BEFORE the run starts, so a worker
+    // suspended mid-resume still finds the count incremented.
+    await updateRuns((r) => countAutoResume(r, chatId));
+    // The panel shows this in place of the Resume button, so the user learns what happened rather
+    // than watching a run restart for no stated reason.
+    postAgentEvent(chatId, { type: 'note', text: AUTO_RESUMED_TEXT });
+    // Same path as the button: no turn, so nothing is added to the conversation and the prompt
+    // cannot be sent twice. The guard against double-running a chat is the one the button uses.
+    if (!sessions.isRunning(chatId)) void runChat(chatId, runs[chatId]?.tabId ?? -1, null);
+  }
 }
 
 /** The answer to 'agent.attach': see lib/rpc.ts. */
@@ -440,6 +566,146 @@ function holdWorker(): () => void {
 }
 
 /**
+ * ---------------------------------------------------------------------------
+ * The Safari keepalive: a port held open by the page, for as long as a run needs it
+ * ---------------------------------------------------------------------------
+ *
+ * `holdWorker` above is Chrome's answer and it stays exactly as it was. It does not work on Safari:
+ * `getPlatformInfo` is an API call, not an extension event, and Safari's background is suspended on
+ * the app's lifecycle rather than on an idle timer — on iOS, within seconds of the popup being
+ * dismissed, which is the moment the owner reported a run stalling.
+ *
+ * The mechanism with reported evidence behind it is an open `runtime.connect` port from a content
+ * script, pinged on an interval. The sources, the numbers and the honest limits are all written out
+ * at the top of lib/keepalive.ts rather than repeated here.
+ *
+ * The shape of it:
+ *
+ *   - **the page holds, the background counts.** `acquireHold(tabId)` asks that tab's content
+ *     script to open a keepalive port; the port arriving is what actually keeps this worker up. The
+ *     background never opens anything itself — it cannot; a worker cannot hold itself awake, which
+ *     is the whole problem.
+ *   - **one hold per tab, refcounted by run.** Two chats on one tab share a port. The last run to
+ *     let go is what releases it.
+ *   - **no run, no port.** `holdPlan` in lib/keepalive.ts is the only thing that decides, and with
+ *     no runs it says release everything. That is the battery promise, and it is unit tested.
+ *   - **Safari only.** Gated on the engine rather than on the build flag alone, so a Chrome build
+ *     cannot start pinging and the check is one thing rather than two.
+ *
+ * Every failure has a floor: a page that will not hold a port (CSP, sandbox, a browser-internal
+ * page, a tab that closed) simply does not get one, and the run falls back to the interrupted path
+ * and the automatic resume below — which is the safety net for exactly the case where this fails.
+ */
+interface TabHold {
+  /** How many runs are driving this tab right now. */
+  runs: number;
+  /** When the hold was taken, for KEEPALIVE_MAX_HOLD_MS. */
+  acquiredAt: number;
+  /** The port the page opened, once it has. Null while we are asking, or after a drop. */
+  port: chrome.runtime.Port | null;
+  /** Set once the ceiling has dropped this hold, so it is not re-asked for on every port drop. */
+  expired?: boolean;
+}
+
+const tabHolds = new Map<number, TabHold>();
+
+/**
+ * Whether this build should use the port keepalive at all.
+ *
+ * `SAFARI_BUILD` is the compile-time answer and the one that matters in production. The storage
+ * key is a debug override the browser flow sets to run the Safari behaviour under Chromium, where
+ * the harness can actually kill a service worker over CDP — see lib/exec/engine.ts for the same
+ * pattern applied to the execution engine, and docs/safari.md for why a Safari-only path that only
+ * a phone can exercise is a path nothing tests. Only the extension's own contexts can write to
+ * chrome.storage.local; a web page cannot reach it, so this is not a switch a site can flip.
+ */
+const SAFARI_MODE_KEY = 'debug:safariMode';
+let safariMode = SAFARI_BUILD;
+
+/**
+ * Read once per worker, and awaited by everything that depends on the answer.
+ *
+ * A promise rather than a fire-and-forget assignment, because the automatic resume is decided at
+ * worker START — a recovery that ran before the flag was known would read it as false and offer a
+ * button where it should have carried on. In a real Safari build this resolves without touching
+ * storage at all, since the flag is a compile-time constant there.
+ */
+let safariModeReady: Promise<void> | null = null;
+
+function loadSafariMode(): Promise<void> {
+  safariModeReady ??= (async () => {
+    if (SAFARI_BUILD) return; // already on; nothing to override
+    try {
+      const r = await chrome.storage.local.get(SAFARI_MODE_KEY);
+      safariMode = r[SAFARI_MODE_KEY] === true;
+    } catch {
+      safariMode = false;
+    }
+  })();
+  return safariModeReady;
+}
+
+/** Ask a tab's content script to hold a port, or to let go. Never throws: a tab that cannot, does not. */
+function askTabToHold(tabId: number, hold: boolean): void {
+  void sendToContent(tabId, { type: 'keepalive', hold }).catch(() => {
+    // A page with no content script (CSP, sandbox, chrome://, a tab that just closed) cannot hold
+    // one. Nothing to do: the run carries on, and if Safari suspends the worker it lands on the
+    // interrupted path and is picked up by the automatic resume.
+  });
+}
+
+/** Take (or add to) a tab's hold, asking the page for a port the first time. */
+function acquireHold(tabId: number): void {
+  if (!safariMode || !Number.isInteger(tabId) || tabId < 0) return;
+  const existing = tabHolds.get(tabId);
+  if (existing) {
+    existing.runs += 1;
+    return;
+  }
+  tabHolds.set(tabId, { runs: 1, acquiredAt: Date.now(), port: null });
+  askTabToHold(tabId, true);
+}
+
+/** Let go of one run's share of a tab's hold, dropping the port when the last run ends. */
+function releaseHold(tabId: number): void {
+  const held = tabHolds.get(tabId);
+  if (!held) return;
+  held.runs -= 1;
+  if (held.runs > 0) return;
+  dropHold(tabId);
+}
+
+/** Drop a tab's hold outright: release the page, disconnect the port, forget it. */
+function dropHold(tabId: number): void {
+  const held = tabHolds.get(tabId);
+  if (!held) return;
+  tabHolds.delete(tabId);
+  try {
+    held.port?.disconnect();
+  } catch {
+    /* already gone */
+  }
+  askTabToHold(tabId, false);
+}
+
+/**
+ * The hold's ceiling, checked whenever a port connects or reconnects.
+ *
+ * A run longer than KEEPALIVE_MAX_HOLD_MS stops being held: the port is released and the page told
+ * to stop pinging, whatever the run is doing. The run is NOT killed — if Safari then suspends the
+ * worker under it, the interrupted path and the automatic resume are what pick it up, which is the
+ * same treatment a page that could never hold a port gets.
+ */
+function expireStaleHolds(now: number = Date.now()): void {
+  for (const [tabId, held] of [...tabHolds]) {
+    if (held.expired || !holdExpired(held.acquiredAt, now)) continue;
+    held.expired = true;
+    console.warn(`[usermods] keepalive: tab ${tabId} held for over ${Math.round(KEEPALIVE_MAX_HOLD_MS / 60000)} minutes; letting go`);
+    dropHold(tabId);
+  }
+}
+
+/**
  * One run of one chat. `turn` is the message that starts it, or null to RESUME: continue from the
  * saved conversation without adding anything to it (see AgentInput.turn).
  */
@@ -450,6 +716,13 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
   const signal = session.controller.signal;
   const post = (e: AgentEventBody) => postAgentEvent(chatId, e);
   const release = holdWorker();
+  // Safari's half: ask the page to hold a port open for as long as this run lasts. A no-op on
+  // Chrome, and a no-op for a tab that cannot host a content script. See the keepalive block above.
+  //
+  // Not awaited: the flag is primed at worker start and the hold is a best-effort mitigation, so
+  // making the first token of every run wait on a storage read would be paying a real cost for an
+  // optional one. `releaseHold` below is idempotent for a hold that was never taken.
+  void loadSafariMode().then(() => acquireHold(session.tabId));
   // Written before anything else happens, so there is no moment at which a run exists and storage
   // does not know. It also replaces a 'failed' or 'interrupted' record: whether this is a resume or
   // a new message, that run is no longer the thing to resume.
@@ -653,6 +926,7 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
     await clearRuns([chatId]);
   }
   release();
+  releaseHold(session.tabId);
   session.running = false;
   // Stop clears the queue; otherwise anything still waiting starts the next turn.
   const next = session.queue.shift();

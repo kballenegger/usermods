@@ -36,6 +36,21 @@ export interface RunRecord {
   updatedAt: number;
   /** Why it failed, in the provider's words. Only on 'failed'. */
   error?: string;
+  /**
+   * The run ended because the user pressed Stop.
+   *
+   * Recorded so that the Safari auto-resume (lib/keepalive.ts) can tell "Safari took this away"
+   * from "the user ended it". It has to be on the STORED record rather than in worker memory,
+   * because the decision is made by a worker that was not there when Stop was pressed.
+   */
+  stoppedByUser?: boolean;
+  /**
+   * How many times this run has picked itself up automatically. See MAX_AUTO_RESUMES.
+   *
+   * Bounded and written down for the same reason: a worker that has just started has no other way
+   * to know it is about to do this for the second time.
+   */
+  autoResumes?: number;
 }
 
 export type RunMap = Record<string, RunRecord>;
@@ -44,6 +59,14 @@ export type RunMap = Record<string, RunRecord>;
 export interface ResumableRun {
   state: 'failed' | 'interrupted';
   error?: string;
+  /**
+   * This run has already picked itself up automatically at least once (Safari; lib/keepalive.ts).
+   *
+   * The panel uses it for the one thing the user sees differently: a run that came back by itself
+   * says so, and a run that came back and then stopped AGAIN gets the ordinary Resume button, since
+   * its one automatic attempt is spent.
+   */
+  autoResumed?: boolean;
 }
 
 /** What the panel shows when a run died with its worker. */
@@ -88,7 +111,7 @@ export function resumableRuns(runs: RunMap): Record<string, ResumableRun> {
   const out: Record<string, ResumableRun> = {};
   for (const [id, rec] of Object.entries(runs)) {
     if (rec.state === 'running') continue;
-    out[id] = { state: rec.state, ...(rec.error ? { error: rec.error } : {}) };
+    out[id] = { state: rec.state, ...(rec.error ? { error: rec.error } : {}), ...(rec.autoResumes ? { autoResumed: true } : {}) };
   }
   return out;
 }
@@ -106,6 +129,13 @@ export function parseRuns(raw: unknown): RunMap {
       startedAt: typeof r.startedAt === 'number' ? r.startedAt : 0,
       updatedAt: typeof r.updatedAt === 'number' ? r.updatedAt : 0,
       ...(typeof r.error === 'string' && r.error ? { error: r.error } : {}),
+      ...(r.stoppedByUser === true ? { stoppedByUser: true } : {}),
+      // A count that is not a whole number is a count nothing wrote: it reads as none, which is the
+      // safe direction — the bound is then checked against a real number rather than against NaN,
+      // which would make every comparison false and let a run resume itself forever.
+      ...(typeof r.autoResumes === 'number' && Number.isFinite(r.autoResumes) && r.autoResumes > 0
+        ? { autoResumes: Math.floor(r.autoResumes) }
+        : {}),
     };
   }
   return out;
