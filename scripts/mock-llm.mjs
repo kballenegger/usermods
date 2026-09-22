@@ -156,6 +156,17 @@ export const RESUME = {
   outage: { prompt: 'survive a long outage RESUMEPROMPT-b2', first: 'RESUMEFIRST-b2 Reading the page.', done: 'RESUMEDONE-b2' },
   kill: { prompt: 'survive a dead worker RESUMEPROMPT-c3', first: 'RESUMEFIRST-c3 Reading the page.', done: 'RESUMEDONE-c3' },
   close: { prompt: 'survive a closed panel RESUMEPROMPT-d4', first: 'RESUMEFIRST-d4 Reading the page.', done: 'RESUMEDONE-d4' },
+  /**
+   * Safari mode: the worker is killed the same way `kill` kills it, but the extension is behaving
+   * as the Safari build does — so the run must pick ITSELF up and finish, with a note and no Resume
+   * button. See the auto-resume half of lib/keepalive.ts.
+   */
+  auto: { prompt: 'survive a paused extension RESUMEPROMPT-e5', first: 'RESUMEFIRST-e5 Reading the page.', done: 'RESUMEDONE-e5' },
+  /**
+   * The same setup, but Stop is pressed before the worker dies. Stop must still mean stop: no
+   * automatic resume, and nothing new reaching the backend.
+   */
+  stop: { prompt: 'stop before the pause RESUMEPROMPT-f6', first: 'RESUMEFIRST-f6 Reading the page.', done: 'RESUMEDONE-f6' },
 };
 
 /**
@@ -165,7 +176,7 @@ export const RESUME = {
  * closed under it, so that step's text, tool call and result all happen with no panel attached) and
  * its third step for longer (the panel is reopened under it, and must show a run in progress).
  */
-export const RESUME_HOLDS = { kill: [0, 4000, 0], close: [0, 2000, 7000] };
+export const RESUME_HOLDS = { kill: [0, 4000, 0], close: [0, 2000, 7000], auto: [0, 4000, 0], stop: [0, 6000, 0] };
 
 /** Three steps: read the page, look at the heading, report. `holds[i]` delays step i's first byte. */
 function resumeScript(name, r, holds = [0, 0, 0]) {
@@ -244,6 +255,8 @@ const SCRIPTS = [
   resumeScript('resume-outage', RESUME.outage),
   resumeScript('resume-kill', RESUME.kill, RESUME_HOLDS.kill),
   resumeScript('resume-close', RESUME.close, RESUME_HOLDS.close),
+  resumeScript('resume-auto', RESUME.auto, RESUME_HOLDS.auto),
+  resumeScript('resume-stop', RESUME.stop, RESUME_HOLDS.stop),
   {
     name: 'wikipedia-reader',
     match: /hide the sidebar and make the article full width/i,

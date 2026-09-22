@@ -133,6 +133,118 @@ Page-world code lives where the page can read the script text it came from, so a
 is a token the page has. Chrome's MAIN world has no GM messaging either, so this is the existing
 contract enforced, not a Safari-only restriction.
 
+## Keeping a run alive when the popup goes away
+
+On iPhone and iPad the popup **is** the extension, and dismissing it is the normal way to get back
+to the page you were changing. Until this change, doing that mid-run stalled the run: Safari
+suspends the background shortly after the popup goes, the agent loop died with it, and the next time
+you opened the popup `lib/runstate.ts` found a run recorded as in flight with nothing behind it,
+marked it interrupted, and offered you a **Resume** button for something you never stopped.
+
+The owner's expectation is the obvious one: dismissing the popup must not interrupt a run. Two
+mechanisms answer it, and they answer different halves of the problem.
+
+### 1. A port held open by the page
+
+Chrome's keepalive is a trivial extension API called on a timer (`holdWorker` in
+`entrypoints/background.ts`), which is what Chrome's own migration guide prescribes. It does nothing
+on Safari: `runtime.getPlatformInfo` is an API *call*, not an extension *event*, and Safari's
+suspension is driven by the app lifecycle rather than by an idle timer.
+
+There is no Apple documentation for what does work. Apple's Safari web-extension docs and the WWDC
+sessions describe the background as non-persistent and stop there. So the mechanism here rests on
+developer reports on Apple's own forums, cited in `lib/keepalive.ts` beside the code:
+
+- [**Safari Extension Stops on iOS 17.5.1 – 18**](https://developer.apple.com/forums/thread/764594)
+  is the one that names something that measurably helps: a `runtime.connect({ name })` port,
+  reconnected when it drops and pinged on a ~9-second interval, took the background's life from
+  about a minute to about a day on iOS 17.5.1, and roughly a day on 17.6.1 and 18. The same thread
+  reports that reinjecting scripts, `scripting.updateContentScripts` and reconnecting on a null
+  `sendMessage` reply all failed.
+- [**Safari Extension Service Worker Permanently Killed on iOS 17.4.x–17.6**](https://developer.apple.com/forums/thread/758346)
+  is the background: killed 30–45 seconds in and, once dead, not woken by `webNavigation` or by a
+  content script's `sendMessage`. Apple marked it fixed twice; developers report it unfixed as late
+  as iOS 18.6.2. The only workaround discussed there is reverting to MV2's `background.scripts`,
+  which is not open to an MV3 extension with a service-worker background.
+- [**Safari iOS extension issues. Background script stops working**](https://developer.apple.com/forums/thread/757926)
+  is the related iOS 17.4.1 regression where rapid `sendMessage` calls wedged the background, which
+  an Apple engineer says 17.6.1 fixed. Useful mainly as evidence that message traffic on its own is
+  not a lifeline — the fix was a fix, not a keepalive.
+
+So: while a run is in flight for tab *T*, the background asks *T*'s content script
+(`entrypoints/content.ts`, which is on every page already) to open a port named
+`usermods-keepalive` and ping it every 9 seconds. The port's **existence** is the mechanism; nothing
+reads its traffic. When the run ends, the background releases it and the page stops.
+
+What the design is careful about:
+
+| Case | What happens |
+|---|---|
+| the tab navigates mid-run | the port drops with the old document; the background asks the new document's content script as soon as it can answer, and the run carries on |
+| the port drops for any other reason | the page reconnects itself, 500 ms then doubling to an 8 s ceiling, and never gives up — reaching for a suspended background is the only thing that can wake one |
+| the page's CSP or sandbox blocks the content script | nothing answers, no port is held, and the run falls back to the interrupted path — which is what §2 below is for |
+| the tab is closed | the run ends with *"The tab this run was working on was closed, so the run stopped."* There is nothing to resume: every tool the run has is addressed to that tab |
+| no run is in flight | **nothing is open and nothing is pinged.** `holdPlan` in `lib/keepalive.ts` is the only thing that decides, and with no runs it releases everything. This is the battery promise, and `test/keepalive.test.ts` asserts it |
+| a run outlives its own limits | the hold is dropped after 20 minutes (`KEEPALIVE_MAX_HOLD_MS`), well past anything the agent loop can produce, so a pathological run cannot pin the background awake forever |
+
+Chrome's behaviour is completely unchanged: it keeps its timer, and the port path is gated on the
+Safari engine.
+
+### 2. Automatic resume, as the safety net
+
+The port is a mitigation, not a guarantee, and this page would rather say so than imply otherwise:
+
+- **iOS can still kill the background under memory pressure**, and the numbers in the forum reports
+  are "about a day", not "indefinitely".
+- **Nothing survives Safari itself being killed**, or the device rebooting.
+- **A page that cannot host a content script cannot hold a port.**
+- **Nobody outside Apple can say whether a given iOS build honours it at all.** See
+  [what only a device can prove](#what-only-a-device-can-prove).
+
+So when Safari pauses the extension anyway, the run picks itself back up. On the next wake — worker
+startup, the popup attaching, or a keepalive port reconnecting — a run recorded as `interrupted`
+with no live session behind it resumes **once**, automatically, and the transcript says
+*"Resumed after Safari paused the extension."* instead of showing a button.
+
+Every guard is a pure rule in `lib/keepalive.ts` with a test beside it:
+
+- **Safari only.** Chrome's worker eviction is rare, its keepalive works, and silently re-sending a
+  model request there is a change nobody asked for. Chrome keeps the manual **Resume** button.
+- **Never over a live session.** Running the same conversation twice against one chat is the single
+  thing this must never do.
+- **Only `interrupted`, never `failed`.** A `failed` run got an answer from the provider and it was
+  a bad one — no key, a 400, out of retries. Sending the same thing again fails the same way.
+- **Never after Stop.** The intent is written to the run record *before* the abort, so it survives
+  the worker that took it; otherwise Safari could suspend the worker between the click and the run
+  noticing, and the next worker would restart what you just ended.
+- **Once.** The count lives on the stored record, because the worker that has to respect the bound
+  is not the worker that spent the attempt. A second failure gets the ordinary Resume button.
+
+Resuming uses the same path the button uses: no turn travels with it, so nothing is added to the
+conversation and the prompt cannot be sent twice.
+
+### What only a device can prove
+
+**Whether iOS actually honours an open port.** That is a property of WebKit and of the iOS build in
+front of you, and nothing on a Mac reproduces it. The forum reports are evidence, not a spec, and
+Apple has marked this area fixed twice while developers kept reporting it broken.
+
+What *is* proved automatically, in `npm run smoke` (the resume flow, sub-flows **e** and **f**): with
+the Safari behaviour switched on, a worker killed mid-run over CDP produces a run that resumes itself
+exactly once with the note and no Resume button, continues from the checkpoint rather than re-running
+anything, and — with Stop pressed first — is not picked up at all. That is the auto-resume half in
+full. It is reached under Chromium through `debug:safariMode`, a `chrome.storage.local` key only the
+extension's own contexts can write; a web page cannot reach it. A real `__SAFARI_BUILD__` bundle
+could not be driven there, because Playwright loads a Chromium extension and only Chromium's CDP can
+stop a service worker on demand.
+
+The state machine itself — acquire and release per run, one port per tab, the reconnect backoff, the
+ceiling, and "no port without a run" — is unit tested in `test/keepalive.test.ts` against injected
+fakes, with no browser involved.
+
+The manual steps for the part only an iPhone can answer are in
+[docs/qa-checklist.md](qa-checklist.md), section 3b.
+
 ## Limitations
 
 These are real and none of them have a workaround in this build.

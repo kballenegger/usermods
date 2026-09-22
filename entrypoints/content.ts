@@ -1,3 +1,4 @@
+import { createHolder } from '@/lib/keepalive-holder';
 import { computedStyles, describeElements, selectorFor, snapshot } from '@/lib/snapshot';
 import { waitForDom } from '@/lib/waitdom';
 import type { ContentEvent, ContentRequest } from '@/lib/types';
@@ -7,6 +8,19 @@ export default defineContentScript({
   runAt: 'document_idle',
   main() {
     let picking: null | (() => void) = null;
+
+    /**
+     * The Safari keepalive's hold on the background, for as long as a run is driving THIS tab.
+     *
+     * Built here and idle until the background asks. Nothing about it is Safari-specific in this
+     * file — the background is what decides whether to ask at all, because it is the side that
+     * knows which engine it is and which runs are in flight — so a Chrome build ships this object,
+     * never receives a 'keepalive' message, and opens nothing. See lib/keepalive.ts.
+     *
+     * A navigation takes this document and its holder with it; the background notices the port drop
+     * and asks the NEW document's content script, so a run survives the page changing under it.
+     */
+    const holder = createHolder();
 
     /**
      * Waits currently running in this page, by id.
@@ -22,6 +36,14 @@ export default defineContentScript({
       switch (msg.type) {
         case 'ping':
           sendResponse({ ok: true });
+          return;
+        case 'keepalive':
+          // The answer is what tells the background this tab CAN hold a port: a page whose CSP or
+          // sandbox kept the content script out never answers at all, and the background falls back
+          // to the ordinary interrupted/Resume path for that run. See lib/keepalive.ts.
+          if (msg.hold) holder.start();
+          else holder.stop();
+          sendResponse({ ok: true, holding: holder.connected });
           return;
         case 'wait': {
           const { promise, cancel } = waitForDom(msg.condition, msg.timeoutMs);

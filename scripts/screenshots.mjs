@@ -5607,6 +5607,68 @@ async function resumeFlow() {
     assertContinued(fail, 'd. the final request', reqD[reqD.length - 1], D.prompt, ['get_page', 'find_elements']);
     console.log('resume: d OK — panel closed mid-run: the run carried on, the reopened panel showed it running, transcript complete');
 
+    // ----- e/f. Safari mode: the run picks itself up, and Stop still stops.
+    //
+    // Only a real iPhone can prove that iOS honours an open keepalive port (docs/safari.md says so
+    // plainly, and docs/qa-checklist.md has the steps). What CAN be proved here is the other half:
+    // that when the background is taken away anyway, a run the user did not stop resumes itself
+    // exactly once with a note and no button — and that Stop is still Stop.
+    //
+    // The Safari behaviour is reached under Chromium through `debug:safariMode`, a
+    // chrome.storage.local key only the extension's own contexts can write (the same mechanism
+    // `debug:retryPolicy` above uses, and for the same reason: a web page cannot reach it). A real
+    // __SAFARI_BUILD__ bundle could not be driven here at all, because Playwright loads a Chromium
+    // extension and only Chromium's CDP can stop a service worker on demand.
+    const SAFARI_MODE = { 'debug:safariMode': true, ...FAST_RETRY };
+
+    // ----- e. The worker dies mid-run, in Safari mode. The run comes back by itself.
+    const E = RESUME_CONV.auto;
+    await panel.close();
+    panel = await openPanel(b.ctx, b.extId, { storage: SAFARI_MODE });
+    await site.bringToFront();
+    await startNewChat(panel);
+    await sendPrompt(panel, E.prompt);
+    await waitForRequests('resume-auto', 2);
+    await panel.waitForTimeout(300);
+    if (!(await stopServiceWorker(b.ctx, panel))) {
+      console.log('resume: e SKIPPED — this Chromium would not stop the extension service worker over CDP');
+    } else {
+      // It finishes. Nobody pressed anything.
+      await panel.locator('.messages .msg.assistant', { hasText: E.done }).waitFor({ timeout: 60_000 });
+      if (await panel.locator('[data-testid="resume"]').count()) fail('e. a Resume button was offered for a run that resumed itself');
+      // Case-insensitively: a note row is uppercased by the panel's own CSS, so the DOM text is
+      // not the string lib/keepalive.ts holds. What is being asserted is that the sentence is
+      // there, not how the stylesheet renders it.
+      const textE = await transcriptText(panel);
+      if (!/resumed after safari paused the extension/i.test(textE)) fail(`e. the note was missing from the transcript: ${JSON.stringify(textE.slice(0, 400))}`);
+      if ((await panel.locator('.messages .msg.user').count()) !== 1) fail('e. the automatic resume added a user bubble');
+      const rowsE = await toolRows(panel);
+      if (JSON.stringify(rowsE.map((r) => r.title.split(' ')[0])) !== JSON.stringify(['get_page', 'find_elements'])) fail(`e. the tool rows were ${JSON.stringify(rowsE)}`);
+      // And it continued rather than re-ran: the prompt travelled once, the earlier tool result came with it.
+      const reqE = await requestsFor('resume-auto');
+      assertContinued(fail, 'e. the resumed request', reqE[reqE.length - 1], E.prompt, ['get_page', 'find_elements']);
+      console.log('resume: e OK — Safari mode: the worker was killed mid-run and the run resumed itself once, with a note and no Resume button');
+
+      // ----- f. Stop, then the worker dies. Stop still means stop.
+      const F = RESUME_CONV.stop;
+      await startNewChat(panel);
+      await sendPrompt(panel, F.prompt);
+      await waitForRequests('resume-stop', 2);
+      await panel.waitForTimeout(300);
+      await panel.locator('.composer .cbtn.send[data-mode="stop"]').click();
+      await panel.waitForTimeout(500);
+      const beforeF = (await requestsFor('resume-stop')).length;
+      // Take the worker away right after Stop: this is the window the stopped-by-user flag exists
+      // for, where a worker that never saw the click would otherwise call the run interrupted.
+      await stopServiceWorker(b.ctx, panel);
+      await panel.waitForTimeout(4000);
+      if ((await requestsFor('resume-stop')).length !== beforeF) fail('f. a stopped run resumed itself after the worker was killed');
+      const textF = await transcriptText(panel);
+      if (/resumed after safari paused the extension/i.test(textF)) fail('f. a stopped run claimed it had been resumed');
+      if (textF.includes(F.done)) fail('f. a stopped run reached its last step');
+      console.log('resume: f OK — Safari mode: Stop still stops, and a stopped run is not picked up automatically');
+    }
+
     await assertNoViolations('resume');
     console.log('resume: OK');
   } finally {

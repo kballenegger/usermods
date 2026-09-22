@@ -6,6 +6,80 @@ All notable changes to usermods are recorded here. The format follows
 
 ## [Unreleased]
 
+### Safari: dismissing the popup no longer interrupts a run
+
+From the owner: on iPhone and iPad the popup *is* the extension, and dismissing it is the normal way
+to get back to the page you are changing — but doing it mid-run stalled the run. Safari suspends the
+background shortly after the popup goes, and the next time you opened it the run was marked
+interrupted and you were shown a **Resume** button for something you never stopped.
+
+- **A keepalive that does not depend on the popup.** While a run is in flight for a tab, the
+  background asks that tab's content script to open a named `runtime.connect` port and ping it every
+  9 seconds; the port's existence is what holds the background up. This is the only mechanism with
+  reported evidence behind it — Chrome's documented `getPlatformInfo`-on-a-timer trick is not
+  honoured by Safari, because it is an API call and not an extension event. The sources (Apple
+  Developer Forums threads [764594](https://developer.apple.com/forums/thread/764594),
+  [758346](https://developer.apple.com/forums/thread/758346) and
+  [757926](https://developer.apple.com/forums/thread/757926)) are cited in `lib/keepalive.ts` beside
+  the code, with the numbers they report.
+  - A tab that **navigates** mid-run keeps its run: the port drops with the old document and the new
+    document's content script is asked as soon as it can answer. A port that drops for any other
+    reason is reconnected by the page itself, 500 ms doubling to an 8 s ceiling, and never gives up.
+  - A page whose **CSP or sandbox** blocks the content script holds no port, and that run falls back
+    to the interrupted path exactly as before.
+  - A tab **closed** under a run ends it with *"The tab this run was working on was closed, so the
+    run stopped."* — there is nothing to resume, since every tool the run has is addressed to that
+    tab.
+  - **With no run in flight, nothing is open and nothing is pinged**, which is the battery promise
+    and is asserted in `test/keepalive.test.ts`. A run that outlives its own limits drops its hold
+    after 20 minutes rather than pinning the background awake forever.
+  - **Chrome is unchanged**, including a byte-identical `manifest.json`: it keeps its timer, the port
+    path is gated on the Safari engine, and no new manifest entry was needed on either target.
+- **Automatic resume, on Safari only, as the safety net.** The port is a mitigation and not a
+  guarantee — iOS can still kill the background under memory pressure, and nothing survives Safari
+  being killed. So when Safari pauses the extension anyway, a run recorded as interrupted with no
+  live session behind it now resumes itself **once**, on the next wake, and the transcript says
+  **"Resumed after Safari paused the extension."** instead of showing a button. It never resumes a
+  run the user **Stopped** (the intent is written to the run record before the abort, so it survives
+  the worker that took it), never one that **failed** with an answer from the provider, never one
+  that is already running, and never more than once — the count lives on the stored record, because
+  the worker that has to respect the bound is not the worker that spent the attempt. A second
+  failure gets the ordinary Resume button. Chrome keeps manual Resume.
+- **Tested.** The state machine — acquire and release per run, one port per tab, the reconnect
+  backoff, the ceiling, "no port without a run" — and every clause of the auto-resume rule are unit
+  tested against injected fakes, with no browser. `npm run smoke`'s resume flow gained two sub-flows
+  that kill the service worker over CDP with the Safari behaviour switched on, and prove the run
+  resumes itself once with the note and no Resume button, continues from the checkpoint rather than
+  re-running anything, and is not picked up at all when Stop was pressed first.
+- **What only a device can prove**, stated plainly in [docs/safari.md](docs/safari.md): whether iOS
+  actually honours an open port. That is a property of WebKit and of the iOS build in front of you,
+  the forum reports are evidence rather than a spec, and Apple has marked this area fixed twice while
+  developers kept reporting it broken. The manual steps are section 3b of
+  [docs/qa-checklist.md](docs/qa-checklist.md).
+
+### Sign-in errors say what the server said
+
+A refused sign-in showed a bare status — "ChatGPT device-code request failed: 403" — while the body
+of that 403 said exactly what had happened. The model-listing path has read the body for a while;
+every sign-in step now does the same.
+
+- **Every device-code step** — both vendors' usercode and token requests, the ChatGPT code exchange,
+  and both token refreshes — reports the step, the status and the server's own message:
+  *"ChatGPT sign-in failed (400): client_version is required"*. Every common shape is read: OAuth's
+  `error_description`, OpenAI's and xAI's `{error:{message}}`, a bare `message` or `detail`, and
+  plain text. An **HTML block page** (Cloudflare, a regional refusal) is reduced to its title
+  sentence rather than discarded or poured into the panel, since for a sign-in that title is the most
+  useful thing on screen. Capped at 300 characters, with anything shaped like a token, key or
+  authorization code redacted before it is shown.
+- **A 403 says what it usually means.** The owner hit one from Hong Kong and read it as a broken
+  sign-in; it was the vendor's edge refusing the region. A 403 now adds *"A 403 here usually means
+  the provider is not serving your region or network rather than a problem with your account. Try a
+  VPN or a different network."* — hedged, because the code genuinely cannot tell a regional block
+  from a blocked network. It rides on 403 alone, and ChatGPT's device-auth poll, where a 403 means
+  "not approved yet", returns before it can ever be reached.
+- The existing Safari **host-permission** classification is untouched: a request that never left the
+  browser still names the host to allow and where to allow it.
+
 ### The side panel and the Mac popup: a one-row composer
 
 From the owner, with a picture of the panel at 420px: "this UI is getting unwieldy. Clean it up,
