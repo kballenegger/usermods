@@ -502,6 +502,44 @@ panel at 13px/1.6 with no colour, border or decoration. A user message is an out
 right; a queued one is the same block as a dashed outline with no fill. Tool rows are a rail, a dot
 and a mono name.
 
+### Markdown text (assistant prose)
+Models write markdown whether or not they were asked to, so an assistant row renders it rather than
+showing its punctuation. `entrypoints/sidepanel/Markdown.tsx` is the one renderer and
+`markdown.css` the one stylesheet; the side panel and the dashboard's transcript preview both use
+them, so a reply reads the same live and stored. **User bubbles stay plain text** — someone typing
+`*` means an asterisk — and so do model-written chat titles and tool summaries.
+
+Three rules decide what the pattern looks like, and all three come from the same place: *this is a
+reading column 320px wide, inside an interface that already has a voice.*
+
+1. **Nothing out-shouts the interface.** A heading in a reply is 14px at the top of its scale, under
+   the panel's own 15px `--fs-title`; below the third level, size stops moving and tone carries the
+   hierarchy. Bold is `--fw-label`, the system's single boldness budget — a heavier weight would make
+   every bolded phrase read as a heading.
+2. **No new colour.** Emphasis is weight, code is `--surface-well` in the mono face, a table is
+   `--border-hair` lines, a blockquote is the same 2px `--border-strong` rail a tool row uses. Links
+   are `--primary-text`, hovering to `--accent-text`, exactly as the dashboard footer does. Adding a
+   colour here would mean adding a row to `test/contrast.test.ts`; the pattern is covered by the
+   `--text-1` and `--text-2` reading pairings already asserted at 7:1.
+3. **Anything wider than the column scrolls inside itself.** A code block and a table each get their
+   own scroller with a permanently drawn 8px bar, because Chrome's overlay scrollbar is invisible
+   until hovered and a clipped line of code otherwise reads as *truncated* rather than *scrollable*.
+   Code does not wrap: a wrapped line of JavaScript loses the indentation that says what is inside
+   what, and this is code the reader is about to run.
+
+A fenced block is a component, not a `<pre>`: a bar naming the language and a **Copy** button that
+becomes **Copied** for 1.4s. It earns its place because the model routinely shows a snippet before
+proposing it, and the alternative is selecting text inside a transcript that is still growing.
+
+Two behaviours are not visual but belong to the pattern. **Streaming**: text arrives in deltas, so
+a reply passes through states with an unterminated `**` or an open ```` ``` ````. Those are closed
+before parsing while a row is still streaming (`lib/markdown.ts`), so a snippet is a code block from
+its first character instead of rendering as a paragraph and then reflowing into a `<pre>` under the
+reader. **Safety**: the text is written by a model, which is untrusted input — HTML is stripped from
+the source (fences and code spans exempted, because that is the model naming an element), links are
+scheme-checked against an allowlist and open in a new tab, and markdown images become *links* rather
+than `<img>` elements, since a model-chosen image URL that the panel fetches is a tracking pixel.
+
 ### The draft panel
 The chat's one draft mod, pinned between the transcript and the composer. Like the activity line it
 is `flex: none` in the chat column, never a row inside `.messages`, so it can appear mid-run without

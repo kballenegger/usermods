@@ -202,8 +202,16 @@ const PAIRS: Pair[] = [
   // AA's 4.5:1 — except the faintest step, which is metadata rather than prose and is held at AA.
   // A muted palette that made body copy harder to read than the bold one would have failed at its
   // only real job, and this is where that would show up.
-  { what: 'text-1 (primary copy, assistant prose)', fg: '--text-1', on: everywhere, min: 7 },
-  { what: 'text-2 (descriptions, help, notice bodies)', fg: '--text-2', on: everywhere, min: 7 },
+  // Rendering assistant prose as MARKDOWN (entrypoints/sidepanel/markdown.css) added no colour of
+  // its own — that was a design constraint, not a coincidence. Every pairing the markdown pattern
+  // introduces is already one of these: bold, headings and code are --text-1 (code on
+  // --surface-well, which `everywhere` covers); blockquotes, strikethrough, table cells and the
+  // language label are --text-2 on the same three surfaces; the neutralised-link span is --text-2
+  // as well; links are --primary-text and --accent-text, asserted under "Role text" below. So the
+  // markdown pattern is covered by the rows already here, and adding a colour to it would mean
+  // adding a row.
+  { what: 'text-1 (primary copy, assistant prose, markdown bold/headings/code)', fg: '--text-1', on: everywhere, min: 7 },
+  { what: 'text-2 (descriptions, help, notice bodies, markdown quotes/tables/inert links)', fg: '--text-2', on: everywhere, min: 7 },
   {
     // The faintest step: placeholders, list markers, meta. Never long-form prose, so AA is the
     // right bar for it. It is checked on the page as well as the panels, which option A could not

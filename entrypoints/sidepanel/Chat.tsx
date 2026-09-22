@@ -4,6 +4,7 @@ import { Activity } from './Activity';
 import { openDashboard } from './App';
 import { ArtifactPanel } from './ArtifactPanel';
 import { Lightbox, PendingStrip, SentImages, type PendingImage } from './Attachments';
+import { Markdown } from './Markdown';
 import { ModelPicker, NEXT_TURN_NOTE } from './ModelPicker';
 import { useConnections } from './useConnections';
 import { carriesFiles, fileFromDataUrlText, filesFromTransfer, processImageFile } from './images';
@@ -1625,7 +1626,12 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
                 </div>
               );
             case 'assistant':
-              return <div key={i} className="msg assistant">{it.text}</div>;
+              // Markdown, not plain text: every model writes it whether or not it was asked to, so
+              // rendering verbatim showed `**bold**` with its asterisks. `streaming` is true only
+              // for the row still being written into — the last one, while this chat is busy — so
+              // an unterminated ** or ``` renders as what it is about to become instead of
+              // flickering between a paragraph and a code block on every delta. See Markdown.tsx.
+              return <div key={i} className="msg assistant"><Markdown text={it.text} streaming={busy && i === items.length - 1} /></div>;
             case 'note':
               return <div key={i} className="label" style={{ textAlign: 'center' }}>{it.text}</div>;
             case 'model': {

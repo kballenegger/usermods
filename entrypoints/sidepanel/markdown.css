@@ -1,0 +1,446 @@
+/*
+ * Assistant prose as a document.
+ *
+ * Every rule here is scoped under `.md`, the wrapper entrypoints/sidepanel/Markdown.tsx paints, so
+ * this file can only affect model-written text. It is imported from styles.css, which the side
+ * panel and the dashboard both load, so a reply reads the same in the transcript and in a stored
+ * chat's preview.
+ *
+ * The governing constraint is that this is a READING surface inside a 320px column, so the design
+ * decisions run the opposite way to a web page's:
+ *
+ *   - Nothing here is bigger than the panel's own title (--fs-title, 15px). A model that opens with
+ *     `# Done` gets a heading at 14px, not a banner. Markdown.tsx demotes the tags; this sets the
+ *     sizes, and the two agree that a reply is a paragraph of a page, never the page.
+ *   - Vertical rhythm matches `.msg.assistant`'s 1.6 line-height, and block spacing is one --sp-2.
+ *     A single-paragraph reply — which is most of them — must occupy exactly the space it did when
+ *     it was plain text, or every row in the transcript shifts.
+ *   - Colour is carried by the surface ramp and the border tokens. There is no new colour in this
+ *     file: emphasis is weight, code is the well, and a table is lines.
+ */
+
+/*
+ * The block container. `:where` keeps the whole file at zero specificity above the class itself, so
+ * an element rule here never beats a component rule in styles.css.
+ *
+ * `white-space: normal` is the load-bearing declaration. The rows this sits inside are `pre-wrap`
+ * — that is how plain text kept its newlines — and under markdown that would double every blank
+ * line, because the parser has already turned the newlines into paragraphs. Code blocks set `pre`
+ * back on themselves, which is the only place it is still wanted.
+ */
+.md {
+  white-space: normal;
+  /* The wrapper adds no box of its own: the row's padding and colour are already right, and the
+     prose starts exactly where the plain text used to. */
+  display: flow-root;
+}
+
+/* A paragraph carries the row's own metrics; only its margin is this file's business. */
+.md :where(p) {
+  margin: 0 0 var(--sp-2);
+  line-height: 1.6;
+}
+
+/* The last block never adds trailing space — the transcript's --stack-gap is what separates rows,
+   and a bottom margin here would make an assistant row sit lower than a user one. */
+.md > :where(:last-child),
+.md :where(li) > :where(:last-child) {
+  margin-bottom: 0;
+}
+
+/* ---------------------------------------------------------------------------
+ * Emphasis
+ * ------------------------------------------------------------------------ */
+
+/*
+ * Bold is --fw-label, the interface's one boldness budget. A heavier weight would make a bolded
+ * phrase read as a heading in the middle of a paragraph, which is precisely what the model uses it
+ * for and precisely what it should not look like.
+ */
+.md :where(strong) {
+  font-weight: var(--fw-label);
+  color: var(--text-1);
+}
+
+.md :where(em) {
+  font-style: italic;
+}
+
+/* Struck-through text is text that no longer applies, so it goes to the secondary tone as well as
+   taking the line: at --text-1 it reads as emphasis rather than as a retraction. */
+.md :where(del) {
+  text-decoration: line-through;
+  color: var(--text-2);
+}
+
+/* ---------------------------------------------------------------------------
+ * Code
+ * ------------------------------------------------------------------------ */
+
+/*
+ * Inline code: mono on the well, the same pairing as every other identifier in the interface
+ * (tool names, selectors, @tokens). 0.92em rather than a fixed size, so it tracks whatever it sits
+ * inside — a code span in a heading stays proportional to that heading.
+ */
+.md :where(code.md-inline) {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  background: var(--surface-well);
+  border: 1px solid var(--border-hair);
+  border-radius: var(--r-field);
+  padding: 0.5px 4px;
+  word-break: break-word;
+}
+
+/*
+ * A fenced block. The bar on top is what makes this a component rather than a <pre>: it names the
+ * language and holds Copy, and it is drawn as the same inset well so the two read as one object.
+ */
+.md .md-code {
+  margin: var(--sp-2) 0;
+  background: var(--surface-well);
+  border: 1px solid var(--border-hair);
+  border-radius: var(--r-field);
+  overflow: hidden;
+}
+
+.md .md-code-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  padding: 3px 4px 3px var(--sp-2);
+  border-bottom: 1px solid var(--border-hair);
+  /* A hair lighter than the code beneath it, so the bar reads as the block's chrome. */
+  background: var(--surface-2);
+}
+
+/* The language, lowercase in mono: a label, not a title. */
+.md .md-code-lang {
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  color: var(--text-2);
+  text-transform: lowercase;
+}
+
+.md .md-copy {
+  font: inherit;
+  font-size: var(--fs-micro);
+  font-weight: var(--fw-label);
+  font-family: var(--font-ui);
+  color: var(--text-2);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--r-field);
+  padding: 2px 7px;
+  cursor: pointer;
+  /* Reserves the width of "Copied" so the bar does not twitch when the label changes. */
+  min-width: 52px;
+}
+
+.md .md-copy:hover {
+  color: var(--text-1);
+  border-color: var(--border-strong);
+}
+
+.md .md-copy:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+/*
+ * The code itself. Horizontal scroll rather than wrapping: a wrapped line of JavaScript loses the
+ * indentation that says what is inside what, and this is code the reader is about to run.
+ */
+.md .md-code :where(pre) {
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3);
+  overflow-x: auto;
+  max-height: 340px;
+  overflow-y: auto;
+  /*
+   * A visible scrollbar, always, on the one element in the panel that scrolls sideways.
+   *
+   * The overlay scrollbar Chrome draws by default is invisible until the pointer moves over the
+   * element, so a line of code running past the right edge looks TRUNCATED rather than scrollable —
+   * which, in a 320px column, is most lines. A permanently drawn bar is the affordance, and it is
+   * thin and tinted to the surface so it reads as part of the block.
+   */
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+.md .md-code :where(pre)::-webkit-scrollbar {
+  height: 8px;
+}
+
+.md .md-code :where(pre)::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 4px;
+}
+
+.md .md-code :where(pre)::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.md .md-code :where(pre code) {
+  font-family: var(--font-mono);
+  font-size: var(--fs-meta);
+  line-height: 1.55;
+  color: var(--text-1);
+  background: none;
+  border: 0;
+  padding: 0;
+  white-space: pre;
+}
+
+/* ---------------------------------------------------------------------------
+ * Lists
+ * ------------------------------------------------------------------------ */
+
+/*
+ * Indented by 1.15rem rather than the browser's 40px: at 320px, a default indent spends an eighth
+ * of the column on nothing. Nested lists inherit it, so each level steps by the same amount.
+ */
+.md :where(ul, ol) {
+  margin: 0 0 var(--sp-2);
+  padding-left: 1.15rem;
+}
+
+.md :where(li) {
+  margin: 2px 0;
+  line-height: 1.6;
+}
+
+.md :where(li) > :where(ul, ol) {
+  margin: 2px 0 0;
+}
+
+.md :where(li)::marker {
+  color: var(--text-2);
+}
+
+/* A GFM task list is a list whose markers are checkboxes, so it drops the bullet. */
+.md :where(li:has(> input[type='checkbox'])) {
+  list-style: none;
+  margin-left: -1.15rem;
+}
+
+.md :where(li) > :where(input[type='checkbox']) {
+  margin-right: var(--sp-1);
+  accent-color: var(--primary);
+}
+
+/* ---------------------------------------------------------------------------
+ * Headings
+ * ------------------------------------------------------------------------ */
+
+/*
+ * The whole scale sits at or below --fs-title (15px), the panel's own heading size, and the top of
+ * it is 14px. A reply is inside the interface; it does not get to set a bigger type than the
+ * interface has. Weight and spacing carry the hierarchy instead of size — the three lower levels
+ * are all body-sized and differ only in tone.
+ */
+.md :where(.md-h) {
+  font-weight: var(--fw-label);
+  color: var(--text-1);
+  line-height: 1.35;
+  /* More space above than below: a heading belongs to what follows it. */
+  margin: var(--sp-3) 0 var(--sp-1);
+}
+
+/* Never a top margin on the first thing in a reply. */
+.md > :where(.md-h:first-child) {
+  margin-top: 0;
+}
+
+.md :where(.md-h1) {
+  font-size: 14px;
+}
+
+.md :where(.md-h2) {
+  font-size: 13.5px;
+}
+
+.md :where(.md-h3) {
+  font-size: var(--fs-body);
+}
+
+/* Below h3 the size stops moving and the tone does the work: a fourth-level heading in a side
+   panel is a labelled paragraph, not a section. */
+.md :where(.md-h4, .md-h5, .md-h6) {
+  font-size: var(--fs-body);
+  color: var(--text-2);
+}
+
+/* ---------------------------------------------------------------------------
+ * Quotes and rules
+ * ------------------------------------------------------------------------ */
+
+/*
+ * A blockquote takes the same 2px left rail as a tool row, for the same reason: it is text that
+ * belongs to something other than the immediate voice. No italics and no background — a quoted
+ * paragraph has to stay as readable as an unquoted one.
+ */
+.md :where(blockquote) {
+  margin: var(--sp-2) 0;
+  padding: 2px 0 2px var(--sp-3);
+  border-left: var(--border-width) solid var(--border-strong);
+  color: var(--text-2);
+}
+
+.md :where(hr) {
+  margin: var(--sp-3) 0;
+  border: 0;
+  border-top: 1px solid var(--border-hair);
+}
+
+/* ---------------------------------------------------------------------------
+ * Links
+ * ------------------------------------------------------------------------ */
+
+.md :where(a) {
+  color: var(--primary-text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  /* A bare URL in a reply is frequently longer than the column. */
+  word-break: break-word;
+}
+
+.md :where(a):hover {
+  color: var(--accent-text);
+}
+
+.md :where(a):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+  border-radius: 2px;
+}
+
+/*
+ * A link whose scheme was refused (javascript:, data:, an extension URL). It keeps the model's own
+ * text — hiding it would be lying about what the reply said — and is drawn as inert: secondary
+ * tone, a dotted underline, no colour and no pointer. It is not an error state; it is a thing that
+ * is simply not a link.
+ */
+.md .md-deadlink {
+  color: var(--text-2);
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+  cursor: default;
+}
+
+/* An image rendered as a link, rather than fetched. Mono, so it reads as a reference to a
+   resource rather than as prose. */
+.md .md-imglink {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  word-break: break-all;
+}
+
+/* ---------------------------------------------------------------------------
+ * Tables
+ * ------------------------------------------------------------------------ */
+
+/*
+ * The scroller Markdown.tsx wraps every table in. Without it a four-column table makes the whole
+ * transcript scroll sideways, which moves every other row too.
+ */
+.md .md-tablewrap {
+  margin: var(--sp-2) 0;
+  overflow-x: auto;
+  border: 1px solid var(--border-hair);
+  border-radius: var(--r-field);
+  /* Same argument as the code block: a table wider than the column must look scrollable rather
+     than cut off. */
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+.md .md-tablewrap::-webkit-scrollbar {
+  height: 8px;
+}
+
+.md .md-tablewrap::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 4px;
+}
+
+.md .md-tablewrap::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.md :where(table) {
+  border-collapse: collapse;
+  font-size: var(--fs-meta);
+  /* Cells size to their content and the wrapper scrolls, rather than three words per line in a
+     column 40px wide. */
+  width: max-content;
+  min-width: 100%;
+}
+
+.md :where(th, td) {
+  padding: 4px var(--sp-2);
+  text-align: left;
+  vertical-align: top;
+  /* Hairlines between cells; the wrapper draws the outer edge, so no double border. */
+  border-bottom: 1px solid var(--border-hair);
+  border-right: 1px solid var(--border-hair);
+}
+
+.md :where(tr) > :where(th:last-child, td:last-child) {
+  border-right: 0;
+}
+
+.md :where(tbody tr:last-child) > :where(td) {
+  border-bottom: 0;
+}
+
+.md :where(th) {
+  font-weight: var(--fw-label);
+  color: var(--text-1);
+  background: var(--surface-well);
+  white-space: nowrap;
+}
+
+.md :where(td) {
+  color: var(--text-2);
+}
+
+/* ---------------------------------------------------------------------------
+ * The dashboard's transcript preview
+ * ------------------------------------------------------------------------ */
+
+/*
+ * The preview is a denser surface than the panel — 11.5px rows, a card rather than a column — so
+ * the prose steps down with it. Only what has to change: the scale, not the structure.
+ */
+.preview .md :where(p, li) {
+  line-height: 1.55;
+}
+
+.preview .md .md-code :where(pre) {
+  max-height: 200px;
+}
+
+/* ---------------------------------------------------------------------------
+ * Compact (phone)
+ * ------------------------------------------------------------------------ */
+
+/*
+ * The popup on a phone. The only markdown rules that need a phone's help are the ones about
+ * horizontal room and the ones about thumbs.
+ */
+[data-surface='popup'][data-layout='compact'] .md :where(ul, ol) {
+  padding-left: 1rem;
+}
+
+[data-surface='popup'][data-layout='compact'] .md .md-copy {
+  /* A thumb target, not a pointer one. */
+  padding: 5px 9px;
+  min-width: 58px;
+}
+
+[data-surface='popup'][data-layout='compact'] .md .md-code :where(pre) {
+  max-height: 260px;
+}
