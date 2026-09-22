@@ -71,7 +71,7 @@
 
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
-import { ARTIFACT_V1, ARTIFACT_V2, ARTIFACT_V3, COMPACT_MARKER, EDITMOD_PROMPTS, editModSource, FAST_MARKER, IMAGES_MARKER, MODELS, RESUME as RESUME_CONV, SLOW_MARKER, SUMMARY_MARKER, VISION as VISION_CONV, WAIT_MARKER } from './mock-llm.mjs';
+import { ARTIFACT_V1, ARTIFACT_V2, ARTIFACT_V3, COMPACT_MARKER, EDITMOD_PROMPTS, editModSource, FAST_MARKER, IMAGES_MARKER, MODELS, RESUME as RESUME_CONV, SLOW_MARKER, SUMMARY_MARKER, THINKING, VISION as VISION_CONV, WAIT_MARKER } from './mock-llm.mjs';
 import { extDir } from './build-dir.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -117,6 +117,7 @@ const PANELSCOPE = process.argv.includes('--panelscope');
 const RESUME = process.argv.includes('--resume');
 const COMPOSER = process.argv.includes('--composer');
 const MODELS_FLOW = process.argv.includes('--models');
+const THINKING_FLOW = process.argv.includes('--thinking');
 
 /**
  * Where the tab bar's captures go when --tabbar is asked to write them (`--tabbar-capture`). These
@@ -142,7 +143,7 @@ const PICKER_SHOT = process.argv.includes('--picker-capture');
 const CAPTURING =
   !SMOKE && !CHATS && !ISOLATION && !COMPACTION && !DASHBOARD && !DASHBOARD_SHOT && !THEME &&
   !TABBAR && !TABBAR_SHOT && !WAIT && !IMAGES && !VISION && !STYLEGUIDE && !ARTIFACT && !ARTIFACT_SHOT &&
-  !PANELSCOPE && !RESUME && !EDITMOD && !COMPOSER && !MODELS_FLOW;
+  !PANELSCOPE && !RESUME && !EDITMOD && !COMPOSER && !MODELS_FLOW && !THINKING_FLOW;
 // --editmod-capture writes screenshots, so it wears the capture mask (the untested line is an
 // artefact of the automated profile, not of the product; see HIDE_UNTESTED_LINE).
 const CAPTURING_EDITMOD = EDITMOD_SHOT;
@@ -4204,6 +4205,153 @@ async function storedProviders(page) {
   });
 }
 
+/**
+ * The per-chat Thinking level (lib/thinking.ts): that picking one puts the documented field on the
+ * wire, that Off changes it rather than dropping it, that a server which refuses the field is
+ * survived once and reported, and that the level outlives a reload.
+ *
+ * It runs against the OpenAI-compatible mock with the connection's Reasoning field set explicitly
+ * to reasoning_effort — the flow is about the level reaching the request, and pinning the field
+ * keeps it from also depending on what Auto guesses from a model id called "demo".
+ */
+async function thinkingFlow() {
+  const fail = (m) => {
+    throw new Error(`thinking: ${m}`);
+  };
+  /** The reasoning knob one turn's requests carried, as the mock recorded it. */
+  const reasoningFor = async (script) => (await requestsFor(script)).map((r) => r.reasoning ?? null);
+
+  const b = await launch('dark');
+  try {
+    await clearViolations();
+    await clearFaults();
+    await fetch(`${CONTROL_BASE}/__requests`, { method: 'DELETE' }).catch(() => {});
+
+    const panel = await openPanel(b.ctx, b.extId, { settings: { theme: 'dark' } });
+    await openSite(b.ctx, FIXTURE_URL);
+    await waitForComposer(panel);
+    await panel.locator('[data-testid="model-button"]').waitFor({ timeout: 15_000 });
+
+    // The migrated connection, told exactly which field this endpoint takes.
+    await panel.evaluate(async () => {
+      const r = await chrome.storage.local.get('connections');
+      const list = (r.connections?.list ?? []).map((c) => ({ ...c, reasoningField: 'reasoning_effort' }));
+      await chrome.storage.local.set({ connections: { v: 1, list } });
+    });
+    await reloadPanel(panel);
+    await waitForComposer(panel);
+
+    // --- 1. the row appears, and starts on Default -------------------------------------
+    const row = panel.locator('[data-testid="thinking-row"]');
+    await row.waitFor({ timeout: 15_000 });
+    const levels = await panel.locator('[data-testid="thinking-level"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-level')));
+    if (JSON.stringify(levels) !== '["default","off","low","medium","high"]') fail(`the row offers ${JSON.stringify(levels)}`);
+    const checked = async () => panel.locator('[data-testid="thinking-level"][aria-checked="true"]').getAttribute('data-level');
+    if ((await checked()) !== 'default') fail(`the row starts on ${await checked()}, expected default`);
+
+    // --- 2. a first turn on Default sends no reasoning field at all ---------------------
+    // The baseline that makes the rest meaningful: an untouched chat is exactly as it was before
+    // the feature existed.
+    await sendPrompt(panel, THINKING.turns[0].prompt);
+    await panel.locator('.messages .msg.assistant', { hasText: THINKING.turns[0].done }).waitFor({ timeout: 60_000 });
+    await panel.locator('.composer button.btn.primary', { hasText: 'Send' }).waitFor({ timeout: 30_000 });
+
+    const turn1 = await reasoningFor('thinking-1');
+    if (!turn1.length || turn1.some((r) => r !== null)) fail(`a chat left on Default carried ${JSON.stringify(turn1)}; it should carry no reasoning field`);
+    if (await panel.locator('[data-testid="model-marker"]').count()) fail('a chat that has changed nothing shows a marker');
+
+    // --- 3. pick High mid-chat: the NEXT turn carries the field, and is marked ----------
+    await panel.locator('[data-testid="thinking-level"][data-level="high"]').click();
+    await panel.waitForFunction(() => document.querySelector('[data-testid="thinking-level"][aria-checked="true"]')?.getAttribute('data-level') === 'high', null, { timeout: 5_000 });
+
+    await sendPrompt(panel, THINKING.turns[1].prompt);
+    await panel.locator('.messages .msg.assistant', { hasText: THINKING.turns[1].done }).waitFor({ timeout: 60_000 });
+    await panel.locator('.composer button.btn.primary', { hasText: 'Send' }).waitFor({ timeout: 30_000 });
+
+    const turn2 = await reasoningFor('thinking-2');
+    if (!turn2.length || !turn2.every((r) => r && r.reasoning_effort === 'high')) fail(`after picking High the turn carried ${JSON.stringify(turn2)}`);
+
+    // The transcript says so, in the same one-line marker a model swap uses. The model did not
+    // change, so the row names the level rather than claiming a swap.
+    const markers = await panel.locator('[data-testid="model-marker"]').allTextContents();
+    if (markers.length !== 1 || !/^thinking: high$/.test(markers[0].trim())) fail(`the transcript's markers are ${JSON.stringify(markers)}`);
+
+    // The title call, which the user never asked for, runs at the floor rather than at High.
+    const titles = await reasoningFor('title');
+    if (titles.length && !titles.every((r) => r && r.reasoning_effort === 'none')) {
+      fail(`the title call carried ${JSON.stringify(titles)}; it should run at the model's floor`);
+    }
+    await assertNoViolations('thinking (the level reaches the wire)');
+
+    // --- 4. change to Off: the field changes, it is not dropped -------------------------
+    await panel.locator('[data-testid="thinking-level"][data-level="off"]').click();
+    await panel.waitForFunction(() => document.querySelector('[data-testid="thinking-level"][aria-checked="true"]')?.getAttribute('data-level') === 'off', null, { timeout: 5_000 });
+
+    await sendPrompt(panel, THINKING.turns[2].prompt);
+    await panel.locator('.messages .msg.assistant', { hasText: THINKING.turns[2].done }).waitFor({ timeout: 60_000 });
+    await panel.locator('.composer button.btn.primary', { hasText: 'Send' }).waitFor({ timeout: 30_000 });
+
+    const turn3 = await reasoningFor('thinking-3');
+    // Off is a VALUE ('none'), not the absence of the field: a backend told nothing would reason.
+    if (!turn3.length || !turn3.every((r) => r && r.reasoning_effort === 'none')) fail(`after switching to Off the turn carried ${JSON.stringify(turn3)}`);
+    const markers2 = await panel.locator('[data-testid="model-marker"]').allTextContents();
+    if (!markers2.some((m) => /thinking: off/.test(m))) fail(`after switching to Off the markers are ${JSON.stringify(markers2)}`);
+
+    // --- 5. a backend that refuses the field --------------------------------------------
+    // Back to a level that sends something, then a standing fault: the server answers 400 to any
+    // request carrying a reasoning field and answers normally to the same request without one.
+    await panel.locator('[data-testid="thinking-level"][data-level="low"]').click();
+    await panel.waitForFunction(() => document.querySelector('[data-testid="thinking-level"][aria-checked="true"]')?.getAttribute('data-level') === 'low', null, { timeout: 5_000 });
+    await setFaults([{ kind: 'no-reasoning' }]);
+
+    await sendPrompt(panel, THINKING.turns[3].prompt);
+    await panel.locator('.messages .msg.assistant', { hasText: THINKING.turns[3].done }).waitFor({ timeout: 60_000 });
+    await panel.locator('.composer button.btn.primary', { hasText: 'Send' }).waitFor({ timeout: 30_000 });
+
+    const turn4 = await requestsFor('thinking-4');
+    if (turn4.length !== 2) fail(`the refused turn made ${turn4.length} requests, expected exactly two (the refusal and the retry)`);
+    if (turn4[0].reasoning?.reasoning_effort !== 'low') fail(`the first request carried ${JSON.stringify(turn4[0].reasoning)}`);
+    if (turn4[1].reasoning) fail(`the retry still carried ${JSON.stringify(turn4[1].reasoning)}; it must drop the field`);
+
+    // The user is told, in words, in a panel note — the same pattern the Images fallback uses.
+    const notes = await panel.locator('.messages .label').allTextContents();
+    const said = notes.find((t) => /does not accept a reasoning setting/i.test(t));
+    if (!said) fail(`the panel never explained the fallback; its notes were ${JSON.stringify(notes)}`);
+    if (!/without it|leave it out/i.test(said)) fail(`the note does not say what was done about it: ${JSON.stringify(said)}`);
+
+    // --- 6. and it is remembered: the next turn does not pay for it again ----------------
+    await sendPrompt(panel, THINKING.turns[4].prompt);
+    await panel.locator('.messages .msg.assistant', { hasText: THINKING.turns[4].done }).waitFor({ timeout: 60_000 });
+    await panel.locator('.composer button.btn.primary', { hasText: 'Send' }).waitFor({ timeout: 30_000 });
+    const turn5 = await requestsFor('thinking-5');
+    if (turn5.length !== 1) fail(`the turn after the refusal made ${turn5.length} requests; the refusal should be remembered`);
+    if (turn5[0].reasoning) fail(`it still carried ${JSON.stringify(turn5[0].reasoning)}`);
+    await clearFaults();
+
+    // --- 7. the level survives a reload --------------------------------------------------
+    await reloadPanel(panel);
+    await waitForComposer(panel);
+    await panel.locator('[data-testid="thinking-row"]').waitFor({ timeout: 15_000 });
+    await panel.waitForFunction(() => document.querySelector('[data-testid="thinking-level"][aria-checked="true"]')?.getAttribute('data-level') === 'low', null, { timeout: 10_000 });
+    const storedLevel = await panel.evaluate(async () => ((await chrome.storage.local.get('chats')).chats ?? [])[0]?.thinking);
+    if (storedLevel !== 'low') fail(`the chat's stored level is ${JSON.stringify(storedLevel)}`);
+
+    // --- 8. a model with no reasoning knob hides the row entirely -------------------------
+    await panel.evaluate(async () => {
+      const r = await chrome.storage.local.get('connections');
+      const list = (r.connections?.list ?? []).map((c) => ({ ...c, reasoningField: 'none' }));
+      await chrome.storage.local.set({ connections: { v: 1, list } });
+    });
+    await panel.waitForFunction(() => !document.querySelector('[data-testid="thinking-row"]'), null, { timeout: 10_000 });
+    await assertNoViolations('thinking (the 400 fallback)');
+    console.log(
+      'thinking: OK — a chat on Default sent no reasoning field and no marker, picking High put reasoning_effort:high on the next turn and marked the transcript "thinking: high" without claiming a model swap, Off sent "none" rather than dropping the field, the title call ran at the model\'s floor, a backend that answers 400 to the field was detected once, re-sent immediately without it, explained in the panel and remembered so the next turn cost one request, the level survived a reload, and a model with no reasoning knob hid the row entirely, zero invalid requests',
+    );
+  } finally {
+    await b.close();
+  }
+}
+
 async function modelsFlow() {
   const fail = (m) => {
     throw new Error(`models: ${m}`);
@@ -5166,6 +5314,10 @@ async function main() {
       await modelsFlow();
       return;
     }
+    if (THINKING_FLOW) {
+      await thinkingFlow();
+      return;
+    }
     if (PICKER_SHOT) {
       await modelPickerShot('dark', '12-model-picker.png');
       return;
@@ -5214,6 +5366,7 @@ async function main() {
       await resumeFlow();
       await composerFlow();
       await modelsFlow();
+      await thinkingFlow();
       return;
     }
     // The dark set: the design system's own palette, and what the README leads with.

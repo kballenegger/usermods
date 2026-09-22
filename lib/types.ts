@@ -2,8 +2,9 @@
 import type { AttachedImage, ImageThumb } from './images';
 import type { WaitCondition } from './agent/wait';
 import type { ImagesSetting } from './providers/vision';
+import type { ReasoningField, ThinkingLevel } from './thinking';
 
-export type { AttachedImage, ImageThumb, ImagesSetting };
+export type { AttachedImage, ImageThumb, ImagesSetting, ReasoningField, ThinkingLevel };
 
 /** A saved userscript. `source` is the canonical full userscript text, header included. */
 export interface Mod {
@@ -113,6 +114,20 @@ export interface Settings {
    * Optional so a profile saved before this existed reads as 'auto'.
    */
   images?: ImagesSetting;
+  /**
+   * How much the model thinks before it answers, on the neutral scale every provider's own knob is
+   * mapped onto (lib/thinking.ts). Filled per run from the chat's own setting by effectiveSettings,
+   * exactly as `model` is. Absent means 'default': the adapter sends no reasoning field at all, so
+   * a chat that has never been touched behaves as it did before the setting existed.
+   */
+  thinking?: ThinkingLevel;
+  /**
+   * Which reasoning field this OpenAI-compatible endpoint takes, from the connection. Only read by
+   * lib/providers/openai.ts; 'auto' guesses from the model id. See lib/thinking.ts.
+   */
+  reasoningField?: ReasoningField;
+  /** Extra top-level request fields for this connection, already parsed and validated. */
+  customFields?: Record<string, unknown>;
 }
 
 /** The global preferences: the part of `Settings` stored under 'settings', none of it about a provider. */
@@ -265,7 +280,9 @@ export type AgentEventBody =
    * composer compares it with the chat's current selection to say "applies from the next turn"
    * while a run that started on another model is still going.
    */
-  | { type: 'model'; connectionId: string; label: string; model: string }
+  /** `thinking` rides along on the same event: the two are resolved together at the top of a run,
+   *  and one event keeps the transcript's model and thinking markers in step. */
+  | { type: 'model'; connectionId: string; label: string; model: string; thinking?: ThinkingLevel }
   /**
    * What the run is doing right now, for the side panel's live activity line. Emitted before each
    * model call and each tool execution, and once with 'idle' when the run is over.
@@ -378,7 +395,7 @@ export type ChatItem =
    * and model each assistant turn came from, as a row. Written only when it differs from the row of
    * this kind before it, so a chat that never changes model holds exactly one, at its first run.
    */
-  | { kind: 'model'; connectionId: string; label: string; model: string }
+  | { kind: 'model'; connectionId: string; label: string; model: string; thinking?: ThinkingLevel }
   | { kind: 'error'; text: string };
 
 /** A user message travelling from the side panel to the agent. */

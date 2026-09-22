@@ -12,7 +12,7 @@ import { resyncPlan } from '@/lib/resync';
 import { mapStack, prepareRunScript, renderRunResult, type RunResult } from '@/lib/runscript';
 import { shouldUpdate } from '@/lib/version';
 import { loadMods, modFromProposal, modFromSource, parseHeader, previewFromSource, upsertMod, deleteMod, saveMods } from '@/lib/mods';
-import { appendTurn, archiveChat, bulkChats, countTurns, createChat, deleteChat, getChat, hostFromUrl, isArchived, listChats, loadItems, loadMessages, markTitleRefreshed, renameChat, saveItems, saveMessages, setChatArtifact, setChatModel, setModelTitle, touchChat } from '@/lib/chats';
+import { appendTurn, archiveChat, bulkChats, countTurns, createChat, deleteChat, getChat, hostFromUrl, isArchived, listChats, loadItems, loadMessages, markTitleRefreshed, renameChat, saveItems, saveMessages, setChatArtifact, setChatModel, setChatThinking, setModelTitle, touchChat } from '@/lib/chats';
 import { loadRuns, markInterrupted, pruneRuns, resumableRuns, saveRuns, type RunMap, type RunRecord } from '@/lib/runstate';
 import { isTombstoned, withKey } from '@/lib/storagequeue';
 import { collectBlobs } from '@/lib/blobs';
@@ -36,14 +36,24 @@ import {
   loadConnections,
   loadModelChoice,
   loadSignedIn,
+  loadThinkingChoice,
   mutateConnections,
   resolveSelection,
   sameSelection,
   selectionForChat,
+  thinkingForChat,
   updateConnection,
   type ModelCache,
   type ModelSelection,
 } from '@/lib/connections';
+import {
+  createThinkingMemory,
+  lowestThinkingLevel,
+  resolveReasoningField,
+  thinkingCapability,
+  THINKING_FALLBACK_PANEL_NOTE,
+  type ThinkingLevel,
+} from '@/lib/thinking';
 import { actionClickPlan, resolveScope, sidePanelAvailable, windowPanelPlan } from '@/lib/sidepanel';
 import { DEFAULT_CONTEXT_BUDGET } from '@/lib/types';
 import type { SidePanelScope } from '@/lib/types';
@@ -193,6 +203,7 @@ const agentPorts = new Set<chrome.runtime.Port>();
  * chrome.storage.local, so the knowledge outlives the worker as well.
  */
 const visionMemory = createVisionMemory();
+const thinkingMemory = createThinkingMemory();
 
 /**
  * The single chokepoint where an agent event is stamped with its chat and put on the wire. The
@@ -474,7 +485,7 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
     const learnedLimits = await loadContextLimits();
     const budget = effectiveBudget(settings.contextBudget ?? DEFAULT_CONTEXT_BUDGET, learnedLimits, budgetKey);
     if (budget !== settings.contextBudget) settings = { ...settings, contextBudget: budget };
-    post({ type: 'model', connectionId: resolved.selection.connectionId, label: resolved.selection.label ?? '', model: resolved.selection.model });
+    post({ type: 'model', connectionId: resolved.selection.connectionId, label: resolved.selection.label ?? '', model: resolved.selection.model, thinking: resolved.thinking });
     history = await loadMessages(chatId);
     if (!turn && !history.length) throw new Error('There is nothing to resume in this chat. Send your message again.');
     const retryPolicy = resolvePolicy((await chrome.storage.local.get(RETRY_POLICY_KEY).catch(() => ({}) as Record<string, unknown>))[RETRY_POLICY_KEY]);
@@ -509,6 +520,10 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
         // say it once. The reducer dedupes consecutive notes as well, which covers the case where
         // two chats learn it at the same moment.
         onVisionUnsupported: () => post({ type: 'note', text: VISION_FALLBACK_PANEL_NOTE }),
+        // The same arrangement for a server that refuses the reasoning field: remembered across
+        // sessions, and said once per run rather than once per request.
+        thinkingMemory,
+        onThinkingUnsupported: () => post({ type: 'note', text: THINKING_FALLBACK_PANEL_NOTE }),
       }),
       // How `screenshot` is described to the model. Only the OpenAI-compatible adapter can ever
       // answer no, and only once it has learned so — every other backend shows images to every
@@ -786,6 +801,24 @@ function watchUserJsNavigations(): void {
 // ---------- chat titles ----------
 
 /**
+ * The same settings with Thinking turned down to whatever floor this model allows.
+ *
+ * Chat titles and compaction summaries are short, mechanical, one-shot calls the user never asked
+ * for, and neither gets better for being reasoned about — but both are billed to the user, and at
+ * 'max' on a frontier model a title would cost more than the turn that earned it. So they always
+ * run at the bottom of the model's own scale ('off' where it can stop, the lowest effort where it
+ * cannot), regardless of what the chat is set to. A model with no reasoning knob is left alone.
+ */
+function cheapestThinking(settings: Settings): Settings {
+  const cap = thinkingCapability({
+    kind: settings.provider,
+    model: settings.model,
+    reasoningField: resolveReasoningField(settings.reasoningField),
+  });
+  return { ...settings, thinking: lowestThinkingLevel(cap) };
+}
+
+/**
  * One tool-free model call: ask the provider for a short answer to a system prompt.
  *
  * This deliberately reuses Provider.chat with an empty tool list rather than adding a method to the
@@ -793,7 +826,7 @@ function watchUserJsNavigations(): void {
  * backends get this for free and none of them grew an API.
  */
 async function complete(settings: Settings, system: string, user: string, signal?: AbortSignal): Promise<string> {
-  const res = await createProvider(settings).chat({
+  const res = await createProvider(cheapestThinking(settings)).chat({
     system,
     messages: [{ role: 'user', content: [{ type: 'text', text: user }] }],
     tools: [],
@@ -970,9 +1003,12 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
       return items;
     }
     case 'chats.create':
-      return createChat(req.host, req.model);
+      return createChat(req.host, req.model, req.thinking);
     case 'chats.setModel':
       await setChatModel(req.id, req.model);
+      return { ok: true };
+    case 'chats.setThinking':
+      await setChatThinking(req.id, req.thinking);
       return { ok: true };
     case 'agent.attach':
       return attachState();
@@ -1682,13 +1718,23 @@ async function resumePendingLogins(): Promise<void> {
  * out, lost its key, or is not in this build) throws the sentence the composer shows for the same
  * state. Loading the connections comes first because that is what migrates a legacy profile.
  */
-async function resolveChatModel(chatId: string): Promise<{ settings: Settings; selection: ModelSelection }> {
+async function resolveChatModel(chatId: string): Promise<{ settings: Settings; selection: ModelSelection; thinking: ThinkingLevel }> {
   const connections = await loadConnections();
-  const [prefs, last, signedIn, chat] = await Promise.all([loadSettings(), loadModelChoice(), loadSignedIn(), getChat(chatId)]);
+  const [prefs, last, lastThinking, signedIn, chat] = await Promise.all([
+    loadSettings(),
+    loadModelChoice(),
+    loadThinkingChoice(),
+    loadSignedIn(),
+    getChat(chatId),
+  ]);
   const resolved = resolveSelection(selectionForChat(chat, connections, last, signedIn), connections, signedIn);
   if (!resolved.ok) throw new Error(resolved.message);
   if (!sameSelection(chat?.model, resolved.selection) || chat?.model?.label !== resolved.selection.label) await setChatModel(chatId, resolved.selection);
-  return { settings: effectiveSettings(prefs, resolved.connection, resolved.model), selection: resolved.selection };
+  // Read at the same moment as the model, for the same reason: a level chosen in the composer
+  // applies from the next turn, and a Resume continues on what the chat is set to now.
+  const thinking = thinkingForChat(chat, lastThinking);
+  if (thinking !== 'default' && chat && chat.thinking === undefined) await setChatThinking(chatId, thinking);
+  return { settings: effectiveSettings(prefs, resolved.connection, resolved.model, thinking), selection: resolved.selection, thinking };
 }
 
 /**

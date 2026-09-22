@@ -376,3 +376,43 @@ test('the note claims only what can be missing, and says what is intact', () => 
   assert.doesNotMatch(RECONNECT_NOTE, /not captured|earlier output/);
   assert.match(GAP_TOOL_SUMMARY, /the model received it/);
 });
+
+// ---------- how much the model was asked to think ----------
+
+test('a change of Thinking level records a row, even on the same model', () => {
+  let items = reduceItems([], { type: 'model', connectionId: 'a', label: 'Local', model: 'demo' });
+  // The same model at the same level again: nothing new to say.
+  items = reduceItems(items, { type: 'model', connectionId: 'a', label: 'Local', model: 'demo' });
+  assert.equal(items.length, 1);
+  // The level changed, which is the other half of "what answered this".
+  items = reduceItems(items, { type: 'model', connectionId: 'a', label: 'Local', model: 'demo', thinking: 'high' });
+  assert.equal(items.length, 2);
+  assert.equal(items[1] && items[1].kind === 'model' ? items[1].thinking : null, 'high');
+  // And once it is recorded, the same level again adds nothing.
+  items = reduceItems(items, { type: 'model', connectionId: 'a', label: 'Local', model: 'demo', thinking: 'high' });
+  assert.equal(items.length, 2);
+});
+
+test("'default' is the absence of a level, not a value that produces rows", () => {
+  let items = reduceItems([], { type: 'model', connectionId: 'a', label: 'Local', model: 'demo' });
+  items = reduceItems(items, { type: 'model', connectionId: 'a', label: 'Local', model: 'demo', thinking: 'default' });
+  assert.equal(items.length, 1, "'default' must read as the same state as no level at all");
+});
+
+test('a level-only change reads as the level, not as a swap to the model it is already on', () => {
+  const items: ChatItem[] = [
+    { kind: 'user', id: 'u1', text: 'go' },
+    { kind: 'model', connectionId: 'a', label: 'Local', model: 'demo' },
+    { kind: 'user', id: 'u2', text: 'again' },
+    { kind: 'model', connectionId: 'a', label: 'Local', model: 'demo', thinking: 'high' },
+    { kind: 'user', id: 'u3', text: 'more' },
+    { kind: 'model', connectionId: 'b', label: 'Other', model: 'alt', thinking: 'low' },
+  ];
+  // Same model, new level: saying "switched to demo" would name a swap that never happened.
+  assert.equal(modelRowText(items, 3), 'thinking: high');
+  // A real swap that also carries a level says both.
+  assert.equal(modelRowText(items, 5), 'switched to alt · Other · thinking: low');
+  // The first row still says nothing in the panel, and names both in the dashboard's preview.
+  assert.equal(modelRowText(items, 1), null);
+  assert.equal(modelRowText(items, 1, { showFirst: true }), 'model: demo · Local');
+});

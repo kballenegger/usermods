@@ -37,6 +37,7 @@
     "smoke:artifact": "USERMODS_TEST_BUILD=1 wxt build && USERMODS_TEST_BUILD=1 node scripts/screenshots.mjs --artifact",
     "smoke:composer": "USERMODS_TEST_BUILD=1 wxt build && USERMODS_TEST_BUILD=1 node scripts/screenshots.mjs --composer",
     "smoke:models": "USERMODS_TEST_BUILD=1 wxt build && USERMODS_TEST_BUILD=1 node scripts/screenshots.mjs --models",
+    "smoke:thinking": "USERMODS_TEST_BUILD=1 wxt build && USERMODS_TEST_BUILD=1 node scripts/screenshots.mjs --thinking",
     "smoke:editmod": "USERMODS_TEST_BUILD=1 wxt build && USERMODS_TEST_BUILD=1 node scripts/screenshots.mjs --editmod",
     "smoke:resume": "USERMODS_TEST_BUILD=1 wxt build && USERMODS_TEST_BUILD=1 node scripts/screenshots.mjs --resume",
     "styleguide": "USERMODS_TEST_BUILD=1 wxt build && USERMODS_TEST_BUILD=1 node scripts/screenshots.mjs --styleguide",

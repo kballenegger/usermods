@@ -7,6 +7,7 @@ import {
 import type { Settings } from '../types';
 // .ts extensions: lib/agent/loop.ts imports this file, and the loop is unit tested under node
 // --experimental-strip-types, whose resolver does not guess them (see lib/transcript.ts).
+import { applyThinking, resolveThinkingLevel, thinkingCapability, xaiSupportsReasoning } from '../thinking.ts';
 import { createAnthropicProvider } from './anthropic.ts';
 import { createOpenAIProvider, type OpenAIProviderDeps } from './openai.ts';
 import { createResponsesProvider } from './responses.ts';
@@ -42,6 +43,15 @@ function createSubscriptionProvider(settings: Settings, kind: 'chatgpt' | 'xai')
   if (SUBSCRIPTIONS_OFF) throw new Error(unavailableProviderMessage(kind));
   const oauth = () => import('../oauth');
 
+  // The chat's Thinking level, if it set one. 'default' maps to nothing, so the per-vendor defaults
+  // just below stay exactly as they were: medium for ChatGPT, high for xAI. A chosen level replaces
+  // the effort and keeps `summary`, which is about what comes BACK rather than how hard it thinks.
+  const level = resolveThinkingLevel(settings.thinking);
+  const chosen = applyThinking(level, thinkingCapability({ kind, model: settings.model })).body as
+    | { reasoning?: { effort?: string } }
+    | Record<string, never>;
+  const effort = chosen.reasoning?.effort;
+
   if (kind === 'chatgpt') {
     return createResponsesProvider({
       tag: 'chatgpt',
@@ -51,7 +61,7 @@ function createSubscriptionProvider(settings: Settings, kind: 'chatgpt' | 'xai')
         const o = await oauth();
         return o.chatgptHeaders(await o.getValidTokens('chatgpt'));
       },
-      body: { reasoning: { effort: 'medium', summary: 'auto' } },
+      body: { reasoning: { effort: effort ?? 'medium', summary: 'auto' } },
     });
   }
 
@@ -63,13 +73,10 @@ function createSubscriptionProvider(settings: Settings, kind: 'chatgpt' | 'xai')
       const o = await oauth();
       return o.xaiProxyHeaders(settings.model, (await o.getValidTokens('xai')).access);
     },
-    body: xaiSupportsReasoning(settings.model) ? { reasoning: { effort: 'high' } } : {},
+    // xAI's non-reasoning and -fast variants reject the field outright, which is also why
+    // thinkingCapability offers them no levels: neither half can put one on the wire.
+    body: xaiSupportsReasoning(settings.model) ? { reasoning: { effort: effort ?? 'high' } } : {},
   });
-}
-
-/** Effort-capable models per xAI's catalog; "non-reasoning" and "-fast" variants reject the field. */
-function xaiSupportsReasoning(model: string): boolean {
-  return !/non-reasoning|fast$/.test(model);
 }
 
 export type { Provider } from './types';

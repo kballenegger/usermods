@@ -1,10 +1,18 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { applyThinking, resolveThinkingLevel, thinkingCapability } from '../thinking.ts';
 import type { Msg, Part, Settings, ToolDef } from '../types';
 import { ProviderError, isAbortError, parseRetryAfter, streamIncomplete } from './errors.ts';
 import type { Provider, ProviderResponse } from './types';
 
-/** Models that accept adaptive thinking. Older ones (Haiku 4.5, 3.x) reject it. */
-const ADAPTIVE_THINKING = /(opus-5|sonnet-5|fable-5|mythos-5|opus-4-[678]|sonnet-4-6)/;
+/**
+ * Models that accept adaptive thinking. Older ones (Haiku 4.5, 3.x) reject it.
+ *
+ * Kept in step with ANTHROPIC_ADAPTIVE in lib/thinking.ts, which decides which levels the picker
+ * offers: the two have to agree, or a model would be offered an effort ladder while being sent the
+ * legacy budget shape. Mythos Preview supports both modes and is listed here for that reason.
+ * https://platform.claude.com/docs/en/build-with-claude/thinking-troubleshooting#supported-models
+ */
+const ADAPTIVE_THINKING = /(opus-5|sonnet-5|fable-5|mythos-5|mythos-preview|opus-4-[678]|sonnet-4-6)/;
 
 /** What the Messages API accepts as a tool_use id. */
 const TOOL_ID_OK = /^[a-zA-Z0-9_-]{1,64}$/;
@@ -115,6 +123,29 @@ export function createAnthropicProvider(settings: Settings): Provider {
 
   return {
     async chat({ system, messages, tools, signal, callbacks }): Promise<ProviderResponse> {
+      // The chat's Thinking level as request fields (lib/thinking.ts). 'default' produces nothing,
+      // so a chat nobody has touched sends exactly the body it sent before this existed.
+      //
+      // Where these go matters for the prompt cache. The system block below is cached with
+      // cache_control, and the cached prefix is built from the system prompt, the tools and the
+      // messages — none of which any thinking field appears in. `thinking` and `output_config` are
+      // SIBLINGS of `system` at the top level of the request, so changing the level mid-chat never
+      // rewrites the block the cache_control marker sits on: the block and its marker are
+      // byte-identical across levels (asserted in test/thinking.test.ts).
+      //
+      // What the level DOES cost is a cache miss of its own, and that is unavoidable rather than a
+      // bug here: Anthropic renders the resolved thinking configuration and effort into the prompt,
+      // so "switching thinking modes, changing the effort value, and changing budget_tokens all
+      // invalidate cache breakpoints". That is one miss on the turn the user changes the level, and
+      // hits again on every turn after it, because the fields are then stable.
+      // https://platform.claude.com/docs/en/build-with-claude/thinking#thinking-and-prompt-caching
+      const level = resolveThinkingLevel(settings.thinking);
+      const cap = thinkingCapability({ kind: 'anthropic', model });
+      const think = applyThinking(level, cap);
+      // The adapter's own default mode, which the level can override (to 'disabled', or to the
+      // legacy 'enabled' + budget_tokens on an older model).
+      const defaultThinking = ADAPTIVE_THINKING.test(model) ? { thinking: { type: 'adaptive' as const } } : {};
+
       const stream = client.messages.stream(
         {
           model,
@@ -122,8 +153,12 @@ export function createAnthropicProvider(settings: Settings): Provider {
           system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
           messages: toAnthropicMessages(messages),
           tools: toAnthropicTools(tools),
-          ...(ADAPTIVE_THINKING.test(model) ? { thinking: { type: 'adaptive' as const } } : {}),
-        },
+          ...defaultThinking,
+          // A union the mapping builds structurally ({type:'disabled'} or {type:'enabled',
+          // budget_tokens}); lib/thinking.ts owns which shape each model may receive.
+          ...(think.thinking ? { thinking: think.thinking as unknown as Anthropic.ThinkingConfigParam } : {}),
+          ...think.body,
+        } as Anthropic.MessageStreamParams,
         { signal },
       );
       stream.on('text', (delta) => callbacks.onText(delta));

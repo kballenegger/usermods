@@ -18,7 +18,8 @@ import { Sheet, SheetRow } from './components/Sheet';
 import { useShell } from './shell';
 import { SEND_LABEL, draftPill, foldToolRows, nextSheet, sendMode, stepsSummary, type ChatSheet, type SheetEvent } from '@/lib/compactshell';
 import { targetChip } from '@/lib/mobile';
-import { mutateConnections, rememberModel, resolveSelection, sameSelection, saveModelChoice, selectionForChat, type ModelSelection } from '@/lib/connections';
+import { mutateConnections, rememberModel, resolveSelection, sameSelection, saveModelChoice, saveThinkingChoice, selectionForChat, thinkingForChat, type ModelSelection } from '@/lib/connections';
+import type { ThinkingLevel } from '@/lib/thinking';
 import { exportFilename, HANDOFF_KEY, resolveHandoff, type ChatHandoff } from '@/lib/dashboard';
 import { ACCEPT_ATTR, MAX_IMAGES_PER_MESSAGE, capNote, emptyTextFor, type AttachedImage, type ImageThumb } from '@/lib/images';
 import { rpc, type AgentPortRequest } from '@/lib/rpc';
@@ -207,6 +208,8 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
   const providers = useConnections();
   /** The model picked for a chat that does not exist yet; it travels with the first send. */
   const [pendingModel, setPendingModel] = useState<ModelSelection | null>(null);
+  /** The Thinking level picked for a chat that does not exist yet; it travels with the first send. */
+  const [pendingThinking, setPendingThinking] = useState<ThinkingLevel | null>(null);
   /** Chats whose model was changed while a run was in flight, until that run's chain ends. */
   const [swappedMidRun, setSwappedMidRun] = useState<ReadonlySet<string>>(() => new Set());
   /**
@@ -230,6 +233,31 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
    */
   const runningOn = lastModel(items);
   const swapWaits = busy && chatId != null && swappedMidRun.has(chatId) && !!runningOn && !sameSelection(runningOn, selection);
+
+  /**
+   * The visible chat's Thinking level: its own if it has one, else the last level picked — the same
+   * rule the model follows, so a new chat starts where the user left off on both counts.
+   */
+  const thinking = thinkingForChat(chatId ? chatRecord : { thinking: pendingThinking ?? undefined }, providers.lastThinking);
+
+  // Read at send time rather than closed over, for the same reason selectionRef is: the chat is
+  // created in a round trip the user can change the level during.
+  const thinkingRef = useRef(thinking);
+  thinkingRef.current = thinking;
+
+  function chooseThinking(next: ThinkingLevel) {
+    void saveThinkingChoice(next);
+    const id = chatIdRef.current;
+    if (!id) {
+      setPendingThinking(next);
+      return;
+    }
+    setChats((prev) => prev.map((c) => (c.id === id ? { ...c, thinking: next } : c)));
+    // Same timing as a model swap: the background reads the level when a run STARTS, so changing it
+    // mid-run applies to the next turn and the reply in flight keeps the level it began with.
+    if (runningRef.current.has(id)) setSwappedMidRun((prev) => new Set(prev).add(id));
+    void rpc({ type: 'chats.setThinking', id, thinking: next }).catch(() => {});
+  }
 
   function chooseModel(next: ModelSelection, typed: boolean) {
     void saveModelChoice(next);
@@ -810,13 +838,14 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
       // view would be wrong, so the text goes back in the composer for the user to resend.
       const gen = genRef.current;
       try {
-        const chat = await rpc({ type: 'chats.create', host, model: selectionRef.current });
+        const chat = await rpc({ type: 'chats.create', host, model: selectionRef.current, thinking: thinkingRef.current });
         if (genRef.current !== gen) {
           setText((cur) => (cur.trim() ? cur : typed));
           return;
         }
         id = chat.id;
         setPendingModel(null);
+        setPendingThinking(null);
         setChats((prev) => [chat, ...prev]);
         // The draft moves with the chat it was composed in, attachments and all, before showChat
         // repoints the composer at the new id.
@@ -1937,6 +1966,8 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
               note={swapWaits ? NEXT_TURN_NOTE : undefined}
               onSelect={chooseModel}
               onManage={() => onOpenSettings?.()}
+              thinking={thinking}
+              onThinking={chooseThinking}
             />
           )}
           <div className="row">
@@ -2003,10 +2034,22 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
                 data-testid="model-chip"
                 aria-haspopup="dialog"
                 aria-expanded={sheet === 'model'}
-                aria-label={modelResolved.ok ? `Model: ${modelResolved.selection.model}, on ${modelResolved.selection.label ?? 'a provider'}. Change model` : 'No model chosen. Choose a model'}
+                aria-label={
+                  modelResolved.ok
+                    ? `Model: ${modelResolved.selection.model}, on ${modelResolved.selection.label ?? 'a provider'}${thinking === 'default' ? '' : `, thinking ${thinking}`}. Change model`
+                    : 'No model chosen. Choose a model'
+                }
                 onClick={() => openModelSheet(modelChipRef)}
               >
                 <span className="cbar-model-name">{modelResolved.ok ? modelResolved.selection.model : 'No model'}</span>
+                {/* The level rides on the chip only when it is NOT the default: on a phone the bar
+                    is the whole of the composer's chrome, so a suffix every chat carries would cost
+                    the model id room it needs more. */}
+                {modelResolved.ok && thinking !== 'default' && (
+                  <span className="cbar-model-thinking" data-testid="model-chip-thinking">
+                    {thinking}
+                  </span>
+                )}
               </button>
             )}
           </>,
@@ -2190,6 +2233,8 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
             note={swapWaits ? NEXT_TURN_NOTE : undefined}
             onSelect={chooseModel}
             onManage={() => onOpenSettings?.()}
+            thinking={thinking}
+            onThinking={chooseThinking}
             onDone={closeSheet}
           />
         </Sheet>

@@ -447,6 +447,27 @@ before a click landed.
 *Don't* reach for this where a native `<select>` does the job — Theme and *Side panel opens* are
 three fixed options and stay native. *Don't* put a blurred shadow on it.
 
+### Segmented level rows (the Thinking row)
+The pattern for choosing one value out of a **short, ordered scale whose available steps depend on
+something else on screen**. One instance so far: the Thinking row under the model picker
+(`ModelPicker.tsx`, `modelpicker.css`), which offers only the levels the chosen model accepts.
+
+It is a row of small buttons in `role="radiogroup"`, not a `<select>`, and the reason is the
+dependency: three to six single words fit on one line, and *which steps this model even has* is half
+of what the row is saying. A select hides that behind a click — you cannot tell a model with five
+levels from one with two without opening it. When a model has no levels at all the row is **not
+drawn**, rather than drawn and disabled: a control whose only option is "Default" states nothing.
+
+Each level reads as a value, like the model trigger above it: mono, 12px, sentence case, a 1px
+control outline, no uppercase label. The chosen one takes `--primary` on its border **and a 1px
+inset rail** — the same device the open trigger uses, because a state may not rest on colour or on a
+transitioned property alone. The row's label (`Thinking`) and its one line of help are `--text-3`;
+the help is the text face, wraps to its own line, and names the knob in the provider's own words
+("Sets Claude's effort level"), so what the control actually does is never a guess.
+
+*Don't* use this for a long scale, an unordered set, or values that need explaining individually —
+that is the dropdown above. *Don't* draw a disabled row to show a control exists.
+
 Beside the trigger, one line of prose (`--text-2`, or `--error-text` with `role="alert"` for a
 problem) says what the trigger alone cannot: that a swap waits for the next turn, or why there is no
 usable model. A problem sentence wraps onto its own line under the trigger rather than into a

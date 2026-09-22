@@ -2,6 +2,7 @@ import type { Artifact } from './artifact';
 import type { Chat } from './chats';
 import type { ModelSelection } from './connections';
 import type { ModelListResult } from './modellist';
+import type { ThinkingLevel } from './thinking';
 import type { ResumableRun } from './runstate';
 import type { AgentEvent, ChatItem, Mod, ScriptPreview, UserTurn } from './types';
 
@@ -47,9 +48,11 @@ export type RpcRequest =
   /** One chat's stored panel transcript, read-only — the dashboard's preview pane. */
   | { type: 'chats.transcript'; id: string }
   /** `model` is what the composer's picker showed when the first message was sent. */
-  | { type: 'chats.create'; host: string; model?: ModelSelection | null }
+  | { type: 'chats.create'; host: string; model?: ModelSelection | null; thinking?: ThinkingLevel }
   /** Point a chat at another model. Takes effect on the chat's next run; a run in flight keeps its own. */
   | { type: 'chats.setModel'; id: string; model: ModelSelection }
+  /** Set how much this chat asks the model to think. Same timing rule as setModel: next run. */
+  | { type: 'chats.setThinking'; id: string; thinking: ThinkingLevel }
   | { type: 'chats.delete'; id: string }
   /** Archive (or unarchive) a chat: it leaves the main switcher list but stays readable. */
   | { type: 'chats.archive'; id: string; archived: boolean }

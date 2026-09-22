@@ -6,28 +6,28 @@ import test from 'node:test';
 import {
   applyBulkArchive,
   archivedChats,
+  blobsKey,
   bulkChats,
   capChats,
   countTurns,
+  createChat,
+  deleteChat,
+  getChat,
   isArchived,
   itemsKey,
+  listChats,
   liveChats,
   MAX_CHATS,
   messagesKey,
   pickChatToShow,
-  sortChats,
-  titleFromText,
-  type Chat,
-} from '../lib/chats.ts';
-import {
-  blobsKey,
-  createChat,
-  deleteChat,
-  listChats,
   saveItems,
   saveMessages,
   setChatArtifact,
+  setChatThinking,
+  sortChats,
+  titleFromText,
   touchChat,
+  type Chat,
 } from '../lib/chats.ts';
 import { artifactKey } from '../lib/artifact.ts';
 import { clearTombstones, dropTombstoned, isTombstoned, TOMBSTONE_TTL_MS, tombstone, withKey } from '../lib/storagequeue.ts';
@@ -539,4 +539,52 @@ test('dropTombstoned returns its input untouched when nothing is tombstoned', ()
   tombstone('b');
   assert.deepEqual(dropTombstoned(rows).map((r) => r.id), ['a']);
   clearTombstones();
+});
+
+// ---------- the per-chat Thinking level ----------
+
+test('a chat stores the Thinking level it was created with, and default writes no field', async () => {
+  await withStorage({}, async () => {
+    const plain = await createChat('example.com', null);
+    assert.equal('thinking' in plain, false, 'a chat created with no level must not carry the field');
+
+    const explicit = await createChat('example.com', null, 'high');
+    assert.equal(explicit.thinking, 'high');
+
+    const defaulted = await createChat('example.com', null, 'default');
+    assert.equal('thinking' in defaulted, false, "'default' is the absence of the field, not a stored value");
+  });
+});
+
+test('setChatThinking writes the level, and setting it back to default removes it', async () => {
+  await withStorage({}, async () => {
+    const chat = await createChat('example.com', null);
+    await setChatThinking(chat.id, 'low');
+    assert.equal((await getChat(chat.id))?.thinking, 'low');
+
+    // Back to default: the record becomes indistinguishable from one never touched, so the stored
+    // shape does not grow a field for every chat that was merely looked at.
+    await setChatThinking(chat.id, 'default');
+    const back = await getChat(chat.id);
+    assert.equal(back?.thinking, undefined);
+    assert.equal('thinking' in back!, false);
+  });
+});
+
+test('setting the Thinking level is not activity: it does not reorder or unarchive', async () => {
+  await withStorage({}, async () => {
+    const chat = await createChat('example.com', null);
+    const before = (await getChat(chat.id))!;
+    await setChatThinking(chat.id, 'max');
+    const after = (await getChat(chat.id))!;
+    assert.equal(after.updatedAt, before.updatedAt, 'choosing a level must not bump updatedAt');
+  });
+});
+
+test('an unknown Thinking level on a stored chat is simply carried, not crashed on', async () => {
+  // Storage is shared with other builds and can hold a level this one does not know. It reads back
+  // as-is here; applyThinking is what refuses to put it on the wire (test/thinking.test.ts).
+  await withStorage({ chats: [{ id: 'x', host: 'example.com', title: 't', createdAt: 1, updatedAt: 1, thinking: 'xhigh' }] }, async () => {
+    assert.equal((await getChat('x'))?.thinking, 'xhigh');
+  });
 });

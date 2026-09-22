@@ -874,7 +874,61 @@ OpenAI-compatible endpoint, and a ChatGPT sign-in as the third if you have one.
 
 ---
 
-## 17. The message box grows
+## 17. The Thinking level on two real providers
+
+`npm run smoke:thinking` proves the mechanics against the mock: which field each level put on the
+wire, the 400 fallback, the marker, the floor for titles. What it cannot prove is that **real**
+backends accept the request shapes — the mock answers 200 to anything the classifier does not
+refuse, so a wrong field name or an illegal combination only shows up here. Needs two real
+providers on different protocols: **Anthropic** (the only one with the mode/effort split) plus any
+OpenAI-compatible endpoint, ideally a local server as well.
+
+1. Chat on a current Claude model (Opus 5, Sonnet 5 or a 4.6). **Expected:** a **Thinking** row
+   under the model, on **Default**, offering Default / Off / Low / Medium / High / Max, with one
+   line of help naming the effort level.
+2. Pick **Max** and send a turn that needs a little thought (*"read this page and tell me what the
+   header is doing"*). **Expected:** a normal reply, visibly slower or longer than Default; the
+   transcript shows a divider reading *thinking: max*.
+   **Expected NOT:** a 400. This is the step that catches `output_config.effort` being sent in the
+   wrong place or with a value the model does not take. **If it fails:** copy the error row
+   verbatim — it names the parameter — plus the model id.
+3. Open DevTools → Network on the service worker and send one more turn. **Expected:** the request
+   body has `output_config: {effort: "max"}` at the **top level**, beside `thinking`, not inside
+   it, and `system` still carries its `cache_control` marker unchanged.
+4. Pick **Off** and send a turn. **Expected:** a reply with no thinking, and `thinking: {"type":
+   "disabled"}` in the request. On Opus 5 this must be sent **without** a raised effort — if you
+   see a 400 saying disabled is not supported at that effort, that combination has leaked back in.
+5. Switch to a model that **cannot** stop thinking (Claude Fable or Mythos, if you have access).
+   **Expected:** the row no longer offers **Off** at all. Picking Low/Medium/High/Max still works.
+6. Switch the chat to an ordinary non-reasoning chat model on your OpenAI-compatible endpoint
+   (`gpt-4o`, or any plain local model). **Expected:** the Thinking row **disappears entirely**
+   rather than appearing greyed out, and turns keep working.
+7. Switch to an OpenAI reasoning model (`gpt-5`, an o-series model). **Expected:** the row is back;
+   picking Low sends `reasoning_effort: "low"` and the turn succeeds.
+8. **A server that refuses the field.** Point an OpenAI-compatible connection at a local server
+   whose model takes no reasoning parameter, set **Reasoning field** on that provider to
+   `reasoning_effort` explicitly (so the guess cannot save you), pick **High** and send a turn.
+   **Expected:** the turn still finishes; a note in the panel says the endpoint does not accept a
+   reasoning setting and that the request was sent again without it; the next turn to that model
+   sends no reasoning field at all and shows the note only once.
+   **If it fails:** copy the server's 400 body — the classifier in `lib/thinking.ts` has to
+   recognise real wording, and a refusal it misses shows up as a red error row instead.
+9. **Qwen 3 on a local server** (llama.cpp, vLLM or Ollama), with **Reasoning field** on Auto.
+   **Expected:** the row offers Default / Off / High only; Off sends
+   `chat_template_kwargs: {enable_thinking: false}` and the reply has no thinking block.
+   **If Auto guesses wrong for your server**, set the field explicitly, or put the knob your server
+   actually wants into **Custom request fields** as JSON and confirm it reaches the request.
+10. With a level other than Default set, let a chat earn a **model-written title** (first turn of a
+    new chat, auto-naming on). **Expected:** in the Network tab, the title call carries the model's
+    **lowest** level (`reasoning_effort: "none"`, or `thinking: {type: "disabled"}`), never the
+    chat's. The same goes for a compaction summary if you can provoke one.
+11. Reload the panel and restart the browser. **Expected:** the chat is still on its level; a
+    **New chat** starts on the last level you picked; the dashboard's chat row shows it beside the
+    model, and the transcript preview shows the *thinking:* lines.
+
+---
+
+## 18. The message box grows
 
 `npm run smoke:composer` measures this; the manual pass is for feel.
 
@@ -919,7 +973,10 @@ OpenAI-compatible endpoint, and a ChatGPT sign-in as the third if you have one.
 | 11 | ChatGPT **Fetch models** after sign-in returns a list (was a 400) | | |
 | 16 | Two real providers: swap mid-chat in every direction, no 400s | | |
 | 16 | Swap during a run applies next turn; removed provider blocks Send | | |
-| 17 | Message box grows, caps, shrinks after send | | |
+| 17 | Thinking: Max/Off on a real Claude model, correct request shape, no 400 | | |
+| 17 | Thinking: row hidden for a non-reasoning model; 400 fallback is survived and reported | | |
+| 17 | Thinking: titles and summaries run at the floor; level survives a reload | | |
+| 18 | Message box grows, caps, shrinks after send | | |
 
 For any **Fail** row, file an issue (or note here) with: the step number, the exact error text
 copied from the console named in that step, the Chrome version (`chrome://version`), and whether
