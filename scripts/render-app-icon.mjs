@@ -26,44 +26,76 @@
 // downscaled from one big raster.
 //
 // ---------------------------------------------------------------------------
-// Two platforms want two different pictures
+// Both platforms now want the same picture: a full-bleed square
 // ---------------------------------------------------------------------------
 //
-// iOS supplies a FULL-BLEED SQUARE and the system applies the superellipse mask itself. Handing it
-// a pre-rounded icon would round it twice and leave pale corners inside the mask. assets/icon.svg
-// already draws its own blue tile edge to edge, so iOS gets it exactly as it is, at 1024. That one
-// image is all current Xcode needs — it derives the rest.
+// iOS has always supplied a FULL-BLEED SQUARE and let the system apply the superellipse mask.
+// Handing it a pre-rounded icon would round it twice and leave pale corners inside the mask.
+// That one 1024 image is all current Xcode needs — it derives the rest.
 //
-// macOS does NOT mask anything. The icon is drawn as-is at every size, and the platform convention
-// is a rounded rectangle inset inside a transparent margin, so icons of different shapes line up
-// optically in the Dock and the Finder. An icon that fills its square reads as bigger than
-// everything beside it, which is the way a Mac icon looks wrong.
+// macOS USED TO BE THE OPPOSITE, and this script used to encode that. Through macOS 15 the system
+// masked nothing: the icon was drawn as supplied, and the convention was a rounded rectangle inset
+// inside a transparent margin (Apple's grid is 824/1024, a ratio of 0.805) so icons of different
+// shapes lined up optically in the Dock. macOS 26 (Tahoe) ENDED THAT. Under Liquid Glass the
+// system draws every app icon in its own rounded-square container and clips the artwork to it, the
+// way iOS always has — and artwork that still carries its own transparent margin is not recognised
+// as already-shaped, it is simply centred inside the system container, which is why the owner saw
+// the mark floating in a frame with the Dock's grey showing around it.
 //
-// Apple's grid for a "square" icon is 824/1024 wide — a ratio of 0.805. THIS ARTWORK CANNOT USE
-// IT, and the reason is the pixel grid rather than taste. The mark is 16 blocks across, so a tile
-// of N pixels draws each block at N/16, and the blocks stay whole only when N is a multiple of 16.
-// 0.805 of 1024 is 824, which is not; the renders came out with ten invented colours per icon,
-// exactly the mush this whole approach exists to prevent. MAC_TILE is therefore 12/16 = 0.75, the
-// nearest ratio to Apple's that keeps every tile a whole multiple of the grid AND leaves a whole
-// pixel of margin on each side. The margin is a little wider than the system's; a fraction of a
-// pixel of extra air is a far cheaper price than a blurred mark.
+// Sources, since this reverses a decision that was carefully argued the other way:
+//   - Apple HIG, "App icons" — macOS 26 icons are drawn in the system's rounded-rectangle shape;
+//     supply a full-bleed 1024x1024 square and let the system mask it.
+//     https://developer.apple.com/design/human-interface-guidelines/app-icons
+//   - Xcode, "Configuring your app icon using an asset catalog".
+//     https://developer.apple.com/documentation/xcode/configuring-your-app-icon
+//   - The same fix, diagnosed in the wild: "macOS Tahoe wraps icons with transparent edges in a
+//     grey squircle in the Dock, shrinking the artwork" — the remedy being to flatten the padding
+//     to opaque full-bleed art "so Tahoe clips a clean squircle itself".
+//     https://github.com/aladh/Spotty/pull/261
 //
-// Below 64px even 0.75 has no whole blocks to give — a 16px icon inset to 12px would ask for 16
-// blocks in 12 pixels — so THE TWO SMALLEST RASTERS ARE FULL BLEED. At 16 and 32 points the icon
-// is a Finder list row or a Dock badge, the margin is a pixel or two and invisible, and a crisp
-// mark matters more than a shape nobody can resolve. INSET_FROM records that threshold.
+// ICON COMPOSER WAS CONSIDERED AND NOT USED. Xcode 27 ships Icon Composer and supports a `.icon`
+// bundle in the asset catalog, and it is the right answer for artwork with real layers, because it
+// gets the specular and shadow passes of Liquid Glass for free. It is the wrong answer here: a
+// `.icon` is a layered-vector document whose whole value is that the system relights and reblurs
+// those layers, and this mark is four flat pixel-art paths on a 16-unit grid whose entire point is
+// that nothing resamples or shades it. Building one from our SVG would also mean either checking in
+// a binary bundle no script can regenerate, or writing a `.icon` emitter for a format Apple has not
+// documented as stable. Full-bleed PNGs through the appiconset get the same system squircle with
+// none of that, so that is what ships.
 //
-// NO CSS ROUNDING IS APPLIED, on either platform, and that is a decision rather than an omission.
-// The artwork already has a corner: assets/icon.svg draws its tile as `M1 0h14v1h1v14...`, which
-// takes one grid block out of each corner — a pixel-art bevel, the BBS-era way of saying "rounded"
-// on a 16x16 grid. Laying a CSS border-radius over it rounds a shape that is already cut, and the
-// result is a visible double step at every corner: the bevel, then the arc, with a notch between
-// them. It was rendered and looked at before this was written down.
+// THE MAC RASTERS ARE THEREFORE FULL BLEED, exactly like iOS, with one change to the artwork: the
+// BEVEL IS DROPPED. assets/icon.svg draws its tile as `M1 0h14v1h1v14...`, taking one grid block
+// out of each corner — a pixel-art bevel, the BBS-era way of saying "rounded" at 16x16. Under a
+// system mask that bevel is actively harmful: those corner blocks are transparent, so they punch
+// four notches out of the navy right where the system's squircle needs opaque colour, and the Dock
+// shows grey through them. macOS gets MAC_BG painted edge to edge underneath instead. The corner is
+// the system's job now. iOS keeps the artwork as-is, because its corners land outside the
+// superellipse and are never seen.
 //
-// So macOS gets the margin and the artwork's own bevel, and nothing else. Every raster here is
-// therefore made only of the five colours in the source, with no antialiased arc anywhere, and all
-// of them — iOS and macOS, inset and full bleed — are held to the same strict no-new-colours rule
-// the toolbar icons are. There is no slack band and nothing is exempt.
+// THE BREATHING ROOM MOVED FROM THE TILE TO THE MARK, and that turns out to need no scaling at
+// all. The old margin was around the whole tile, which is what read as "a small mark floating in a
+// frame". What should be inset is the MARK, and the artwork already insets it: the u spans grid
+// units 2..14 of 16, leaving two units of its own blue on each side. So the artwork is drawn at the
+// FULL canvas size — the same picture iOS gets — and the mark lands at 12/16 = 75% of the width,
+// which is the 70–80% a native macOS 26 icon occupies inside its squircle. The only thing added is
+// MAC_BG underneath, to fill the four bevel corners.
+//
+// Scaling the artwork down would be worse twice over. It would shrink the mark below 75% (0.75 of
+// the canvas puts the mark at 0.75 × 12/16 = 56%, which is the floating-mark look again, one layer
+// in), and it would reintroduce the pixel-grid problem this script exists to catch: a canvas of N
+// pixels at scale s draws each block at N·s/16, whole only for particular pairs, and Apple's old
+// 0.805 on a 1024 grid invented ten colours per icon.
+//
+// Drawing at full size also means THERE IS NO LONGER A SMALL-SIZE EXCEPTION. Every macOS raster,
+// 16 through 1024, is the same construction with whole blocks — at 16px each grid unit is exactly
+// one pixel — so the no-new-colours check applies unweakened at every slot, with nothing documented
+// away. The old INSET_FROM threshold is gone with the inset that needed it.
+//
+// NO CSS ROUNDING IS APPLIED, on either platform. On iOS and now on macOS the system does the
+// rounding; laying a border-radius under it would antialias an arc that gets clipped away anyway,
+// and would break the no-new-colours rule for nothing. Every raster here is made only of the
+// colours in the source, and all of them are held to that same strict rule with no slack band and
+// no exemption.
 
 import { chromium } from 'playwright';
 import { colourKey, decodePNG, pretty } from './lib/png.mjs';
@@ -77,13 +109,18 @@ const CATALOG = path.join(ROOT, 'safari', 'App', 'Assets.xcassets');
 const ICONSET = path.join(CATALOG, 'AppIcon.appiconset');
 
 /**
- * The macOS tile, as a fraction of the canvas. 12/16, not Apple's 824/1024, so that every tile is a
- * whole multiple of the artwork's 16-unit grid and no block is ever split across a pixel boundary.
- * See the note at the top.
+ * How much of the canvas the MARK occupies once the artwork is drawn at full size: the u spans grid
+ * units 2..14 of 16, so it lands at 75% with two units of its own field on each side. Asserted
+ * against the rendered pixels below rather than trusted, since it is a property of the SVG's path
+ * data and would change silently if the artwork were redrawn. See the note at the top.
  */
-const MAC_TILE = 12 / 16;
-/** Below this many pixels there is no room to inset without splitting blocks, so the tile fills. */
-const INSET_FROM = 64;
+const MARK_SPAN = 12 / 16;
+/**
+ * The tile colour from assets/icon.svg, painted edge to edge under the macOS mark so the system's
+ * squircle has opaque artwork to clip. It is one of the source palette colours by construction, so
+ * the no-new-colours check covers it like everything else.
+ */
+const MAC_BG = '#1008C8';
 
 /**
  * The macOS sizes, as (points, scale) pairs. macOS asks for both scales of every size from 16 to
@@ -105,26 +142,33 @@ const IOS_SIZE = 1024;
 // ---------------------------------------------------------------------------
 
 /**
- * Lay the SVG out alone on a transparent page at exactly `size`, and screenshot it.
+ * Lay the SVG out alone on a page at exactly `size`, and screenshot it.
  *
- * `inset` is the macOS treatment: the tile is scaled to MAC_TILE of the canvas, centred, and
- * clipped to a rounded rectangle. On iOS it is false and the artwork fills the square.
+ * `platform` picks the treatment:
+ *
+ *   'ios' — the artwork alone, full bleed on a transparent page, exactly as it is drawn. Its bevel
+ *           corners stay transparent because the superellipse mask cuts further in than they do.
+ *
+ *   'mac' — the same artwork at the same full size, over MAC_BG painted across the whole square.
+ *           The background is what fills the bevel's four transparent corner blocks, so the
+ *           system's rounded-square mask has opaque colour everywhere it clips. See the note at
+ *           the top.
  */
-async function render(browser, svg, size, file, { inset }) {
+async function render(browser, svg, size, file, { platform }) {
   const page = await browser.newPage({ viewport: { width: size, height: size }, deviceScaleFactor: 1 });
-  const tile = inset ? size * MAC_TILE : size;
-  const offset = inset ? (size - tile) / 2 : 0;
-  // No border-radius: the artwork carries its own corner bevel. See the note at the top.
+  const mac = platform === 'mac';
+  // No border-radius on either platform: the system does the rounding now. See the note at the top.
   await page.setContent(
     `<!doctype html><html><head><style>
-       html,body{margin:0;padding:0;background:transparent;width:${size}px;height:${size}px}
-       .tile{position:absolute;left:${offset}px;top:${offset}px;width:${tile}px;height:${tile}px}
+       html,body{margin:0;padding:0;background:${mac ? MAC_BG : 'transparent'};width:${size}px;height:${size}px}
        /* crispEdges in the SVG keeps the blocks hard; this stops any browser-side smoothing of
           the element box on top of it. */
-       svg{display:block;width:${tile}px;height:${tile}px;image-rendering:pixelated}
-     </style></head><body><div class="tile">${svg}</div></body></html>`,
+       svg{display:block;width:${size}px;height:${size}px;image-rendering:pixelated}
+     </style></head><body>${svg}</body></html>`,
   );
-  await page.screenshot({ path: file, omitBackground: true });
+  // omitBackground would punch the mac field back out to transparent, which is the exact thing
+  // macOS 26 wraps in a grey frame — so it is only for iOS, whose bevel corners must stay clear.
+  await page.screenshot({ path: file, omitBackground: !mac });
   await page.close();
 }
 
@@ -141,13 +185,17 @@ function sourcePalette() {
 }
 
 /**
- * Check one rendered icon: exact size, and not a single colour the artwork does not contain.
+ * Check one rendered icon: exact size, not a single colour the artwork does not contain, and enough
+ * opaque pixels that a blank render cannot pass.
  *
  * No exemptions and no slack band: nothing here is antialiased, because nothing here is rounded.
- * `inset` only tells the opacity floor below how much of the canvas the tile was supposed to
- * cover, since an inset icon is legitimately transparent around its margin.
+ *
+ * `platform` sets the opacity floor. A macOS raster must now be COMPLETELY opaque — that is the
+ * whole point of the change, since any transparent pixel is a hole the system's squircle shows the
+ * Dock through — so its floor is 1. iOS keeps a floor just under 1 because its bevel legitimately
+ * leaves four transparent corner blocks.
  */
-function verify(file, size, palette, { inset = false } = {}) {
+function verify(file, size, palette, { platform = 'ios' } = {}) {
   const im = decodePNG(file);
   const rel = path.relative(ROOT, file);
   if (im.width !== size || im.height !== size) {
@@ -178,13 +226,36 @@ function verify(file, size, palette, { inset = false } = {}) {
   }
 
   // A blank or near-blank icon would pass every colour check above, since transparent is in the
-  // palette. The mark covers the whole tile, so anything mostly transparent is a failed render.
+  // palette. Beyond that, a macOS raster with ANY transparent pixel is the bug this change fixes:
+  // the system clips its squircle out of whatever is supplied, and a hole in the artwork is a hole
+  // the Dock's grey shows through. So macOS demands 100% and says which pixel failed.
   const filled = 1 - transparent / (im.width * im.height);
-  const floor = inset ? MAC_TILE * MAC_TILE * 0.9 : 0.95;
-  if (filled < floor) {
+  if (platform === 'mac' && transparent > 0) {
+    throw new Error(
+      `${rel} has ${transparent} transparent pixel(s); a macOS icon must be opaque edge to edge or ` +
+        "macOS 26 shows its own grey frame through the gaps",
+    );
+  }
+  if (filled < 0.95) {
     throw new Error(`${rel} is only ${(filled * 100).toFixed(1)}% opaque; the artwork did not render`);
   }
-  return { filled };
+
+  // How wide the mark actually came out, as a fraction of the canvas: the leftmost and rightmost
+  // pixel that is not the background field. This is the number the owner sees — "does it fill the
+  // frame" — and it is a property of the SVG's path data, so it would drift silently if the artwork
+  // were redrawn. The caller checks it against MARK_SPAN.
+  let markLeft = im.width;
+  let markRight = -1;
+  for (let y = 0; y < im.height; y++) {
+    for (let x = 0; x < im.width; x++) {
+      const key = colourKey(im.px, (y * im.width + x) * 4);
+      if (key === 'transparent' || pretty(key) === MAC_BG.toLowerCase()) continue;
+      if (x < markLeft) markLeft = x;
+      if (x > markRight) markRight = x;
+    }
+  }
+  const markSpan = markRight < markLeft ? 0 : (markRight - markLeft + 1) / im.width;
+  return { filled, markSpan };
 }
 
 // ---------------------------------------------------------------------------
@@ -236,18 +307,27 @@ for (const f of fs.readdirSync(ICONSET)) {
 const browser = await chromium.launch({ channel: 'chromium' });
 try {
   const ios = path.join(ICONSET, `ios-${IOS_SIZE}.png`);
-  await render(browser, svg, IOS_SIZE, ios, { inset: false });
-  verify(ios, IOS_SIZE, palette);
+  await render(browser, svg, IOS_SIZE, ios, { platform: 'ios' });
+  verify(ios, IOS_SIZE, palette, { platform: 'ios' });
   console.log(`[appicon] ios-${IOS_SIZE}.png`.padEnd(28) + `${IOS_SIZE}x${IOS_SIZE}  full bleed, verified`);
 
   for (const size of MAC_SIZES) {
     const file = path.join(ICONSET, `mac-${size}.png`);
-    // Too small to inset without splitting blocks: fill, and be crisp instead of shaped.
-    const inset = size >= INSET_FROM;
-    await render(browser, svg, size, file, { inset });
-    const { filled } = verify(file, size, palette, { inset });
-    const shape = inset ? 'inset tile' : 'full bleed (too small to inset)';
-    console.log(`[appicon] mac-${size}.png`.padEnd(28) + `${size}x${size}  ${shape}, ${(filled * 100).toFixed(0)}% opaque, verified`);
+    await render(browser, svg, size, file, { platform: 'mac' });
+    const { markSpan } = verify(file, size, palette, { platform: 'mac' });
+    // The mark has to actually land where the artwork says it does. One block of tolerance, which
+    // is all a 16px raster can express; anything further off means the SVG was redrawn and the
+    // icon's proportions moved without anyone deciding to move them.
+    if (Math.abs(markSpan - MARK_SPAN) > 1 / 16 + 1e-9) {
+      throw new Error(
+        `${path.relative(ROOT, file)}: the mark spans ${(markSpan * 100).toFixed(1)}% of the canvas, ` +
+          `expected about ${(MARK_SPAN * 100).toFixed(0)}% — the artwork's own margins changed`,
+      );
+    }
+    console.log(
+      `[appicon] mac-${size}.png`.padEnd(28) +
+        `${size}x${size}  full bleed, opaque, mark ${(markSpan * 100).toFixed(0)}% wide, verified`,
+    );
   }
 
   fs.writeFileSync(path.join(ICONSET, 'Contents.json'), `${JSON.stringify(contents(), null, 2)}\n`);
@@ -257,11 +337,12 @@ try {
   );
 
   if (preview) {
-    // A look-at-it render at the size a person judges a Mac icon at, so the shape and the margin
-    // can be reviewed rather than taken on trust.
+    // A look-at-it render at the size a person judges a Mac icon at, so the field and the mark's
+    // inset can be reviewed rather than taken on trust. It is the raw square; the system's squircle
+    // is applied on top of this at display time.
     const out = path.resolve(ROOT, preview);
     fs.mkdirSync(path.dirname(out), { recursive: true });
-    await render(browser, svg, 256, out, { inset: true });
+    await render(browser, svg, 256, out, { platform: 'mac' });
     console.log(`[appicon] preview -> ${path.relative(ROOT, out)}`);
   }
 } finally {

@@ -6,6 +6,17 @@ All notable changes to usermods are recorded here. The format follows
 
 ## [Unreleased]
 
+### The Mac app icon fills its frame on macOS 26
+
+- **The macOS rasters are full-bleed squares now, not a 0.75 tile in a transparent margin.** macOS
+  26 (Tahoe) clips every app icon to its own rounded-square container, the way iOS always has, so
+  artwork carrying its own margin was simply centred inside the system frame with the Dock's grey
+  showing around it. The tile colour goes to every edge, the artwork's pixel-art bevel is dropped on
+  macOS because its transparent corners punched holes in the mask (iOS keeps it — its superellipse
+  cuts further in), and the mark lands at 75% of the width from the artwork's own margins, with no
+  scaling and therefore no small-size exception. `scripts/render-app-icon.mjs` now fails on a single
+  transparent pixel in a macOS raster, and on a mark that drifts from that 75%.
+
 ### Safari: dismissing the popup no longer interrupts a run
 
 From the owner: on iPhone and iPad the popup *is* the extension, and dismissing it is the normal way
