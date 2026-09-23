@@ -3,7 +3,7 @@
 // the user opens a page, types a short code, and we poll for the token.
 //
 // Wire details come from the vendors' own CLIs (openai/codex and xAI's grok CLI), as reused by
-// several open-source agents. Neither vendor publishes docs for this; see README.
+// several open-source agents. Neither vendor publishes docs for this; see docs/guide.md.
 //
 // ---------------------------------------------------------------------------
 // Shape: start, then single steps. Not a loop.

@@ -8,7 +8,7 @@ body:
         Worth knowing before you write: usermods has **no server, no account and no telemetry**, and
         that is a deliberate constraint rather than a missing feature. Anything needing a
         usermods-operated backend is out of scope. The
-        [Roadmap](https://github.com/kballenegger/usermods/blob/main/README.md#roadmap) says what is
+        [Roadmap](https://github.com/kballenegger/usermods/blob/main/docs/roadmap.md) says what is
         already intended.
 
   - type: textarea

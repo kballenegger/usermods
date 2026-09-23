@@ -27,15 +27,15 @@ Full `chrome.*` surface as of this check (`entrypoints/` + `lib/`):
 | `declarativeNetRequest.updateDynamicRules` (redirect, `regexSubstitution`) | `entrypoints/background.ts` |
 | `scripting.executeScript` (with `files`) | `entrypoints/background.ts` (content-script fallback injection) |
 | `storage.local` | `entrypoints/background.ts`, `lib/chats.ts`, `lib/consent.ts`, `lib/oauth.ts` |
-| `storage.session` | **Not actually called.** README's "Chat history is kept per tab in `chrome.storage.session`" does not match the code — `lib/chats.ts` persists chats, messages and items in `chrome.storage.local` (see below). |
+| `storage.session` | **Not actually called.** An old README line, "Chat history is kept per tab in `chrome.storage.session`", did not match the code — `lib/chats.ts` persists chats, messages and items in `chrome.storage.local` (see below). |
 | `tabs.captureVisibleTab` | `entrypoints/background.ts` (screenshot tool) |
 | `tabs.{query,get,create,remove,getCurrent,sendMessage,onActivated,onUpdated}` | `entrypoints/background.ts`, `entrypoints/sidepanel/App.tsx`, `entrypoints/install/main.tsx` |
 | `runtime.{onInstalled,onStartup,onMessage,onConnect,connect,sendMessage,getURL}` | `entrypoints/background.ts`, `entrypoints/content.ts`, `entrypoints/sidepanel/Chat.tsx`, `lib/gm.ts` |
 | `identity` | Not used (confirmed by grep — OAuth device-code flows in `lib/oauth.ts` use plain `fetch`, not `chrome.identity`) |
 
-**Doc bug found in passing:** the README (`## How it works`) says chat history lives in
+**Doc bug found in passing:** the README's *How it works* (since moved to [architecture.md](architecture.md)) said chat history lives in
 `chrome.storage.session`. The code (`lib/chats.ts`) uses `chrome.storage.local` for the chat index,
-message history and panel transcript. Worth a one-line README fix — flagged here, not changed, since
+message history and panel transcript. Worth a one-line fix — flagged here, not changed, since
 this pass owns only `docs/browsers.md`.
 
 ---
@@ -162,7 +162,7 @@ including Safari, at versions far below any other floor this list sets. No porti
 - [MDN: `storage.session`](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/storage/session)
 
 Moot for the actual port: as noted above, usermods doesn't call `storage.session` anywhere in
-`entrypoints/` or `lib/` — only `storage.local`, which is universally supported. If the README's
+`entrypoints/` or `lib/` — only `storage.local`, which is universally supported. If that old
 description is ever made true (moving chat history to `storage.session`), that would still be safe
 on Firefox 115+/Safari 16.4+, both well under every other floor here.
 
@@ -192,7 +192,7 @@ close-to-identical shape (`userScripts`, `onUserScriptMessage`/`onUserScriptConn
 `declarativeNetRequest`, `scripting.executeScript`, `storage.*`, `tabs.captureVisibleTab`) or has a
 well-documented Firefox-native equivalent that needs a real adapter (`sidePanel` → `sidebarAction`).
 `userScripts` landed in Firefox 136 (March 2025), so the floor is recent but stable — this is not
-waiting on an unshipped API anymore, which is presumably why the README's roadmap entry ("Firefox,
+waiting on an unshipped API anymore, which is presumably why the [roadmap](roadmap.md) entry ("Firefox,
 once its side panel story is settled") predates Firefox 136 shipping `userScripts` at all; the
 side-panel gap is now the only structural blocker, not the userscript execution model.
 

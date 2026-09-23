@@ -9,7 +9,7 @@ body:
         The `@grant` lines and the exact error are what make it diagnosable.
 
         Two known behaviours to rule out first, both documented in the
-        [README](https://github.com/kballenegger/usermods/blob/main/README.md#gm-api-compatibility):
+        [docs/gm-api.md](https://github.com/kballenegger/usermods/blob/main/docs/gm-api.md):
 
         - `GM_download`, `GM_cookie` and `GM_webRequest` are **not implemented**, and
           `GM_registerMenuCommand`, `GM_notification` and `GM_getTab`/`GM_saveTab`/`GM_getTabs` are

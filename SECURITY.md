@@ -104,4 +104,4 @@ Two properties are deliberate, documented, and not secretly being treated as bug
 - Installed scripts run with the grants their header declares, after the user sees them in the
   preview.
 
-If you think either of those is worse than the README claims, that is a legitimate report — say why.
+If you think either of those is worse than [docs/architecture.md](docs/architecture.md#security-notes) claims, that is a legitimate report — say why.
