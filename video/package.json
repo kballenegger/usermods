@@ -1,0 +1,22 @@
+{
+  "name": "usermods-launch-video",
+  "private": true,
+  "type": "module",
+  "description": "The usermods launch video, a HyperFrames composition. See README.md.",
+  "scripts": {
+    "prepare-assets": "node scripts/prepare.mjs",
+    "lint": "HYPERFRAMES_NO_TELEMETRY=1 hyperframes lint",
+    "check": "HYPERFRAMES_NO_TELEMETRY=1 hyperframes check",
+    "preview": "HYPERFRAMES_NO_TELEMETRY=1 hyperframes preview",
+    "render": "node scripts/prepare.mjs && node scripts/render.mjs --quality delivery --fps 30 --output out/usermods-launch.mp4",
+    "render:draft": "node scripts/prepare.mjs && node scripts/render.mjs --quality draft --fps 30 --output out/usermods-launch-draft.mp4",
+    "sheet": "sh scripts/contact-sheet.sh out/usermods-launch.mp4 out/contact-sheet.png",
+    "render:all": "node scripts/render-all.mjs",
+    "sheet:all": "for v in 16x9 1x1 9x16 x; do sh scripts/contact-sheet.sh out/usermods-launch-$v.mp4 out/contact-sheet-$v.png; done",
+    "readme": "node scripts/readme-assets.mjs"
+  },
+  "devDependencies": {
+    "gsap": "3.14.2",
+    "hyperframes": "0.8.62"
+  }
+}

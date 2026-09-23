@@ -1,0 +1,214 @@
+      /* The repo's own faces (OFL), from @fontsource: Jersey 10 for the wordmark and the big
+         numbers only, IBM Plex Mono for every other word. */
+      @font-face { font-family: 'Jersey 10'; src: url('assets/fonts/jersey-10-400.woff2') format('woff2'); font-weight: 400; }
+      @font-face { font-family: 'IBM Plex Mono'; src: url('assets/fonts/ibm-plex-mono-400.woff2') format('woff2'); font-weight: 400; }
+      @font-face { font-family: 'IBM Plex Mono'; src: url('assets/fonts/ibm-plex-mono-500.woff2') format('woff2'); font-weight: 500; }
+      @font-face { font-family: 'IBM Plex Mono'; src: url('assets/fonts/ibm-plex-mono-600.woff2') format('woff2'); font-weight: 600; }
+      @font-face { font-family: 'IBM Plex Mono'; src: url('assets/fonts/ibm-plex-mono-700.woff2') format('woff2'); font-weight: 700; }
+
+      /* The identity palette from docs/branding.md and entrypoints/sidepanel/tokens.css. */
+      :root {
+        --brand-blue: #1008c8;
+        --brand-lime: #aeff24;
+        --brand-cyan: #00e5f2;
+        --brand-ink: #030b16;
+        --brand-pink: #f343d3;
+        --brand-yellow: #fff345;
+        --navy-900: #0c1220;
+        --navy-800: #181e2b;
+        --navy-700: #212737;
+        --navy-500: #6b748a;
+        --text-1: #f1f3f9;
+        --text-2: #b8bece;
+        --blue-300: #98b6fb;
+        --pink-400: #d262ba;
+        --mono: 'IBM Plex Mono', ui-monospace, monospace;
+        --pixel: 'Jersey 10', monospace;
+      }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--brand-ink); }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; font-family: var(--mono); color: var(--text-1); }
+
+      .scene { position: absolute; inset: 0; overflow: hidden; }
+      .scene.blue { background: var(--brand-blue); }
+      .scene.navy { background: var(--navy-900); }
+      .layer { position: absolute; inset: 0; }
+      svg.px, img.px { image-rendering: pixelated; shape-rendering: crispEdges; display: block; }
+
+
+      /* ---------- the wordmark: lime pixel letters, cyan lower edge, ink offset shadow ---------- */
+      .wordmark {
+        font-family: var(--pixel);
+        color: var(--brand-lime);
+        line-height: 0.78;
+        letter-spacing: 0.01em;
+        text-shadow: 0 0.035em 0 var(--brand-cyan), 0.04em 0.075em 0 var(--brand-ink);
+        white-space: nowrap;
+      }
+      .tagline { font-weight: 700; color: var(--brand-yellow); text-shadow: 5px 5px 0 var(--brand-ink); white-space: nowrap; }
+      .rule { display: block; height: 10px; background: var(--brand-pink); box-shadow: 5px 5px 0 var(--brand-ink); transform-origin: 0 50%; }
+      .subline { font-weight: 600; color: var(--brand-cyan); white-space: nowrap; }
+
+      /* Typed text: a monospace line revealed one character per step. */
+      .typed { display: inline-block; overflow: hidden; white-space: nowrap; vertical-align: bottom; width: 0; }
+      .caret { display: inline-block; width: 0.55em; height: 0.95em; background: currentColor; vertical-align: -0.1em; margin-left: 0.08em; }
+
+      /* ---------- 1 · cold open ---------- */
+      #open-hero, #end-hero { position: absolute; left: 0; right: 0; top: 200px; display: flex; flex-direction: column; align-items: center; }
+      .mark-row { display: flex; align-items: center; gap: 56px; }
+      .mark-row .wordmark { font-size: 340px; }
+      .tag-block { margin-top: 70px; display: flex; flex-direction: column; align-items: center; }
+      .tag-block .tagline { font-size: 76px; }
+      .tag-block .rule { width: 100%; margin-top: 20px; }
+      .tag-block .subline { font-size: 44px; margin-top: 34px; }
+      .skyline { position: absolute; left: 0; right: 0; bottom: 0; height: 250px; }
+
+      /* ---------- 2 · the problem ---------- */
+      #problem-lines { position: absolute; left: 200px; top: 350px; display: flex; flex-direction: column; gap: 44px; }
+      #problem-lines .line { font-size: 66px; font-weight: 700; white-space: nowrap; }
+      .l-white { color: var(--text-1); }
+      .l-cyan { color: var(--brand-cyan); }
+      .l-lime { color: var(--brand-lime); }
+      /* Two faint corner glows, as radial gradients (a CSS blur filter would force slow capture). */
+      .glow-tl, .glow-br { position: absolute; width: 1600px; height: 1600px; opacity: 0.5; }
+      .glow-tl { left: -800px; top: -900px; background: radial-gradient(closest-side, rgba(16, 8, 200, 0.75), rgba(16, 8, 200, 0)); }
+      .glow-br { right: -820px; bottom: -940px; background: radial-gradient(closest-side, rgba(58, 12, 110, 0.8), rgba(58, 12, 110, 0)); }
+
+      /* ---------- 3 · the demo ---------- */
+      #cam { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; }
+      #win {
+        position: absolute; left: 66px; top: 70px; width: 1788px; height: 904px;
+        border: 4px solid var(--brand-cyan); background: var(--brand-ink);
+        box-shadow: 18px 18px 0 var(--brand-ink);
+      }
+      #titlebar { position: absolute; left: 0; top: 0; right: 0; height: 44px; display: flex; align-items: center; gap: 12px; padding: 0 16px; background: var(--brand-ink); }
+      .dot { width: 16px; height: 16px; }
+      #urlbar { margin-left: 22px; height: 30px; width: 760px; background: var(--navy-800); border: 2px solid var(--navy-500); display: flex; align-items: center; padding: 0 12px; gap: 10px; font-size: 18px; color: var(--text-2); }
+      #titlebar .ext { margin-left: auto; width: 32px; height: 32px; }
+      #site { position: absolute; left: 0; top: 44px; width: 1340px; height: 852px; overflow: hidden; background: #f6f6ef; }
+      #site img, #site .cell { position: absolute; }
+      #site > img { left: 0; top: 0; width: 1340px; height: 852px; }
+      .cell { background-image: url('assets/capture/site-after.webp'); background-size: 1340px 852px; opacity: 0; }
+      #panel { position: absolute; left: 1340px; top: 44px; width: 440px; height: 852px; overflow: hidden; background: var(--navy-900); }
+      #panel img { position: absolute; left: 0; top: 0; width: 440px; height: 852px; opacity: 0; }
+      #panel img.first { opacity: 1; }
+      #hl { position: absolute; border: 5px solid var(--brand-pink); opacity: 0; box-shadow: 0 0 0 3px var(--brand-ink); }
+      #cursor { position: absolute; left: 0; top: 0; width: 36px; height: 57px; opacity: 0; }
+      .ping { position: absolute; width: 60px; height: 60px; margin: -30px 0 0 -30px; border: 4px solid var(--brand-lime); opacity: 0; }
+
+      .cap {
+        position: absolute; left: 96px; top: 858px; display: flex; align-items: center; gap: 26px;
+        padding: 14px 34px 16px 24px; background: var(--brand-ink); border: 4px solid var(--brand-cyan);
+        box-shadow: 10px 10px 0 var(--brand-pink); opacity: 0;
+      }
+      .cap .n { font-family: var(--pixel); font-size: 110px; line-height: 0.8; color: var(--brand-lime); text-shadow: 0 4px 0 var(--brand-cyan); }
+      .cap .t { font-size: 38px; font-weight: 700; color: var(--text-1); white-space: nowrap; }
+      .cap .t em { font-style: normal; color: var(--brand-yellow); }
+
+      /* ---------- 4 · features ---------- */
+      .feat { position: absolute; inset: 0; opacity: 0; }
+      .feat .copy { position: absolute; left: 130px; top: 250px; width: 960px; }
+      .feat .num { font-family: var(--pixel); font-size: 200px; line-height: 0.8; color: var(--brand-lime); text-shadow: 0 7px 0 var(--brand-cyan), 9px 16px 0 var(--brand-blue); }
+      .feat h2 { margin-top: 56px; font-size: 70px; line-height: 1.1; font-weight: 700; color: var(--text-1); }
+      .feat h2 em { font-style: normal; color: var(--brand-yellow); }
+      .feat p { margin-top: 30px; font-size: 32px; line-height: 1.45; font-weight: 500; color: var(--text-2); }
+      .feat p b { color: var(--brand-cyan); font-weight: 600; }
+      /* The visual half of a feature beat: its box is set per layout below, its content centred. */
+      .visual { position: absolute; display: flex; align-items: center; justify-content: center; }
+      .shot { position: relative; flex: none; border: 4px solid var(--brand-cyan); box-shadow: 16px 16px 0 var(--brand-blue); background: var(--navy-900); overflow: hidden; }
+      .shot img { display: block; width: 100%; height: 100%; }
+      .shot.crop img { position: absolute; left: 0; max-width: none; }
+      .devices { gap: 0; }
+      .shot.ipad { width: 448px; height: 668px; margin-top: 170px; margin-right: -90px; }
+      .phone { position: relative; flex: none; background: var(--brand-ink); border: 4px solid var(--brand-cyan); border-radius: 58px; padding: 16px; box-shadow: 16px 16px 0 var(--brand-blue); }
+      .phone img { display: block; width: 360px; height: auto; border-radius: 42px; }
+      .chips { margin-top: 34px; display: flex; gap: 16px; flex-wrap: wrap; }
+      .chip { padding: 8px 18px; font-size: 26px; font-weight: 700; color: var(--brand-ink); background: var(--brand-cyan); box-shadow: 6px 6px 0 var(--brand-blue); }
+      .chip.pink { background: var(--brand-pink); }
+      .chip.yellow { background: var(--brand-yellow); }
+      .chip.lime { background: var(--brand-lime); }
+      .term { position: relative; flex: none; width: 720px; background: var(--brand-ink); border: 4px solid var(--brand-cyan); box-shadow: 16px 16px 0 var(--brand-blue); }
+      .term .bar { height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 16px; border-bottom: 2px solid var(--navy-700); font-size: 20px; color: var(--text-2); }
+      .term pre { padding: 26px 28px 32px; font-family: var(--mono); font-size: 24px; line-height: 1.6; color: var(--text-1); white-space: pre-wrap; }
+      .term .k { color: var(--brand-pink); }
+      .term .a { color: var(--brand-yellow); }
+      .term .c { color: var(--brand-cyan); }
+
+      /* ---------- 5 · end card ---------- */
+      #end-cta { position: absolute; left: 0; right: 0; top: 632px; display: flex; flex-direction: column; align-items: center; gap: 22px; }
+      .pill { display: flex; align-items: center; gap: 20px; padding: 14px 30px; background: var(--brand-ink); border: 4px solid var(--brand-lime); box-shadow: 10px 10px 0 var(--brand-pink); font-size: 40px; font-weight: 700; color: var(--text-1); white-space: nowrap; }
+      .pill .dim { color: var(--brand-lime); }
+      .soon { padding: 8px 22px; background: var(--brand-ink); font-size: 30px; font-weight: 600; color: var(--brand-yellow); white-space: nowrap; }
+
+      /* ---------- transitions: blocky pixel wipes ---------- */
+      .wipe { position: absolute; inset: 0; z-index: 50; pointer-events: none; }
+      .wipe i { position: absolute; width: 120px; height: 120px; opacity: 0; }
+
+
+      /* =========================================================================================
+       * Per-layout composition. The markup is shared; each shape re-lays the scenes out for itself
+       * rather than cropping the 16:9. `wide` is 1920x1080, `square` 1080x1080 (also the X cut),
+       * `tall` 1080x1920 with text kept out of the platform UI zones (top 220px, bottom 420px).
+       * ======================================================================================= */
+
+      /* ---- wide (16:9) ---- */
+      #root[data-layout='wide'] #end-hero { top: 70px; }
+      #root[data-layout='wide'] #end-hero .tag-block { margin-top: 52px; }
+      #root[data-layout='wide'] .visual { left: 1090px; right: 60px; top: 60px; bottom: 60px; }
+      #root[data-layout='wide'] .devices { justify-content: flex-end; padding-right: 60px; }
+
+      /* ---- square (1:1) and the X cut ---- */
+      #root[data-layout='square'] #open-hero { top: 250px; }
+      #root[data-layout='square'] #end-hero { top: 140px; }
+      #root[data-layout='square'] .mark-row .wordmark { font-size: 250px; }
+      #root[data-layout='square'] .tag-block { margin-top: 44px; }
+      #root[data-layout='square'] .tag-block .tagline { font-size: 54px; }
+      #root[data-layout='square'] .tag-block .rule { height: 8px; margin-top: 16px; }
+      #root[data-layout='square'] .tag-block .subline { font-size: 34px; margin-top: 26px; }
+      #root[data-layout='square'] #end-cta { top: 590px; gap: 18px; }
+      #root[data-layout='square'] .pill { font-size: 34px; padding: 12px 26px; }
+      #root[data-layout='square'] .soon { font-size: 25px; }
+      #root[data-layout='square'] #problem-lines { left: 70px; top: 270px; gap: 34px; }
+      #root[data-layout='square'] #problem-lines .line { font-size: 58px; }
+      #root[data-layout='square'] .cap { left: 36px; right: 36px; top: auto; bottom: 34px; gap: 20px; padding: 12px 24px 14px 20px; box-shadow: 8px 8px 0 var(--brand-pink); }
+      #root[data-layout='square'] .cap .n { font-size: 84px; }
+      #root[data-layout='square'] .cap .t { font-size: 31px; }
+      #root[data-layout='square'] .feat .copy { left: 56px; top: 0; bottom: 0; width: 470px; display: flex; flex-direction: column; justify-content: center; }
+      #root[data-layout='square'] .feat .num { font-size: 130px; }
+      #root[data-layout='square'] .feat h2 { margin-top: 38px; font-size: 44px; }
+      #root[data-layout='square'] .feat p { margin-top: 22px; font-size: 23px; }
+      #root[data-layout='square'] .chips { margin-top: 26px; gap: 12px; }
+      #root[data-layout='square'] .chip { font-size: 21px; padding: 6px 14px; }
+      #root[data-layout='square'] .visual { left: 556px; right: 40px; top: 40px; bottom: 40px; }
+      #root[data-layout='square'] .shot.ipad { display: none; }
+      #root[data-layout='square'] .term { width: 470px; }
+      #root[data-layout='square'] .term .bar { font-size: 16px; }
+      #root[data-layout='square'] .term pre { font-size: 16px; padding: 18px 18px 22px; }
+
+      /* ---- tall (9:16): text lives between y=220 and y=1500 ---- */
+      #root[data-layout='tall'] #open-hero { top: 590px; }
+      #root[data-layout='tall'] #end-hero { top: 400px; }
+      #root[data-layout='tall'] .mark-row .wordmark { font-size: 250px; }
+      #root[data-layout='tall'] .tag-block { margin-top: 48px; }
+      #root[data-layout='tall'] .tag-block .tagline { font-size: 56px; }
+      #root[data-layout='tall'] .tag-block .rule { height: 8px; margin-top: 16px; }
+      #root[data-layout='tall'] .tag-block .subline { font-size: 35px; margin-top: 28px; }
+      #root[data-layout='tall'] #end-cta { top: 880px; gap: 22px; }
+      #root[data-layout='tall'] .pill { font-size: 34px; padding: 12px 26px; }
+      #root[data-layout='tall'] .soon { font-size: 25px; }
+      #root[data-layout='tall'] #problem-lines { left: 70px; top: 660px; gap: 40px; }
+      #root[data-layout='tall'] #problem-lines .line { font-size: 58px; }
+      #root[data-layout='tall'] .cap { left: 44px; right: 44px; top: 236px; gap: 22px; padding: 14px 24px 16px 20px; box-shadow: 8px 8px 0 var(--brand-pink); }
+      #root[data-layout='tall'] .cap .n { font-size: 92px; }
+      #root[data-layout='tall'] .cap .t { font-size: 35px; }
+      #root[data-layout='tall'] .feat .copy { left: 64px; right: 64px; top: 250px; width: auto; }
+      #root[data-layout='tall'] .feat .num { font-size: 150px; }
+      #root[data-layout='tall'] .feat h2 { margin-top: 40px; font-size: 58px; }
+      #root[data-layout='tall'] .feat p { margin-top: 22px; font-size: 27px; }
+      #root[data-layout='tall'] .chips { margin-top: 26px; }
+      #root[data-layout='tall'] .visual { left: 40px; right: 40px; top: 740px; bottom: 420px; }
+      #root[data-layout='tall'] .shot.ipad { display: none; }
+      #root[data-layout='tall'] .phone { padding: 12px; border-radius: 48px; }
+      #root[data-layout='tall'] .phone img { width: 310px; border-radius: 36px; }
+      #root[data-layout='tall'] .term { width: 960px; }
+      #root[data-layout='tall'] .term pre { font-size: 22px; }

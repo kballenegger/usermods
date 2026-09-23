@@ -1,0 +1,143 @@
+    <div id="root" data-composition-id="main" data-layout="{{LAYOUT}}" data-start="0" data-duration="{{TOTAL}}" data-fps="30" data-width="{{W}}" data-height="{{H}}">
+      <!-- 1 · cold open ------------------------------------------------------------------------>
+      <section id="s-open" class="clip scene blue" data-start="0" data-duration="{{D_OPEN}}" data-track-index="0">
+        <div class="layer" id="open-sky"></div>
+        <svg class="skyline px" id="open-skyline" viewBox="0 0 {{W}} 250" preserveAspectRatio="none"></svg>
+        <div id="open-hero">
+          <div class="mark-row">
+            <div class="wordmark" id="open-word">usermods</div>
+          </div>
+          <div class="tag-block">
+            <div class="tagline" id="open-tag">Your web. Your rules.</div>
+            <span class="rule" id="open-rule"></span>
+            <div class="subline"><span class="typed" id="open-sub">Vibe-code userscripts in place.</span><span id="open-caret-wrap"><span class="caret" id="open-caret"></span></span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2 · the problem ---------------------------------------------------------------------->
+      <section id="s-problem" class="clip scene navy" data-start="{{T_PROBLEM}}" data-duration="{{D_PROBLEM}}" data-track-index="0">
+        <div class="glow-tl"></div>
+        <div class="glow-br"></div>
+        <div id="problem-lines">
+{{PROBLEM_LINES}}
+        </div>
+      </section>
+
+      <!-- 3 · the demo: the real extension, captured by capture/capture.mjs -------------------->
+      <section id="s-demo" class="clip scene blue" data-start="{{T_DEMO}}" data-duration="{{D_DEMO}}" data-track-index="0">
+        <div class="layer" id="demo-sky"></div>
+        <div id="cam">
+          <div id="win">
+            <div id="titlebar">
+              <svg class="dot px" viewBox="0 0 2 2"><rect width="2" height="2" fill="#f343d3" /></svg>
+              <svg class="dot px" viewBox="0 0 2 2"><rect width="2" height="2" fill="#fff345" /></svg>
+              <svg class="dot px" viewBox="0 0 2 2"><rect width="2" height="2" fill="#aeff24" /></svg>
+              <div id="urlbar"><span style="color: var(--brand-lime)">&#9632;</span>news.ycombinator.com/show</div>
+              <img class="ext px" src="assets/icon.svg" alt="" />
+            </div>
+            <div id="site"><img id="site-before" src="assets/capture/site-before.webp" alt="" /></div>
+            <div id="panel"></div>
+            <div id="hl"></div>
+            <div class="ping" id="ping1"></div>
+            <div class="ping" id="ping2"></div>
+            <div class="ping" id="ping3"></div>
+            <svg class="px" id="cursor" viewBox="0 0 12 19"></svg>
+          </div>
+        </div>
+        <div class="cap" id="cap1"><span class="n">1</span><span class="t">Open the panel. <em>Say what you want.</em></span></div>
+        <div class="cap" id="cap2"><span class="n">2</span><span class="t">It reads the real page first.</span></div>
+        <div class="cap" id="cap3"><span class="n">3</span><span class="t">It writes a mod and <em>proposes it.</em></span></div>
+        <div class="cap" id="cap4"><span class="n">4</span><span class="t">Run once. <em>The page changes.</em></span></div>
+        <div class="cap" id="cap5"><span class="n">5</span><span class="t">Save. <em>It runs on every visit.</em></span></div>
+      </section>
+
+      <!-- 4 · features (stills are the README captures from docs/screenshots) ------------------>
+      <section id="s-feat" class="clip scene navy" data-start="{{T_FEAT}}" data-duration="{{D_FEAT}}" data-track-index="0">
+        <div class="glow-tl"></div>
+        <div class="glow-br"></div>
+
+        <div class="feat" id="f1">
+          <div class="copy">
+            <div class="num">01</div>
+            <h2>Any model. <em>Your plan.</em></h2>
+            <p>Claude, GPT, Grok, OpenRouter, Ollama. Or sign in with the <b>ChatGPT</b> or <b>SuperGrok</b> subscription you already pay for.</p>
+          </div>
+          <div class="visual"><div class="shot crop" data-src="assets/shots/model-picker.png" data-y0="0" data-h="930"></div></div>
+        </div>
+
+        <div class="feat" id="f2">
+          <div class="copy">
+            <div class="num">02</div>
+            <h2>Edit <em>any</em> installed mod in chat.</h2>
+            <p>Imported ones too. <b>Update mod</b> writes back over the same script, header and stored values intact.</p>
+          </div>
+          <div class="visual"><div class="shot crop" data-src="assets/shots/editing.png" data-y0="445" data-h="1100"></div></div>
+        </div>
+
+        <div class="feat" id="f3">
+          <div class="copy">
+            <div class="num">03</div>
+            <h2>Bring your <em>Tampermonkey</em> library.</h2>
+            <p>One backup file brings every script across, with the <b>GM_*</b> API, <b>@require</b> and <b>@resource</b> they expect.</p>
+          </div>
+          <div class="visual"><div class="shot crop" data-src="assets/shots/migrate.png" data-y0="110" data-h="950"></div></div>
+        </div>
+
+        <div class="feat" id="f4">
+          <div class="copy">
+            <div class="num">04</div>
+            <h2>Chrome <em>and</em> Safari.</h2>
+            <p>The same extension, the same mods.</p>
+            <div class="chips"><span class="chip">Chrome</span><span class="chip yellow">Mac</span><span class="chip pink">iPhone</span><span class="chip lime">iPad</span></div>
+          </div>
+          <div class="visual devices"><div class="shot ipad"><img src="assets/shots/ipad-popover.png" alt="" /></div><div class="phone"><img src="assets/shots/iphone.png" alt="" /></div></div>
+        </div>
+
+        <div class="feat" id="f5">
+          <div class="copy">
+            <div class="num">05</div>
+            <h2>Open source. <em>MIT.</em></h2>
+            <p>Mods are plain <b>.user.js</b> files. Your key, your machine. No account, no hosted service.</p>
+          </div>
+          <div class="visual"><div class="term">
+            <div class="bar">
+              <svg class="dot px" viewBox="0 0 2 2" style="width: 14px; height: 14px"><rect width="2" height="2" fill="#f343d3" /></svg>
+              <svg class="dot px" viewBox="0 0 2 2" style="width: 14px; height: 14px"><rect width="2" height="2" fill="#fff345" /></svg>
+              <svg class="dot px" viewBox="0 0 2 2" style="width: 14px; height: 14px"><rect width="2" height="2" fill="#aeff24" /></svg>
+              <span style="margin-left: 10px">hacker-news-dark.user.js</span>
+            </div>
+            <pre id="term-code"></pre>
+          </div></div>
+        </div>
+      </section>
+
+      <!-- 5 · end card ------------------------------------------------------------------------->
+      <section id="s-end" class="clip scene blue" data-start="{{T_END}}" data-duration="{{D_END}}" data-track-index="0">
+        <div class="layer" id="end-sky"></div>
+        <svg class="skyline px" id="end-skyline" viewBox="0 0 {{W}} 250" preserveAspectRatio="none"></svg>
+        <div id="end-hero">
+          <div class="mark-row">
+            <div class="wordmark" id="end-word">usermods</div>
+          </div>
+          <div class="tag-block">
+            <div class="tagline" id="end-tag">Your web. Your rules.</div>
+            <span class="rule" id="end-rule"></span>
+            <div class="subline" id="end-sub">Vibe-code userscripts in place.</div>
+          </div>
+        </div>
+        <div id="end-cta">
+          <div class="pill" id="end-gh"><span class="dim">&gt;</span>github.com/kballenegger/usermods</div>
+          <div class="soon" id="end-soon">Open source &middot; Coming to the Chrome Web Store</div>
+        </div>
+      </section>
+
+      <div class="wipe" id="wipe-a"></div>
+      <div class="wipe" id="wipe-b"></div>
+      <div class="wipe" id="wipe-c"></div>
+      <div class="wipe" id="wipe-d"></div>
+
+      <!-- Chiptune bed, synthesised by scripts/music.mjs: no third-party audio. -->
+      <audio id="music" data-start="0" data-duration="{{TOTAL}}" data-track-index="1" data-volume="0.8" src="{{AUDIO}}"></audio>
+    </div>
+

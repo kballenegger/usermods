@@ -8,6 +8,9 @@ Open the side panel on any page, describe what you want changed, and usermods in
 
 Userscripts, userstyles, usermods.
 
+<!-- VIDEO: replace this block with the github.com/user-attachments URL on its own line once uploaded -->
+<p align="center"><a href="https://github.com/kballenegger/usermods/releases/download/launch-video/usermods-launch-16x9.mp4"><img src="docs/video-poster.jpg" alt="Watch the one-minute usermods launch video: someone types &quot;make hacker news dark&quot; into the side panel, the agent reads the page and proposes a mod, Run once turns Hacker News dark, and Save installs it; then any model, editing mods in chat, Tampermonkey import, Chrome and Safari, MIT." width="100%"></a></p>
+
 <p align="center"><img src="docs/screenshots/hero-github.png" alt="usermods in the Chrome side panel next to a GitHub repository page, mid-conversation: a proposed mod that collapses the file list is saved and enabled, and the user is asking for a follow-up change." width="100%"></p>
 
 ## Why
