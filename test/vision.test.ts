@@ -281,10 +281,9 @@ test('a screenshot elided by compaction is not resurrected as an image part', as
 
   const out = toOpenAIMessages('SYS', res.messages);
   const images = out.flatMap((m) => partsOf(m).filter((p: any) => p.type === 'image_url'));
-  // Compaction protects the most recent result of each tool, so the last screenshot survives; the
-  // five older ones are stubs and the adapter finds no image left in them to attach.
-  assert.ok(images.length <= 2, `compaction left ${images.length} images on the wire; the old ones should be stubs`);
-  assert.ok(images.length < 6, 'every screenshot survived, so nothing was actually elided');
+  // Compaction leaves the two most recent user turns alone, so their screenshots survive; the four
+  // older ones are stubs (or summarised away) and the adapter finds no image left to attach.
+  assert.equal(images.length, 2, 'only the screenshots in the two most recent turns survive compaction');
 
   // And the conversion is still valid: every tool message answers a call that came before it.
   const seen = new Set<string>();
