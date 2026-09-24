@@ -23,6 +23,7 @@ import {
   type ThinkingLevel,
 } from '../lib/thinking.ts';
 import { createOpenAIProvider } from '../lib/providers/openai.ts';
+import { createAnthropicProvider } from '../lib/providers/anthropic.ts';
 import { isVisionRejection } from '../lib/providers/vision.ts';
 import { isContextLengthError } from '../lib/agent/retry.ts';
 import { ProviderError } from '../lib/providers/errors.ts';
@@ -149,57 +150,65 @@ describe('Anthropic: adaptive thinking and output_config.effort', () => {
 
 describe('Anthropic: the prompt cache survives a level change', () => {
   /**
-   * The request the adapter builds, reduced to what the cache prefix is made of.
+   * The request createAnthropicProvider really sends at one level, captured off the wire.
    *
-   * This mirrors lib/providers/anthropic.ts: the system block carries the cache_control marker, and
-   * the thinking fields are spread at the TOP LEVEL beside it. The point of the test is that no
-   * level can reach inside `system`.
+   * The fake server answers 400 so the call rejects straight after the body is sent; only the body
+   * matters here. The system block carries the cache_control marker, and the point of these tests is
+   * that no level can reach inside `system`, `tools` or `messages`.
    */
-  const buildRequest = (level: ThinkingLevel, model = 'claude-opus-5') => {
-    const think = applyThinking(level, cap('anthropic', model));
-    return {
-      model,
-      max_tokens: 16000,
-      system: [{ type: 'text', text: 'SYSTEM PROMPT', cache_control: { type: 'ephemeral' } }],
-      messages: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }],
-      tools: [{ name: 'get_page', description: 'read', input_schema: { type: 'object' } }],
-      thinking: { type: 'adaptive' },
-      ...(think.thinking ? { thinking: think.thinking } : {}),
-      ...think.body,
-    };
-  };
+  const sentAt = async (level: ThinkingLevel, model = 'claude-opus-5'): Promise<Record<string, unknown>> =>
+    withFetch(
+      () => errorResponse(400, 'captured'),
+      async (sent) => {
+        const provider = createAnthropicProvider({ ...DEFAULT_SETTINGS, provider: 'anthropic', apiKey: 'k', model, thinking: level });
+        await assert.rejects(
+          provider.chat({
+            system: 'SYSTEM PROMPT',
+            messages: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }],
+            tools: [{ name: 'get_page', description: 'read', inputSchema: { type: 'object', properties: {} } }],
+            callbacks: { onText: () => {} },
+          }),
+        );
+        assert.equal(sent.length, 1, 'exactly one request, with the SDK retries turned off');
+        return sent[0];
+      },
+    );
 
-  test('the system block and its cache_control are byte-identical across every level', () => {
-    const baseline = JSON.stringify(buildRequest('default').system);
-    for (const level of THINKING_LEVELS) {
-      const req = buildRequest(level);
-      assert.equal(JSON.stringify(req.system), baseline, `level ${level} changed the cached system block`);
-      // Not just equal by value: the marker itself must still be there and unchanged.
-      assert.deepEqual(req.system[0]?.cache_control, { type: 'ephemeral' }, `level ${level} disturbed the cache_control marker`);
-    }
-  });
+  /** The top-level keys whose values differ between two requests. */
+  const changedKeys = (a: Record<string, unknown>, b: Record<string, unknown>) =>
+    [...new Set([...Object.keys(a), ...Object.keys(b)])].filter((k) => JSON.stringify(a[k]) !== JSON.stringify(b[k])).sort();
 
-  test('the tools and messages are identical across every level too', () => {
+  test('the system block, tools and messages are byte-identical across every level', async () => {
     // Tool and system-prompt breakpoints can miss depending on where the model renders the
     // configuration; what WE control is that we do not rewrite them ourselves.
-    const tools = JSON.stringify(buildRequest('default').tools);
-    const messages = JSON.stringify(buildRequest('default').messages);
+    const base = await sentAt('default');
+    assert.deepEqual((base.system as Array<{ cache_control?: unknown }>)[0]?.cache_control, { type: 'ephemeral' });
     for (const level of THINKING_LEVELS) {
-      assert.equal(JSON.stringify(buildRequest(level).tools), tools, `level ${level} rewrote the tools array`);
-      assert.equal(JSON.stringify(buildRequest(level).messages), messages, `level ${level} rewrote the messages`);
+      const req = await sentAt(level);
+      assert.equal(JSON.stringify(req.system), JSON.stringify(base.system), `level ${level} changed the cached system block`);
+      assert.equal(JSON.stringify(req.tools), JSON.stringify(base.tools), `level ${level} rewrote the tools array`);
+      assert.equal(JSON.stringify(req.messages), JSON.stringify(base.messages), `level ${level} rewrote the messages`);
     }
   });
 
-  test('a level only ever adds top-level siblings of system', () => {
+  test('a level only ever changes top-level siblings of system', async () => {
     // Whatever a level changes, it changes OUTSIDE the cached prefix's own fields.
-    const base = buildRequest('default');
-    const raised = buildRequest('max');
-    const changed = Object.keys(raised).filter((k) => JSON.stringify((raised as Record<string, unknown>)[k]) !== JSON.stringify((base as Record<string, unknown>)[k]));
-    assert.deepEqual(changed, ['output_config'], `a level changed ${JSON.stringify(changed)}; only top-level thinking fields may differ`);
+    const base = await sentAt('default');
+    assert.deepEqual(base.thinking, { type: 'adaptive' }, "'default' keeps the adapter's own adaptive mode");
+    for (const level of ['low', 'medium', 'high', 'max'] as ThinkingLevel[]) {
+      const req = await sentAt(level);
+      assert.deepEqual(changedKeys(base, req), ['output_config'], `level ${level} changed more than output_config`);
+      assert.deepEqual(req.output_config, { effort: level });
+    }
+    // Off overrides the adapter's adaptive default. If the default were spread last it would win,
+    // and Off would quietly send adaptive thinking.
+    const off = await sentAt('off');
+    assert.deepEqual(changedKeys(base, off), ['thinking']);
+    assert.deepEqual(off.thinking, { type: 'disabled' });
   });
 
-  test('the same level twice produces the identical request, so consecutive turns cache', () => {
-    assert.equal(JSON.stringify(buildRequest('medium')), JSON.stringify(buildRequest('medium')));
+  test('the same level twice produces the identical request, so consecutive turns cache', async () => {
+    assert.equal(JSON.stringify(await sentAt('medium')), JSON.stringify(await sentAt('medium')));
   });
 });
 
