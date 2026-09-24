@@ -89,9 +89,7 @@ test('four images fit in a message and a fifth does not', () => {
 });
 
 test('a partial overflow says how many were taken rather than refusing the lot', () => {
-  const note = capNote(3, 3);
-  assert.match(note ?? '', /Only 1 more image fits/);
-  assert.doesNotMatch(note ?? '', /were skipped\b.*\bnone/);
+  assert.equal(capNote(3, 3), 'Only 1 more image fits in this message \u2014 the rest were skipped.');
 });
 
 test('an image still over the cap after shrinking is reported with both sizes', () => {
@@ -251,8 +249,10 @@ test('a user message carrying tool results does not count as a turn', () => {
 // ---------- compaction ----------
 
 test('an attached image is counted at the same flat cost as a screenshot', () => {
-  const part: Part = { type: 'image', mediaType: 'image/png', data: 'AAAA' };
-  assert.ok(estimatePart(part) >= IMAGE_TOKENS, 'an image must not be estimated by its base64 length');
+  const tiny: Part = { type: 'image', mediaType: 'image/png', data: 'AAAA' };
+  const big: Part = { type: 'image', mediaType: 'image/png', data: 'A'.repeat(400_000) };
+  assert.ok(estimatePart(tiny) >= IMAGE_TOKENS);
+  assert.equal(estimatePart(big), estimatePart(tiny), 'an image must not be estimated by its base64 length');
 });
 
 test('tier 1 elides attached images before the cutoff and leaves recent ones alone', () => {
