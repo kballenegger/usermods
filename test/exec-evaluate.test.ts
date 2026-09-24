@@ -11,12 +11,16 @@ import { buildPageInjection, evalAllowed, evaluateIsolated, injectIntoPage, sent
 /**
  * A document that runs, or refuses to run, an appended inline script.
  *
- * `csp: true` models the real refusal precisely: appendChild succeeds, nothing throws, and the
- * script's own statements never execute, so the attribute the script would have set is absent.
+ * Without `csp`, an appended script really executes: its text runs with this fake as `document`.
+ * As in a browser, an exception inside the script does not escape appendChild; it is recorded in
+ * `errors` instead. `csp: true` models the real refusal precisely: appendChild succeeds, nothing
+ * throws, and the script's own statements never execute, so the attribute the script would have
+ * set is absent.
  */
-function fakeDoc(opts: { csp?: boolean } = {}): InjectDoc & { ran: string[]; attrs: Map<string, string>; removed: number } {
+function fakeDoc(opts: { csp?: boolean } = {}): InjectDoc & { ran: string[]; errors: string[]; attrs: Map<string, string>; removed: number } {
   const attrs = new Map<string, string>();
   const ran: string[] = [];
+  const errors: string[] = [];
   let removed = 0;
   const documentElement = {
     setAttribute: (n: string, v: string) => void attrs.set(n, v),
@@ -26,25 +30,29 @@ function fakeDoc(opts: { csp?: boolean } = {}): InjectDoc & { ran: string[]; att
       const el = node as { textContent: string };
       if (!opts.csp) {
         ran.push(el.textContent);
-        // The injected source's first statement, executed the way the browser would.
-        const m = el.textContent.match(/setAttribute\("([^"]+)"/);
-        if (m?.[1]) attrs.set(m[1], '1');
+        try {
+          new Function('document', el.textContent)(doc);
+        } catch (e) {
+          errors.push(String((e as Error)?.message ?? e));
+        }
       }
       return node;
     },
   };
-  return {
+  const doc = {
     documentElement,
     head: null,
     createElement: () => ({ textContent: '', remove: () => void removed++ }),
     get ran() {
       return ran;
     },
+    errors,
     attrs,
     get removed() {
       return removed;
     },
   };
+  return doc;
 }
 
 test('isolated evaluation gets the bridge and the reporter, and chrome by neither name', () => {
@@ -73,17 +81,26 @@ test('evalAllowed reports what the document actually permits', () => {
 });
 
 test('the sentinel is set before the mod, so a mod that throws still counts as having run', () => {
-  const src = buildPageInjection('throw new Error("boom")', 'abc');
-  const attrIndex = src.indexOf(sentinelAttribute('abc'));
-  const modIndex = src.indexOf('boom');
-  assert.ok(attrIndex >= 0 && attrIndex < modIndex, 'the sentinel must come first');
+  const doc = fakeDoc();
+  doc.documentElement.appendChild({ textContent: buildPageInjection('throw new Error("boom")', 'abc') });
+  assert.deepEqual(doc.errors, ['boom'], 'the mod really ran and threw');
+  assert.equal(doc.attrs.has(sentinelAttribute('abc')), true, 'the sentinel must come first');
   // Otherwise every mod with a bug would be reported as a CSP block, which is a different fix.
-  assert.match(src, /^try\{/);
+  assert.equal(injectIntoPage('throw new Error("boom")', 'n2', fakeDoc()), true);
+});
+
+test('a sentinel that cannot be set does not stop the mod from running', () => {
+  // A document with no documentElement makes the sentinel line throw. It is guarded, so the mod's
+  // own code still runs after it.
+  let ran = false;
+  new Function('document', 'mark', buildPageInjection('mark()', 'abc'))({}, () => (ran = true));
+  assert.equal(ran, true);
 });
 
 test('a page that runs the script reports true, and the script does not stay in the DOM', () => {
   const doc = fakeDoc();
-  assert.equal(injectIntoPage('window.x = 1', 'n1', doc), true);
+  assert.equal(injectIntoPage('let x = 1', 'n1', doc), true);
+  assert.deepEqual(doc.errors, [], 'and the mod itself ran cleanly');
   assert.equal(doc.removed, 1);
   // The sentinel is cleaned up, so the next injection starts from a known state.
   assert.equal(doc.attrs.has(sentinelAttribute('n1')), false);
@@ -91,7 +108,7 @@ test('a page that runs the script reports true, and the script does not stay in 
 
 test('a page that refuses the script reports false rather than appearing to succeed', () => {
   const doc = fakeDoc({ csp: true });
-  assert.equal(injectIntoPage('window.x = 1', 'n1', doc), false);
+  assert.equal(injectIntoPage('let x = 1', 'n1', doc), false);
   assert.deepEqual(doc.ran, []);
   // And the element is still removed, so a refused injection leaves no trace either.
   assert.equal(doc.removed, 1);
