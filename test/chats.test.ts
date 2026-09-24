@@ -572,12 +572,14 @@ test('setChatThinking writes the level, and setting it back to default removes i
 });
 
 test('setting the Thinking level is not activity: it does not reorder or unarchive', async () => {
-  await withStorage({}, async () => {
-    const chat = await createChat('example.com', null);
-    const before = (await getChat(chat.id))!;
-    await setChatThinking(chat.id, 'max');
-    const after = (await getChat(chat.id))!;
-    assert.equal(after.updatedAt, before.updatedAt, 'choosing a level must not bump updatedAt');
+  // Seeded with an old timestamp and an archive stamp, so a bump to Date.now() or a cleared
+  // archivedAt cannot hide inside the same millisecond as the chat's creation.
+  await withStorage({ chats: [chat('x', 1, 5)] }, async () => {
+    await setChatThinking('x', 'max');
+    const after = (await getChat('x'))!;
+    assert.equal(after.thinking, 'max');
+    assert.equal(after.updatedAt, 1, 'choosing a level must not bump updatedAt');
+    assert.equal(after.archivedAt, 5, 'choosing a level must not unarchive the chat');
   });
 });
 

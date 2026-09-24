@@ -21,20 +21,14 @@ function issue(table: GrantTable, modId: string, over: Partial<{ tabId: number; 
   return table.issue({ modId, world: over.world ?? 'USER_SCRIPT', tabId: over.tabId ?? FRAME.tabId, frameId: over.frameId ?? FRAME.frameId }, NOW);
 }
 
-test('the modId comes from the table, so a message cannot claim to be another mod', () => {
-  const table = new GrantTable(counter());
-  const mine = issue(table, 'mod-a')!;
-  // The forgery this whole module exists to stop: a caller presenting its own token while naming
-  // someone else's mod. There is nowhere to put the claim: resolve() takes the token alone.
-  const grant = table.resolve(mine.token, FRAME, NOW);
-  assert.equal(grant?.modId, 'mod-a');
-});
-
 test('two mods in one document get two different tokens, and neither resolves to the other', () => {
   const table = new GrantTable(counter());
   const a = issue(table, 'mod-a')!;
   const b = issue(table, 'mod-b')!;
   assert.notEqual(a.token, b.token);
+  // The forgery this whole module exists to stop: a caller presenting its own token while naming
+  // someone else's mod. There is nowhere to put the claim: resolve() takes the token alone, and the
+  // modId comes from the table.
   assert.equal(table.resolve(a.token, FRAME, NOW)?.modId, 'mod-a');
   assert.equal(table.resolve(b.token, FRAME, NOW)?.modId, 'mod-b');
 });
@@ -100,12 +94,15 @@ test('navigation revokes the frame, and the tab takes its subframes with it', ()
   const table = new GrantTable(counter());
   const top = issue(table, 'mod-a')!;
   const sub = issue(table, 'mod-a', { frameId: 4 })!;
+  const sub2 = issue(table, 'mod-a', { frameId: 5 })!;
   const other = issue(table, 'mod-a', { tabId: 9 })!;
   table.revokeFrame(7, 4);
   assert.ok(table.resolve(top.token, { tabId: 7, frameId: 0 }, NOW));
   assert.equal(table.resolve(sub.token, { tabId: 7, frameId: 4 }, NOW), null);
+  assert.ok(table.resolve(sub2.token, { tabId: 7, frameId: 5 }, NOW), 'revoking one frame must leave its siblings');
   table.revokeTab(7);
   assert.equal(table.resolve(top.token, { tabId: 7, frameId: 0 }, NOW), null);
+  assert.equal(table.resolve(sub2.token, { tabId: 7, frameId: 5 }, NOW), null, 'a subframe must go with its tab');
   assert.ok(table.resolve(other.token, { tabId: 9, frameId: 0 }, NOW));
 });
 

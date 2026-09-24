@@ -257,7 +257,9 @@ test('…and the same after compaction put a summary where the early turns were'
   // The summary is an ordinary user message everywhere.
   const first = toAnthropicMessages(history)[0];
   assert.equal(first?.role, 'user');
-  assert.match(JSON.stringify(toOpenAIMessages('s', history)[1]), /Summary of the earlier part/);
+  const o = toOpenAIMessages('s', history)[1];
+  assert.equal(o?.role, 'user');
+  assert.ok(typeof o?.content === 'string' && o.content.startsWith(SUMMARY_PREFIX), 'the OpenAI user message carries the summary');
 });
 
 // ---------------------------------------------------------------------------
@@ -319,9 +321,14 @@ test('an over-long id is shortened rather than sent', () => {
   assertAnthropicValid(openaiTurn(1, [long, 'call_ok']), 'long id');
 });
 
-test('whitespace-only assistant text is dropped for Anthropic and kept out of the way for OpenAI', () => {
+test('whitespace-only assistant text is dropped for Anthropic and does not cost OpenAI the tool calls', () => {
   const a = toAnthropicMessages(openaiTurn(1)) as unknown as Array<{ content: Block[] }>;
   assert.deepEqual(a[1]?.content.map((b) => b.type), ['tool_use', 'tool_use']);
+  // chat/completions: the text rides along on the assistant message that carries the calls.
+  const o = toOpenAIMessages('s', openaiTurn(1))[2] as { role: string; content: string | null; tool_calls?: Array<{ id: string }> };
+  assert.equal(o.role, 'assistant');
+  assert.equal(o.content, '\n\n');
+  assert.deepEqual(o.tool_calls?.map((c) => c.id), ['functions.get_page:1', 'call_1']);
 });
 
 test('a screenshot survives the swap in each protocol\'s own arrangement', () => {

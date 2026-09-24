@@ -10,6 +10,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  addVersion,
   adoptMod,
   createArtifact,
   currentVersion,
@@ -185,39 +186,28 @@ test('reheader leaves every line it does not own alone', () => {
   assert.ok(out.includes('@weird-key   keep me'), 'an unknown key must survive');
   // A locale variant is the author's translation, not ours to rewrite.
   assert.ok(out.includes('@name:fr     Vieux'), 'a locale-suffixed key must not be rewritten');
-  // A header with no @match gains the draft's, rather than saving a script that never runs.
-  assert.ok(out.includes('@match'), 'the draft’s patterns must be added when the header had none');
+  // A header with no @match gains the draft's, rather than saving a script that never runs. The
+  // line goes inside the block, before the closing marker, or parseHeader would never see it.
+  const lines = out.split('\n');
+  const match = lines.indexOf('// @match       *://a.example/*');
+  assert.ok(match >= 0, 'the draft’s patterns must be added when the header had none');
+  assert.ok(match < lines.indexOf('// ==/UserScript=='), 'the added @match must sit inside the header block');
 });
 
-/** Apply a propose_mod-shaped revision to an artifact, the way recordProposal does. */
+/** Apply a propose_mod-shaped revision through addVersion, the way recordProposal does. */
 function adoptedProposal(a: Artifact, code: string, over: { name?: string; matches?: string[] } = {}): Artifact {
   const v = currentVersion(a)!;
-  return {
-    ...a,
-    versions: [
-      ...a.versions,
-      {
-        n: a.current + 1,
-        code,
-        name: over.name ?? v.name,
-        description: v.description,
-        matches: over.matches ?? v.matches,
-        createdAt: Date.now(),
-        source: 'proposal' as const,
-        // This is the inheritance addVersion does, asserted separately below.
-        ...(v.header ? { header: v.header } : {}),
-      },
-    ],
-    current: a.current + 1,
-    name: over.name ?? v.name,
-    matches: over.matches ?? v.matches,
-  };
+  // No header here: a proposal never carries one, so whatever the saved source has, addVersion put there.
+  return addVersion(a, draftOf({ code, name: over.name ?? v.name, description: v.description, matches: over.matches ?? v.matches }));
 }
 
 test('addVersion inherits the header, so a revision cannot drop it', () => {
   const a = fromMod('chat-1', imported());
-  const next = adoptMod(a, imported({ id: 'mod-imported' }));
-  assert.ok(currentVersion(next)!.header, 'the header must ride forward');
+  const before = currentVersion(a)!.header;
+  assert.ok(before, 'the seeded version must carry the imported header');
+  const next = addVersion(a, draftOf());
+  assert.equal(next.current, 2, 'the draft must land as a new version');
+  assert.deepEqual(currentVersion(next)!.header, before, 'the header must ride forward');
 });
 
 test('a rollback restores the header its target carried, not the one in force now', () => {
@@ -412,17 +402,14 @@ test('the open_mod tool is declared with mod_id and replace', () => {
   assert.equal(schema.additionalProperties, false);
 });
 
-test('the system prompt teaches when to open a mod and when to make a new one', () => {
-  assert.match(SYSTEM_PROMPT, /Mods already installed on this page/);
-  assert.match(SYSTEM_PROMPT, /call open_mod with its id/);
-  // The three branches the brief asks for, in one sentence each.
-  assert.match(SYSTEM_PROMPT, /"also", "too", "as well"/);
-  assert.match(SYSTEM_PROMPT, /unrelated to every mod listed, write a new one/);
-  assert.match(SYSTEM_PROMPT, /cannot tell, ask in ONE sentence/);
-  // And that it must not throw a metadata block away.
-  assert.match(SYSTEM_PROMPT, /never propose a script that would drop its @require/);
-  // Detaching is the user's to do, not the model's to fake.
-  assert.match(SYSTEM_PROMPT, /Save as a new mod instead/);
+test('the system prompt names the open_mod tool and the heading modsBlock emits', () => {
+  // Only the tokens the prompt shares with code are pinned here, not its wording.
+  assert.match(SYSTEM_PROMPT, /\bopen_mod\b/);
+  // The prompt quotes the heading with <n> for the count, so it must match what modsBlock writes.
+  const one = { id: 'm1', name: 'A', description: '', enabled: true, matches: [], linked: false };
+  const heading = modsBlock([one]).split('\n')[0]!;
+  assert.equal(heading, '[Mods already installed on this page: 1]');
+  assert.ok(SYSTEM_PROMPT.includes(heading.replace(': 1]', ': <n>]')), `the prompt does not describe the heading ${heading}`);
 });
 
 // ---------------------------------------------------------------------------

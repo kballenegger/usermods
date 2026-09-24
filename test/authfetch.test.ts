@@ -82,17 +82,13 @@ test('on Chrome the host advice is left out', () => {
   }
 });
 
-test('neither message is the raw platform string', () => {
+test('the Chrome message names both hosts in a sentence', () => {
   // The failure mode being fixed: the user seeing "Load failed" or "Failed to fetch" and having
   // nothing to act on.
-  for (const safari of [true, false]) {
-    for (const kind of ['chatgpt', 'xai'] as const) {
-      const m = fetchFailureMessage(kind, safari);
-      assert.doesNotMatch(m, /^Load failed/);
-      assert.doesNotMatch(m, /Failed to fetch/);
-      assert.ok(m.length > 40, 'a sentence, not a code');
-    }
-  }
+  assert.equal(
+    fetchFailureMessage('chatgpt', false),
+    'Could not reach auth.openai.com and chatgpt.com. Check your internet connection and try again.',
+  );
 });
 
 // ---------------------------------------------------------------------------

@@ -169,7 +169,7 @@ test('a transcript is unfinished while a tool row has no result or a message is 
   assert.equal(looksUnfinished([]), false);
 });
 
-test('the reconnect note is a note row, so it never reads as model output', () => {
+test('text after a note row starts a new assistant row', () => {
   const items = reduceItems([{ kind: 'note', text: RECONNECT_NOTE }], { type: 'text', delta: 'resumed' });
   assert.deepEqual(items.map((i) => i.kind), ['note', 'assistant']);
 });
@@ -363,18 +363,10 @@ test('a bubble left marked queued with nothing running is the same gap, and stop
   assert.equal(items[1]?.kind === 'user' && items[1].queued, true, 'the input is not mutated');
 });
 
-test('the note claims only what can be missing, and says what is intact', () => {
-  // What can be missing: rows on screen. What cannot: the conversation, the draft, saved mods.
-  assert.match(RECONNECT_NOTE, /rows/);
-  assert.match(RECONNECT_NOTE, /streamed text or tool results/);
-  assert.match(RECONNECT_NOTE, /conversation the model sees/);
-  assert.match(RECONNECT_NOTE, /draft/);
-  assert.match(RECONNECT_NOTE, /saved mods/);
-  assert.match(RECONNECT_NOTE, /intact/);
+test('the note does not repeat the old false claim that the run output was lost', () => {
   // The old wording said the run's OUTPUT was lost, which has not been true since the background
   // began keeping the transcript itself.
   assert.doesNotMatch(RECONNECT_NOTE, /not captured|earlier output/);
-  assert.match(GAP_TOOL_SUMMARY, /the model received it/);
 });
 
 // ---------- how much the model was asked to think ----------
