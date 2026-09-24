@@ -232,7 +232,21 @@ test('abortableSleep rejects at once on an already-aborted signal and cleans up 
   const ac = new AbortController();
   ac.abort();
   await assert.rejects(abortableSleep(10_000, ac.signal), (e: unknown) => (e as Error).name === 'AbortError');
-  await abortableSleep(1, new AbortController().signal);
+  // Count abort listeners on a live signal: a sleep that ends normally must take its listener off.
+  const signal = new AbortController().signal;
+  let live = 0;
+  const add = signal.addEventListener.bind(signal);
+  const remove = signal.removeEventListener.bind(signal);
+  signal.addEventListener = ((...args: Parameters<typeof add>) => {
+    if (args[0] === 'abort') live++;
+    add(...args);
+  }) as typeof signal.addEventListener;
+  signal.removeEventListener = ((...args: Parameters<typeof remove>) => {
+    if (args[0] === 'abort') live--;
+    remove(...args);
+  }) as typeof signal.removeEventListener;
+  await abortableSleep(1, signal);
+  assert.equal(live, 0, 'no abort listener left on the signal');
 });
 
 test('an abort thrown by the request itself is never retried', async () => {
