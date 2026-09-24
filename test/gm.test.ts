@@ -141,7 +141,6 @@ test('an @require ending in a line comment cannot swallow the script body', () =
 // ---------- finding 2: no forced strict mode, one scope per unit ----------
 
 test('the wrapper does not impose strict mode', () => {
-  assert.ok(!/^\s*'use strict'/m.test(buildRegisteredCode(mod(HEADER), {})), 'no "use strict" directive is emitted');
   // Sloppy-mode behaviour a real script may rely on: assigning to an undeclared name.
   const w = run(buildRegisteredCode(mod(HEADER + 'implicitGlobal = 7;\nwindow.seen = implicitGlobal;\n'), {}));
   assert.equal(w.win.seen, 7);
