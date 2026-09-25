@@ -13,6 +13,7 @@ import { ModsView } from './ModsView';
 import { SettingsView } from './SettingsView';
 import { PANEL_SHELL, ShellContext, type Shell } from './shell';
 import { usePointerEnvironment } from './usePointer';
+import { useUpdates } from './useUpdates';
 
 type Tab = 'chat' | 'mods' | 'settings';
 
@@ -65,6 +66,8 @@ export function App({ surface = 'panel' }: AppProps = {}) {
   const [consented, setConsented] = useState<boolean | null>(null);
   /** Set when Settings asks to show the notice again, for someone who has already accepted it. */
   const [reviewing, setReviewing] = useState(false);
+  /** Mods with a newer version waiting for review: the badge on Mods. Nothing installs by itself. */
+  const { count: updateCount } = useUpdates();
   const pointer = usePointerEnvironment();
   const layout = popupLayout(pointer);
   /** The content-first shell: the Safari popup under a thumb. Never the panel, never the Mac. */
@@ -224,7 +227,14 @@ export function App({ surface = 'panel' }: AppProps = {}) {
     const nav = (
       <nav className="tabs popup-nav" aria-label="usermods">
         <button type="button" data-view="chat" aria-current={tab === 'chat' ? 'page' : undefined} className={tab === 'chat' ? 'active' : ''} onClick={() => setTab('chat')}>Chat</button>
-        <button type="button" data-view="mods" aria-current={tab === 'mods' ? 'page' : undefined} className={tab === 'mods' ? 'active' : ''} onClick={() => setTab('mods')}>Mods</button>
+        <button type="button" data-view="mods" aria-current={tab === 'mods' ? 'page' : undefined} className={tab === 'mods' ? 'active' : ''} onClick={() => setTab('mods')}>
+          Mods
+          {updateCount > 0 && (
+            <span className="tab-badge" data-testid="mods-update-badge" aria-label={`, ${updateCount} update${updateCount === 1 ? '' : 's'} available`}>
+              {updateCount}
+            </span>
+          )}
+        </button>
         <button type="button" data-view="settings" aria-current={tab === 'settings' ? 'page' : undefined} className={tab === 'settings' ? 'active' : ''} onClick={() => setTab('settings')}>Settings</button>
       </nav>
     );
@@ -324,7 +334,7 @@ export function App({ surface = 'panel' }: AppProps = {}) {
             <Sheet title="Menu" onClose={() => setMenuOpen(false)} returnFocus={menuRef} testId="sheet-menu">
               <nav className="sheet-list" aria-label="usermods">
                 <SheetRow label="Chat" current={tab === 'chat'} onClick={() => go('chat')} action="view-chat" />
-                <SheetRow label="Mods" current={tab === 'mods'} onClick={() => go('mods')} action="view-mods" />
+                <SheetRow label="Mods" value={updateCount > 0 ? `${updateCount} update${updateCount === 1 ? '' : 's'}` : undefined} current={tab === 'mods'} onClick={() => go('mods')} action="view-mods" />
                 <SheetRow label="Settings" current={tab === 'settings'} onClick={() => go('settings')} action="view-settings" />
               </nav>
               <div className="sheet-list">
@@ -367,7 +377,14 @@ export function App({ surface = 'panel' }: AppProps = {}) {
       <nav className="tabs">
         <div className="tab-group">
           <button type="button" data-view="chat" aria-current={tab === 'chat' ? 'page' : undefined} className={tab === 'chat' ? 'active' : ''} onClick={() => setTab('chat')}>Chat</button>
-          <button type="button" data-view="mods" aria-current={tab === 'mods' ? 'page' : undefined} className={tab === 'mods' ? 'active' : ''} onClick={() => setTab('mods')}>Mods</button>
+          <button type="button" data-view="mods" aria-current={tab === 'mods' ? 'page' : undefined} className={tab === 'mods' ? 'active' : ''} onClick={() => setTab('mods')}>
+          Mods
+          {updateCount > 0 && (
+            <span className="tab-badge" data-testid="mods-update-badge" aria-label={`, ${updateCount} update${updateCount === 1 ? '' : 's'} available`}>
+              {updateCount}
+            </span>
+          )}
+        </button>
         </div>
         {/* The page in view. A volt dot means a real page the panel can act on. It takes the slack
             between the groups and only truncates when the panel is genuinely too narrow. */}

@@ -1,0 +1,630 @@
+
+<!DOCTYPE html>
+<html
+  lang="en"
+  data-color-mode="auto" data-light-theme="light" data-dark-theme="dark"
+  data-a11y-animated-images="system" data-a11y-link-underlines="true"
+  >
+  <head>
+<!-- https://gist.github.com/ThomasRoest/d415d54bb81ade76c61dec7a445f65ba (a Firefox user.js, not a userscript), signed out. Saved 2026-09-25 and trimmed: scripts, styles, images and tracking attributes removed so the page makes no requests. -->
+  <script type="application/json" id="client-env">{"locale":"en","featureFlags":["actions_enable_background_steps","actions_new_hosted_runner_image_select_sizes_and_versions","activity_diff_file_tree","activity_repos_file_tree","activity_repos_overview_header","activity_repos_overview_sidebar","agent_author_search_expansion","agent_author_search_expansion_ui_pulls","alternate_user_config_repo","async_conversion_coverage_enabled","billing_billable_licenses_cost_center_bucket_fix","billing_budget_expiration","billing_cost_center_list_assigned_resources","billing_discount_threshold_notification","code_quality_enablement_banner_targeting","code_quality_remove_preview","code_view_raf_sticky_lines","codespaces_prebuild_region_target_update","coding_agent_third_party_model_ui","copilot_agent_snippy","copilot_api_agentic_issue_marshal_yaml","copilot_automation_repo_mcp_servers","copilot_automations_pagination","copilot_chat_auto_mode_v2","copilot_chat_clear_model_selection_for_default_change","copilot_chat_vision_dotcom_chat_ga_gate","copilot_css_textarea_autosize","copilot_custom_copilots","copilot_custom_copilots_feature_preview","copilot_duplicate_thread","copilot_extensions_removal_on_marketplace","copilot_fix_failed_workflows_all_skus","copilot_hide_hovercard","copilot_immersive_task_hyperlinking","copilot_mc_cli_resume_any_users_task","copilot_mission_control_agent_merge_fix_ci","copilot_mission_control_agent_merge_resolve_conflicts","copilot_mission_control_early_stop","copilot_mission_control_environment_list_icons","copilot_mission_control_managed_sandbox_environments","copilot_mission_control_needs_attention","copilot_mission_control_reasoning_effort","copilot_mission_control_sandbox_client_side_clone","copilot_mission_control_sandbox_remote_bypass","copilot_mission_control_session_filters","copilot_mission_control_task_alive_updates","copilot_mission_control_task_sharing","copilot_org_policy_page_focus_mode","copilot_share_active_subthread","copilot_spaces_ga","copilot_spaces_individual_policies_ga","copilot_swe_agent_authorization_status_ui","copilot_swe_agent_automation_resource_scoped_writes","copilot_swe_agent_hide_model_picker_if_only_auto","copilot_swe_agent_issue_comment_trigger","copilot_swe_agent_pr_comment_model_picker","copilot_swe_agent_pull_request_comment_trigger","copilot_swe_agent_pull_request_merged_trigger","copilot_swe_agent_pull_request_opened_trigger","copilot_swe_agent_pull_request_synchronize_trigger","copilot_swe_agent_use_subagents","copilot_task_api_github_rest_style","copilot_task_scoped_alive_channel","copilot_token_based_billing","copilot_unconfigured_is_inherited","copilot_user_can_upgrade_plan_field","copilot_workbench_sunset_redirect","dashboard_indexeddb_caching","dashboard_lists_max_age_filter","dashboard_universe_2025_feedback_dialog","fgpat_permissions_selector_redesign","glc_code_quality_repo_settings_workflow_config","hide_github_models_ui","hyperspace_2025_logged_out_batch_1","hyperspace_2025_logged_out_batch_2","hyperspace_2025_logged_out_batch_3","in_product_messaging_datadog_monitoring","ipm_ubb_individual_budget_banner","issue_fields_multi_select","issue_inline_avatars","issue_pinned_views","issue_relative_time_micro","issues_dashboard_sso_structured_errors","issues_expanded_file_types","issues_hide_closed_sub_issues","issues_lazy_load_comment_box_suggestions","issues_react_chrome_container_query_fix","issues_relates_to_projects_search","labels_archiving","labels_archiving_info","landing_pages_ninetailed","lifecycle_label_name_updates","marketing_cookie_consent_banner","marketing_pages_search_explore_provider","memex_default_issue_create_repository","memex_live_update_hovercard","memex_mwl_filter_field_delimiter","memex_remove_deprecated_type_issue","merge_queue_restricted_pushers_warning","merge_status_checks_refetch_dedupe","merge_status_header_feedback","mergeability_refetch_dedupe","octocaptcha_origin_optimization","primer_react_css_anchor_positioning","primer_react_merged_forwarded_refs","prs_copilot_app_open_action","prs_css_anchor_positioning","prs_thread_reply_as_primary_action","pull_request_copilot_attribution_header","pull_request_overview_panel_edit_description","pull_request_persister","pull_request_stacks_feedback_dialog","pull_request_virtualization_image_estimate","pull_request_virtualization_loader_batching","pull_request_virtualization_scroll_compensation","pull_request_virtualization_scroll_intent","quick_search_lazy_suggestions","react_blob_isolate_code_lines","react_blob_ssr_content_visibility","react_data_router_tanstack_allowed","react_query_props_with_key","react_sandbox_future_tanstack","repo_app_turbo","repo_issues_sidebar_layout","repo_pulls_dashboard_declutter","repo_pulls_dashboard_ga","repo_pulls_dashboard_persistence","repo_pulls_dashboard_sidebar_links","repos_contributors_limited_default_range","review_involves_filter","rule_ignored_file_paths","rulesets_actor_list_editor","sample_network_conn_type","sanitize_preset_flash_error","sanitize_preset_validation_message","security_center_artifact_filters_popover","see_who_reacted","semantic_similarity_duplicate_issue_detection","session_logs_ungroup_reasoning_text","set_sha256_on_repo_creation_form","site_banner_desktop_copilot_app","site_ghca_pixel_mona","site_github_app_ga_page","site_github_app_ga_page_highlight","site_github_app_mobile_native_share","site_global_banner_dev_days_attendee","site_global_banner_learn_copilot_sdk","site_global_nav_spark_models_removed","speculation_rules_ui_service","suggest_custom_property_values_copilot","suppress_automated_browser_vitals","swp_forms_disable_octocaptcha","thread_resolution_reason","ui_service_referrer_metrics","universe26_banners_septsession","update_issue_suggestions","viewscreen_sandbox","warn_inaccessible_attachments","webp_support","workstream_plugin_bootstrap"],"githubDomain":"https://github.com","copilotApiOverrideUrl":"https://api.githubcopilot.com","cmcApiUrl":"https://api.github.com/cmc_internal/api"}</script>
+  <title>user.js · GitHub</title>
+  </head>
+  <body class="logged-out env-production page-responsive" style="word-wrap: break-word;" >
+    <div data-turbo-body class="logged-out env-production page-responsive" style="word-wrap: break-word;" >
+      <div id="__primerPortalRoot__" style="z-index: 1000; position: absolute; width: 100%;" data-turbo-permanent></div>
+    <div class="position-relative header-wrapper js-header-wrapper ">
+      <a href="#start-of-content" data-skip-target-assigned="false" class="px-2 tmp-py-4 color-bg-accent-emphasis color-fg-on-emphasis show-on-focus js-skip-to-content">Skip to content</a>
+      <span data-view-component="true" class="progress-pjax-loader Progress position-fixed width-full">
+    <span style="width: 0%;" data-view-component="true" class="Progress-item progress-pjax-loader-bar left-0 top-0 color-bg-accent-emphasis"></span>
+</span>      
+<react-partial
+  partial-name="keyboard-shortcuts-dialog"
+  data-ssr="false"
+  data-attempted-ssr="false"
+  data-react-profiling="false"
+>
+  <script type="application/json" data-target="react-partial.embeddedData">{"props":{"docsUrl":"https://docs.github.com/get-started/accessibility/keyboard-shortcuts"}}</script>
+  <div data-target="react-partial.reactRoot"></div>
+</react-partial>
+<react-partial
+  partial-name="app-install-banner-partial"
+  data-ssr="false"
+  data-attempted-ssr="false"
+  data-react-profiling="false"
+>
+  <script type="application/json" data-target="react-partial.embeddedData">{"props":{}}</script>
+  <div data-target="react-partial.reactRoot"></div>
+</react-partial>
+            <div class="Header js-details-container Details flex-wrap flex-md-nowrap p-responsive" role="banner" >
+  <div class="Header-item d-none d-md-flex">
+    <a class="Header-link" data-hotkey="g d" aria-label="Gist Homepage " style="--focus-outlineColor: #fff;" href="/">
+</a>
+  </div>
+  <div class="Header-item d-md-none">
+      <button aria-label="Toggle navigation" aria-expanded="false" type="button" data-view-component="true" class="Header-link js-details-target btn-link">    
+</button>  </div>
+  <div class="Header-item Header-item--full js-site-search flex-column flex-md-row width-full flex-order-2 flex-md-order-none mr-0 tmp-mr-md-3 tmp-mt-3 tmp-mt-md-0 Details-content--hidden-not-important d-md-flex">
+      <div class="header-search flex-self-stretch flex-md-self-auto mr-0 tmp-mr-md-3 tmp-mb-3 tmp-mb-md-0">
+  <!-- '"` --><!-- </textarea></xmp> --></option></form><form data-turbo="false" action="/search" accept-charset="UTF-8" method="get">
+    <div class="d-flex">
+        <primer-text-field class="FormControl width-full FormControl--fullWidth">
+      <label id="label-b9cb59af-5cc7-4021-9efc-928e7e9db7a9" class="sr-only FormControl-label" for="q">
+        Search Gists
+</label>    
+  <div class="FormControl-input-wrap">
+      <input placeholder="Search..." aria-describedby="validation-b9cb59af-5cc7-4021-9efc-928e7e9db7a9" data-target="primer-text-field.inputElement " class="form-control FormControl-input FormControl-medium rounded-right-0" type="text" name="q" id="q" />
+</div>
+      <div class="FormControl-inlineValidation" id="validation-b9cb59af-5cc7-4021-9efc-928e7e9db7a9" hidden="hidden">
+  <span class="FormControl-inlineValidation--visual" data-target="primer-text-field.validationSuccessIcon" hidden></span>
+  <span class=" FormControl-inlineValidation--visual" data-target="primer-text-field.validationErrorIcon"></span>
+  <span></span>
+</div>
+</primer-text-field>
+      <button id="icon-button-dfcd18b4-69ce-4b7c-b4db-8f20beac29da" aria-labelledby="tooltip-1ce1a998-0b68-45ba-8169-9246c3b4dc2a" type="submit" data-view-component="true" class="Button Button--iconOnly Button--secondary Button--medium rounded-left-0">  
+</button><tool-tip id="tooltip-1ce1a998-0b68-45ba-8169-9246c3b4dc2a" for="icon-button-dfcd18b4-69ce-4b7c-b4db-8f20beac29da" popover="manual" data-direction="s" data-type="label" data-view-component="true" class="sr-only position-absolute">Search Gists</tool-tip>
+    </div>
+</form></div>
+    <nav aria-label="Global" class="d-flex flex-column flex-md-row flex-self-stretch flex-md-self-auto">
+  <a class="Header-link mr-0 tmp-mr-md-3 py-2 py-md-0 border-top border-md-top-0 border-white-fade" data-ga-click="Header, go to all gists, text:all gists" href="/discover">All gists</a>
+  <a class="Header-link mr-0 tmp-mr-md-3 py-2 py-md-0 border-top border-md-top-0 border-white-fade" data-ga-click="Header, go to GitHub, text:Back to GitHub" href="https://github.com">Back to GitHub</a>
+    <a class="Header-link d-block d-md-none mr-0 tmp-mr-md-3 py-2 py-md-0 border-top border-md-top-0 border-white-fade" data-ga-click="Header, sign in" href="https://gist.github.com/auth/github?return_to=https%3A%2F%2Fgist.github.com%2FThomasRoest%2Fd415d54bb81ade76c61dec7a445f65ba">
+      Sign in
+</a>
+      <a class="Header-link d-block d-md-none mr-0 tmp-mr-md-3 py-2 py-md-0 border-top border-md-top-0 border-white-fade" data-ga-click="Header, sign up" href="/join?return_to=https%3A%2F%2Fgist.github.com%2FThomasRoest%2Fd415d54bb81ade76c61dec7a445f65ba&amp;source=header-gist">
+        Sign up
+</a></nav>
+  </div>
+  <div class="Header-item Header-item--full flex-justify-center d-md-none position-relative">
+    <a class="Header-link" data-hotkey="g d" aria-label="Gist Homepage " style="--focus-outlineColor: #fff;" href="/">
+</a>
+  </div>
+    <div class="Header-item f4 mr-0" role="navigation" aria-label="Sign in or sign up">
+      <a class="Header-link no-underline tmp-mr-3" data-ga-click="Header, sign in" href="https://gist.github.com/auth/github?return_to=https%3A%2F%2Fgist.github.com%2FThomasRoest%2Fd415d54bb81ade76c61dec7a445f65ba">
+        Sign&nbsp;in
+</a>        <a class="Header-link d-inline-block no-underline border color-border-default rounded px-2 py-1" data-ga-click="Header, sign up" href="/join?return_to=https%3A%2F%2Fgist.github.com%2FThomasRoest%2Fd415d54bb81ade76c61dec7a445f65ba&amp;source=header-gist">
+          Sign&nbsp;up
+</a>    </div>
+</div>
+      <div hidden="hidden" data-view-component="true" class="js-stale-session-flash stale-session-flash flash flash-warn flash-full">
+        <span class="js-stale-session-flash-signed-in" hidden>You signed in with another tab or window. <a class="Link--inTextBlock" href="">Reload</a> to refresh your session.</span>
+        <span class="js-stale-session-flash-signed-out" hidden>You signed out in another tab or window. <a class="Link--inTextBlock" href="">Reload</a> to refresh your session.</span>
+        <span class="js-stale-session-flash-switched" hidden>You switched accounts on another tab or window. <a class="Link--inTextBlock" href="">Reload</a> to refresh your session.</span>
+    <button id="icon-button-36664466-9cf9-467d-8c77-ac3f175b4060" aria-labelledby="tooltip-16aade5c-61c8-4cb4-b29c-7cf23b9116c6" type="button" data-view-component="true" class="Button Button--iconOnly Button--invisible Button--medium flash-close js-flash-close">  
+</button><tool-tip id="tooltip-16aade5c-61c8-4cb4-b29c-7cf23b9116c6" for="icon-button-36664466-9cf9-467d-8c77-ac3f175b4060" popover="manual" data-direction="s" data-type="label" data-view-component="true" class="sr-only position-absolute">Dismiss alert</tool-tip>
+</div>
+    </div>
+  <div id="start-of-content" class="show-on-focus"></div>
+    <div id="js-flash-container" class="flash-container" data-turbo-replace>
+  <template class="js-flash-template">
+<div class="flash flash-full   {{ className }}">
+  <div >
+    <button autofocus class="flash-close js-flash-close" type="button" aria-label="Dismiss this message">
+    </button>
+    <div aria-atomic="true" role="alert" class="js-flash-alert">
+      <div>{{ message }}</div>
+    </div>
+  </div>
+</div>
+  </template>
+</div>
+  <div
+    class="application-main "
+    data-commit-hovercards-enabled
+    data-discussion-hovercards-enabled
+    data-issue-and-pr-hovercards-enabled
+    data-project-hovercards-enabled
+  >
+        <div itemscope itemtype="http://schema.org/Code">
+    <main id="gist-pjax-container">
+  <div class="gist-detail-intro gist-banner tmp-pb-3">
+    <div class="text-center container-lg tmp-px-3">
+      <p class="lead">
+        Instantly share code, notes, and snippets.
+      </p>
+    </div>
+  </div>
+<div class="gisthead pagehead pb-0 tmp-pt-3 tmp-mb-4">
+  <div class="px-0">
+<div class="tmp-mb-3 d-flex tmp-px-3 tmp-px-md-3 tmp-px-lg-5">
+  <div class="flex-auto min-width-0 width-fit tmp-mr-3">
+    <div class="d-flex">
+      <div class="d-none d-md-block">
+        <a class="mr-2 flex-shrink-0" data-hovercard-type="user" data-hovercard-url="/users/ThomasRoest/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="/ThomasRoest"></a>
+      </div>
+      <div class="d-flex flex-column width-full">
+        <div class="d-flex flex-row width-full">
+          <h1 class="wb-break-word f3 text-normal mb-md-0 mb-1">
+            <span class="author"><a data-hovercard-type="user" data-hovercard-url="/users/ThomasRoest/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="/ThomasRoest">ThomasRoest</a></span><!--
+                --><span class="mx-1 color-fg-muted">/</span><!--
+                --><strong itemprop="name" class="css-truncate-target mr-1" style="max-width: 410px"><a href="/ThomasRoest/d415d54bb81ade76c61dec7a445f65ba">user.js</a></strong>
+          </h1>
+        </div>
+        <div class="note m-0">
+          Created
+          <relative-time tense="past" datetime="2017-01-10T17:47:02Z" data-view-component="true">January 10, 2017 17:47</relative-time>
+        </div>
+      </div>
+    </div>
+  </div>
+  <ul class="d-md-flex pagehead-actions float-none mr-2">
+  </ul>
+  <div class="d-inline-block d-md-none ml-auto">
+    <action-menu data-select-variant="none" data-view-component="true" class="flex-self-start ml-auto tmp-ml-auto d-inline-block">
+  <focus-group direction="vertical" mnemonics retain>
+    <button id="gist_options-button" popovertarget="gist_options-overlay" aria-controls="gist_options-list" aria-haspopup="true" aria-labelledby="tooltip-ce34dd53-6d4c-49bf-8aa2-3f9f891837c2" type="button" data-view-component="true" class="Button Button--iconOnly Button--secondary Button--small">  
+</button><tool-tip id="tooltip-ce34dd53-6d4c-49bf-8aa2-3f9f891837c2" for="gist_options-button" popover="manual" data-direction="s" data-type="label" data-view-component="true" class="sr-only position-absolute">Show Gist options</tool-tip>
+<anchored-position data-target="action-menu.overlay" id="gist_options-overlay" anchor="gist_options-button" align="start" side="outside-bottom" anchor-offset="normal" popover="auto" data-view-component="true">
+  <div data-view-component="true" class="Overlay Overlay--size-auto">
+      <div data-view-component="true" class="Overlay-body Overlay-body--paddingNone">          <action-list>
+  <div data-view-component="true">
+    <ul aria-labelledby="gist_options-button" id="gist_options-list" role="menu" data-view-component="true" class="ActionListWrap--inset ActionListWrap">
+        <li rel="nofollow" data-ga-click="Gist, download zip, location:gist overview" data-targets="action-list.items" data-item-id="download_from_gist_options" role="none" data-view-component="true" class="ActionListItem">
+    <a tabindex="-1" id="item-59876800-8fb3-4a7e-b8be-c67058f8d95f" href="/ThomasRoest/d415d54bb81ade76c61dec7a445f65ba/archive/88dc923e794c0164898045501e634bdcc9934436.zip" role="menuitem" data-view-component="true" class="ActionListContent ActionListContent--visual16">
+        <span class="ActionListItem-visual ActionListItem-visual--leading">
+        </span>
+        <span data-view-component="true" class="ActionListItem-label">
+          Download ZIP
+</span>      
+</a>
+</li>
+</ul>    
+</div></action-list>
+</div>
+</div></anchored-position>  </focus-group>
+</action-menu>  </div>
+  <ul class="d-md-flex d-none pagehead-actions float-none">
+      <li>
+          <a id="gist-star-button" href="/login?return_to=https%3A%2F%2Fgist.github.com%2FThomasRoest%2Fd415d54bb81ade76c61dec7a445f65ba" rel="nofollow" aria-label="You must be signed in to star a gist" data-view-component="true" class="btn-with-count Button--secondary Button--small Button">  <span class="Button-content">
+      <span class="Button-visual Button-leadingVisual">
+      </span>
+    <span class="Button-label">Star</span>
+      <span class="Button-visual Button-trailingVisual">
+          <span class="d-flex" aria-hidden="true"><span title="0" data-view-component="true" class="Counter">0</span></span>
+          <span class="sr-only">(<span title="0" data-view-component="true" class="Counter">0</span>)</span>
+      </span>
+  </span>
+</a><tool-tip id="tooltip-cb464282-ed71-45fe-a582-8e36923b94aa" for="gist-star-button" popover="manual" data-direction="n" data-type="description" data-view-component="true" class="sr-only position-absolute">You must be signed in to star a gist</tool-tip>
+      </li>
+        <li>
+            <a id="gist-fork-button" href="/login?return_to=https%3A%2F%2Fgist.github.com%2FThomasRoest%2Fd415d54bb81ade76c61dec7a445f65ba" rel="nofollow" aria-label="You must be signed in to fork a gist" data-view-component="true" class="btn-with-count Button--secondary Button--small Button">  <span class="Button-content">
+      <span class="Button-visual Button-leadingVisual">
+      </span>
+    <span class="Button-label">Fork</span>
+      <span class="Button-visual Button-trailingVisual">
+          <span class="d-flex" aria-hidden="true"><span title="0" data-view-component="true" class="Counter">0</span></span>
+          <span class="sr-only">(<span title="0" data-view-component="true" class="Counter">0</span>)</span>
+      </span>
+  </span>
+</a><tool-tip id="tooltip-b1bf79f3-78da-499b-abee-fe24ace66fbd" for="gist-fork-button" popover="manual" data-direction="n" data-type="description" data-view-component="true" class="sr-only position-absolute">You must be signed in to fork a gist</tool-tip>
+        </li>
+  </ul>
+</div>
+  <ul class="d-flex d-md-none tmp-px-3 mb-2 pagehead-actions float-none" >
+    <li>
+<div data-view-component="true" class="flex-items-center d-inline-flex">
+    <select-panel data-menu-input="gist-share-url-sized-down" id="select-panel-81b371eb-fb30-43d2-ba30-ffd7926008de" anchor-align="start" anchor-side="outside-bottom" data-menu-input="gist-share-url-sized-down" data-select-variant="single" data-fetch-strategy="local" data-open-on-load="false" data-dynamic-label="true" data-view-component="true" class="flex-shrink-0">
+  <dialog-helper>
+    <button id="select-panel-81b371eb-fb30-43d2-ba30-ffd7926008de-button" aria-controls="select-panel-81b371eb-fb30-43d2-ba30-ffd7926008de-dialog" aria-haspopup="dialog" aria-expanded="false" type="button" data-view-component="true" class="rounded-right-0 border-right-0 Button--secondary Button--small Button">  <span class="Button-content">
+    <span class="Button-label">Embed</span>
+  </span>
+    <span class="Button-visual Button-trailingAction">
+    </span>
+</button>
+    <dialog id="select-panel-81b371eb-fb30-43d2-ba30-ffd7926008de-dialog" aria-labelledby="select-panel-81b371eb-fb30-43d2-ba30-ffd7926008de-dialog-title" data-target="select-panel.dialog" style="position: absolute;" data-view-component="true" class="Overlay Overlay-whenNarrow Overlay--size-small-portrait">
+      <div data-view-component="true" class="Overlay-header">
+  <div class="Overlay-headerContentWrap">
+    <div class="Overlay-titleWrap">
+      <h1 class="Overlay-title " id="select-panel-81b371eb-fb30-43d2-ba30-ffd7926008de-dialog-title">
+        Select an option
+      </h1>
+    </div>
+    <div class="Overlay-actionWrap">
+      <button data-close-dialog-id="select-panel-81b371eb-fb30-43d2-ba30-ffd7926008de-dialog" aria-label="Close" aria-label="Close" type="button" data-view-component="true" class="close-button Overlay-closeButton"></button>
+    </div>
+  </div>
+</div>      <div data-view-component="true" class="Overlay-body p-0 tmp-p-0">
+        <focus-group direction="vertical" mnemonics retain>
+          <live-region data-target="select-panel.liveRegion"></live-region>
+          <div data-fetch-strategy="local" data-target="select-panel.list" data-view-component="true">
+            <div id="select-panel-81b371eb-fb30-43d2-ba30-ffd7926008de-body">
+                <action-list>
+  <div data-view-component="true">
+    <ul aria-label="Select an option options" id="select-panel-81b371eb-fb30-43d2-ba30-ffd7926008de-list" role="listbox" data-view-component="true" class="ActionListWrap p-2 tmp-p-2">
+        <li data-targets="action-list.items" role="none" data-view-component="true" class="ActionListItem">
+    <button value="&lt;script src=&quot;https://gist.github.com/ThomasRoest/d415d54bb81ade76c61dec7a445f65ba.js&quot;&gt;&lt;/script&gt;" id="item-ea362217-d37f-4f91-987a-2f2c4e4899f4" type="button" role="option" aria-selected="true" data-view-component="true" class="ActionListContent">
+        <span class="ActionListItem-visual ActionListItem-action--leading">
+        </span>
+      <span data-view-component="true" class="ActionListItem-descriptionWrap">
+        <span data-view-component="true" class="ActionListItem-label">
+           Embed
+</span>      <span data-view-component="true" class="ActionListItem-description">Embed this gist in your website.</span>
+</span></button>
+</li>
+        <li data-targets="action-list.items" role="none" data-view-component="true" class="ActionListItem">
+    <button value="https://gist.github.com/ThomasRoest/d415d54bb81ade76c61dec7a445f65ba" id="item-1ea88445-2657-40c6-a7b7-910a189e720e" type="button" role="option" aria-selected="false" data-view-component="true" class="ActionListContent">
+        <span class="ActionListItem-visual ActionListItem-action--leading">
+        </span>
+      <span data-view-component="true" class="ActionListItem-descriptionWrap">
+        <span data-view-component="true" class="ActionListItem-label">
+           Share
+</span>      <span data-view-component="true" class="ActionListItem-description">Copy sharable link for this gist.</span>
+</span></button>
+</li>
+        <li data-targets="action-list.items" role="none" data-view-component="true" class="ActionListItem">
+    <button value="https://gist.github.com/d415d54bb81ade76c61dec7a445f65ba.git" id="item-09818330-931d-41a9-a192-f4cc9dc53549" type="button" role="option" aria-selected="false" data-view-component="true" class="ActionListContent">
+        <span class="ActionListItem-visual ActionListItem-action--leading">
+        </span>
+      <span data-view-component="true" class="ActionListItem-descriptionWrap">
+        <span data-view-component="true" class="ActionListItem-label">
+          Clone via HTTPS
+</span>      <span data-view-component="true" class="ActionListItem-description">Clone using the web URL.</span>
+</span></button>
+</li>
+</ul>    
+</div></action-list>
+            </div>
+            <div data-target="select-panel.noResults" class="SelectPanel-emptyPanel" hidden>
+              <h2 class="v-align-middle m-3 f5">No results found</h2>
+            </div>
+</div>        </focus-group>
+</div>      <div data-view-component="true" class="Overlay-footer Overlay-footer--alignEnd Overlay-footer--divided">        <a target="_blank" rel="noopener noreferrer" href="https://docs.github.com/articles/which-remote-url-should-i-use">Learn more about clone URLs</a>
+</div>
+</dialog>  </dialog-helper>
+</select-panel>    <primer-text-field class="FormControl width-full FormControl--fullWidth">
+      <label for="gist-share-url-sized-down" id="label-5f6fabcb-3a79-4ea5-9188-c8e0664b9fc3" class="sr-only FormControl-label">
+        Clone this repository at &amp;lt;script src=&amp;quot;https://gist.github.com/ThomasRoest/d415d54bb81ade76c61dec7a445f65ba.js&amp;quot;&amp;gt;&amp;lt;/script&amp;gt;
+</label>    
+  <div class="FormControl-input-wrap FormControl-input-wrap--small">
+      <input id="gist-share-url-sized-down" aria-label="Clone this repository at &amp;lt;script src=&amp;quot;https://gist.github.com/ThomasRoest/d415d54bb81ade76c61dec7a445f65ba.js&amp;quot;&amp;gt;&amp;lt;/script&amp;gt;" value="&lt;script src=&quot;https://gist.github.com/ThomasRoest/d415d54bb81ade76c61dec7a445f65ba.js&quot;&gt;&lt;/script&gt;" readonly="readonly" data-autoselect="true" data-target="primer-text-field.inputElement " aria-describedby="validation-5f6fabcb-3a79-4ea5-9188-c8e0664b9fc3" class="form-control FormControl-monospace FormControl-input FormControl-small rounded-left-0 rounded-right-0 border-right-0" type="text" name="gist-share-url-sized-down" />
+</div>
+      <div class="FormControl-inlineValidation" id="validation-5f6fabcb-3a79-4ea5-9188-c8e0664b9fc3" hidden="hidden">
+  <span class="FormControl-inlineValidation--visual" data-target="primer-text-field.validationSuccessIcon" hidden></span>
+  <span class=" FormControl-inlineValidation--visual" data-target="primer-text-field.validationErrorIcon"></span>
+  <span></span>
+</div>
+</primer-text-field>
+  <span data-view-component="true">
+  <clipboard-copy id="clipboard-button" aria-label="Copy" for="gist-share-url-sized-down" type="button" data-view-component="true" class="rounded-left-0 Button--secondary Button--small Button">
+</clipboard-copy>  <div aria-live="polite" aria-atomic="true" class="sr-only" data-clipboard-copy-feedback></div>
+</span>
+</div>
+    </li>
+    <li>
+        <button href="https://desktop.github.com" data-platforms="windows,mac" id="icon-button-eba7298e-4a65-4d84-9db3-071cdb81540b" aria-labelledby="tooltip-4e659e1f-0619-4aa5-83ae-d97bce24c206" type="button" data-view-component="true" class="Button Button--iconOnly Button--secondary Button--small js-remove-unless-platform">  
+</button><tool-tip id="tooltip-4e659e1f-0619-4aa5-83ae-d97bce24c206" for="icon-button-eba7298e-4a65-4d84-9db3-071cdb81540b" popover="manual" data-direction="s" data-type="label" data-view-component="true" class="sr-only position-absolute">Save ThomasRoest/d415d54bb81ade76c61dec7a445f65ba to your computer and use it in GitHub Desktop.</tool-tip>
+    </li>
+  </ul>
+<div class="d-flex flex-md-row flex-column px-0 tmp-pr-md-3 tmp-px-lg-5">
+  <div class="flex-md-order-1 flex-order-2 flex-auto">
+    <nav class="UnderlineNav box-shadow-none tmp-px-3 tmp-px-lg-0"
+     aria-label="Gist"
+     data-pjax="#gist-pjax-container">
+  <div class="UnderlineNav-body">
+    <a class="js-selected-navigation-item selected UnderlineNav-item" data-pjax="true" data-hotkey="g c" aria-current="page" data-selected-links="gist_code /ThomasRoest/d415d54bb81ade76c61dec7a445f65ba" href="/ThomasRoest/d415d54bb81ade76c61dec7a445f65ba">
+      Code
+</a>
+      <a class="js-selected-navigation-item UnderlineNav-item" data-pjax="true" data-hotkey="g r" data-selected-links="gist_revisions /ThomasRoest/d415d54bb81ade76c61dec7a445f65ba/revisions" href="/ThomasRoest/d415d54bb81ade76c61dec7a445f65ba/revisions">
+        Revisions
+        <span title="1" data-view-component="true" class="Counter">1</span>
+</a>
+  </div>
+</nav>
+  </div>
+  <div class="d-md-flex d-none flex-items-center flex-md-order-2 flex-order-1" data-multiple>
+<div data-view-component="true" class="flex-items-center d-inline-flex">
+    <select-panel data-menu-input="gist-share-url-original" id="select-panel-ba4c32c0-ce31-42f7-988b-35d7c6e97785" anchor-align="start" anchor-side="outside-bottom" data-menu-input="gist-share-url-original" data-select-variant="single" data-fetch-strategy="local" data-open-on-load="false" data-dynamic-label="true" data-view-component="true" class="flex-shrink-0">
+  <dialog-helper>
+    <button id="select-panel-ba4c32c0-ce31-42f7-988b-35d7c6e97785-button" aria-controls="select-panel-ba4c32c0-ce31-42f7-988b-35d7c6e97785-dialog" aria-haspopup="dialog" aria-expanded="false" type="button" data-view-component="true" class="rounded-right-0 border-right-0 Button--secondary Button--small Button">  <span class="Button-content">
+    <span class="Button-label">Embed</span>
+  </span>
+    <span class="Button-visual Button-trailingAction">
+    </span>
+</button>
+    <dialog id="select-panel-ba4c32c0-ce31-42f7-988b-35d7c6e97785-dialog" aria-labelledby="select-panel-ba4c32c0-ce31-42f7-988b-35d7c6e97785-dialog-title" data-target="select-panel.dialog" style="position: absolute;" data-view-component="true" class="Overlay Overlay-whenNarrow Overlay--size-small-portrait">
+      <div data-view-component="true" class="Overlay-header">
+  <div class="Overlay-headerContentWrap">
+    <div class="Overlay-titleWrap">
+      <h1 class="Overlay-title " id="select-panel-ba4c32c0-ce31-42f7-988b-35d7c6e97785-dialog-title">
+        Select an option
+      </h1>
+    </div>
+    <div class="Overlay-actionWrap">
+      <button data-close-dialog-id="select-panel-ba4c32c0-ce31-42f7-988b-35d7c6e97785-dialog" aria-label="Close" aria-label="Close" type="button" data-view-component="true" class="close-button Overlay-closeButton"></button>
+    </div>
+  </div>
+</div>      <div data-view-component="true" class="Overlay-body p-0 tmp-p-0">
+        <focus-group direction="vertical" mnemonics retain>
+          <live-region data-target="select-panel.liveRegion"></live-region>
+          <div data-fetch-strategy="local" data-target="select-panel.list" data-view-component="true">
+            <div id="select-panel-ba4c32c0-ce31-42f7-988b-35d7c6e97785-body">
+                <action-list>
+  <div data-view-component="true">
+    <ul aria-label="Select an option options" id="select-panel-ba4c32c0-ce31-42f7-988b-35d7c6e97785-list" role="listbox" data-view-component="true" class="ActionListWrap p-2 tmp-p-2">
+        <li data-targets="action-list.items" role="none" data-view-component="true" class="ActionListItem">
+    <button value="&lt;script src=&quot;https://gist.github.com/ThomasRoest/d415d54bb81ade76c61dec7a445f65ba.js&quot;&gt;&lt;/script&gt;" id="item-c8352cc7-2a5c-4a1e-8f89-691397746d47" type="button" role="option" aria-selected="true" data-view-component="true" class="ActionListContent">
+        <span class="ActionListItem-visual ActionListItem-action--leading">
+        </span>
+      <span data-view-component="true" class="ActionListItem-descriptionWrap">
+        <span data-view-component="true" class="ActionListItem-label">
+           Embed
+</span>      <span data-view-component="true" class="ActionListItem-description">Embed this gist in your website.</span>
+</span></button>
+</li>
+        <li data-targets="action-list.items" role="none" data-view-component="true" class="ActionListItem">
+    <button value="https://gist.github.com/ThomasRoest/d415d54bb81ade76c61dec7a445f65ba" id="item-3b45eaa5-d925-4ff0-a94e-6c7b12de9353" type="button" role="option" aria-selected="false" data-view-component="true" class="ActionListContent">
+        <span class="ActionListItem-visual ActionListItem-action--leading">
+        </span>
+      <span data-view-component="true" class="ActionListItem-descriptionWrap">
+        <span data-view-component="true" class="ActionListItem-label">
+           Share
+</span>      <span data-view-component="true" class="ActionListItem-description">Copy sharable link for this gist.</span>
+</span></button>
+</li>
+        <li data-targets="action-list.items" role="none" data-view-component="true" class="ActionListItem">
+    <button value="https://gist.github.com/d415d54bb81ade76c61dec7a445f65ba.git" id="item-ee13faf7-2572-4a00-af72-3fbc57f2fbc8" type="button" role="option" aria-selected="false" data-view-component="true" class="ActionListContent">
+        <span class="ActionListItem-visual ActionListItem-action--leading">
+        </span>
+      <span data-view-component="true" class="ActionListItem-descriptionWrap">
+        <span data-view-component="true" class="ActionListItem-label">
+          Clone via HTTPS
+</span>      <span data-view-component="true" class="ActionListItem-description">Clone using the web URL.</span>
+</span></button>
+</li>
+</ul>    
+</div></action-list>
+            </div>
+            <div data-target="select-panel.noResults" class="SelectPanel-emptyPanel" hidden>
+              <h2 class="v-align-middle m-3 f5">No results found</h2>
+            </div>
+</div>        </focus-group>
+</div>      <div data-view-component="true" class="Overlay-footer Overlay-footer--alignEnd Overlay-footer--divided">        <a target="_blank" rel="noopener noreferrer" href="https://docs.github.com/articles/which-remote-url-should-i-use">Learn more about clone URLs</a>
+</div>
+</dialog>  </dialog-helper>
+</select-panel>    <primer-text-field class="FormControl width-full FormControl--fullWidth">
+      <label for="gist-share-url-original" id="label-5a13dfbf-e1ae-4f0a-b3b2-955b2874aec3" class="sr-only FormControl-label">
+        Clone this repository at &amp;lt;script src=&amp;quot;https://gist.github.com/ThomasRoest/d415d54bb81ade76c61dec7a445f65ba.js&amp;quot;&amp;gt;&amp;lt;/script&amp;gt;
+</label>    
+  <div class="FormControl-input-wrap FormControl-input-wrap--small">
+      <input id="gist-share-url-original" aria-label="Clone this repository at &amp;lt;script src=&amp;quot;https://gist.github.com/ThomasRoest/d415d54bb81ade76c61dec7a445f65ba.js&amp;quot;&amp;gt;&amp;lt;/script&amp;gt;" value="&lt;script src=&quot;https://gist.github.com/ThomasRoest/d415d54bb81ade76c61dec7a445f65ba.js&quot;&gt;&lt;/script&gt;" readonly="readonly" data-autoselect="true" data-target="primer-text-field.inputElement " aria-describedby="validation-5a13dfbf-e1ae-4f0a-b3b2-955b2874aec3" class="form-control FormControl-monospace FormControl-input FormControl-small rounded-left-0 rounded-right-0 border-right-0" type="text" name="gist-share-url-original" />
+</div>
+      <div class="FormControl-inlineValidation" id="validation-5a13dfbf-e1ae-4f0a-b3b2-955b2874aec3" hidden="hidden">
+  <span class="FormControl-inlineValidation--visual" data-target="primer-text-field.validationSuccessIcon" hidden></span>
+  <span class=" FormControl-inlineValidation--visual" data-target="primer-text-field.validationErrorIcon"></span>
+  <span></span>
+</div>
+</primer-text-field>
+  <span data-view-component="true">
+  <clipboard-copy id="clipboard-button" aria-label="Copy" for="gist-share-url-original" type="button" data-view-component="true" class="rounded-left-0 Button--secondary Button--small Button">
+</clipboard-copy>  <div aria-live="polite" aria-atomic="true" class="sr-only" data-clipboard-copy-feedback></div>
+</span>
+</div>
+    <div class="ml-2">
+        <button href="https://desktop.github.com" data-platforms="windows,mac" id="icon-button-16d7ef25-09f1-44af-afb2-d47dfc9f0628" aria-labelledby="tooltip-0f981155-1fd3-4121-8909-088007bd0b08" type="button" data-view-component="true" class="Button Button--iconOnly Button--secondary Button--small js-remove-unless-platform">  
+</button><tool-tip id="tooltip-0f981155-1fd3-4121-8909-088007bd0b08" for="icon-button-16d7ef25-09f1-44af-afb2-d47dfc9f0628" popover="manual" data-direction="s" data-type="label" data-view-component="true" class="sr-only position-absolute">Save ThomasRoest/d415d54bb81ade76c61dec7a445f65ba to your computer and use it in GitHub Desktop.</tool-tip>
+    </div>
+    <div class="ml-2">
+      <a class="btn btn-sm" rel="nofollow" data-ga-click="Gist, download zip, location:gist overview" href="/ThomasRoest/d415d54bb81ade76c61dec7a445f65ba/archive/88dc923e794c0164898045501e634bdcc9934436.zip">Download ZIP</a>
+    </div>
+  </div>
+</div>
+  </div>
+</div>
+<div class="container-lg tmp-px-3">
+  <div class="repository-content gist-content" >
+  <div>
+<div class="js-gist-file-update-container js-task-list-container">
+      <div id="file-user-js" class="file my-2">
+      <div class="file-header d-flex flex-md-items-center flex-items-start">
+        <div class="file-actions flex-order-2 pt-0">
+          <a href="/ThomasRoest/d415d54bb81ade76c61dec7a445f65ba/raw/88dc923e794c0164898045501e634bdcc9934436/user.js" data-view-component="true" class="Button--secondary Button--small Button">  <span class="Button-content">
+    <span class="Button-label">Raw</span>
+  </span>
+</a>
+        </div>
+        <div class="file-info tmp-pr-4 d-flex flex-md-items-center flex-items-start flex-order-1 flex-auto">
+          <span class="mr-1">
+          </span>
+          <a class="wb-break-all" href="#file-user-js">
+            <strong class="user-select-contain gist-blob-name css-truncate-target">
+              user.js
+            </strong>
+          </a>
+        </div>
+      </div>
+    <div itemprop="text"
+      class="Box-body p-0 blob-wrapper data type-javascript  gist-border-0"
+      style="overflow: auto" tabindex="0" role="region"
+      aria-label="user.js content, created by ThomasRoest on 05:47PM on January 10, 2017."
+    >
+<div class="js-check-hidden-unicode js-blob-code-container blob-code-content">
+  <template class="js-file-alert-template">
+  <div data-view-component="true" class="flash flash-warn flash-full d-flex flex-items-center">
+    <span>
+      This file contains hidden or bidirectional Unicode text that may be interpreted or compiled differently than what appears below. To review, open the file in an editor that reveals hidden Unicode characters.
+      <a class="Link--inTextBlock" href="https://github.co/hiddenchars" target="_blank">Learn more about bidirectional Unicode characters</a>
+    </span>
+  <div data-view-component="true" class="flash-action">        <a href="{{ revealButtonHref }}" data-view-component="true" class="btn-sm btn">    Show hidden characters
+</a>
+</div>
+</div></template>
+<template class="js-line-alert-template">
+  <span aria-label="This line has hidden Unicode characters" data-view-component="true" class="line-alert tooltipped tooltipped-e">
+</span></template>
+  <table data-hpc class="highlight tab-size js-file-line-container" data-tab-size="4" data-paste-markdown-skip data-tagsearch-path="user.js">
+        <tr>
+          <td id="file-user-js-L1" class="blob-num js-line-number js-blob-rnum" data-line-number="1"></td>
+          <td id="file-user-js-LC1" class="blob-code blob-code-inner js-file-line"><span class=pl-k>class</span> <span class=pl-v>User</span> <span class=pl-kos>{</span></td>
+        </tr>
+        <tr>
+          <td id="file-user-js-L2" class="blob-num js-line-number js-blob-rnum" data-line-number="2"></td>
+          <td id="file-user-js-LC2" class="blob-code blob-code-inner js-file-line">  <span class=pl-en>constructor</span><span class=pl-kos>(</span><span class=pl-s1>name</span><span class=pl-kos>,</span> <span class=pl-s1>email</span><span class=pl-kos>)</span> <span class=pl-kos>{</span></td>
+        </tr>
+        <tr>
+          <td id="file-user-js-L3" class="blob-num js-line-number js-blob-rnum" data-line-number="3"></td>
+          <td id="file-user-js-LC3" class="blob-code blob-code-inner js-file-line">    <span class=pl-smi>this</span><span class=pl-kos>.</span><span class=pl-c1>name</span> <span class=pl-c1>=</span> <span class=pl-s1>name</span><span class=pl-kos>;</span></td>
+        </tr>
+        <tr>
+          <td id="file-user-js-L4" class="blob-num js-line-number js-blob-rnum" data-line-number="4"></td>
+          <td id="file-user-js-LC4" class="blob-code blob-code-inner js-file-line">    <span class=pl-smi>this</span><span class=pl-kos>.</span><span class=pl-c1>email</span> <span class=pl-c1>=</span> <span class=pl-s1>email</span><span class=pl-kos>;</span></td>
+        </tr>
+        <tr>
+          <td id="file-user-js-L5" class="blob-num js-line-number js-blob-rnum" data-line-number="5"></td>
+          <td id="file-user-js-LC5" class="blob-code blob-code-inner js-file-line">  <span class=pl-kos>}</span></td>
+        </tr>
+        <tr>
+          <td id="file-user-js-L6" class="blob-num js-line-number js-blob-rnum" data-line-number="6"></td>
+          <td id="file-user-js-LC6" class="blob-code blob-code-inner js-file-line"><span class=pl-kos>}</span></td>
+        </tr>
+        <tr>
+          <td id="file-user-js-L7" class="blob-num js-line-number js-blob-rnum" data-line-number="7"></td>
+          <td id="file-user-js-LC7" class="blob-code blob-code-inner js-file-line">
+</td>
+        </tr>
+        <tr>
+          <td id="file-user-js-L8" class="blob-num js-line-number js-blob-rnum" data-line-number="8"></td>
+          <td id="file-user-js-LC8" class="blob-code blob-code-inner js-file-line"><span class=pl-k>const</span> <span class=pl-s1>user</span> <span class=pl-c1>=</span> <span class=pl-k>new</span> <span class=pl-v>User</span><span class=pl-kos>(</span><span class=pl-s>&#39;example_user&#39;</span><span class=pl-kos>,</span> <span class=pl-s>&#39;hello@example.com&#39;</span><span class=pl-kos>)</span><span class=pl-kos>;</span></td>
+        </tr>
+        <tr>
+          <td id="file-user-js-L9" class="blob-num js-line-number js-blob-rnum" data-line-number="9"></td>
+          <td id="file-user-js-LC9" class="blob-code blob-code-inner js-file-line">
+</td>
+        </tr>
+        <tr>
+          <td id="file-user-js-L10" class="blob-num js-line-number js-blob-rnum" data-line-number="10"></td>
+          <td id="file-user-js-LC10" class="blob-code blob-code-inner js-file-line"><span class=pl-smi>console</span><span class=pl-kos>.</span><span class=pl-en>log</span><span class=pl-kos>(</span><span class=pl-s>`name: <span class=pl-s1><span class=pl-kos>${</span><span class=pl-s1>user</span><span class=pl-kos>.</span><span class=pl-c1>name</span><span class=pl-kos>}</span></span>, email: <span class=pl-s1><span class=pl-kos>${</span><span class=pl-s1>user</span><span class=pl-kos>.</span><span class=pl-c1>email</span><span class=pl-kos>}</span></span>`</span><span class=pl-kos>)</span><span class=pl-kos>;</span></td>
+        </tr>
+  </table>
+</div>
+    </div>
+  </div>
+</div>
+        <a name="comments"></a>
+        <div class="js-quote-selection-container" data-quote-markdown=".js-comment-body">
+          <div class="js-discussion "
+          >
+            <div class="tmp-ml-md-6 tmp-pl-md-3 ml-0 pl-0">
+<!-- Rendered timeline since 2017-01-10 09:47:02 -->
+<div id="partial-timeline-marker"
+      class="js-timeline-marker js-updatable-content"
+      data-last-modified="Tue, 10 Jan 2017 17:47:02 GMT"
+      >
+</div>
+            </div>
+            <div class="discussion-timeline-actions">
+              <div data-view-component="true" class="tmp-mt-3 flash flash-warn">
+    <a rel="nofollow" class="btn btn-primary" href="/join?source=comment-gist">Sign up for free</a>
+    <strong>to join this conversation on GitHub</strong>.
+    Already have an account?
+    <a rel="nofollow" class="Link--inTextBlock" data-test-selector="comments-sign-in-link" href="/login?return_to=https%3A%2F%2Fgist.github.com%2FThomasRoest%2Fd415d54bb81ade76c61dec7a445f65ba">Sign in to comment</a>
+</div>
+            </div>
+          </div>
+        </div>
+</div>
+  </div>
+</div><!-- /.container -->
+    </main>
+  </div>
+  </div>
+          <footer class="footer f6 color-fg-muted color-border-subtle tmp-pt-7 tmp-pb-6 p-responsive" role="contentinfo"  >
+  <h2 class='sr-only'>Footer</h2>
+  <div class="d-flex flex-justify-center flex-items-center flex-column-reverse flex-lg-row flex-wrap flex-lg-nowrap">
+    <div class="d-flex flex-items-center flex-shrink-0 mx-2">
+      <a aria-label="GitHub Homepage" class="footer-octicon mr-2" href="https://github.com">
+</a>
+      <span>
+        &copy; 2026 GitHub,&nbsp;Inc.
+      </span>
+    </div>
+    <nav aria-label="Footer">
+      <h3 class="sr-only" id="sr-footer-heading">Footer navigation</h3>
+      <ul class="list-style-none d-flex flex-justify-center flex-wrap mb-2 mb-lg-0" aria-labelledby="sr-footer-heading">
+          <li class="mx-2">
+            <a href="https://docs.github.com/site-policy/github-terms/github-terms-of-service" data-view-component="true" class="Link--secondary Link">Terms</a>
+          </li>
+          <li class="mx-2">
+            <a href="https://docs.github.com/site-policy/privacy-policies/github-privacy-statement" data-view-component="true" class="Link--secondary Link">Privacy</a>
+          </li>
+            <li class="mx-2">
+              <a href="https://github.com/security" data-view-component="true" class="Link--secondary Link">Security</a>
+            </li>
+            <li class="mx-2">
+              <a href="https://www.githubstatus.com/" data-view-component="true" class="Link--secondary Link">Status</a>
+            </li>
+          <li class="mx-2">
+            <a href="https://github.community/" data-view-component="true" class="Link--secondary Link">Community</a>
+          </li>
+          <li class="mx-2">
+            <a href="https://docs.github.com/" data-view-component="true" class="Link--secondary Link">Docs</a>
+          </li>
+          <li class="mx-2">
+            <a href="https://support.github.com?tags=dotcom-footer" data-view-component="true" class="Link--secondary Link">Contact</a>
+          </li>
+<li class="mx-2" >
+  <cookie-consent-link>
+    <button
+      type="button"
+      class="Link--secondary underline-on-hover border-0 p-0 color-bg-transparent"
+      data-action="click:cookie-consent-link#showConsentManagement"
+    >
+      Manage cookies
+    </button>
+  </cookie-consent-link>
+</li>
+  <li class="mx-2">
+    <cookie-consent-link>
+      <button
+        type="button"
+        class="Link--secondary underline-on-hover border-0 p-0 color-bg-transparent text-left"
+        data-action="click:cookie-consent-link#showConsentManagement"
+      >
+        Do not share my personal information
+      </button>
+    </cookie-consent-link>
+  </li>
+      </ul>
+    </nav>
+  </div>
+</footer>
+    <ghcc-consent id="ghcc" class="position-fixed bottom-0 left-0" style="z-index: 999999"
+      data-locale="en"
+      data-initial-cookie-consent-allowed=""
+      data-cookie-consent-required="false"
+    ></ghcc-consent>
+  <div id="ajax-error-message" class="ajax-error-message flash flash-error" hidden>
+    <button type="button" class="flash-close js-ajax-error-dismiss" aria-label="Dismiss error">
+    </button>
+    You can’t perform that action at this time.
+  </div>
+    <template id="site-details-dialog">
+  <details class="details-reset details-overlay details-overlay-dark lh-default color-fg-default hx_rsm" open>
+    <summary role="button" aria-label="Close dialog"></summary>
+    <details-dialog class="Box Box--overlay d-flex flex-column anim-fade-in fast hx_rsm-dialog hx_rsm-modal">
+      <button class="Box-btn-octicon m-0 btn-octicon position-absolute right-0 top-0" type="button" aria-label="Close dialog" data-close-dialog>
+      </button>
+      <div class="octocat-spinner tmp-my-6 js-details-dialog-spinner"></div>
+    </details-dialog>
+  </details>
+</template>
+    <div class="Popover js-hovercard-content position-absolute" style="display: none; outline: none;">
+  <div class="Popover-message Popover-message--bottom-left Popover-message--large Box color-shadow-large" style="width:360px;">
+  </div>
+</div>
+    <template id="snippet-clipboard-copy-button">
+  <div class="zeroclipboard-container position-absolute right-0 top-0">
+    <clipboard-copy aria-label="Copy code to clipboard" class="ClipboardButton btn js-clipboard-copy m-2 p-0" data-copy-feedback="Copied!" data-tooltip-direction="w">
+    </clipboard-copy>
+  </div>
+</template>
+<template id="snippet-clipboard-copy-button-unpositioned">
+  <div class="zeroclipboard-container">
+    <clipboard-copy aria-label="Copy code to clipboard" class="ClipboardButton btn btn-invisible js-clipboard-copy m-2 p-0 d-flex flex-justify-center flex-items-center" data-copy-feedback="Copied!" data-tooltip-direction="w">
+    </clipboard-copy>
+  </div>
+</template>
+    </div>
+    <div id="js-global-screen-reader-notice" class="sr-only mt-n1" aria-live="polite" aria-atomic="true" ></div>
+    <div id="js-global-screen-reader-notice-assertive" class="sr-only mt-n1" aria-live="assertive" aria-atomic="true"></div>
+  </body>
+</html>

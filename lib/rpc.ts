@@ -4,6 +4,8 @@ import type { ModelSelection } from './connections';
 import type { ModelListResult } from './modellist';
 import type { ThinkingLevel } from './thinking';
 import type { ResumableRun } from './runstate';
+import type { StartShare } from './sharecontroller';
+import type { AvailableUpdate, UpdateReview } from './updates';
 import type { AgentEvent, ChatItem, Mod, ScriptPreview, UserTurn } from './types';
 
 export type OAuthKind = 'chatgpt' | 'xai';
@@ -26,7 +28,14 @@ export type RpcRequest =
   | { type: 'mods.preview'; url: string }
   | { type: 'mods.preview'; source: string }
   /** Install an outside userscript: parse, fetch @require/@resource, save, register. */
-  | { type: 'mods.install'; source: string; downloadUrl?: string; enabled?: boolean; values?: Record<string, unknown> }
+  | { type: 'mods.install'; source: string; downloadUrl?: string; enabled?: boolean; values?: Record<string, unknown>; replaceId?: string }
+  /** Is this script (by download URL, or @name + @namespace) already installed? The install page asks. */
+  | { type: 'mods.findInstalled'; source: string; url: string }
+  /**
+   * Share a mod to a gist or Greasy Fork: save the prepared source on the mod, open the site's own
+   * editor in a new tab, and fill it when it loads (lib/sharecontroller.ts). Nothing is sent.
+   */
+  | { type: 'share.start'; share: StartShare }
   /**
    * Save an edited source over an existing mod: re-parse the header, refetch @require/@resource if
    * and only if the header's dependency lines changed, keep the mod's id, enabled flag, GM values
@@ -34,8 +43,23 @@ export type RpcRequest =
    * caller-built Mod and does no dependency resolution at all.
    */
   | { type: 'mods.saveSource'; id: string; source: string }
-  /** Refetch from downloadUrl and replace the source if @version moved. */
+  /**
+   * The Update button: check this mod for a newer version now. It never installs: a newer version
+   * comes back as `available`, and the review screen (updates.get / updates.apply) is where the
+   * user decides.
+   */
   | { type: 'mods.update'; id: string }
+  /** Run the (throttled) update check for every installed mod; `force` ignores the daily limit. */
+  | { type: 'updates.check'; force?: boolean }
+  /** Per mod: the version on offer and any quiet check error. No sources. */
+  | { type: 'updates.summary' }
+  /** Everything the review screen shows for one mod. */
+  | { type: 'updates.get'; modId: string }
+  | { type: 'updates.skip'; modId: string; version: string }
+  /** "Install update": installs exactly the text with this hash, the one the screen showed. */
+  | { type: 'updates.apply'; modId: string; hash: string }
+  /** "Check with the agent first": the safety review, cached per (mod, new version). */
+  | { type: 'updates.review'; modId: string; hash: string }
   /** Import a Tampermonkey backup (JSON text, or a base64 ZIP). */
   | { type: 'mods.importBackup'; json: string }
   | { type: 'mods.importBackup'; zipBase64: string }
@@ -117,7 +141,19 @@ interface RpcResults {
   'mods.install': Mod[];
   'mods.saveSource': Mod[];
   'mods.preview': ScriptPreview;
-  'mods.update': { updated: boolean; version: string };
+  'mods.update': { updated: boolean; version: string; available?: string };
+  'updates.check': { checked: number; offered: number };
+  'updates.summary': Record<string, { available?: string; error?: string; lastChecked?: number }>;
+  'updates.get': {
+    mod: Mod;
+    update: AvailableUpdate | null;
+    review: UpdateReview | null;
+    reviewer: { ok: true; model: string } | { ok: false; reason: string };
+  };
+  'updates.apply': { version: string };
+  'updates.review': UpdateReview;
+  'mods.findInstalled': { modId: string; version: string; newer: boolean } | null;
+  'share.start': { tabId: number };
   'mods.importBackup': { imported: number; skipped: string[]; mods: Mod[] };
   'mods.try': { ok: boolean; result?: string; logs: string[]; error?: string };
   'userScripts.status': { available: boolean; message: string };

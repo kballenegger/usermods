@@ -18,6 +18,15 @@
 //                            mid-run), against the mock's fault injection and its fixture page
 //   npm run smoke:wait       headless: the wait flow alone (every wait_for condition, a deliberate
 //                            timeout, Stop mid-wait), against a fixture page the mock server serves
+//   npm run smoke:share      headless: Export's share items against routed fixture copies of the
+//                            gist editor and Greasy Fork's post form: fill, hint, remembered
+//                            install link, Update gist, clipboard fallback, leak check, sign-in
+//   npm run smoke:banner     headless: the install banner on a gist, a raw script and a blob page,
+//                            Install / Installed / Update, dismissal, and never in a frame
+//   npm run smoke:updates    headless: update checks offer and never install; the review screen,
+//                            the agent's safety review (only the two sources sent), skip, install
+//   node scripts/screenshots.mjs --share-capture   the share flow, also writing 14 and 15
+//   node scripts/screenshots.mjs --banner-capture  the banner flow, also writing 16
 //   npm run smoke:editmod    headless: editing an installed mod alone (import a userscript with a
 //                            metadata block, @require and GM grants; edit it from the mod row and
 //                            from a fresh chat via open_mod; detach; prove the round trip)
@@ -83,6 +92,8 @@ import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { ARTIFACT_V1, ARTIFACT_V2, ARTIFACT_V3, COMPACT_MARKER, EDITMOD_PROMPTS, editModSource, FAST_MARKER, IMAGES_MARKER, MARKDOWN_REPLY, MODELS, RESUME as RESUME_CONV, SLOW_MARKER, SUMMARY_MARKER, THINKING, VISION as VISION_CONV, WAIT_MARKER } from './mock-llm.mjs';
 import { extDir } from './build-dir.mjs';
+import { bannerFlow, shareFlow } from './lib/share-flows.mjs';
+import { updatesFlow } from './lib/update-flow.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -128,6 +139,23 @@ const RESUME = process.argv.includes('--resume');
 const COMPOSER = process.argv.includes('--composer');
 const MODELS_FLOW = process.argv.includes('--models');
 const THINKING_FLOW = process.argv.includes('--thinking');
+/** Sharing to a gist and Greasy Fork, against routed fixture pages (scripts/lib/share-flows.mjs). */
+const SHARE_FLOW = process.argv.includes('--share');
+/** The share flow, also writing 14-export-menu.png and 15-share-hint.png. */
+const SHARE_SHOT = process.argv.includes('--share-capture');
+/** The install banner, against saved copies of real pages (scripts/lib/share-flows.mjs). */
+const BANNER_FLOW = process.argv.includes('--banner');
+/** The banner flow, also writing 16-install-banner.png. */
+const BANNER_SHOT = process.argv.includes('--banner-capture');
+/**
+ * Rewrite only the captures the Export menu changed: the Mods view in both themes and the
+ * dashboard (whose rows now carry "Export ▾"), plus the three sharing captures (14, 15, 16).
+ */
+const EXPORT_SHOT = process.argv.includes('--export-capture');
+/** Update checks and the review screen (scripts/lib/update-flow.mjs). */
+const UPDATES_FLOW = process.argv.includes('--updates');
+/** The updates flow, also writing 17-update-review.png. */
+const UPDATES_SHOT = process.argv.includes('--updates-capture');
 /** Print the composer's height at three panel widths (composerHeightFlow), before or after a change. */
 const COMPOSER_HEIGHT = process.argv.includes('--composer-height');
 /**
@@ -180,10 +208,11 @@ const MARKDOWN_SHOT = process.argv.includes('--markdown-capture');
 const CAPTURING =
   !SMOKE && !CHATS && !ISOLATION && !COMPACTION && !DASHBOARD && !DASHBOARD_SHOT && !THEME &&
   !TABBAR && !TABBAR_SHOT && !WAIT && !IMAGES && !VISION && !STYLEGUIDE && !ARTIFACT && !ARTIFACT_SHOT &&
-  !PANELSCOPE && !RESUME && !EDITMOD && !COMPOSER && !MODELS_FLOW && !THINKING_FLOW && !COMPOSER_HEIGHT;
+  !PANELSCOPE && !RESUME && !EDITMOD && !COMPOSER && !MODELS_FLOW && !THINKING_FLOW && !COMPOSER_HEIGHT &&
+  !SHARE_FLOW && !SHARE_SHOT && !BANNER_FLOW && !BANNER_SHOT && !EXPORT_SHOT && !UPDATES_FLOW && !UPDATES_SHOT;
 // --editmod-capture writes screenshots, so it wears the capture mask (the untested line is an
 // artefact of the automated profile, not of the product; see HIDE_UNTESTED_LINE).
-const CAPTURING_EDITMOD = EDITMOD_SHOT || COMPOSER_SHOT;
+const CAPTURING_EDITMOD = EDITMOD_SHOT || COMPOSER_SHOT || EXPORT_SHOT;
 
 /** See note 4: a first-run setup instruction, not the steady state the README should show. */
 const HIDE_SETUP_NOTICE = '.app > .notice, .dash-inner > .notice { display: none !important; }';
@@ -243,7 +272,7 @@ async function startMock() {
 // Browser
 // ---------------------------------------------------------------------------
 
-async function launch(colorScheme = 'light') {
+async function launch(colorScheme = 'light', { args = [] } = {}) {
   if (!fs.existsSync(path.join(EXT_DIR, 'manifest.json'))) {
     throw new Error(`No build at ${EXT_DIR}. Run "npm run build" first.`);
   }
@@ -254,7 +283,7 @@ async function launch(colorScheme = 'light') {
     colorScheme,
     viewport: PANEL,
     deviceScaleFactor: SCALE,
-    args: [`--disable-extensions-except=${EXT_DIR}`, `--load-extension=${EXT_DIR}`],
+    args: [`--disable-extensions-except=${EXT_DIR}`, `--load-extension=${EXT_DIR}`, ...args],
   });
 
   let [sw] = ctx.serviceWorkers();
@@ -295,7 +324,7 @@ function captureProviders() {
 
 async function openPanel(ctx, extId, { settings = {}, storage = {} } = {}) {
   // The three --*-capture modes write README images too, from flows that otherwise assert.
-  if (CAPTURING || CAPTURING_EDITMOD || ARTIFACT_SHOT || DASHBOARD_SHOT || TABBAR_SHOT) storage = { ...captureProviders(), ...storage };
+  if (CAPTURING || CAPTURING_EDITMOD || ARTIFACT_SHOT || DASHBOARD_SHOT || TABBAR_SHOT || SHARE_SHOT) storage = { ...captureProviders(), ...storage };
   const page = await ctx.newPage();
   await page.goto(`chrome-extension://${extId}/sidepanel.html`);
   await page.evaluate(
@@ -2908,7 +2937,7 @@ function seedChats() {
 /** Open dashboard.html with chats and mods already in storage. */
 async function openDashboard(ctx, extId, { storage = {}, settings = {} } = {}) {
   // Same rule as openPanel: a capture names its provider the way a reader would see it.
-  if (CAPTURING || DASHBOARD_SHOT) storage = { ...captureProviders(), ...storage };
+  if (CAPTURING || DASHBOARD_SHOT || EXPORT_SHOT) storage = { ...captureProviders(), ...storage };
   const page = await ctx.newPage();
   await page.setViewportSize({ width: 1280, height: 950 });
   await page.goto(`chrome-extension://${extId}/dashboard.html`);
@@ -5765,6 +5794,27 @@ async function main() {
       await modelsFlow();
       return;
     }
+    if (EXPORT_SHOT) {
+      // Only what the Export menu changed. hero-github.png is hand-captured and is never written here.
+      await mods('dark', '03-mods.png');
+      await mods('light', '03-mods-light.png');
+      await dashboardFlow({ capture: true });
+      await shareFlow({ launch, openPanel, openSite, log, outDir: OUT_DIR, capture: true });
+      await bannerFlow({ launch, log, outDir: OUT_DIR, capture: true });
+      return;
+    }
+    if (UPDATES_FLOW || UPDATES_SHOT) {
+      await updatesFlow({ launch, openPanel, openSite, log, controlBase: CONTROL_BASE, outDir: OUT_DIR, capture: UPDATES_SHOT });
+      return;
+    }
+    if (SHARE_FLOW || SHARE_SHOT) {
+      await shareFlow({ launch, openPanel, openSite, log, outDir: OUT_DIR, capture: SHARE_SHOT });
+      return;
+    }
+    if (BANNER_FLOW || BANNER_SHOT) {
+      await bannerFlow({ launch, log, outDir: OUT_DIR, capture: BANNER_SHOT });
+      return;
+    }
     if (THINKING_FLOW) {
       await thinkingFlow();
       return;
@@ -5823,6 +5873,9 @@ async function main() {
       await composerFlow();
       await modelsFlow();
       await thinkingFlow();
+      await shareFlow({ launch, openPanel, openSite, log, outDir: OUT_DIR });
+      await bannerFlow({ launch, log, outDir: OUT_DIR });
+      await updatesFlow({ launch, openPanel, openSite, log, controlBase: CONTROL_BASE });
       return;
     }
     // The dark set: the design system's own palette, and what the README leads with.
