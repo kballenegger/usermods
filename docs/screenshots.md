@@ -92,6 +92,13 @@ the running extension, not mockups. The README leads with a handful; this is the
       <sub><b>The install banner.</b> A page showing a userscript gets a dismissible offer to install it, through the usual preview.</sub>
     </td>
   </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="screenshots/17-update-review.png" alt="The Review update screen with the powers summary, a safety review and the code diff.">
+      <sub><b>Reviewing an update.</b> What the new version may do that the old one could not, an optional safety review by your own model, and the diff. Nothing installs until you press Install update.</sub>
+    </td>
+    <td width="50%" valign="top"></td>
+  </tr>
 </table>
 
 ## Design

@@ -18,6 +18,7 @@ see [architecture.md](architecture.md). For the `GM_*` surface a script can coun
   - [Attaching images](#attaching-images)
   - [Screenshots, and models that cannot see them](#screenshots-and-models-that-cannot-see-them)
   - [Migrating from Tampermonkey](#migrating-from-tampermonkey)
+- [Updates](#updates)
 - [Sharing a mod: Export, a gist, Greasy Fork](#sharing-a-mod-export-a-gist-greasy-fork)
 - [The install banner](#the-install-banner)
 - [Dashboard](#dashboard)
@@ -171,7 +172,7 @@ usermods runs ordinary userscripts, so you can bring in scripts from Greasy Fork
 
 **Import a file.** *Import file* in the Mods tab takes a `.user.js` file from disk through the same preview.
 
-`@require` libraries and `@resource` files are downloaded at install time and stored with the mod, because registered scripts cannot fetch them later. If one of those downloads fails, the install fails and names the URL. Scripts with a `@downloadURL` get an **Update** button that refetches and compares `@version`.
+`@require` libraries and `@resource` files are downloaded at install time and stored with the mod, because registered scripts cannot fetch them later. If one of those downloads fails, the install fails and names the URL. Scripts with a `@downloadURL` get an **Update** button that checks for a newer `@version` now; see [Updates](#updates) — nothing is installed without your review.
 
 <img src="screenshots/05-install.png" width="420" alt="The install page previewing a script fetched from Greasy Fork, with its matches, GM permissions and required library.">
 
@@ -244,6 +245,41 @@ A script already installed is recognised by its `@downloadURL`, or by `@namespac
 
 The `GM_*` surface an imported script can count on — what is supported, what is a stub, `@connect`,
 the page world, and which `@include` forms are dropped — is in [gm-api.md](gm-api.md).
+
+## Updates
+
+Installed scripts that name an `@updateURL` or `@downloadURL` (or were installed from a URL) are
+checked for newer versions when the side panel or the dashboard opens and when the browser starts,
+**at most once a day per mod**. A check fetches the script's `@updateURL` (usually a small
+header-only `.meta.js`), and the full script only if that says there is a newer `@version`. Older
+versions are never offered. A check that cannot complete — offline, a 404, or on Safari a site you
+have not given usermods access to — only leaves a quiet "update check: could not check" on the row.
+
+**Updates are never installed automatically.** When a newer version exists, the mod's row says
+**Update available v1.2.0** and the Mods tab shows a count; nothing about the mod changes. The
+button (or **Update**, which checks right away) opens the review screen:
+
+<img src="screenshots/17-update-review.png" width="600" alt="The Review update screen: Tidy v1.0.0 to v1.1.0, What changed in its powers listing a new @connect host and GM_xmlhttpRequest, a Safety review marked review carefully with one high finding, the Install update, Not now, Skip this version buttons, and the code diff.">
+
+- **What changed in its powers**, computed from the two headers: sites added or removed
+  (`@match`/`@include`/`@exclude`), new permissions (`GM_xmlhttpRequest`, `unsafeWindow`, `@grant
+  none` meaning the page's own world), new `@connect` hosts, new `@require`/`@resource` URLs, and
+  `@run-at` or frame changes.
+- **Code changes**: the line diff between what you have and what is on offer.
+- **Install update** installs exactly the text on the screen, keeping the mod's settings and stored
+  values. **Not now** closes it. **Skip this version** hides that version until a newer one appears.
+- **Check with the agent first** asks the model you last picked in a chat to review the update for
+  malicious or risky changes: data being sent somewhere new, cookies or storage being read, input
+  being recorded, remote code, wider site matches, mining, ad injection, safeguards removed. It sends
+  **only the installed and the new source and the header changes above** — nothing from any page,
+  no chat. The scripts are marked as untrusted text, so a script that tells the model it is safe is
+  itself a red flag. The answer is a verdict (*looks safe*, *review carefully*, *do not install*), a
+  summary and findings with line numbers. It is advisory: the model can be wrong, and the decision is
+  still yours. The review is kept for that version, so asking twice costs once. With no provider
+  connected the button is disabled and says why.
+
+Turn checking off with **Check installed mods for updates** in Settings › Preferences. There is no
+option to install updates automatically.
 
 ## Sharing a mod: Export, a gist, Greasy Fork
 

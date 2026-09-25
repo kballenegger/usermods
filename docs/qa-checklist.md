@@ -650,17 +650,15 @@ document.title = 'pageworld:' + (typeof unsafeWindow === 'undefined' ? 'isolated
 1. Take the mod installed in section 5 (has a `@downloadURL`/Update button), or install any
    Greasy Fork script with an old cached version.
 2. In Mods, click **Update** on it.
-   **Expected:** status line shows either `"<name>" is up to date.` or `"<name>" updated to
-   <version>.` — no error, no duplicate mod card created.
-   **If it fails:** side panel DevTools; service worker console for the refetch/compare against
-   `@version`.
-3. If you can find/construct a script whose remote copy differs from the installed one (e.g.
-   re-host a locally edited copy with a bumped `@version` at a URL you control, install it, then
-   edit the remote file and bump the version again), click **Update**.
-   **Expected:** status reads `"<name>" updated to <new version>.`, **Show code** reflects the
-   new source, and any `GM_setValue` values previously stored are **not** wiped by the update.
-   **If it fails:** side panel DevTools; diff the mod's stored values before/after via a
-   `GM_listValues`-reading test line if needed.
+   **Expected:** status line shows `"<name>" is up to date.`, or — when the remote is newer —
+   `"<name>" v<x> is available…` and the review screen opens in a new tab. Nothing is installed by
+   the click; no duplicate mod card.
+   **If it fails:** side panel DevTools; service worker console for the check.
+3. With a script whose remote copy has a bumped `@version` (re-host a copy at a URL you control),
+   click **Update**, then **Install update** on the review screen.
+   **Expected:** the mod shows the new version, **Show code** reflects the new source, and any
+   `GM_setValue` values previously stored are **not** wiped. See 14c for the rest of the review
+   screen.
 
 ---
 
@@ -880,6 +878,24 @@ the smoke drives reconstructions of the signed-in pages, not GitHub's and Greasy
    itself loads (no jump to the install page) with the bar; Install opens the file's Raw URL.
 4. ×, then reload. **Expected:** gone for that page, still shown on others.
 5. Safari: revoke usermods' access to gist.github.com. **Expected:** no bar there.
+
+## 14c. Updates: offered, reviewed, never automatic
+
+1. Install a Greasy Fork script at an old version (its *Versions* tab has old install links), then
+   open the side panel. **Expected:** within seconds the row says **Update available v…** and the
+   Mods tab shows **1**. The installed version is unchanged (its chip still shows the old version).
+2. Close and reopen the panel. **Expected:** no second request to Greasy Fork (Network panel of the
+   service worker), because the check is once a day.
+3. Click the offer. **Expected:** the review screen with the versions, *What changed in its powers*
+   and the diff. **Not now** closes it and changes nothing.
+4. **Check with the agent first** with a real provider connected. **Expected:** a verdict, summary
+   and findings within a minute, and the advisory line. In the provider's request log (or a proxy),
+   the request contains the two scripts and nothing from any page. With no provider, the button is
+   disabled and says why.
+5. **Skip this version**. **Expected:** the offer and the count disappear and stay gone across a
+   reopen. **Install update** on a later version installs it; the mod keeps its settings.
+6. Settings › *Check installed mods for updates* off, then reopen the panel a day later (or clear
+   `updates` in storage). **Expected:** no check.
 
 ## 15. Screenshots on a custom OpenAI endpoint: a vision model, then a text-only one
 
@@ -1103,6 +1119,7 @@ OpenAI-compatible endpoint, ideally a local server as well.
 | 14 | Export a mod → import into Tampermonkey | | |
 | 14a | Share to a real gist: fill, create, install link, update, deleted gist, sign-in, leak check | | |
 | 14a | Publish and post a new version on a real Greasy Fork account | | |
+| 14c | Updates: offered not installed, once a day, review screen, agent review, skip, install | | |
 | 14b | Install banner on a real gist, blob page, Greasy Fork update; dismiss; Safari access | | |
 | 15 | Screenshot to a vision model on a custom OpenAI endpoint | | |
 | 15 | Text-only model: one fallback, note, no repeat screenshots | | |

@@ -106,11 +106,20 @@ check, a deleted gist, a sign-in wall and both Greasy Fork forms; the banner flo
 on a gist, a raw text page and a blob page, Install / Installed / Update, a remembered dismissal,
 nothing in a frame, and the `.user.js` redirect for a gist raw URL.
 
+The updates flow (`npm run smoke:updates`, `scripts/lib/update-flow.mjs`) has the mock serve a
+newer copy of an installed script at `/__updates/tidy.user.js` (and its `.meta.js`) and answer the
+safety-review prompt with a fixed verdict. It proves that the open-time check offers the update
+without touching the mod, that a second open within a day fetches nothing, that the review screen
+names a newly added `@connect` host, that "Check with the agent first" sent the mock exactly a system
+and a user message holding the two sources and no page content, that Skip hides the version, and
+that only "Install update" installs a later one.
+
 ## Security notes
 
 - Page content that the model reads is untrusted. The system prompt tells the model to treat it as data, and every generated script is shown to you before it is saved. Read it.
 - Scripts run in an isolated world: they see the DOM but not the page's JavaScript globals. Default `@match` is the current site only.
 - Your API keys are stored in extension local storage, and each is sent only to the provider it belongs to. Removing a provider deletes its key.
+- Updates are offered, never applied by a check (`lib/updates.ts`, `lib/updatecontroller.ts`): only the review screen's Install update installs, and only the exact text it showed (matched by hash). The optional safety review sends the model the two sources and the header changes, fenced as untrusted text; its verdict is advisory.
 - Sharing to a gist or Greasy Fork holds no credential and sends nothing: `lib/sharecontroller.ts` opens the site's page in your tab, `lib/shareclient.ts` fills it, and the site's own button (which you press) submits it. A pre-share scan (`lib/leakscan.ts`) lists likely secrets first. The install banner (`lib/banner.ts`) reads the page it is on and nothing else, and never installs.
 
 Found a vulnerability? Please report it privately through GitHub's **Report a vulnerability** button

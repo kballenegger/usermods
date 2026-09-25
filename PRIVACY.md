@@ -86,6 +86,11 @@ Three consequences are worth stating plainly:
 **Consent.** Before the first message is ever sent, usermods shows a notice describing the above and
 requires you to acknowledge it. You can re-read it at any time from Settings → *Review data notice*.
 
+**The update safety review.** When you press *Check with the agent first* on an update, usermods
+sends the script's installed source, its new source and a summary of how its header changed to the
+model provider you last chose, and to no one else. Nothing from any page you visit and nothing from
+your chats is included. It happens only when you press that button.
+
 ## 3. Other network requests
 
 Besides the model endpoint, usermods makes network requests only in these cases, all of them started
@@ -95,6 +100,10 @@ by an explicit action of yours:
   *Fetch models*, usermods requests that URL. `@require` libraries and `@resource` files named in a
   script's header are downloaded at install time from the addresses the script names, and stored
   with the mod.
+- **Checking installed scripts for updates.** At most once a day per script (and only while
+  *Check installed mods for updates* is on, which it is by default), usermods requests the
+  `@updateURL` or `@downloadURL` that script's own header names, to see whether a newer version
+  exists. Nothing is installed by a check.
 - **Signing in to a subscription** *(GitHub build only)*. The ChatGPT and xAI device-code sign-in flows contact those
   vendors' own authentication servers.
 - **`GM_xmlhttpRequest` from a userscript.** Scripts you installed can make cross-origin requests,

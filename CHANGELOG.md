@@ -6,6 +6,23 @@ All notable changes to usermods are recorded here. The format follows
 
 ## [Unreleased]
 
+### Updates are offered, reviewed, and never automatic
+
+- **Installed scripts are checked for newer versions** when the panel or dashboard opens and at
+  browser start, at most once a day per mod, from `@updateURL` (a `.meta.js` first) or
+  `@downloadURL`, two at a time and within a byte budget. Never a downgrade. A failed check is a
+  quiet note on the row. *Check installed mods for updates* in Settings turns it off.
+- **Nothing installs without a click.** The Update button used to fetch and install in one step; it
+  now only checks. A newer version shows as *Update available v…* on the row, a count on the Mods tab
+  (panel and dashboard), and a row in the phone's sheet.
+- **The review screen** (the install page in update mode) shows old → new, *What changed in its
+  powers* from the headers (sites, grants, `@connect` hosts, `@require`/`@resource`, run-at, page
+  world), the code diff, and Install update / Not now / Skip this version.
+- **Check with the agent first**: a safety review by your chosen model, sent only the two sources and
+  the header changes, with the scripts fenced as untrusted text against prompt injection. Its JSON
+  verdict and findings are validated and shown as advisory; cached per version. Only offered for
+  updates, not fresh installs (the install page's preview is a different flow).
+
 ### Share a mod as a gist or on Greasy Fork, from your own tab
 
 - **Export is a menu now**: Download .user.js, Copy to clipboard, Share as Gist (then Update gist),
