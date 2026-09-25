@@ -93,11 +93,25 @@ disappears. `npm run smoke:composer` measures the growing message box in a real 
 Backoff is shortened for the flow through a `chrome.storage.local` key (`debug:retryPolicy`), which
 only the extension's own contexts can write.
 
+The share flow (`npm run smoke:share`) and the banner flow (`npm run smoke:banner`) live in
+`scripts/lib/share-flows.mjs`. Every request to GitHub, Greasy Fork and the gist raw host is
+answered by a Playwright route — reconstructions of the signed-in gist and Greasy Fork forms
+(`scripts/lib/share-fixtures.mjs`) and saved copies of real signed-out pages (`test/fixtures/pages`) —
+and those hosts are mapped to "not found" in Chrome's resolver, so anything a route misses fails
+instead of reaching the real site. A tab the extension opens starts navigating before Playwright
+attaches to it, so the flows wrap the worker's `tabs.create` to open blank first; that is test
+instrumentation only. The share flow proves the fill, the hint, the recorded gist with its
+`@updateURL`/`@downloadURL`, Update gist with a bumped version, the clipboard fallback, the leak
+check, a deleted gist, a sign-in wall and both Greasy Fork forms; the banner flow proves the banner
+on a gist, a raw text page and a blob page, Install / Installed / Update, a remembered dismissal,
+nothing in a frame, and the `.user.js` redirect for a gist raw URL.
+
 ## Security notes
 
 - Page content that the model reads is untrusted. The system prompt tells the model to treat it as data, and every generated script is shown to you before it is saved. Read it.
 - Scripts run in an isolated world: they see the DOM but not the page's JavaScript globals. Default `@match` is the current site only.
 - Your API keys are stored in extension local storage, and each is sent only to the provider it belongs to. Removing a provider deletes its key.
+- Sharing to a gist or Greasy Fork holds no credential and sends nothing: `lib/sharecontroller.ts` opens the site's page in your tab, `lib/shareclient.ts` fills it, and the site's own button (which you press) submits it. A pre-share scan (`lib/leakscan.ts`) lists likely secrets first. The install banner (`lib/banner.ts`) reads the page it is on and nothing else, and never installs.
 
 Found a vulnerability? Please report it privately through GitHub's **Report a vulnerability** button
 rather than opening an issue. [SECURITY.md](../SECURITY.md) has the scope and what to expect.

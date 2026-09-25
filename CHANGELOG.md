@@ -6,6 +6,39 @@ All notable changes to usermods are recorded here. The format follows
 
 ## [Unreleased]
 
+### Share a mod as a gist or on Greasy Fork, from your own tab
+
+- **Export is a menu now**: Download .user.js, Copy to clipboard, Share as Gist (then Update gist),
+  Publish on Greasy Fork (then Post new version on Greasy Fork). In the Mods tab, the phone's "more"
+  sheet and the dashboard's rows; the dashboard's bulk Export zip is unchanged.
+- **usermods never publishes anything itself.** It opens the site's own editor in a new tab of your
+  signed-in browser, fills the form, and points at the site's save button with a small bubble; you
+  press it. No OAuth, no token. On GitHub the gist editor is filled through its own editor API from
+  the page (Chrome), GitHub's own file-drop handler, or a synthetic paste; if none takes, the script
+  goes on the clipboard and the bubble says where to paste it and what to name the file.
+- **Once saved, it is remembered**: the gist's always-latest raw link becomes the mod's
+  `@updateURL`/`@downloadURL` and its install link (shown with Copy); Update gist bumps the patch
+  version and replaces the file on the gist's edit page. A deleted gist offers "Share as a new gist".
+  Greasy Fork's script page is remembered too, so the next share is a new version; Greasy Fork's
+  header expectations are checked and `@license MIT` is added only if you tick it.
+- **A leak check runs before every share**: keys (`sk-`, `xai-`, AWS, GitHub tokens), JWTs, Bearer
+  tokens, hard-coded `apiKey = "…"`, private IPs and `.local`/`.internal`/`.ts.net` hosts,
+  `localhost` ports. Findings are listed, masked, with Share anyway / Cancel. Local only.
+
+### An install banner on pages that offer a userscript
+
+- A gist with a `.user.js` file, a GitHub file page of one, a plain-text script the `.user.js`
+  redirect does not catch, and Greasy Fork / OpenUserJS pages when an update is available get a slim
+  dismissible bar: "usermods can install “…”" with Install, or Installed ✓, or Update to v…. Install
+  opens the install page (preview first, nothing saved until you confirm). Dismissals are remembered
+  per page. No network, top frame only, and on four hosts or a text document only.
+- **The install page updates an installed script in place** (matched by download URL, or by `@name`
+  and `@namespace`) instead of installing a second copy; its button says Update to v… or Reinstall.
+- **Fixed: a GitHub file page ending in `.user.js` was hijacked by the install redirect** and the
+  install page tried to preview GitHub's HTML. GitHub and GitLab "blob" pages now load as
+  themselves (a second, higher-priority `allow` rule; the Safari watcher asks the same question),
+  and the banner offers the script from the page's Raw link.
+
 ### The Mac app icon fills its frame on macOS 26
 
 - **The macOS rasters are full-bleed squares now, not a 0.75 tile in a transparent margin.** macOS

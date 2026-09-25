@@ -102,6 +102,14 @@ by an explicit action of yours:
   to hosts *it* names, shown to you in the install preview before you save it. usermods neither
   inspects nor records their contents.
 
+**Sharing a mod to GitHub Gist or Greasy Fork** is not a request usermods makes. When you choose
+*Share as Gist* or *Publish on Greasy Fork*, usermods opens that site's own page in a tab of your
+browser, where you are signed in as yourself, and fills in its form with the mod's source. Nothing is
+sent until you press the site's own save button, and then it is your browser submitting the site's
+form, as if you had typed it. usermods holds no GitHub or Greasy Fork credentials. Afterwards it
+stores, on your device, the address of the gist or script page and the gist's raw link. The install
+banner, which offers to install a userscript a page shows, reads only that page and makes no request.
+
 No request is ever made to a server operated by the author of usermods, because there is none.
 
 ## 4. What usermods does not do

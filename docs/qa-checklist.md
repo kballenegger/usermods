@@ -816,7 +816,7 @@ Same flow as section 11, with the **SuperGrok subscription** preset / "xAI subsc
 
 ## 14. Export a mod, import it into Tampermonkey
 
-1. In usermods Mods tab, pick any saved mod and click **Export**.
+1. In usermods Mods tab, pick any saved mod and click **Export ▾ → Download .user.js**.
    **Expected:** a `.user.js` file downloads, named from the mod's name (lowercased, non-word
    chars replaced with `-`), e.g. `my-mod-name.user.js`.
    **If it fails:** side panel DevTools (check for a blocked-download permission prompt too).
@@ -835,6 +835,51 @@ Same flow as section 11, with the **SuperGrok subscription** preset / "xAI subsc
 4. Load the page it matches in the Tampermonkey-only profile/tab.
    **Expected:** same effect as it has under usermods.
    **If it fails:** page console.
+
+## 14a. Share to a real gist and a real Greasy Fork account (owner only)
+
+Use your own GitHub account and a Greasy Fork account. This is the part no automated test can reach:
+the smoke drives reconstructions of the signed-in pages, not GitHub's and Greasy Fork's real ones.
+
+1. Mods tab → a mod with no secrets → **Export ▾ → Share as Gist**, signed in to GitHub.
+   **Expected:** a new tab on gist.github.com with the file name `<mod>.user.js`, the description,
+   and the whole script in the editor (check the last line too); a usermods bubble pointing at a
+   ringed **Create secret gist**. Nothing was created yet.
+   **If it fails:** the bubble instead says "Paste your script here…" → GitHub changed its editor;
+   note which. The gist tab's console (DevTools of that tab) and the service worker console.
+2. Press **Create secret gist**. **Expected:** the gist page, a bubble "Saved. usermods remembered
+   this gist…"; in the panel an install-link card, and on the mod's card an *install link* row. The
+   mod's source now has `@updateURL`/`@downloadURL` = `https://gist.githubusercontent.com/<you>/<id>/raw/<file>`.
+3. Open the install link in another profile with usermods or Tampermonkey. **Expected:** its install
+   page. In usermods, the mod's **Update** says it is up to date.
+4. **Export ▾ → Update gist.** **Expected:** the gist's edit page, the file replaced (not appended —
+   there must be exactly one `==UserScript==`), `@version` one patch higher, bubble at
+   **Update secret gist**. Press it; the gist shows the new version, and the raw link serves it.
+5. Delete the gist on GitHub, then **Update gist**. **Expected:** the bubble says the gist no longer
+   exists, with **Share as a new gist**, which fills a fresh gist.
+6. Sign out of GitHub, **Share as Gist**. **Expected:** "Sign in to GitHub, then usermods will fill this
+   in"; sign in, get back to gist.github.com, and the form fills.
+7. A mod containing a fake `sk-…` key → **Share as Gist**. **Expected:** the panel lists it masked with
+   **Share anyway** / **Cancel**; Cancel opens nothing.
+8. **Publish on Greasy Fork** (signed in). **Expected:** the @license question when the header has
+   none; the post form's Code box and Additional info filled; the bubble at **Post script** (with the
+   sync tip if the mod has a gist). Post it (a throwaway test script, then delete it on Greasy Fork).
+   **Expected:** "Posted. usermods remembered this script"; the item now reads **Post new version on
+   Greasy Fork** and opens `/scripts/<id>/versions/new` with the bumped version.
+   **If it fails:** Greasy Fork's validation message on its own page, and whether the code box was
+   empty (their source-editor toggle).
+
+## 14b. The install banner on real pages
+
+1. A public gist with a `.user.js` file (e.g. one of yours from 14a in another profile). **Expected:**
+   the bar "usermods can install “…”" with Install; Install opens the install page on the gist's raw
+   link, and nothing installs until you confirm.
+2. The same gist after installing: **Installed ✓**. A Greasy Fork script you have at an older version:
+   **Update to v…**, and the install page says it replaces your copy.
+3. A GitHub file page of a `.user.js` (`github.com/<o>/<r>/blob/…/x.user.js`). **Expected:** the page
+   itself loads (no jump to the install page) with the bar; Install opens the file's Raw URL.
+4. ×, then reload. **Expected:** gone for that page, still shown on others.
+5. Safari: revoke usermods' access to gist.github.com. **Expected:** no bar there.
 
 ## 15. Screenshots on a custom OpenAI endpoint: a vision model, then a text-only one
 
@@ -1056,6 +1101,9 @@ OpenAI-compatible endpoint, ideally a local server as well.
 | 12 | SuperGrok subscription sign-in + turn | | |
 | 13 | `npm run build:store` — no subscription options | | |
 | 14 | Export a mod → import into Tampermonkey | | |
+| 14a | Share to a real gist: fill, create, install link, update, deleted gist, sign-in, leak check | | |
+| 14a | Publish and post a new version on a real Greasy Fork account | | |
+| 14b | Install banner on a real gist, blob page, Greasy Fork update; dismiss; Safari access | | |
 | 15 | Screenshot to a vision model on a custom OpenAI endpoint | | |
 | 15 | Text-only model: one fallback, note, no repeat screenshots | | |
 | 11 | ChatGPT **Fetch models** after sign-in returns a list (was a 400) | | |

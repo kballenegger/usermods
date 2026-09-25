@@ -3,7 +3,7 @@
 The long version of everything the [README](../README.md) introduces in a line: the providers you
 can connect, how the model and its thinking level are picked in the chat, subscriptions instead of
 API keys, editing a mod you already have, importing scripts and migrating from Tampermonkey,
-attaching images, the dashboard, and where the side panel opens.
+attaching images, sharing a mod as a gist or on Greasy Fork, the install banner, the dashboard, and where the side panel opens.
 
 For what happens underneath — the agent loop, drafts, compaction, storage and the security notes —
 see [architecture.md](architecture.md). For the `GM_*` surface a script can count on, see
@@ -18,6 +18,8 @@ see [architecture.md](architecture.md). For the `GM_*` surface a script can coun
   - [Attaching images](#attaching-images)
   - [Screenshots, and models that cannot see them](#screenshots-and-models-that-cannot-see-them)
   - [Migrating from Tampermonkey](#migrating-from-tampermonkey)
+- [Sharing a mod: Export, a gist, Greasy Fork](#sharing-a-mod-export-a-gist-greasy-fork)
+- [The install banner](#the-install-banner)
 - [Dashboard](#dashboard)
 - [Where the panel opens](#where-the-panel-opens)
 
@@ -165,7 +167,7 @@ usermods runs ordinary userscripts, so you can bring in scripts from Greasy Fork
 
 **Install from a URL.** Paste a `.user.js` URL into *Install from URL* in the Mods tab and click **Fetch**. You get a preview — name, version, what it matches, which `GM_*` permissions it asks for, the libraries it loads, and the full source — before anything is saved.
 
-**Click a `.user.js` link.** usermods redirects `.user.js` navigations to its own install page, the way Tampermonkey does, so clicking an install link on Greasy Fork shows the same preview instead of a wall of raw JavaScript. The script's URL travels in the install page's fragment (`install.html#https://…`) and everything after the first `#` is taken verbatim, so a link whose own query string carries another `url=` cannot change which script is previewed. The page shows the exact URL it is about to fetch, and refuses anything that is not `http`/`https`.
+**Click a `.user.js` link.** usermods redirects `.user.js` navigations (gist and GitHub raw links included) to its own install page, the way Tampermonkey does, so clicking an install link on Greasy Fork shows the same preview instead of a wall of raw JavaScript. The script's URL travels in the install page's fragment (`install.html#https://…`) and everything after the first `#` is taken verbatim, so a link whose own query string carries another `url=` cannot change which script is previewed. The page shows the exact URL it is about to fetch, and refuses anything that is not `http`/`https`. A GitHub or GitLab *file page* that happens to end in `.user.js` is a web page, not the script, so it is left alone and the [install banner](#the-install-banner) offers the script from it instead.
 
 **Import a file.** *Import file* in the Mods tab takes a `.user.js` file from disk through the same preview.
 
@@ -242,6 +244,83 @@ A script already installed is recognised by its `@downloadURL`, or by `@namespac
 
 The `GM_*` surface an imported script can count on — what is supported, what is a stub, `@connect`,
 the page world, and which `@include` forms are dropped — is in [gm-api.md](gm-api.md).
+
+## Sharing a mod: Export, a gist, Greasy Fork
+
+Each mod's **Export ▾** (the Mods tab, the phone's "more" sheet, and every row in the dashboard) has
+four ways out:
+
+- **Download .user.js** saves the file, named from the mod (`wide-wiki.user.js`). The dashboard's
+  bulk **Export zip** is unchanged.
+- **Copy to clipboard** copies the whole script, header included.
+- **Share as Gist** (later **Update gist**) and **Publish on Greasy Fork** (later **Post new
+  version on Greasy Fork**) put the script on those sites *in your own tab, signed in as you*.
+
+usermods never publishes anything itself. It has no GitHub or Greasy Fork token and asks for none.
+It opens the site's own page in a new tab, fills the form, and shows a small usermods bubble pointing
+at the site's save button. **You press that button**; usermods never does.
+
+<img src="screenshots/15-share-hint.png" width="720" alt="GitHub's new-gist form filled with a userscript, file name wide-wiki.user.js, and a usermods bubble pointing at the ringed Create secret gist button.">
+
+**Before anything opens, the script is checked for things that should not be published**: API keys
+(`sk-…`, `xai-…`, AWS, GitHub tokens), JSON Web Tokens, `Bearer` tokens, hard-coded `apiKey = "…"`
+values, private addresses (`10.x`, `192.168.x`, `100.64–127.x` where Tailscale lives) and host names
+(`.local`, `.internal`, `.ts.net`), and `localhost` ports. If any turn up the panel lists them, masked,
+with **Share anyway** and **Cancel**. A secret gist is unlisted, not private: anyone with its link can
+read it. Everything on Greasy Fork is public. The check runs locally and sends nothing anywhere.
+
+**A gist.** *Share as Gist* opens <https://gist.github.com/> and fills the file name
+(`<mod-name>.user.js`), the description and the file itself. The bubble says which button is which:
+**Create secret gist** keeps it unlisted, **Create public gist** also lists it on your profile. Once
+the gist is saved, usermods remembers it and points the mod's `@updateURL` and `@downloadURL` at the
+gist's raw link *without a revision*, which always serves the newest version:
+
+    https://gist.githubusercontent.com/<you>/<id>/raw/<mod-name>.user.js
+
+That is the **install link** shown on the mod's card with **Copy**. Anyone who opens it gets the
+usermods (or Tampermonkey) install page, and their copy updates from the gist.
+
+After that the item reads **Update gist**: it bumps the patch version (`1.0.0` → `1.0.1`), opens the
+gist's edit page, replaces that file's content, and points at **Update secret gist** / **Update public
+gist**. If you deleted the gist, the page says so and offers **Share as a new gist**.
+
+If you are signed out, the bubble says *Sign in to GitHub, then usermods will fill this in*, and it
+does once the editor appears (for up to 30 minutes). If GitHub has changed its page so that usermods
+cannot find the editor, the script is put on your clipboard (or behind a **Copy script** button) and
+the bubble says *Paste your script here (it is on your clipboard) and name the file
+`<mod-name>.user.js`*.
+
+**Greasy Fork.** *Publish on Greasy Fork* opens its *Post a new script* form. Greasy Fork expects
+`@name`, `@namespace`, `@version`, `@description`, `@match` or `@include`, and `@license`; if the mod
+lacks `@license` the panel asks before adding `@license MIT` (unticked until you tick it), and offers
+`@namespace usermods` when there is no namespace. The code box and the additional info are filled, and
+the bubble points at **Post script**. After Greasy Fork accepts it, usermods remembers the script, and
+the item becomes **Post new version on Greasy Fork**, which opens that script's new-version form with
+the bumped version. If the mod also has a gist, the bubble mentions that Greasy Fork can *sync* from
+the gist's raw link (your script's Admin tab), so new versions post themselves.
+
+## The install banner
+
+When a page offers a userscript, usermods says so at the top of the page:
+
+- a **gist** with a `.user.js` file,
+- a **GitHub file page** (`github.com/…/blob/…/x.user.js`),
+- a **plain-text script** that the `.user.js` redirect does not catch (a `?raw` view, a paste site),
+- a **Greasy Fork** or **OpenUserJS** script page, only when you already have that script and the
+  page has a newer version (their own Install button covers the rest).
+
+<img src="screenshots/16-install-banner.png" width="720" alt="A raw userscript shown as plain text, with a slim usermods bar at the top: usermods can install “Pinterest Dark (Polished)”, an Install button and a close button.">
+
+**Install** opens the same install page as a `.user.js` link: preview, permissions and `@require`
+first, nothing saved until you confirm. If the script is already installed (same download URL, or
+the same `@name` *and* `@namespace`) the bar says **Installed ✓**, or **Update to v…** when the page
+has a newer version; the install page then updates your copy in place rather than adding a second
+one. The × hides it for that page, remembered. Your own shared gists, and the tabs a share is
+filling, never show it. It never installs anything by itself.
+
+It costs nothing elsewhere: the check reads the page only on those hosts or when the document is
+plain text (and then only its first 2 KB), it never runs in frames, and it makes no network request.
+On Safari it only runs on sites you have given usermods access to.
 
 ## Dashboard
 

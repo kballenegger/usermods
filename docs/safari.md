@@ -272,6 +272,16 @@ anyway. Safari builds fall back to watching navigations through the tabs API
 works and it is late: the navigation is already under way, so script source can flash up before the
 install page replaces it.
 
+**Sharing fills the gist editor from the isolated world only.** On Chrome the share flow first
+sets GitHub's gist editor through the editor's own API with `scripting.executeScript({ world:
+'MAIN', func })` — a bundled function, never a code string. That is exactly the use this document
+rules out above, so the Safari build skips it (`SAFARI_BUILD` in `lib/sharecontroller.ts`) and fills
+from the page content script alone: GitHub's own `gist:filedrop` handler for a new gist, then a
+synthetic paste. If neither takes, the fallback is the same as Chrome's, with one difference: Safari
+only lets a page write the clipboard inside a click, so the bubble offers **Copy script** rather
+than saying the script is already on the clipboard. The install banner and the hint run where the
+content script runs, so a site you have not granted usermods access to gets neither.
+
 **No sidebar.** Safari has no side-panel surface for extensions. The popup is the only UI, which on
 iPhone means a sheet covering the page it is about. That is why the popup header names the target tab
 at all times (`lib/mobile.ts`, `targetChip`): once the popup is open there is nothing else on screen
