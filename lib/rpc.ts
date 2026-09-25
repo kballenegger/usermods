@@ -4,6 +4,7 @@ import type { ModelSelection } from './connections';
 import type { ModelListResult } from './modellist';
 import type { ThinkingLevel } from './thinking';
 import type { ResumableRun } from './runstate';
+import type { StartShare } from './sharecontroller';
 import type { AgentEvent, ChatItem, Mod, ScriptPreview, UserTurn } from './types';
 
 export type OAuthKind = 'chatgpt' | 'xai';
@@ -26,7 +27,14 @@ export type RpcRequest =
   | { type: 'mods.preview'; url: string }
   | { type: 'mods.preview'; source: string }
   /** Install an outside userscript: parse, fetch @require/@resource, save, register. */
-  | { type: 'mods.install'; source: string; downloadUrl?: string; enabled?: boolean; values?: Record<string, unknown> }
+  | { type: 'mods.install'; source: string; downloadUrl?: string; enabled?: boolean; values?: Record<string, unknown>; replaceId?: string }
+  /** Is this script (by download URL, or @name + @namespace) already installed? The install page asks. */
+  | { type: 'mods.findInstalled'; source: string; url: string }
+  /**
+   * Share a mod to a gist or Greasy Fork: save the prepared source on the mod, open the site's own
+   * editor in a new tab, and fill it when it loads (lib/sharecontroller.ts). Nothing is sent.
+   */
+  | { type: 'share.start'; share: StartShare }
   /**
    * Save an edited source over an existing mod: re-parse the header, refetch @require/@resource if
    * and only if the header's dependency lines changed, keep the mod's id, enabled flag, GM values
@@ -118,6 +126,8 @@ interface RpcResults {
   'mods.saveSource': Mod[];
   'mods.preview': ScriptPreview;
   'mods.update': { updated: boolean; version: string };
+  'mods.findInstalled': { modId: string; version: string; newer: boolean } | null;
+  'share.start': { tabId: number };
   'mods.importBackup': { imported: number; skipped: string[]; mods: Mod[] };
   'mods.try': { ok: boolean; result?: string; logs: string[]; error?: string };
   'userScripts.status': { available: boolean; message: string };

@@ -906,6 +906,42 @@ button.pill,
   outline: none;
 }
 
+/* A card's menu (the mod's Export) opens below its button, from the button's left edge: in a
+   narrow panel the footer wraps and Export starts the second line, so a right-aligned menu would
+   run off the left side of the panel. */
+.menu.down {
+  top: calc(100% + var(--sp-1));
+  bottom: auto;
+}
+
+/* The share prompt's findings: a short list of masked matches, never the secret itself. */
+.share-leaks {
+  margin: 0;
+  padding-left: 18px;
+  font-size: var(--fs-meta);
+}
+.share-leaks li + li {
+  margin-top: 2px;
+}
+.share-prompt .toggle {
+  display: block;
+  line-height: 1.5;
+}
+.mod-share-link {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-meta);
+  min-width: 0;
+}
+.mod-share-link .mono {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* A menu item is a full-width row: a mark, a word, and the shortcut in mono a tone back. */
 .menu-item {
   display: flex;

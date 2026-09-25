@@ -36,6 +36,33 @@ export interface Mod {
   enabled: boolean;
   createdAt: number;
   updatedAt: number;
+  /**
+   * Where the user has shared this mod, remembered after they pressed the site's own save button
+   * (lib/share.ts). Optional and additive: mods saved before sharing existed simply have none, and
+   * nothing about running a mod reads it.
+   */
+  share?: ModShare;
+}
+
+/** A mod's published copies. Each is recorded only once the site itself has saved it. */
+export interface ModShare {
+  gist?: {
+    /** https://gist.github.com/<user>/<id> */
+    url: string;
+    user: string;
+    id: string;
+    /** The .user.js file inside the gist. */
+    fileName: string;
+    /** The sha-less raw URL, which always serves the latest revision: the install link. */
+    rawUrl: string;
+    savedAt: number;
+  };
+  greasyFork?: {
+    /** https://greasyfork.org/<locale>/scripts/<id>-<slug> */
+    url: string;
+    id: string;
+    savedAt: number;
+  };
 }
 
 /** What the install screen shows before the user commits. */
@@ -447,6 +474,28 @@ export type ContentRequest =
    * of a run whichever of the two channels is still up.
    */
   | { type: 'keepalive'; hold: boolean }
+  /**
+   * Sharing (lib/sharecontroller.ts): fill the gist or Greasy Fork form in this tab, show the hint
+   * bubble, or list the .user.js files a just-saved gist holds. Sent only by the background, only
+   * to a tab a share opened.
+   */
+  | { type: 'share-fill'; req: import('./sharefill').FillRequest }
+  | { type: 'share-hint'; hint: ShareHintSpec }
+  | { type: 'share-files' }
   | { type: 'ping' };
+
+/** A hint bubble, as the background asks for it. The content script finds the anchor itself. */
+export interface ShareHintSpec {
+  text: string;
+  extra?: string;
+  /** Which of the site's buttons to point at. */
+  anchor: 'gist-submit' | 'greasyfork-submit' | 'none';
+  /** Put this on the clipboard (and offer a Copy button); `text`/`textNotCopied` say which happened. */
+  copy?: string;
+  textNotCopied?: string;
+  /** Offer "Share as a new gist" (a deleted gist's edit page). */
+  offerNewGist?: boolean;
+  testId?: string;
+}
 
 export type ContentEvent = { type: 'picked'; element: PickedElement } | { type: 'pick-cancelled' };

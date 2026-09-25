@@ -7,7 +7,10 @@ import { wrapForExecution } from '@/lib/exec/wrap';
 import { checkConnect, connectOf } from '@/lib/connect';
 import { dependenciesChanged, fetchText, previewFromUrl, reparseEditedSource, resolveDependencies, toBase64 } from '@/lib/install';
 import { UPDATED_MARK } from '@/lib/importreport';
-import { installPageUrl, isUserScriptUrl, scriptIdentity } from '@/lib/installurl';
+import { installPageUrl, isInstallableUrl, isUserScriptUrl, scriptIdentity, USER_JS_PATTERN, USER_JS_VIEW_PATTERN } from '@/lib/installurl';
+import { addDismissal, BANNER_DISMISSED_KEY, bannerWorthShowing, installState, isDismissed, type Detection } from '@/lib/banner';
+import type { BannerStateReply } from '@/lib/bannerclient';
+import { createShareController } from '@/lib/sharecontroller';
 import { resyncPlan } from '@/lib/resync';
 import { mapStack, prepareRunScript, renderRunResult, type RunResult } from '@/lib/runscript';
 import { shouldUpdate } from '@/lib/version';
@@ -136,6 +139,22 @@ export default defineBackground(() => {
   chrome.runtime.onStartup.addListener(() => void bootstrap());
 
   watchUserJsNavigations();
+
+  // Sharing to a gist or Greasy Fork follows the tab it opened from one page load to the next, so
+  // its listener has to be here, in the first turn, like every other one a sleeping worker needs.
+  share.listen();
+
+  // The page content script's messages: the install banner and the share hint's one button. Types
+  // with no dot, so the RPC listener below never sees them; only a content script sends them, and
+  // only from a tab (sender.tab), which a web page cannot forge.
+  chrome.runtime.onMessage.addListener((msg: { type?: string } & Record<string, unknown>, sender, sendResponse) => {
+    if (!msg || typeof msg.type !== 'string' || !msg.type.startsWith('usermods:') || sender.id !== chrome.runtime.id || !sender.tab) return false;
+    handlePageMessage(msg, sender).then(sendResponse, (e: unknown) => {
+      console.warn('[usermods] page message', e);
+      sendResponse(undefined);
+    });
+    return true;
+  });
 
   // A sign-in that was in flight when this worker was last torn down. Safari suspends the
   // background constantly — on iOS, as soon as the popup closes, which is exactly when the user is
@@ -1008,18 +1027,30 @@ async function bootstrap() {
  * means a script URL with a fragment of its own survives, because we never parse the remainder.
  */
 const USER_JS_RULE_ID = 1;
+/** Lets a code host's HTML view of a .user.js file (a GitHub blob page) load as itself. */
+const USER_JS_VIEW_RULE_ID = 2;
 
 async function installUserJsRedirect(): Promise<void> {
   const target = chrome.runtime.getURL('install.html');
   await chrome.declarativeNetRequest.updateDynamicRules({
-    removeRuleIds: [USER_JS_RULE_ID],
+    removeRuleIds: [USER_JS_RULE_ID, USER_JS_VIEW_RULE_ID],
     addRules: [
       {
         id: USER_JS_RULE_ID,
         priority: 1,
         action: { type: 'redirect', redirect: { regexSubstitution: `${target}#\\0` } },
         condition: {
-          regexFilter: String.raw`^https?://[^?#]+\.user\.js([?#].*)?$`,
+          regexFilter: USER_JS_PATTERN,
+          isUrlFilterCaseSensitive: false,
+          resourceTypes: ['main_frame'],
+        },
+      },
+      {
+        id: USER_JS_VIEW_RULE_ID,
+        priority: 2,
+        action: { type: 'allow' },
+        condition: {
+          regexFilter: USER_JS_VIEW_PATTERN,
           isUrlFilterCaseSensitive: false,
           resourceTypes: ['main_frame'],
         },
@@ -1191,6 +1222,74 @@ async function nameChat(chatId: string, settings: Settings, post: (e: AgentEvent
   }
 }
 
+// ---------- sharing and the install banner ----------
+
+const share = createShareController({
+  loadMods,
+  async saveMod(mod) {
+    await upsertMod(mod);
+    await syncRegistrations();
+  },
+  sendToContent,
+});
+
+/** Keep what a content script says about a page to the shape and size the banner uses. */
+function cleanDetection(d: unknown): Detection | null {
+  const x = d as Partial<Detection> | null;
+  if (!x || !Array.isArray(x.scripts) || typeof x.kind !== 'string') return null;
+  const str = (v: unknown, max = 2048) => (typeof v === 'string' ? v.slice(0, max) : '');
+  const scripts = x.scripts.slice(0, 10).map((s) => ({
+    name: str(s?.name, 200),
+    namespace: str(s?.namespace, 500),
+    version: str(s?.version, 100),
+    installUrl: str(s?.installUrl),
+    ...(s?.downloadUrl ? { downloadUrl: str(s.downloadUrl) } : {}),
+  }));
+  const gist = x.gist && typeof x.gist.id === 'string' ? { user: str(x.gist.user, 100), id: str(x.gist.id, 64) } : undefined;
+  return { kind: x.kind as Detection['kind'], scripts, ...(gist ? { gist } : {}) };
+}
+
+async function handlePageMessage(msg: { type?: string } & Record<string, unknown>, sender: chrome.runtime.MessageSender): Promise<unknown> {
+  const tab = sender.tab!;
+  switch (msg.type) {
+    case 'usermods:banner-state': {
+      const quiet: BannerStateReply = { show: false, states: [] };
+      const detection = cleanDetection(msg.detection);
+      const href = typeof msg.href === 'string' ? msg.href : '';
+      if (!detection || !href) return quiet;
+      // A tab a share is driving is the user writing their own script: no banner there.
+      if (tab.id != null && (await share.active(tab.id))) return quiet;
+      const stored = await chrome.storage.local.get(BANNER_DISMISSED_KEY);
+      if (isDismissed(stored[BANNER_DISMISSED_KEY] as string[] | undefined, href)) return quiet;
+      const mods = await loadMods();
+      // The user's own shared gist is theirs; offering to install it back is a nag.
+      if (detection.gist && mods.some((m) => m.share?.gist?.id === detection.gist!.id)) return quiet;
+      const states = detection.scripts.map((s) => {
+        const st = installState(s, mods);
+        return bannerWorthShowing(detection.kind, st) ? st : null;
+      });
+      return { show: states.some(Boolean), states } satisfies BannerStateReply;
+    }
+    case 'usermods:banner-dismiss': {
+      if (typeof msg.href !== 'string') return undefined;
+      const stored = await chrome.storage.local.get(BANNER_DISMISSED_KEY);
+      await chrome.storage.local.set({ [BANNER_DISMISSED_KEY]: addDismissal(stored[BANNER_DISMISSED_KEY] as string[] | undefined, msg.href) });
+      return { ok: true };
+    }
+    case 'usermods:banner-install': {
+      const url = typeof msg.url === 'string' ? msg.url : '';
+      if (!isInstallableUrl(url)) return undefined;
+      // The install page fetches, previews and asks; nothing is saved until the user presses Install.
+      await chrome.tabs.create({ url: installPageUrl(chrome.runtime.getURL('install.html'), url), index: tab.index + 1, ...(tab.id != null ? { openerTabId: tab.id } : {}) });
+      return { ok: true };
+    }
+    case 'usermods:share-new-gist':
+      if (tab.id != null) await share.restartAsNewGist(tab.id);
+      return { ok: true };
+  }
+  return undefined;
+}
+
 // ---------- RPC ----------
 
 async function handleRpc(req: RpcRequest): Promise<unknown> {
@@ -1221,7 +1320,16 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
     case 'mods.preview':
       return 'url' in req ? previewFromUrl(req.url) : previewFromSource(req.source);
     case 'mods.install': {
-      const mod = await installSource(req.source, { downloadUrl: req.downloadUrl, enabled: req.enabled, values: req.values });
+      // replaceId: the install page updating a script that is already installed (it found it with
+      // mods.findInstalled and said so on its button) — same mod, same id, values and enabled flag.
+      const existing = req.replaceId ? (await loadMods()).find((m) => m.id === req.replaceId) : undefined;
+      if (req.replaceId && !existing) throw new Error('The installed copy of this script is gone. Install it again.');
+      const mod = await installSource(req.source, {
+        downloadUrl: req.downloadUrl,
+        enabled: existing ? existing.enabled : req.enabled,
+        values: req.values,
+        ...(existing ? { existing } : {}),
+      });
       const mods = await upsertMod(mod);
       await syncRegistrations();
       return mods;
@@ -1233,6 +1341,16 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
     }
     case 'mods.update':
       return updateMod(req.id);
+    case 'mods.findInstalled': {
+      const h = parseHeader(req.source);
+      const state = installState(
+        { name: h.name, namespace: h.raw['namespace']?.[0]?.trim() ?? '', version: h.version, installUrl: req.url, ...(h.downloadUrl ? { downloadUrl: h.downloadUrl } : {}) },
+        await loadMods(),
+      );
+      return state.kind === 'install' ? null : { modId: state.modId, version: state.kind === 'update' ? state.from : state.version, newer: state.kind === 'update' };
+    }
+    case 'share.start':
+      return share.start(req.share);
     case 'mods.importBackup':
       return importBackup(req);
     case 'mods.try': {

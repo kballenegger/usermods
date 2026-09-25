@@ -1,6 +1,8 @@
 import { createHolder } from '@/lib/keepalive-holder';
 import { computedStyles, describeElements, selectorFor, snapshot } from '@/lib/snapshot';
 import { waitForDom } from '@/lib/waitdom';
+import { initBanner } from '@/lib/bannerclient';
+import { handleShareMessage } from '@/lib/shareclient';
 import type { ContentEvent, ContentRequest } from '@/lib/types';
 
 export default defineContentScript({
@@ -104,8 +106,21 @@ export default defineContentScript({
           picking = startPicker();
           sendResponse({ ok: true });
           return;
+        case 'share-fill':
+        case 'share-hint':
+        case 'share-files':
+          // Sharing a mod to a gist or Greasy Fork: lib/shareclient.ts. Async, like 'wait'.
+          void handleShareMessage(msg).then(sendResponse, (e: unknown) =>
+            sendResponse({ state: 'missing', reason: e instanceof Error ? e.message : String(e) }),
+          );
+          return true;
       }
     });
+
+    // The install banner (lib/bannerclient.ts): a page offering a userscript gets a slim bar saying
+    // usermods can install it. Top frame only, and it returns at once on every page that is neither
+    // one of four hosts nor a plain-text document.
+    if (window.top === window) initBanner();
 
     function labelFor(el: Element): string {
       const tag = el.tagName.toLowerCase();

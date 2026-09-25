@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   bulkTargets,
   editorSync,
-  exportFilename,
   exportFilenames,
   filterMods,
   formatSize,
@@ -18,6 +17,8 @@ import { previewFromSource } from '@/lib/mods';
 import { rpc } from '@/lib/rpc';
 import type { Mod } from '@/lib/types';
 import { InstallPanel } from './InstallPanel';
+import { useModShare } from '../sidepanel/components/ExportMenu';
+import { MenuButton, type MenuItem } from '../sidepanel/components/Menu';
 
 export function ModsSection({
   mods,
@@ -125,9 +126,8 @@ export function ModsSection({
     }
   }
 
-  function exportOne(m: Mod) {
-    download(new Blob([m.source], { type: 'text/javascript' }), exportFilename(m.name));
-  }
+  // Export: download, copy, and sharing to a gist or Greasy Fork (sidepanel/components/ExportMenu).
+  const share = useModShare({ onStatus: say, onError: fail, onChanged });
 
   return (
     <>
@@ -180,6 +180,7 @@ export function ModsSection({
 
       {error && <div className="error" style={{ marginBottom: 10 }}>{error}</div>}
       {status && <div className="ok" style={{ marginBottom: 10 }}>{status}</div>}
+      {(share.prompt || share.notices) && <div className="dash-share">{share.prompt}{share.notices}</div>}
 
       <div className="panes">
         <div>
@@ -206,7 +207,7 @@ export function ModsSection({
                 }
                 onToggle={() => void toggle(m)}
                 onEdit={onEditMod ? () => onEditMod(m) : undefined}
-                onExport={() => exportOne(m)}
+                exportItems={share.items(m)}
                 onUpdate={() => void update(m)}
                 onDelete={() => void remove(m)}
               />
@@ -243,7 +244,7 @@ function ModRow({
   onToggleSelect,
   onToggle,
   onEdit,
-  onExport,
+  exportItems,
   onUpdate,
   onDelete,
 }: {
@@ -258,7 +259,8 @@ function ModRow({
   onToggle: () => void;
   /** Open this mod in a chat. Absent when the page cannot do the handoff. */
   onEdit?: () => void;
-  onExport: () => void;
+  /** Download, copy, share as a gist, publish on Greasy Fork. */
+  exportItems: MenuItem[];
   onUpdate: () => void;
   onDelete: () => void;
 }) {
@@ -343,9 +345,9 @@ function ModRow({
             Edit in chat
           </button>
         )}
-        <button className="pill" onClick={onExport} data-testid="mod-export">
-          Export
-        </button>
+        <MenuButton label={`Export “${mod.name}”`} title="Download, copy, or share this mod" className="pill" testId="mod-export" items={exportItems} placement="down">
+          Export ▾
+        </MenuButton>
         {mod.downloadUrl && (
           <button className="pill" onClick={onUpdate} data-testid="mod-update">
             Update
@@ -492,6 +494,24 @@ function ModEditor({
           <>
             <dt>Source</dt>
             <dd className="break">{mod.downloadUrl}</dd>
+          </>
+        )}
+        {mod.share?.gist && (
+          <>
+            <dt>Gist</dt>
+            <dd className="break" data-testid="mod-editor-gist">
+              <a href={mod.share.gist.url} target="_blank" rel="noopener noreferrer">{mod.share.gist.url}</a>
+              <br />
+              install link: {mod.share.gist.rawUrl}
+            </dd>
+          </>
+        )}
+        {mod.share?.greasyFork && (
+          <>
+            <dt>Greasy Fork</dt>
+            <dd className="break">
+              <a href={mod.share.greasyFork.url} target="_blank" rel="noopener noreferrer">{mod.share.greasyFork.url}</a>
+            </dd>
           </>
         )}
       </dl>

@@ -20,6 +20,8 @@ function InstallPage() {
   const [installError, setInstallError] = useState('');
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
+  /** The installed copy of this same script, when there is one: Install becomes Update, in place. */
+  const [installed, setInstalled] = useState<{ modId: string; version: string; newer: boolean } | null>(null);
 
   const url = scriptUrlFromLocation(location);
 
@@ -33,7 +35,12 @@ function InstallPage() {
       return;
     }
     rpc({ type: 'mods.preview', url })
-      .then(setPreview)
+      .then(async (p) => {
+        setPreview(p);
+        // Matched by download URL, or @name + @namespace (lib/banner.ts installState). A script that
+        // is already installed is updated in place rather than installed a second time.
+        setInstalled(await rpc({ type: 'mods.findInstalled', source: p.source, url }).catch(() => null));
+      })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
   }, [url]);
 
@@ -42,7 +49,13 @@ function InstallPage() {
     setBusy(true);
     setInstallError('');
     try {
-      await rpc({ type: 'mods.install', source: preview.source, downloadUrl: preview.downloadUrl ?? url, enabled: true });
+      await rpc({
+        type: 'mods.install',
+        source: preview.source,
+        downloadUrl: preview.downloadUrl ?? url,
+        enabled: true,
+        ...(installed ? { replaceId: installed.modId } : {}),
+      });
       setDone(true);
     } catch (e) {
       setInstallError(e instanceof Error ? e.message : String(e));
@@ -81,7 +94,9 @@ function InstallPage() {
             <h4 className="grow">Installed</h4>
           </div>
           <div className="desc">
-            “{preview.name}” is installed and enabled. It will run the next time you load a page it matches. Manage it from the usermods side panel.
+            {installed
+              ? `“${preview.name}” is updated${preview.version ? ` to v${preview.version}` : ''}. It will run the next time you load a page it matches.`
+              : `“${preview.name}” is installed and enabled. It will run the next time you load a page it matches. Manage it from the usermods side panel.`}
           </div>
           <div className="row">
             <button className="btn primary" onClick={() => void closeTab()}>Close tab</button>
@@ -90,7 +105,25 @@ function InstallPage() {
       )}
       {!done && !error && !preview && <div className="empty">fetching {url}…</div>}
       {!done && preview && (
-        <InstallPreview preview={preview} busy={busy} error={installError} onInstall={() => void install()} onCancel={() => void closeTab()} />
+        <>
+          {installed && (
+            <div className="card" data-testid="install-already">
+              <div className="desc">
+                {installed.newer
+                  ? `You have v${installed.version} of this script. Installing replaces it with v${preview.version}, keeping its settings and stored values.`
+                  : `This script is already installed${installed.version ? ` (v${installed.version})` : ''}. Installing again replaces it in place.`}
+              </div>
+            </div>
+          )}
+          <InstallPreview
+            preview={preview}
+            busy={busy}
+            error={installError}
+            onInstall={() => void install()}
+            onCancel={() => void closeTab()}
+            installLabel={installed ? (installed.newer ? `Update to v${preview.version}` : 'Reinstall') : 'Install'}
+          />
+        </>
       )}
     </div>
   );

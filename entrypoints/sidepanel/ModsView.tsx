@@ -5,7 +5,9 @@ import type { Mod, ScriptPreview } from '@/lib/types';
 import { HANDOFF_KEY, type ChatHandoff } from '@/lib/dashboard';
 import { urlMatches } from '@/lib/mods';
 import { DeleteIcon, EditModIcon, MoreIcon } from './components/icons';
+import { copyText, useModShare } from './components/ExportMenu';
 import { InstallPreview } from './components/InstallPreview';
+import { MenuButton, type MenuItem } from './components/Menu';
 import { Sheet, SheetRow } from './components/Sheet';
 import { TampermonkeyCard } from './components/TampermonkeyCard';
 import { useShell } from './shell';
@@ -74,15 +76,6 @@ export function ModsView({ tabId, pageUrl, host, onEditInChat }: { tabId: number
     }
   }
 
-  function exportMod(m: Mod) {
-    const blob = new Blob([m.source], { type: 'text/javascript' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `${m.name.replace(/[^\w.-]+/g, '-').toLowerCase() || 'mod'}.user.js`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  }
-
   /** Preview a URL or a file's text, then wait for the user to confirm. */
   async function preview(req: { url: string } | { source: string; downloadUrl?: string }) {
     setError('');
@@ -142,14 +135,34 @@ export function ModsView({ tabId, pageUrl, host, onEditInChat }: { tabId: number
     }
   }
 
+  // Export: download, copy, and sharing to a gist or Greasy Fork (components/ExportMenu.tsx).
+  const share = useModShare({
+    onStatus: (s) => {
+      setError('');
+      setStatus(s);
+    },
+    onError: fail,
+    onChanged: () => void rpc({ type: 'mods.list' }).then(setMods).catch(() => {}),
+  });
+
   const here = mods.filter((m) => pageUrl && urlMatches(pageUrl, [...m.matches, ...m.includeGlobs]));
   const elsewhere = mods.filter((m) => !here.includes(m));
-  const cardProps = { onToggle: toggle, onRemove: remove, onTry: tryNow, onExport: exportMod, onUpdate: update, onEdit: (m: Mod) => void editInChat(m) };
+  const cardProps = {
+    onToggle: toggle,
+    onRemove: remove,
+    onTry: tryNow,
+    exportItems: share.items,
+    onCopyLink: (url: string) => void copyText(url).then(() => setStatus('Copied the install link.'), fail),
+    onUpdate: update,
+    onEdit: (m: Mod) => void editInChat(m),
+  };
 
   return (
     <div className="view stack">
       {error && <div className="error">▲ {error}</div>}
       {status && <div className="ok">● {status}</div>}
+      {share.prompt}
+      {share.notices}
 
       <TampermonkeyCard
         onImported={(r) => {
@@ -208,7 +221,8 @@ function ModCard({
   onToggle,
   onRemove,
   onTry,
-  onExport,
+  exportItems,
+  onCopyLink,
   onUpdate,
   onEdit,
 }: {
@@ -216,7 +230,9 @@ function ModCard({
   onToggle: (m: Mod) => void;
   onRemove: (m: Mod) => void;
   onTry: (m: Mod) => void;
-  onExport: (m: Mod) => void;
+  /** The Export menu's items for this mod: download, copy, gist, Greasy Fork. */
+  exportItems: (m: Mod) => MenuItem[];
+  onCopyLink: (url: string) => void;
   onUpdate: (m: Mod) => void;
   onEdit: (m: Mod) => void;
 }) {
@@ -252,6 +268,16 @@ function ModCard({
           {m.grants.length > 6 && <span className="muted" style={{ fontSize: 'var(--fs-label)' }}>+{m.grants.length - 6} more</span>}
         </div>
       )}
+      {m.share?.gist && (
+        // The install link a gist share produced: anyone can install from it and gets new versions.
+        <div className="mod-share-link" data-testid="mod-install-link">
+          <span className="label" style={{ margin: 0 }}>install link</span>
+          <span className="mono" title={m.share.gist.rawUrl}>{m.share.gist.rawUrl}</span>
+          <button className="btn" onClick={() => onCopyLink(m.share!.gist!.rawUrl)} aria-label={`Copy the install link for “${m.name}”`}>
+            Copy
+          </button>
+        </div>
+      )}
       <details>
         <summary>▼ code</summary>
         <pre>{m.source}</pre>
@@ -283,7 +309,7 @@ function ModCard({
             data-action="mod-more"
             aria-haspopup="dialog"
             aria-expanded={moreOpen}
-            aria-label={`More actions for “${m.name}”: run once, export${m.downloadUrl ? ', update' : ''}, delete`}
+            aria-label={`More actions for “${m.name}”: run once, export, share${m.downloadUrl ? ', update' : ''}, delete`}
             onClick={() => setMoreOpen(true)}
           >
             <MoreIcon />
@@ -291,7 +317,17 @@ function ModCard({
         ) : (
           <>
             <button className="btn" onClick={() => onTry(m)}>Run once</button>
-            <button className="btn" onClick={() => onExport(m)}>Export</button>
+            <MenuButton
+              label={`Export “${m.name}”`}
+              title="Download, copy, or share this mod"
+              className="btn"
+              testId="mod-export"
+              items={exportItems(m)}
+              menuLabel={`Export “${m.name}”`}
+              placement="down"
+            >
+              Export ▾
+            </MenuButton>
             {m.downloadUrl && <button className="btn" onClick={() => onUpdate(m)}>Update</button>}
             <button className="btn danger" onClick={() => onRemove(m)}>Delete</button>
           </>
@@ -301,7 +337,18 @@ function ModCard({
         <Sheet title={m.name} onClose={() => setMoreOpen(false)} returnFocus={moreRef} testId="sheet-mod-actions">
           <div className="sheet-list">
             <SheetRow label="Run once" action="mod-try" onClick={fromSheet(onTry)} />
-            <SheetRow label="Export" value=".user.js" action="mod-export" onClick={fromSheet(onExport)} />
+            {/* Export's four ways, as rows of their own: a menu inside a sheet is one layer too many. */}
+            {exportItems(m).map((item) => (
+              <SheetRow
+                key={item.id}
+                label={item.label}
+                action={`mod-${item.testId ?? item.id}`}
+                onClick={() => {
+                  setMoreOpen(false);
+                  item.onSelect();
+                }}
+              />
+            ))}
             {m.downloadUrl && <SheetRow label="Update" value="from its download URL" action="mod-update" onClick={fromSheet(onUpdate)} />}
           </div>
           <div className="sheet-list">
