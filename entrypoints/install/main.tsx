@@ -12,7 +12,29 @@ import { applyStoredTheme } from '@/lib/theme';
 import type { ScriptPreview } from '@/lib/types';
 import { InstallPreview } from '../sidepanel/components/InstallPreview';
 import { ThemeToggle } from '../sidepanel/components/ThemeToggle';
+import { UpdateReviewPage } from './UpdateReview';
 import '../sidepanel/styles.css';
+
+/** install.html?update=<modId> is the update review screen; anything else is a script install. */
+function Page() {
+  const updateId = new URLSearchParams(location.search).get('update');
+  if (!updateId) return <InstallPage />;
+  return (
+    <div className="page">
+      <div className="page-head">
+        <div>
+          <div className="wordmark">
+            <img className="brand-mark" src="/icon/128.png" alt="" width={16} height={16} />
+            usermods
+          </div>
+          <h2>Review update</h2>
+        </div>
+        <ThemeToggle />
+      </div>
+      <UpdateReviewPage modId={updateId} />
+    </div>
+  );
+}
 
 function InstallPage() {
   const [preview, setPreview] = useState<ScriptPreview | null>(null);
@@ -135,6 +157,6 @@ void applyStoredTheme();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <InstallPage />
+    <Page />
   </React.StrictMode>,
 );

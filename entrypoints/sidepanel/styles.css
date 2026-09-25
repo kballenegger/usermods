@@ -2042,3 +2042,49 @@ button.attach:focus-visible {
   font-size: var(--fs-meta);
   color: var(--text-2);
 }
+
+/* A count on the Mods tab: updates waiting for review. Ink on the live colour, never colour alone —
+   the number is the message, and the tab's accessible name says it in words. */
+.tab-badge {
+  display: inline-block;
+  min-width: 16px;
+  margin-left: 6px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-fg);
+  font: 600 10px/16px var(--font-mono);
+  text-align: center;
+  vertical-align: 1px;
+}
+
+/* The row's update line: an offer (a button) or a quiet note that a check could not complete. */
+.mod-update-line {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-meta);
+}
+
+/* The update review screen (install.html?update=…). */
+.update-notes,
+.update-findings {
+  margin: 0;
+  padding-left: 18px;
+}
+.update-notes li + li,
+.update-findings li + li {
+  margin-top: 4px;
+}
+.update-diff {
+  max-height: 60vh;
+}
+.update-actions {
+  flex-wrap: wrap;
+}
+/* A danger chip: the review's "do not install" and high-severity findings. Word and colour both. */
+.chip.danger {
+  color: var(--error-text);
+  background: var(--error-bg);
+  border-color: var(--error-text);
+}

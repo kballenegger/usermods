@@ -5,6 +5,7 @@ import type { ModelListResult } from './modellist';
 import type { ThinkingLevel } from './thinking';
 import type { ResumableRun } from './runstate';
 import type { StartShare } from './sharecontroller';
+import type { AvailableUpdate, UpdateReview } from './updates';
 import type { AgentEvent, ChatItem, Mod, ScriptPreview, UserTurn } from './types';
 
 export type OAuthKind = 'chatgpt' | 'xai';
@@ -42,8 +43,23 @@ export type RpcRequest =
    * caller-built Mod and does no dependency resolution at all.
    */
   | { type: 'mods.saveSource'; id: string; source: string }
-  /** Refetch from downloadUrl and replace the source if @version moved. */
+  /**
+   * The Update button: check this mod for a newer version now. It never installs: a newer version
+   * comes back as `available`, and the review screen (updates.get / updates.apply) is where the
+   * user decides.
+   */
   | { type: 'mods.update'; id: string }
+  /** Run the (throttled) update check for every installed mod; `force` ignores the daily limit. */
+  | { type: 'updates.check'; force?: boolean }
+  /** Per mod: the version on offer and any quiet check error. No sources. */
+  | { type: 'updates.summary' }
+  /** Everything the review screen shows for one mod. */
+  | { type: 'updates.get'; modId: string }
+  | { type: 'updates.skip'; modId: string; version: string }
+  /** "Install update": installs exactly the text with this hash, the one the screen showed. */
+  | { type: 'updates.apply'; modId: string; hash: string }
+  /** "Check with the agent first": the safety review, cached per (mod, new version). */
+  | { type: 'updates.review'; modId: string; hash: string }
   /** Import a Tampermonkey backup (JSON text, or a base64 ZIP). */
   | { type: 'mods.importBackup'; json: string }
   | { type: 'mods.importBackup'; zipBase64: string }
@@ -125,7 +141,17 @@ interface RpcResults {
   'mods.install': Mod[];
   'mods.saveSource': Mod[];
   'mods.preview': ScriptPreview;
-  'mods.update': { updated: boolean; version: string };
+  'mods.update': { updated: boolean; version: string; available?: string };
+  'updates.check': { checked: number; offered: number };
+  'updates.summary': Record<string, { available?: string; error?: string; lastChecked?: number }>;
+  'updates.get': {
+    mod: Mod;
+    update: AvailableUpdate | null;
+    review: UpdateReview | null;
+    reviewer: { ok: true; model: string } | { ok: false; reason: string };
+  };
+  'updates.apply': { version: string };
+  'updates.review': UpdateReview;
   'mods.findInstalled': { modId: string; version: string; newer: boolean } | null;
   'share.start': { tabId: number };
   'mods.importBackup': { imported: number; skipped: string[]; mods: Mod[] };

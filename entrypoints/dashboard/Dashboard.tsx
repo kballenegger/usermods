@@ -5,6 +5,7 @@ import { rpc } from '@/lib/rpc';
 import { isConnected } from '@/lib/connections';
 import type { Mod } from '@/lib/types';
 import { useConnections } from '../sidepanel/useConnections';
+import { useUpdates } from '../sidepanel/useUpdates';
 import { SettingsView } from '../sidepanel/SettingsView';
 import { ThemeToggle } from '../sidepanel/components/ThemeToggle';
 import { ChatsSection } from './ChatsSection';
@@ -22,6 +23,8 @@ export function Dashboard() {
   const [section, setSection] = useState<Section>(sectionFromHash);
   const [chats, setChats] = useState<Chat[]>([]);
   const [mods, setMods] = useState<Mod[]>([]);
+  /** Mods with a newer version waiting for review: the badge on the Mods tab. */
+  const { count: updateCount } = useUpdates();
   /**
    * Which chat each saved mod came from, for the Mods list's "from chat" line.
    *
@@ -195,6 +198,11 @@ export function Dashboard() {
           </button>
           <button className={section === 'mods' ? 'active' : ''} onClick={() => go('mods')}>
             Mods
+            {updateCount > 0 && (
+              <span className="tab-badge" data-testid="mods-update-badge" aria-label={`, ${updateCount} update${updateCount === 1 ? '' : 's'} available`}>
+                {updateCount}
+              </span>
+            )}
           </button>
           <button className={section === 'settings' ? 'active' : ''} onClick={() => go('settings')}>
             Settings

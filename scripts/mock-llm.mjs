@@ -1103,6 +1103,21 @@ const FALLBACK = {
 // string, deliberately dressed in the quotes and trailing period a real model tends to add, so the
 // screenshots flow exercises the panel's sanitiser rather than a pre-cleaned answer.
 
+// Update safety reviews (lib/updates.ts REVIEW_SYSTEM_PROMPT): a one-shot, tool-free request with
+// the review system prompt. Answered with a fixed JSON review that names the new @connect host, so
+// the updates flow can see findings rendered; recorded as script 'review' so the flow can check
+// what was sent (the two sources, nothing from a page).
+const updateServed = { source: '', fetches: 0 };
+const REVIEW_SYSTEM = /you review updates to browser userscripts/i;
+export const REVIEW_REPLY = JSON.stringify({
+  verdict: 'review carefully',
+  summary: 'The new version starts sending data to a host the old one never contacted.',
+  findings: [{ severity: 'high', what: 'New @connect host collect.example.net and a POST of document.cookie to it', where: 'header, L14', why: 'Your cookies for every matched site would leave the browser.' }],
+});
+function isReviewRequest(body) {
+  return (body.messages ?? []).some((m) => m.role === 'system' && REVIEW_SYSTEM.test(messageText(m)));
+}
+
 /** Matches the title system prompt without pinning its exact wording. */
 const TITLE_SYSTEM = /you name chat conversations/i;
 const TITLE_REPLY = '"Full-width Wikipedia articles."';
@@ -1858,6 +1873,30 @@ const server = http.createServer(async (req, res) => {
   // route change and a region that mutates then settles. Served from here so the flow does not
   // depend on a live site behaving asynchronously on cue. The query string is ignored — the SPA
   // route change pushes ?step=2 onto this same path, and the page must still render there.
+  // The updates flow's "remote" copy of an installed script: POST sets what is served, GET serves it
+  // (as a .user.js and as its header-only .meta.js), counting fetches so the flow can prove the
+  // daily throttle.
+  if (url.pathname === '/__updates' && req.method === 'POST') {
+    const body = JSON.parse(await readBody(req));
+    updateServed.source = String(body.source ?? '');
+    updateServed.fetches = 0;
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end('{"ok":true}');
+    return;
+  }
+  if (url.pathname === '/__updates' && req.method === 'GET') {
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ fetches: updateServed.fetches }));
+    return;
+  }
+  if (url.pathname === '/__updates/tidy.user.js' || url.pathname === '/__updates/tidy.meta.js') {
+    updateServed.fetches++;
+    const src = updateServed.source;
+    const text = url.pathname.endsWith('.meta.js') ? (src.match(/\/\/\s*==UserScript==[\s\S]*?\/\/\s*==\/UserScript==/)?.[0] ?? '') + '\n' : src;
+    res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'access-control-allow-origin': '*' });
+    res.end(text);
+    return;
+  }
   if (url.pathname === '/__fixture/async.html') {
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
     res.end(ASYNC_FIXTURE);
@@ -1932,7 +1971,7 @@ const server = http.createServer(async (req, res) => {
     recordViolations(body, messages);
 
     // Fault injection, decided before anything is written. The request is recorded either way.
-    const kind = isSummaryRequest(body) ? 'summary' : isTitleRequest(body) ? 'title' : (pickScript(messages).script.name ?? 'fallback');
+    const kind = isSummaryRequest(body) ? 'summary' : isReviewRequest(body) ? 'review' : isTitleRequest(body) ? 'title' : (pickScript(messages).script.name ?? 'fallback');
     // Collected once and reused: the fault decision needs to know whether a picture is on the wire,
     // and every recorded request carries the same summary so a flow can count what was sent.
     const collected = collectImages(messages);
@@ -1987,6 +2026,11 @@ const server = http.createServer(async (req, res) => {
       requests.push({ at: Date.now(), script: 'summary', ...where, messages: stripImageData(messages), images: collected.images, hasImages: collected.images.length > 0, ...(reasoning ? { reasoning } : {}) });
       if (process.env.MOCK_LLM_VERBOSE) console.error('[mock-llm] compaction summary');
       await streamStep(res, { text: SUMMARY_REPLY, calls: [] }, body.model ?? 'demo');
+      return;
+    }
+    if (isReviewRequest(body)) {
+      requests.push({ at: Date.now(), script: 'review', ...where, messages: stripImageData(messages), images: collected.images, hasImages: collected.images.length > 0, ...(reasoning ? { reasoning } : {}) });
+      await streamStep(res, { text: REVIEW_REPLY, calls: [] }, body.model ?? 'demo');
       return;
     }
     if (isTitleRequest(body)) {

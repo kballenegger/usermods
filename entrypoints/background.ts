@@ -11,6 +11,8 @@ import { installPageUrl, isInstallableUrl, isUserScriptUrl, scriptIdentity, USER
 import { addDismissal, BANNER_DISMISSED_KEY, bannerWorthShowing, installState, isDismissed, type Detection } from '@/lib/banner';
 import type { BannerStateReply } from '@/lib/bannerclient';
 import { createShareController } from '@/lib/sharecontroller';
+import { createUpdateController } from '@/lib/updatecontroller';
+import { withRetry } from '@/lib/agent/retry';
 import { resyncPlan } from '@/lib/resync';
 import { mapStack, prepareRunScript, renderRunResult, type RunResult } from '@/lib/runscript';
 import { shouldUpdate } from '@/lib/version';
@@ -139,6 +141,10 @@ export default defineBackground(() => {
   chrome.runtime.onStartup.addListener(() => void bootstrap());
 
   watchUserJsNavigations();
+
+  // Look for newer versions of installed mods: at most once a day per mod (lib/updates.ts), and
+  // only ever recorded — nothing is installed until the user reviews it and says so.
+  void updates.check().catch((e: unknown) => console.warn('[usermods] update check', e));
 
   // Sharing to a gist or Greasy Fork follows the tab it opened from one page load to the next, so
   // its listener has to be here, in the first turn, like every other one a sleeping worker needs.
@@ -1222,6 +1228,57 @@ async function nameChat(chatId: string, settings: Settings, post: (e: AgentEvent
   }
 }
 
+// ---------- update checks ----------
+
+/**
+ * The model a safety review is sent to: the one the user last chose (the same default a new chat
+ * gets), at the lowest thinking level it allows unless the user picked a higher one.
+ */
+async function reviewSettings(): Promise<{ ok: true; settings: Settings; model: string } | { ok: false; reason: string }> {
+  const connections = await loadConnections();
+  const [prefs, last, lastThinking, signedIn] = await Promise.all([loadSettings(), loadModelChoice(), loadThinkingChoice(), loadSignedIn()]);
+  const resolved = resolveSelection(selectionForChat(undefined, connections, last, signedIn), connections, signedIn);
+  if (!resolved.ok) return { ok: false, reason: resolved.message };
+  const base = effectiveSettings(prefs, resolved.connection, resolved.model, lastThinking);
+  const settings = lastThinking === 'default' ? cheapestThinking(base) : base;
+  return { ok: true, settings, model: `${resolved.selection.label ?? resolved.connection.label} · ${resolved.model}` };
+}
+
+const updates = createUpdateController({
+  loadMods,
+  async install(mod, source) {
+    const fresh = await installSource(source, { downloadUrl: mod.downloadUrl, enabled: mod.enabled, existing: mod });
+    await upsertMod(fresh);
+    await syncRegistrations();
+  },
+  async modelAvailable() {
+    const r = await reviewSettings().catch((e: unknown) => ({ ok: false as const, reason: e instanceof Error ? e.message : String(e) }));
+    return r.ok ? { ok: true, model: r.model } : { ok: false, reason: r.reason };
+  },
+  async complete(system, user) {
+    const r = await reviewSettings();
+    if (!r.ok) throw new Error(r.reason);
+    // The same retry the chat's model requests get; two minutes in all, then it gives up.
+    const signal = AbortSignal.timeout(120_000);
+    const res = await withRetry(
+      () =>
+        createProvider(r.settings).chat({
+          system,
+          messages: [{ role: 'user', content: [{ type: 'text', text: user }] }],
+          tools: [],
+          signal,
+          callbacks: { onText: () => {} },
+        }),
+      { signal, policy: resolvePolicy((await chrome.storage.local.get(RETRY_POLICY_KEY))[RETRY_POLICY_KEY]) },
+    );
+    const text = res.content
+      .filter((p): p is Extract<Part, { type: 'text' }> => p.type === 'text')
+      .map((p) => p.text)
+      .join('');
+    return { text, model: r.model };
+  },
+});
+
 // ---------- sharing and the install banner ----------
 
 const share = createShareController({
@@ -1339,8 +1396,30 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
       await syncRegistrations();
       return mods;
     }
-    case 'mods.update':
-      return updateMod(req.id);
+    case 'mods.update': {
+      // The Update button: check this one mod now. It never installs — a newer version is offered
+      // on the review screen (updates.get / updates.apply), which the caller opens.
+      const mod = (await loadMods()).find((m) => m.id === req.id);
+      if (!mod) throw new Error('That mod no longer exists.');
+      if (!mod.downloadUrl && !parseHeader(mod.source).updateUrl) throw new Error(`"${mod.name}" has no @downloadURL, so there is nothing to update from.`);
+      await updates.check({ force: true, onlyId: req.id });
+      const sum = (await updates.summary())[req.id];
+      if (sum?.error && !sum.available) throw new Error(`Could not check “${mod.name}” for updates: ${sum.error}.`);
+      return { updated: false, version: mod.version, ...(sum?.available ? { available: sum.available } : {}) };
+    }
+    case 'updates.check':
+      return updates.check({ ...(req.force ? { force: true } : {}) });
+    case 'updates.summary':
+      return updates.summary();
+    case 'updates.get':
+      return updates.get(req.modId);
+    case 'updates.skip':
+      await updates.skip(req.modId, req.version);
+      return { ok: true };
+    case 'updates.apply':
+      return updates.apply(req.modId, req.hash);
+    case 'updates.review':
+      return updates.review(req.modId, req.hash);
     case 'mods.findInstalled': {
       const h = parseHeader(req.source);
       const state = installState(
@@ -1782,27 +1861,8 @@ async function saveEditedSource(id: string, source: string): Promise<Mod> {
   return mod;
 }
 
-/** Refetch from @downloadURL and swap in the new source when the remote @version is newer. */
-async function updateMod(id: string): Promise<{ updated: boolean; version: string }> {
-  const mods = await loadMods();
-  const mod = mods.find((m) => m.id === id);
-  if (!mod) throw new Error('That mod no longer exists.');
-  if (!mod.downloadUrl) throw new Error(`"${mod.name}" has no @downloadURL, so there is nothing to update from.`);
-  const source = await fetchText(mod.downloadUrl);
-  if (!/\/\/\s*==UserScript==/.test(source)) throw new Error(`${mod.downloadUrl} did not return a userscript.`);
-  const next = parseHeader(source);
-  // Versions are compared ordinally, so a downgrade (1.9 published after 1.10 was installed, or a
-  // rolled-back file) does not overwrite what is installed. With no version on either side there
-  // is nothing to order by, so the source text decides.
-  if (!shouldUpdate({ version: mod.version, source: mod.source }, { version: next.version, source })) {
-    return { updated: false, version: mod.version || next.version };
-  }
-  // Keep identity, enabled state and GM values; replace source and dependencies.
-  const fresh = await installSource(source, { downloadUrl: mod.downloadUrl, enabled: mod.enabled, existing: mod });
-  await upsertMod(fresh);
-  await syncRegistrations();
-  return { updated: true, version: fresh.version || next.version };
-}
+// Updates are checked by lib/updatecontroller.ts and applied only from its review screen: there is
+// no path here that fetches a newer version and installs it in one step.
 
 /** Import a Tampermonkey backup: JSON text, or a base64-encoded ZIP. */
 async function importBackup(req: { json: string } | { zipBase64: string }): Promise<{ imported: number; skipped: string[]; mods: Mod[] }> {

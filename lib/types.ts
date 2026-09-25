@@ -131,6 +131,11 @@ export interface Settings {
    */
   sidePanelScope?: SidePanelScope;
   /**
+   * Look for newer versions of installed mods (lib/updates.ts): at most once a day per mod, and
+   * never installing anything — a newer version is only offered. Optional; absent reads as on.
+   */
+  checkUpdates?: boolean;
+  /**
    * Whether screenshots and attachments are sent to an OpenAI-compatible endpoint as pictures.
    *
    * Only this one provider needs the setting: the Anthropic and Responses backends accept images
@@ -158,7 +163,7 @@ export interface Settings {
 }
 
 /** The global preferences: the part of `Settings` stored under 'settings', none of it about a provider. */
-export type Prefs = Pick<Settings, 'autoNameChats' | 'theme' | 'contextBudget' | 'sidePanelScope'>;
+export type Prefs = Pick<Settings, 'autoNameChats' | 'theme' | 'contextBudget' | 'sidePanelScope' | 'checkUpdates'>;
 
 /**
  * Default context budget, in estimated tokens. Well under the 200k window of the models this ships

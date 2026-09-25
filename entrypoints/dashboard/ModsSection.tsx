@@ -18,6 +18,7 @@ import { rpc } from '@/lib/rpc';
 import type { Mod } from '@/lib/types';
 import { InstallPanel } from './InstallPanel';
 import { useModShare } from '../sidepanel/components/ExportMenu';
+import { openUpdateReview, useUpdates } from '../sidepanel/useUpdates';
 import { MenuButton, type MenuItem } from '../sidepanel/components/Menu';
 
 export function ModsSection({
@@ -87,9 +88,12 @@ export function ModsSection({
 
   async function update(m: Mod) {
     try {
+      // A check, never an install: a newer version opens the review screen, where the user decides.
       const r = await rpc({ type: 'mods.update', id: m.id });
-      say(r.updated ? `“${m.name}” updated to ${r.version}.` : `“${m.name}” is up to date.`);
-      onChanged();
+      if (r.available) {
+        say(`“${m.name}” v${r.available} is available. Review it in the tab that opened; nothing changes until you install it.`);
+        openUpdateReview(m.id);
+      } else say(`“${m.name}” is up to date.`);
     } catch (e) {
       fail(e);
     }
@@ -128,6 +132,7 @@ export function ModsSection({
 
   // Export: download, copy, and sharing to a gist or Greasy Fork (sidepanel/components/ExportMenu).
   const share = useModShare({ onStatus: say, onError: fail, onChanged });
+  const updates = useUpdates();
 
   return (
     <>
@@ -208,6 +213,7 @@ export function ModsSection({
                 onToggle={() => void toggle(m)}
                 onEdit={onEditMod ? () => onEditMod(m) : undefined}
                 exportItems={share.items(m)}
+                update={updates.summary[m.id]}
                 onUpdate={() => void update(m)}
                 onDelete={() => void remove(m)}
               />
@@ -245,6 +251,7 @@ function ModRow({
   onToggle,
   onEdit,
   exportItems,
+  update,
   onUpdate,
   onDelete,
 }: {
@@ -261,6 +268,8 @@ function ModRow({
   onEdit?: () => void;
   /** Download, copy, share as a gist, publish on Greasy Fork. */
   exportItems: MenuItem[];
+  /** A waiting update or a quiet check error (useUpdates). */
+  update?: { available?: string; error?: string };
   onUpdate: () => void;
   onDelete: () => void;
 }) {
@@ -348,10 +357,16 @@ function ModRow({
         <MenuButton label={`Export “${mod.name}”`} title="Download, copy, or share this mod" className="pill" testId="mod-export" items={exportItems} placement="down">
           Export ▾
         </MenuButton>
-        {mod.downloadUrl && (
-          <button className="pill" onClick={onUpdate} data-testid="mod-update">
-            Update
+        {update?.available ? (
+          <button className="pill" onClick={() => openUpdateReview(mod.id)} data-testid="mod-update-available" title="Review the new version; nothing installs until you say so">
+            Update available v{update.available}
           </button>
+        ) : (
+          mod.downloadUrl && (
+            <button className="pill" onClick={onUpdate} data-testid="mod-update" title={update?.error ? `Last check: ${update.error}` : 'Check for a newer version now'}>
+              Update
+            </button>
+          )
         )}
         <button className="pill danger" onClick={onDelete} data-testid="mod-delete">
           Delete

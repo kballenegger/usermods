@@ -23,6 +23,8 @@
 //                            install link, Update gist, clipboard fallback, leak check, sign-in
 //   npm run smoke:banner     headless: the install banner on a gist, a raw script and a blob page,
 //                            Install / Installed / Update, dismissal, and never in a frame
+//   npm run smoke:updates    headless: update checks offer and never install; the review screen,
+//                            the agent's safety review (only the two sources sent), skip, install
 //   node scripts/screenshots.mjs --share-capture   the share flow, also writing 14 and 15
 //   node scripts/screenshots.mjs --banner-capture  the banner flow, also writing 16
 //   npm run smoke:editmod    headless: editing an installed mod alone (import a userscript with a
@@ -91,6 +93,7 @@ import { spawn } from 'node:child_process';
 import { ARTIFACT_V1, ARTIFACT_V2, ARTIFACT_V3, COMPACT_MARKER, EDITMOD_PROMPTS, editModSource, FAST_MARKER, IMAGES_MARKER, MARKDOWN_REPLY, MODELS, RESUME as RESUME_CONV, SLOW_MARKER, SUMMARY_MARKER, THINKING, VISION as VISION_CONV, WAIT_MARKER } from './mock-llm.mjs';
 import { extDir } from './build-dir.mjs';
 import { bannerFlow, shareFlow } from './lib/share-flows.mjs';
+import { updatesFlow } from './lib/update-flow.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -149,6 +152,10 @@ const BANNER_SHOT = process.argv.includes('--banner-capture');
  * dashboard (whose rows now carry "Export ▾"), plus the three sharing captures (14, 15, 16).
  */
 const EXPORT_SHOT = process.argv.includes('--export-capture');
+/** Update checks and the review screen (scripts/lib/update-flow.mjs). */
+const UPDATES_FLOW = process.argv.includes('--updates');
+/** The updates flow, also writing 17-update-review.png. */
+const UPDATES_SHOT = process.argv.includes('--updates-capture');
 /** Print the composer's height at three panel widths (composerHeightFlow), before or after a change. */
 const COMPOSER_HEIGHT = process.argv.includes('--composer-height');
 /**
@@ -202,7 +209,7 @@ const CAPTURING =
   !SMOKE && !CHATS && !ISOLATION && !COMPACTION && !DASHBOARD && !DASHBOARD_SHOT && !THEME &&
   !TABBAR && !TABBAR_SHOT && !WAIT && !IMAGES && !VISION && !STYLEGUIDE && !ARTIFACT && !ARTIFACT_SHOT &&
   !PANELSCOPE && !RESUME && !EDITMOD && !COMPOSER && !MODELS_FLOW && !THINKING_FLOW && !COMPOSER_HEIGHT &&
-  !SHARE_FLOW && !SHARE_SHOT && !BANNER_FLOW && !BANNER_SHOT && !EXPORT_SHOT;
+  !SHARE_FLOW && !SHARE_SHOT && !BANNER_FLOW && !BANNER_SHOT && !EXPORT_SHOT && !UPDATES_FLOW && !UPDATES_SHOT;
 // --editmod-capture writes screenshots, so it wears the capture mask (the untested line is an
 // artefact of the automated profile, not of the product; see HIDE_UNTESTED_LINE).
 const CAPTURING_EDITMOD = EDITMOD_SHOT || COMPOSER_SHOT || EXPORT_SHOT;
@@ -5796,6 +5803,10 @@ async function main() {
       await bannerFlow({ launch, log, outDir: OUT_DIR, capture: true });
       return;
     }
+    if (UPDATES_FLOW || UPDATES_SHOT) {
+      await updatesFlow({ launch, openPanel, openSite, log, controlBase: CONTROL_BASE, outDir: OUT_DIR, capture: UPDATES_SHOT });
+      return;
+    }
     if (SHARE_FLOW || SHARE_SHOT) {
       await shareFlow({ launch, openPanel, openSite, log, outDir: OUT_DIR, capture: SHARE_SHOT });
       return;
@@ -5864,6 +5875,7 @@ async function main() {
       await thinkingFlow();
       await shareFlow({ launch, openPanel, openSite, log, outDir: OUT_DIR });
       await bannerFlow({ launch, log, outDir: OUT_DIR });
+      await updatesFlow({ launch, openPanel, openSite, log, controlBase: CONTROL_BASE });
       return;
     }
     // The dark set: the design system's own palette, and what the README leads with.
