@@ -28,7 +28,7 @@ final class MacViewController: NSViewController {
     /// The extension's bundle identifier, derived rather than hardcoded so a build with
     /// `USERMODS_BUNDLE_ID` overridden still opens its own row and not the public build's.
     private var extensionBundleIdentifier: String {
-        let app = Bundle.main.bundleIdentifier ?? "io.github.kballenegger.usermods"
+        let app = Bundle.main.bundleIdentifier ?? "com.kballenegger.usermods"
         return "\(app).extension"
     }
 

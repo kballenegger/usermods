@@ -346,7 +346,7 @@ function simulator({ configuration, bundleId, device }) {
 
   if (target.state !== 'Booted') run('/usr/bin/xcrun', ['simctl', 'boot', target.udid], { env });
   run('/usr/bin/xcrun', ['simctl', 'install', target.udid, app], { env });
-  const id = bundleId ?? 'io.github.kballenegger.usermods';
+  const id = bundleId ?? 'com.kballenegger.usermods';
   run('/usr/bin/xcrun', ['simctl', 'launch', target.udid, id], { env });
   console.log('');
   console.log(`installed and launched ${id} on ${target.name} (${target.udid}).`);

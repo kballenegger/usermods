@@ -10,7 +10,7 @@
 
 // Reverse-DNS from the public repository, so a clone builds without editing anything. Override it
 // for a real device install: two apps cannot share a bundle identifier on one Apple ID.
-USERMODS_BUNDLE_ID = io.github.kballenegger.usermods
+USERMODS_BUNDLE_ID = com.kballenegger.usermods
 
 USERMODS_MARKETING_VERSION = 0.1.0
 USERMODS_BUILD_NUMBER = 1
