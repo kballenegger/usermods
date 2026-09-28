@@ -121,6 +121,23 @@ export function SettingsView({ onReviewNotice }: { onReviewNotice?: () => void }
         </span>
       </label>
 
+      <label className="field">
+        <span className="toggle" style={{ marginBottom: 'var(--sp-1)' }}>
+          <input
+            type="checkbox"
+            checked={s.checkUpdates !== false}
+            onChange={(e) => update({ checkUpdates: e.target.checked })}
+            data-testid="setting-check-updates"
+          />
+          Check installed mods for updates
+        </span>
+        <span>
+          At most once a day, usermods asks each installed script's update address whether there is
+          a newer version, and says so on its row. Nothing is ever installed until you review it and
+          press Install update.
+        </span>
+      </label>
+
       {/*
         The one field on this screen you TYPE a number into, which is why it is the one that needs
         a draft. Everything else here is a toggle or a select, where the value the control reports

@@ -4,7 +4,7 @@
 
 **Vibe-code userscripts in place.** An open-source browser extension that lets you customize any website by chatting with the LLM of your choice.
 
-Open the side panel on any page, describe what you want changed, and usermods inspects the page, writes a userscript, tests it live, and hands it to you with *Try* and *Save* buttons. Saved mods run automatically on every matching page load. Export them as standard `.user.js` files, install ones from Greasy Fork, or [migrate your whole Tampermonkey library in one file](docs/guide.md#migrating-from-tampermonkey).
+Open the side panel on any page, describe what you want changed, and usermods inspects the page, writes a userscript, tests it live, and hands it to you with *Try* and *Save* buttons. Saved mods run automatically on every matching page load. Export them as standard `.user.js` files, share them as a GitHub gist or on Greasy Fork from your own signed-in tab (usermods fills the form; you press the button), install ones from Greasy Fork or any page that offers one, or [migrate your whole Tampermonkey library in one file](docs/guide.md#migrating-from-tampermonkey).
 
 Userscripts, userstyles, usermods.
 

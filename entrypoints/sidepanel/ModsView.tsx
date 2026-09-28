@@ -5,10 +5,13 @@ import type { Mod, ScriptPreview } from '@/lib/types';
 import { HANDOFF_KEY, type ChatHandoff } from '@/lib/dashboard';
 import { urlMatches } from '@/lib/mods';
 import { DeleteIcon, EditModIcon, MoreIcon } from './components/icons';
+import { copyText, useModShare } from './components/ExportMenu';
 import { InstallPreview } from './components/InstallPreview';
+import { MenuButton, type MenuItem } from './components/Menu';
 import { Sheet, SheetRow } from './components/Sheet';
 import { TampermonkeyCard } from './components/TampermonkeyCard';
 import { useShell } from './shell';
+import { openUpdateReview, useUpdates, type UpdateSummary } from './useUpdates';
 
 /** A script waiting on the user's confirmation, plus where it came from. */
 interface Pending {
@@ -74,15 +77,6 @@ export function ModsView({ tabId, pageUrl, host, onEditInChat }: { tabId: number
     }
   }
 
-  function exportMod(m: Mod) {
-    const blob = new Blob([m.source], { type: 'text/javascript' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `${m.name.replace(/[^\w.-]+/g, '-').toLowerCase() || 'mod'}.user.js`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  }
-
   /** Preview a URL or a file's text, then wait for the user to confirm. */
   async function preview(req: { url: string } | { source: string; downloadUrl?: string }) {
     setError('');
@@ -134,22 +128,47 @@ export function ModsView({ tabId, pageUrl, host, onEditInChat }: { tabId: number
     setError('');
     setStatus('');
     try {
+      // A check, never an install: a newer version opens the review screen, where the user decides.
       const r = await rpc({ type: 'mods.update', id: m.id });
-      setStatus(r.updated ? `“${m.name}” updated to ${r.version}.` : `“${m.name}” is up to date.`);
-      if (r.updated) setMods(await rpc({ type: 'mods.list' }));
+      if (r.available) {
+        setStatus(`“${m.name}” v${r.available} is available. Review it in the tab that opened; nothing changes until you install it.`);
+        openUpdateReview(m.id);
+      } else setStatus(`“${m.name}” is up to date.`);
     } catch (e) {
       fail(e);
     }
   }
 
+  // Export: download, copy, and sharing to a gist or Greasy Fork (components/ExportMenu.tsx).
+  const updates = useUpdates();
+  const share = useModShare({
+    onStatus: (s) => {
+      setError('');
+      setStatus(s);
+    },
+    onError: fail,
+    onChanged: () => void rpc({ type: 'mods.list' }).then(setMods).catch(() => {}),
+  });
+
   const here = mods.filter((m) => pageUrl && urlMatches(pageUrl, [...m.matches, ...m.includeGlobs]));
   const elsewhere = mods.filter((m) => !here.includes(m));
-  const cardProps = { onToggle: toggle, onRemove: remove, onTry: tryNow, onExport: exportMod, onUpdate: update, onEdit: (m: Mod) => void editInChat(m) };
+  const cardProps = {
+    onToggle: toggle,
+    onRemove: remove,
+    onTry: tryNow,
+    exportItems: share.items,
+    onCopyLink: (url: string) => void copyText(url).then(() => setStatus('Copied the install link.'), fail),
+    onUpdate: update,
+    updates: updates.summary,
+    onEdit: (m: Mod) => void editInChat(m),
+  };
 
   return (
     <div className="view stack">
       {error && <div className="error">▲ {error}</div>}
       {status && <div className="ok">● {status}</div>}
+      {share.prompt}
+      {share.notices}
 
       <TampermonkeyCard
         onImported={(r) => {
@@ -208,18 +227,25 @@ function ModCard({
   onToggle,
   onRemove,
   onTry,
-  onExport,
+  exportItems,
+  onCopyLink,
   onUpdate,
+  updates,
   onEdit,
 }: {
   m: Mod;
   onToggle: (m: Mod) => void;
   onRemove: (m: Mod) => void;
   onTry: (m: Mod) => void;
-  onExport: (m: Mod) => void;
+  /** The Export menu's items for this mod: download, copy, gist, Greasy Fork. */
+  exportItems: (m: Mod) => MenuItem[];
+  onCopyLink: (url: string) => void;
   onUpdate: (m: Mod) => void;
+  /** Update offers and quiet check errors, by mod id (useUpdates). */
+  updates: UpdateSummary;
   onEdit: (m: Mod) => void;
 }) {
+  const upd = updates[m.id];
   /**
    * On a phone (the compact Safari popup) five buttons in a row is a row that wraps to three lines
    * of 44px targets under every card. There the foot keeps the switch and the one verb the card is
@@ -250,6 +276,28 @@ function ModCard({
         <div className="row">
           {m.grants.slice(0, 6).map((g) => <span key={g} className="chip">{g}</span>)}
           {m.grants.length > 6 && <span className="muted" style={{ fontSize: 'var(--fs-label)' }}>+{m.grants.length - 6} more</span>}
+        </div>
+      )}
+      {upd?.available ? (
+        // An offer, never an install: the button opens the review screen.
+        <div className="mod-update-line" data-testid="mod-update-available">
+          <button className="btn primary" onClick={() => openUpdateReview(m.id)} aria-label={`Update available for “${m.name}”: v${upd.available}. Review it`}>
+            Update available v{upd.available}
+          </button>
+        </div>
+      ) : upd?.error ? (
+        <div className="mod-update-line muted" data-testid="mod-update-error" title={upd.error}>
+          update check: {upd.error}
+        </div>
+      ) : null}
+      {m.share?.gist && (
+        // The install link a gist share produced: anyone can install from it and gets new versions.
+        <div className="mod-share-link" data-testid="mod-install-link">
+          <span className="label" style={{ margin: 0 }}>install link</span>
+          <span className="mono" title={m.share.gist.rawUrl}>{m.share.gist.rawUrl}</span>
+          <button className="btn" onClick={() => onCopyLink(m.share!.gist!.rawUrl)} aria-label={`Copy the install link for “${m.name}”`}>
+            Copy
+          </button>
         </div>
       )}
       <details>
@@ -283,7 +331,7 @@ function ModCard({
             data-action="mod-more"
             aria-haspopup="dialog"
             aria-expanded={moreOpen}
-            aria-label={`More actions for “${m.name}”: run once, export${m.downloadUrl ? ', update' : ''}, delete`}
+            aria-label={`More actions for “${m.name}”: run once, export, share${m.downloadUrl ? ', update' : ''}, delete`}
             onClick={() => setMoreOpen(true)}
           >
             <MoreIcon />
@@ -291,8 +339,18 @@ function ModCard({
         ) : (
           <>
             <button className="btn" onClick={() => onTry(m)}>Run once</button>
-            <button className="btn" onClick={() => onExport(m)}>Export</button>
-            {m.downloadUrl && <button className="btn" onClick={() => onUpdate(m)}>Update</button>}
+            <MenuButton
+              label={`Export “${m.name}”`}
+              title="Download, copy, or share this mod"
+              className="btn"
+              testId="mod-export"
+              items={exportItems(m)}
+              menuLabel={`Export “${m.name}”`}
+              placement="down"
+            >
+              Export ▾
+            </MenuButton>
+            {m.downloadUrl && <button className="btn" onClick={() => onUpdate(m)} title="Check for a newer version now. Nothing installs until you review it.">Update</button>}
             <button className="btn danger" onClick={() => onRemove(m)}>Delete</button>
           </>
         )}
@@ -301,8 +359,20 @@ function ModCard({
         <Sheet title={m.name} onClose={() => setMoreOpen(false)} returnFocus={moreRef} testId="sheet-mod-actions">
           <div className="sheet-list">
             <SheetRow label="Run once" action="mod-try" onClick={fromSheet(onTry)} />
-            <SheetRow label="Export" value=".user.js" action="mod-export" onClick={fromSheet(onExport)} />
-            {m.downloadUrl && <SheetRow label="Update" value="from its download URL" action="mod-update" onClick={fromSheet(onUpdate)} />}
+            {/* Export's four ways, as rows of their own: a menu inside a sheet is one layer too many. */}
+            {exportItems(m).map((item) => (
+              <SheetRow
+                key={item.id}
+                label={item.label}
+                action={`mod-${item.testId ?? item.id}`}
+                onClick={() => {
+                  setMoreOpen(false);
+                  item.onSelect();
+                }}
+              />
+            ))}
+            {upd?.available && <SheetRow label={`Update available v${upd.available}`} value="review" action="mod-update-review" onClick={() => { setMoreOpen(false); openUpdateReview(m.id); }} />}
+            {m.downloadUrl && <SheetRow label="Check for update" value="from its download URL" action="mod-update" onClick={fromSheet(onUpdate)} />}
           </div>
           <div className="sheet-list">
             <SheetRow label="Delete" icon={<DeleteIcon />} action="mod-delete" danger onClick={fromSheet(onRemove)} />

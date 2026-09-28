@@ -62,6 +62,7 @@ export async function loadSettings(): Promise<Settings> {
     theme: resolveTheme(stored),
     contextBudget: stored?.contextBudget ?? DEFAULT_SETTINGS.contextBudget,
     sidePanelScope: stored?.sidePanelScope ?? DEFAULT_SETTINGS.sidePanelScope,
+    checkUpdates: stored?.checkUpdates !== false,
   };
   return { ...DEFAULT_SETTINGS, ...prefs };
 }

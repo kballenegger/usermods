@@ -48,6 +48,7 @@ export function MenuButton({
   disabled,
   testId,
   action,
+  placement = 'up',
 }: {
   /** The trigger's accessible name; the visible part is `icon` and/or `children`. */
   label: string;
@@ -61,6 +62,11 @@ export function MenuButton({
   disabled?: boolean;
   testId?: string;
   action?: string;
+  /**
+   * Which way it opens. Up by default, for the composer, the last thing in the panel. A menu on a
+   * card or a row (the mod's Export) opens down instead, from its button's left edge.
+   */
+  placement?: 'up' | 'down';
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -178,7 +184,7 @@ export function MenuButton({
         {children}
       </button>
       {open && (
-        <div className="menu" id={menuId} ref={menuRef} role="menu" aria-label={menuLabel ?? label} tabIndex={-1} onKeyDown={onMenuKeyDown} data-testid={testId ? `${testId}-menu` : undefined}>
+        <div className={placement === 'down' ? 'menu down' : 'menu'} id={menuId} ref={menuRef} role="menu" aria-label={menuLabel ?? label} tabIndex={-1} onKeyDown={onMenuKeyDown} data-testid={testId ? `${testId}-menu` : undefined}>
           {items.map((item) => (
             <button
               key={item.id}

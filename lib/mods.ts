@@ -181,6 +181,9 @@ export function modFromSource(source: string, existing?: Mod, overrides: Partial
     requires: existing?.requires ?? [],
     resources: existing?.resources ?? [],
     downloadUrl: h.downloadUrl ?? existing?.downloadUrl,
+    // Where it was shared is a fact about the mod, not about this text: an edit, an update from its
+    // download URL or a reinstall over it keeps the gist and Greasy Fork links it already had.
+    ...(existing?.share ? { share: existing.share } : {}),
     source,
     enabled: existing?.enabled ?? true,
     createdAt: existing?.createdAt ?? now,

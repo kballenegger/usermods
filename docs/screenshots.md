@@ -72,6 +72,33 @@ the running extension, not mockups. The README leads with a handful; this is the
       <sub><b>Replies are markdown.</b> Lists, tables, blockquotes and code blocks with a language label and Copy — sanitised, with no raw HTML reaching the DOM.</sub>
     </td>
   </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="screenshots/14-export-menu.png" alt="A mod card in the Mods tab with its Export menu open: Download .user.js, Copy to clipboard, Share as Gist, Publish on Greasy Fork.">
+      <sub><b>Export.</b> Download, copy, or share to a gist or Greasy Fork from your own signed-in tab.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="screenshots/14-export-menu-dashboard.png" alt="The dashboard's mod list with a row's Export menu open, its last item reading Post new version on Greasy Fork.">
+      <sub><b>Export in the dashboard.</b> The same menu on every row; the items change once a mod has been shared.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="screenshots/15-share-hint.png" alt="GitHub's new-gist form filled with a userscript and a usermods bubble pointing at the ringed Create secret gist button.">
+      <sub><b>Sharing a gist.</b> usermods fills the form and points at the site's own button. You press it. (A reconstruction of the signed-in page; the smoke never touches GitHub.)</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="screenshots/16-install-banner.png" alt="A plain-text userscript with a slim usermods bar at the top offering to install it.">
+      <sub><b>The install banner.</b> A page showing a userscript gets a dismissible offer to install it, through the usual preview.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="screenshots/17-update-review.png" alt="The Review update screen with the powers summary, a safety review and the code diff.">
+      <sub><b>Reviewing an update.</b> What the new version may do that the old one could not, an optional safety review by your own model, and the diff. Nothing installs until you press Install update.</sub>
+    </td>
+    <td width="50%" valign="top"></td>
+  </tr>
 </table>
 
 ## Design

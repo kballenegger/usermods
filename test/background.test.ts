@@ -3,9 +3,11 @@
 //   npm test
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { appendTurn } from '../lib/chats.ts';
 import { checkConnect, connectFromSource, connectOf, hostsFromMatchPatterns } from '../lib/connect.ts';
-import { installPageUrl, isInstallableUrl, isUserScriptUrl, scriptIdentity, scriptUrlFromLocation } from '../lib/installurl.ts';
+import { installPageUrl, isInstallableUrl, isUserScriptUrl, scriptIdentity, scriptUrlFromLocation, USER_JS_PATTERN, USER_JS_VIEW_PATTERN } from '../lib/installurl.ts';
 import { findByName, sameModName } from '../lib/modmatch.ts';
 import { resyncPlan } from '../lib/resync.ts';
 import { compareVersions, shouldUpdate } from '../lib/version.ts';
@@ -67,6 +69,25 @@ test('finding 1: the Safari navigation watcher matches what the redirect rule wo
   assert.equal(isUserScriptUrl('https://example.com/?x=a.user.js'), false);
   assert.equal(isUserScriptUrl('https://example.com/page#a.user.js'), false);
   assert.equal(isUserScriptUrl(''), false);
+  // Gist and GitHub raw URLs are scripts, and are redirected like any other.
+  assert.equal(isUserScriptUrl('https://gist.githubusercontent.com/u/c5e8506a7c32169843d0373f710dfb02/raw/x.user.js'), true);
+  assert.equal(isUserScriptUrl('https://gist.github.com/u/c5e8506a7c32169843d0373f710dfb02/raw/2a2b898e9d3aec9072e9a18939d514e2702bf123/x.user.js'), true);
+  assert.equal(isUserScriptUrl('https://raw.githubusercontent.com/o/r/main/x.user.js'), true);
+  assert.equal(isUserScriptUrl('https://github.com/o/r/raw/refs/heads/main/x.user.js'), true);
+  // A code host's HTML view of the file is a page, not the script: the banner offers it there.
+  assert.equal(isUserScriptUrl('https://github.com/o/r/blob/main/x.user.js'), false);
+  assert.equal(isUserScriptUrl('https://gitlab.com/group/sub/r/-/blob/main/x.user.js'), false);
+});
+
+test('the redirect rule and the watcher share one pattern pair, and RE2 can compile it', () => {
+  // declarativeNetRequest regexFilter is RE2: no lookaround, no backreferences. The exclusion is
+  // therefore a second, higher-priority allow rule, not a negative lookahead in the first.
+  for (const p of [USER_JS_PATTERN, USER_JS_VIEW_PATTERN]) {
+    assert.doesNotMatch(p, /\(\?[=!<]|\\[1-9]/, `${p} uses syntax RE2 rejects`);
+  }
+  const src = readFileSync(fileURLToPath(new URL('../entrypoints/background.ts', import.meta.url)), 'utf8');
+  assert.match(src, /regexFilter: USER_JS_PATTERN/);
+  assert.match(src, /action: \{ type: 'allow' \},\s*condition: \{\s*regexFilter: USER_JS_VIEW_PATTERN/);
 });
 
 // ---------- 4: a provider error must not discard the chat ----------

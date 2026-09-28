@@ -1,0 +1,102 @@
+// ==UserScript==
+// @name         Pinterest Dark (Polished)
+// @namespace    https://gist.github.com/KillaMeep/c5e8506a7c32169843d0373f710dfb02
+// @version      0.1
+// @description  Nicely styled dark theme for Pinterest (toggle with Shift+R)
+// @author       KillaMeep
+// @match        https://*.pinterest.com/*
+// @match        https://pinterest.com/*
+// @match        http://*.pinterest.com/*
+// @match        http://pinterest.com/*
+// @icon         https://www.google.com/s2/favicons?sz=64&domain=pinterest.com
+// @grant        none
+// @run-at       document-start
+// ==/UserScript==
+
+(function() {
+  'use strict';
+  console.log('Pinterest dark userscript initializing (KillaMeep)');
+  const DARK_CSS = `
+:root{ --bg: #0b0b0f; --panel:#111315; --muted:#9aa0a6; --text:#e6e6e6; --accent:#e60023; }
+html.dark-by-userscript, body.dark-by-userscript { background: var(--bg) !important; color: var(--text) !important; }
+html.dark-by-userscript *{ background-color: transparent !important; color: inherit !important; border-color: rgba(255,255,255,0.06) !important }
+html.dark-by-userscript header, html.dark-by-userscript nav, html.dark-by-userscript footer, html.dark-by-userscript [data-test-id="app-root"] { background: var(--panel) !important }
+html.dark-by-userscript a, html.dark-by-userscript a * { color: var(--accent) !important }
+html.dark-by-userscript img, html.dark-by-userscript video, html.dark-by-userscript svg { filter: none !important; background: transparent !important }
+html.dark-by-userscript input, html.dark-by-userscript textarea, html.dark-by-userscript select, html.dark-by-userscript button { background: rgba(255,255,255,0.02) !important; color: var(--text) !important; border-color: rgba(255,255,255,0.04) !important }
+html.dark-by-userscript .pin, html.dark-by-userscript .BoardGrid, html.dark-by-userscript article { background: linear-gradient(180deg, rgba(0,0,0,0.45), rgba(0,0,0,0.3)) !important }
+html.dark-by-userscript *{ transition: background-color .12s linear, color .12s linear, border-color .12s linear }
+`;
+
+  const LS_KEY = 'pinterest_dark_enabled_v1';
+  let __pd_enabled = true;
+  try {
+    const ls = localStorage.getItem(LS_KEY);
+    if (ls === 'false') __pd_enabled = false;
+  } catch (err) { /* ignore storage errors */ }
+
+  const ensureStyle = () => {
+    try {
+      if (!document.getElementById('dark-by-userscript-style')) {
+        const s = document.createElement('style');
+        s.id = 'dark-by-userscript-style';
+        s.textContent = DARK_CSS;
+        const parent = (document.head || document.documentElement);
+        parent.appendChild(s);
+        s.dataset.injectedAt = Date.now();
+        console.log('Pinterest dark userscript: style injected');
+      }
+      if (__pd_enabled) {
+        if (!document.documentElement.classList.contains('dark-by-userscript')) {
+          document.documentElement.classList.add('dark-by-userscript');
+          console.log('Pinterest dark userscript: class added');
+        }
+      } else {
+        if (document.documentElement.classList.contains('dark-by-userscript')) {
+          document.documentElement.classList.remove('dark-by-userscript');
+          console.log('Pinterest dark userscript: class removed (user disabled)');
+        }
+      }
+    } catch (err) {
+      console.error('Pinterest dark userscript: injection error', err);
+    }
+  };
+
+  // Retry a few times during page load in case the head/body are replaced by the SPA
+  let __pd_attempts = 0;
+  const __pd_maxAttempts = 12;
+  const __pd_interval = setInterval(() => {
+    ensureStyle();
+    if (++__pd_attempts >= __pd_maxAttempts) clearInterval(__pd_interval);
+  }, 500);
+
+  // Apply as early as possible
+  ensureStyle();
+
+  // Keep it applied across SPA navigations
+  const observer = new MutationObserver(() => ensureStyle());
+  observer.observe(document.documentElement || document, { childList: true, subtree: true });
+
+  // Keyboard toggle: Shift+R
+  window.addEventListener('keydown', (e) => {
+    try {
+      const ae = document.activeElement;
+      const tag = ae && ae.tagName;
+      const isEditable = ae && (ae.isContentEditable || ['INPUT','TEXTAREA','SELECT'].includes(tag));
+      if (isEditable) return; // don't toggle while typing
+      if (e.shiftKey && (e.key === 'R' || e.key === 'r')) {
+        __pd_enabled = !__pd_enabled;
+        try { localStorage.setItem(LS_KEY, __pd_enabled ? 'true' : 'false'); } catch (err) { /* ignore */ }
+        if (__pd_enabled) {
+          document.documentElement.classList.add('dark-by-userscript');
+          console.log('Pinterest dark userscript: enabled by user');
+        } else {
+          document.documentElement.classList.remove('dark-by-userscript');
+          console.log('Pinterest dark userscript: disabled by user');
+        }
+      }
+    } catch (err) {
+      console.error('Pinterest dark userscript: toggle error', err);
+    }
+  });
+})();

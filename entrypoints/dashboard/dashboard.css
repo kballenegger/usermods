@@ -788,3 +788,13 @@ button.pill.primary:disabled {
 .dash-footer a:hover {
   color: var(--accent-text);
 }
+
+/* Sharing a mod (sidepanel/components/ExportMenu): the pre-share check, the install link and the
+   deleted-gist offer, above the list they are about. */
+.dash-share {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 10px;
+  max-width: 760px;
+}

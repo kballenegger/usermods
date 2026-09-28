@@ -426,6 +426,51 @@ export function reheader(header: string, v: { name: string; description: string;
   return out.join('\n');
 }
 
+/**
+ * Set (or add, or remove) single-valued header keys in a whole userscript source, leaving every
+ * other line exactly as it was — the sharing path's reheader. `@version`, `@updateURL`,
+ * `@downloadURL`, `@license` and `@namespace` are keys a share has to be able to write without
+ * touching the twenty others an imported script carries, which is the same promise reheader makes
+ * for name, description and matches.
+ *
+ * A key that is present is rewritten in place (its first line; later duplicates are dropped, since
+ * each of these keys means one thing). A key that is absent is added just before the closing fence,
+ * aligned to the column the header's own `@name` line uses. `null` removes the key. Locale variants
+ * (`@name:fr`) are never touched: `[\w:-]+` captures the whole key, exactly as parseHeader reads it.
+ * A source with no header is returned unchanged — there is nothing to put a key in.
+ */
+export function reheaderFields(source: string, fields: Record<string, string | null>): string {
+  const block = source.match(/\/\/\s*==UserScript==[\s\S]*?\/\/\s*==\/UserScript==/);
+  if (!block || block.index === undefined) return source;
+  const lines = block[0].split('\n');
+  const nameLine = lines.map((l) => l.match(/^(\s*\/\/\s*)(@name\s+)\S/)).find(Boolean);
+  const lead = nameLine?.[1] ?? '// ';
+  const width = Math.max(nameLine?.[2]?.length ?? 13, 2);
+  const line = (key: string, value: string) => `${lead}@${key}${' '.repeat(Math.max(1, width - key.length - 1))}${value}`;
+  const done = new Set<string>();
+  const out: string[] = [];
+  for (const l of lines) {
+    const kv = l.match(/^\s*\/\/\s*@([\w:-]+)(\s*)(.*?)\s*$/);
+    const key = kv?.[1];
+    if (!key || !(key in fields)) {
+      out.push(l);
+      continue;
+    }
+    if (done.has(key)) continue;
+    done.add(key);
+    const value = fields[key];
+    if (value === null || value === undefined) continue;
+    const m = l.match(/^(\s*\/\/\s*@[\w:-]+)(\s*)/)!;
+    out.push(`${m[1]}${m[2] || ' '}${value}`);
+  }
+  const end = out.findIndex((l) => /\/\/\s*==\/UserScript==/.test(l));
+  const add = Object.entries(fields)
+    .filter(([k, v]) => !done.has(k) && v !== null && v !== undefined)
+    .map(([k, v]) => line(k, v as string));
+  out.splice(end >= 0 ? end : out.length, 0, ...add);
+  return source.slice(0, block.index) + out.join('\n') + source.slice(block.index + block[0].length);
+}
+
 // ---------------------------------------------------------------------------
 // Diff
 // ---------------------------------------------------------------------------
