@@ -36,9 +36,9 @@ test('a missing or nonsense viewport is no inset, never a NaN in the stylesheet'
   assert.equal(keyboardInset({ height: Number.POSITIVE_INFINITY, offsetTop: 0 }, 800), 0);
 });
 
-test('a keyboard taller than the window still yields a whole number', () => {
-  const inset = keyboardInset({ height: 100.4, offsetTop: 0 }, 800.2);
-  assert.equal(Number.isInteger(inset), true);
+test('a fractional viewport rounds to the nearest pixel', () => {
+  // 800.2 - 100.4 is 699.8 covered, which rounds up.
+  assert.equal(keyboardInset({ height: 100.4, offsetTop: 0 }, 800.2), 700);
 });
 
 test('a normal page names its host and path', () => {

@@ -3,8 +3,6 @@
 //   npm test
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { CHROME_MIN_VERSION, POPUP_PATH, SAFARI_MIN_VERSION, SAFARI_ONLY_ICON_SIZES, actionFor, buildManifest, isSafariOnlyIcon, isSafariTarget, permissionsFor } from '../lib/manifest.ts';
 
 test('only safari is the safari target', () => {
@@ -124,11 +122,21 @@ test('the large icon renders are Safari-only, so the Chrome package is unchanged
   }
 });
 
-test('the hook that drops them is actually wired to the build', () => {
+test('the hook that drops them is actually wired to the build', async () => {
   // isSafariOnlyIcon is only useful if something calls it. This is the kind of wiring that fails by
   // doing nothing: the files simply ship everywhere again and the manifest quietly grows two keys.
-  const config = readFileSync(fileURLToPath(new URL('../wxt.config.ts', import.meta.url)), 'utf8');
-  assert.match(config, /'build:publicAssets'/);
-  assert.match(config, /isSafariOnlyIcon/);
-  assert.match(config, /browser === 'safari'/);
+  // So run the real build:publicAssets hook from wxt.config.ts on a file list, per target.
+  const config = (await import('../wxt.config.ts')).default as {
+    hooks: { 'build:publicAssets': (wxt: unknown, files: { relativeDest: string }[]) => void };
+  };
+  const hook = config.hooks['build:publicAssets'];
+  const files = () => ['icon/16.png', 'icon/128.png', 'icon/256.png', 'icon/512.png', 'theme-boot.js'].map((relativeDest) => ({ relativeDest }));
+
+  const chrome = files();
+  hook({ config: { browser: 'chrome' } }, chrome);
+  assert.deepEqual(chrome.map((f) => f.relativeDest), ['icon/16.png', 'icon/128.png', 'theme-boot.js']);
+
+  const safari = files();
+  hook({ config: { browser: 'safari' } }, safari);
+  assert.deepEqual(safari.map((f) => f.relativeDest), files().map((f) => f.relativeDest));
 });

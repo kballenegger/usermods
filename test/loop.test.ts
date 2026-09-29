@@ -16,6 +16,8 @@ import { toAnthropicMessages } from '../lib/providers/anthropic.ts';
 import { toOpenAIMessages } from '../lib/providers/openai.ts';
 import { toInput } from '../lib/providers/responses.ts';
 import type { Provider, ProviderResponse } from '../lib/providers/types.ts';
+import type { RunResult } from '../lib/runscript.ts';
+import type { WaitSpec } from '../lib/agent/wait.ts';
 import { reduceItems } from '../lib/transcript.ts';
 import type { AgentEventBody, ChatItem, Msg, Part, Settings } from '../lib/types.ts';
 
@@ -55,9 +57,13 @@ function fakeProvider(steps: Step[]) {
   return { provider, requests };
 }
 
-/** A page that counts how many times each tool actually ran. */
-function fakeEnv() {
+/**
+ * A page that counts how many times each tool actually ran, and records every wait it was asked for.
+ * `outcome` is what run_script reports back.
+ */
+function fakeEnv(outcome: RunResult['outcome'] = { kind: 'ok', result: 'done', returnedValue: true }) {
   const ran: string[] = [];
+  const waits: WaitSpec[] = [];
   const env: AgentEnv = {
     async sendToContent<T>(req: unknown): Promise<T> {
       const type = (req as { type: string }).type;
@@ -67,7 +73,7 @@ function fakeEnv() {
     },
     async runScript() {
       ran.push('run_script');
-      return { outcome: { kind: 'ok', value: 'done' }, logs: [] } as never;
+      return { outcome, logs: [] };
     },
     async screenshot() {
       ran.push('screenshot');
@@ -76,12 +82,13 @@ function fakeEnv() {
     async pageInfo() {
       return { url: 'https://example.com/', title: 'Example' };
     },
-    async wait() {
+    async wait(spec) {
       ran.push('wait');
+      waits.push(structuredClone(spec));
       return { met: true, elapsedMs: 1 } as never;
     },
   };
-  return { env, ran };
+  return { env, ran, waits };
 }
 
 function input(provider: Provider, env: AgentEnv, over: Partial<AgentInput> = {}) {
@@ -437,14 +444,66 @@ test('a history with nothing left to compact fails rather than resending the sam
 });
 
 test('an ordinary 400 still ends the run without compacting anything', async () => {
-  // The recovery must be narrow. A bad key or a missing model is not fixed by throwing away the
-  // conversation, and doing so would destroy context for nothing.
+  // The recovery must be narrow. A missing model or a malformed request is not fixed by throwing
+  // away the conversation, and doing so would destroy context for nothing.
   const { provider, requests } = fakeProvider([
-    { fail: new ProviderError('401 Unauthorized: invalid api key', { kind: 'http', status: 401 }) },
+    { fail: new ProviderError('400 Bad Request: {"error":{"message":"The model `fake` does not exist."}}', { kind: 'http', status: 400 }) },
   ]);
   const { args, events } = input(provider, fakeEnv().env, { history: longHistory(12) });
   const out = await runAgent(args);
   assert.ok(out.failure);
   assert.equal(requests.length, 1);
-  assert.equal(events.some((e) => e.type === 'compacted'), false, 'a bad key must not trigger compaction');
+  assert.equal(events.some((e) => e.type === 'compacted'), false, 'a 400 that is not an overflow must not trigger compaction');
+});
+
+// ---------------------------------------------------------------------------
+// run_script's then_wait
+// ---------------------------------------------------------------------------
+//
+// chrome.userScripts is unavailable in an automated profile, so run_script never runs in the
+// browser flow and the composition below has no other home than this fake page.
+
+/** Run one tool call through the loop and hand back its tool_result, plus the fake page. */
+async function runOne(name: string, callInput: Record<string, unknown>, outcome?: RunResult['outcome']) {
+  const page = fakeEnv(outcome);
+  const { provider } = fakeProvider([reply('', [call('c1', name, callInput)]), reply('Done.')]);
+  const out = await runAgent(input(provider, page.env).args);
+  const result = resultsIn(out.messages).find((p) => p.type === 'tool_result' && p.toolCallId === 'c1');
+  assert.ok(result && result.type === 'tool_result', `no result for the ${name} call`);
+  return { result, text: textOf({ role: 'user', content: result.content }), ...page };
+}
+
+test('then_wait reaches env.wait as the same parsed spec wait_for would send', async () => {
+  const condition = { selector: '.result', state: 'attached', timeout_ms: 8000 };
+  const composed = await runOne('run_script', { code: 'go()', then_wait: condition });
+  assert.deepEqual(composed.ran, ['run_script', 'wait'], 'the wait runs after the script');
+  assert.deepEqual(composed.waits, [
+    { condition: { kind: 'selector', selector: '.result', state: 'attached', count: 1 }, timeoutMs: 8000 },
+  ]);
+  const direct = await runOne('wait_for', condition);
+  assert.deepEqual(composed.waits, direct.waits, 'then_wait and wait_for must hand the page the same spec');
+});
+
+test('a malformed then_wait is refused before the script runs, so the page is untouched', async () => {
+  const { result, text, ran } = await runOne('run_script', { code: 'go()', then_wait: { selector: '.a', load: 'complete' } });
+  assert.deepEqual(ran, [], 'neither the script nor the wait may run');
+  assert.equal(result.isError, true);
+  assert.match(text, /^then_wait: wait_for takes exactly one condition/);
+});
+
+test('a navigation is the expected outcome only for a url or load then_wait', async () => {
+  // A script that navigates normally loses its result. When the model said it was waiting for the
+  // navigation, that same outcome is reported as success.
+  const navigated = { kind: 'navigated', url: 'https://example.com/checkout' } as RunResult['outcome'];
+  const expected = 'The script ran and the page navigated to https://example.com/checkout, which is what then_wait was waiting for.';
+  for (const then_wait of [{ url: '/checkout' }, { load: 'complete' }]) {
+    const { result, text } = await runOne('run_script', { code: 'go()', then_wait }, navigated);
+    assert.ok(text.startsWith(`${expected}\n\nthen_wait: `), `${JSON.stringify(then_wait)} should expect the navigation, got: ${text}`);
+    assert.notEqual(result.isError, true);
+  }
+  for (const then_wait of [{ selector: '.result' }, { text: 'Done' }, { idle: true }]) {
+    const { text } = await runOne('run_script', { code: 'go()', then_wait }, navigated);
+    assert.ok(!text.includes(expected), `${JSON.stringify(then_wait)} does not wait for a navigation`);
+    assert.match(text, /the script's result was lost/);
+  }
 });

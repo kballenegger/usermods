@@ -7,11 +7,17 @@
 // So this file reads the real files in safari/ and asserts the handful of lines each platform
 // needs. It does not replace building, which is `node scripts/safari-xcode.mjs mac` and
 // `... simulator`; it catches the edit that deletes one of these lines months from now.
+//
+// The xcconfig, plist, entitlement and project checks read the config itself, which is the thing
+// Xcode consumes. The checks on the Swift sources and scripts/safari-xcode.mjs are source lint:
+// running them needs xcodebuild and codesign, which npm test does not have, so they pin the
+// ordering and flags as text. A harmless rewrite can fail them; update the pattern when it does.
 //   npm test
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync, readdirSync } from 'node:fs';
 import { colourKey, decodePNG } from '../scripts/lib/png.mjs';
+import { buildManifest } from '../lib/manifest.ts';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -34,8 +40,9 @@ test('each platform has a deployment floor, and iOS matches the manifest', () =>
   // 16.4 is where WebKit got MV3 web extensions. lib/manifest.ts writes the same number into
   // browser_specific_settings.safari.strict_min_version, and the two drifting apart means an
   // install that fails on a device the project says it supports.
-  assert.match(shared, /^IPHONEOS_DEPLOYMENT_TARGET = 16\.4$/m);
-  assert.match(read('lib/manifest.ts'), /strict_min_version.{0,20}16\.4/s);
+  const ios = /^IPHONEOS_DEPLOYMENT_TARGET = (.+)$/m.exec(shared)?.[1];
+  assert.equal(ios, '16.4');
+  assert.equal(buildManifest('safari').browser_specific_settings?.safari?.strict_min_version, ios);
   // Ventura, which is where Safari 16.4 landed on the desktop.
   assert.match(shared, /^MACOSX_DEPLOYMENT_TARGET = 13\.0$/m);
 });

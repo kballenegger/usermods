@@ -308,7 +308,7 @@ test('store build: a subscription connection saved by the GitHub build is kept, 
   assert.deepEqual(pickerGroups(s, SIGNED_IN, '', false).map((g) => g.connection.id), ['g', 'x', 'k']);
   // A chat that was on the subscription says so, and does not move to the key-based one.
   const r = resolveSelection({ connectionId: 'g', model: 'gpt-5.5' }, s, SIGNED_IN, true);
-  assert.deepEqual(r, { ok: false, problem: 'unavailable', message: problemMessage('unavailable', 'ChatGPT subscription') });
+  assert.deepEqual(r, { ok: false, problem: 'unavailable', message: 'ChatGPT subscription is not available in this build of usermods. Pick another model to continue.' });
   // A new chat's default skips them.
   assert.deepEqual(defaultSelection(s, { connectionId: 'g', model: 'gpt-5.5' }, SIGNED_IN, true), { connectionId: 'k', model: 'claude-opus-5', label: 'Anthropic' });
 });

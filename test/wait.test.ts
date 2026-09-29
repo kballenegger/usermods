@@ -1,7 +1,6 @@
 // wait_for: input validation, the wording the model reads back, the abuse guard, and the labels
 // the panel shows. Everything here is pure, so the whole contract of the tool is testable without
-// a browser — which matters more than usual for this one, because chrome.userScripts is
-// unavailable under automation and run_script's then_wait composition can only be exercised here.
+// a browser. run_script's then_wait composition is tested through the loop in test/loop.test.ts.
 //   npm test
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -428,38 +427,6 @@ test('a batch with a wait and a real tool together counts as acting', () => {
   const t = foldWait({ consecutive: 3, totalMs: 0, nudged: false }, ['wait_for', 'get_page'], 200);
   assert.equal(t.consecutive, 1, 'the streak restarts at this batch rather than continuing');
   assert.equal(waitAbuseNudge(t), null);
-});
-
-// ---------------------------------------------------------------------------
-// then_wait: composition, which cannot be exercised in a browser
-// ---------------------------------------------------------------------------
-//
-// chrome.userScripts is unavailable in an automated profile, so run_script never runs in the
-// browser flow and the composition below has no other home. These assert the two halves of the
-// contract the loop implements: then_wait takes exactly the same input as wait_for, and a
-// navigation stops being a lost result when it is the thing the model asked to wait for.
-
-test('then_wait takes exactly the same condition shape as wait_for', () => {
-  const direct = spec({ selector: '.result', state: 'attached', timeout_ms: 8000 });
-  const composed = spec({ selector: '.result', state: 'attached', timeout_ms: 8000 });
-  assert.deepEqual(composed, direct);
-});
-
-test('then_wait rejects the same malformed conditions, so a bad one costs no page change', () => {
-  // The loop parses then_wait BEFORE running the code, so this refusal means the page is untouched.
-  assert.match(refusal({ selector: '.a', load: 'complete' }), /exactly one condition/);
-  assert.match(refusal({ url: '/(broken/' }), /Invalid regular expression/);
-});
-
-test('a navigation is the expected outcome only for a url or load then_wait', () => {
-  // This mirrors the rule in lib/agent/loop.ts: a script that navigates normally loses its result,
-  // but when the model said it was waiting for the navigation, that same outcome is success.
-  const expected = (c: WaitCondition) => c.kind === 'url' || c.kind === 'load';
-  assert.equal(expected(spec({ url: '/checkout' }).condition), true);
-  assert.equal(expected(spec({ load: 'complete' }).condition), true);
-  assert.equal(expected(spec({ selector: '.result' }).condition), false);
-  assert.equal(expected(spec({ text: 'Done' }).condition), false);
-  assert.equal(expected(spec({ idle: true }).condition), false);
 });
 
 // ---------------------------------------------------------------------------

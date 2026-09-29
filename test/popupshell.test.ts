@@ -5,6 +5,11 @@
 // The failure worth catching: a rule sized for a thumb that is not scoped to the phone, which on a
 // Mac gives a 420px popup 44px controls and 16px fields and looks like a shrunken phone. That
 // renders, so nothing catches it but eyes.
+//
+// Two kinds of check live here. The CSS and HTML checks read the shipped stylesheets and page, so
+// they test the real artifact. The checks on App.tsx, shell.ts, Sheet.tsx and usePointer.ts are
+// source lint: the suite has no DOM renderer, so they pin the JSX and hook wiring as text. A
+// harmless rewrite of that code can fail them; fix the pattern, not the product, when it does.
 //   npm test
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -215,15 +220,17 @@ test('the iPad rule never reaches a phone, and never reaches a fine pointer', ()
   // Every rule in the file that is not the Mac's names a coarse pointer AND a tablet's screen.
   const queries = [...bare.matchAll(/@media ([^{]+)\{/g)].map((m) => m[1]!.trim());
   assert.ok(queries.length >= 4);
+  const floors: number[] = [];
   for (const q of queries) {
     if (q === '(pointer: fine)') continue;
     assert.match(q, /^\(pointer: coarse\) and \(min-device-width: (\d+)px\)$/, `unexpected query: ${q}`);
     const floor = Number(/min-device-width: (\d+)px/.exec(q)![1]);
     // The widest iPhone screen is 440pt and the narrowest iPad (mini) is 744pt.
     assert.ok(floor > 440 && floor >= 700, `${q} would match an iPhone`);
+    floors.push(floor);
   }
   // And the first tier has to admit the iPad mini.
-  assert.ok(700 <= 744);
+  assert.ok(Math.min(...floors) <= 744, `no iPad tier starts at or below the iPad mini's 744pt`);
 });
 
 test('the iPad heights rise with the screen and stay under it', () => {

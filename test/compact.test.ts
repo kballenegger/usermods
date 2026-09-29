@@ -19,10 +19,12 @@ import {
   isUserTurnStart,
   needsCompaction,
   OMITTED_NOTE,
+  PROTECT_RECENT_TURNS,
   renderForSummary,
   startsWithSummary,
   SUMMARY_PREFIX,
   SUMMARY_SYSTEM_PROMPT,
+  SUMMARY_SYSTEM_PROMPT_WITH_DRAFT,
 } from '../lib/agent/compact.ts';
 import { toAnthropicMessages } from '../lib/providers/anthropic.ts';
 import { toOpenAIMessages } from '../lib/providers/openai.ts';
@@ -94,7 +96,10 @@ test('a tool result adds up the parts it contains', () => {
 test('an unserializable opaque item is counted as zero rather than throwing', () => {
   const cyclic: Record<string, unknown> = {};
   cyclic.self = cyclic;
-  assert.doesNotThrow(() => estimatePart({ type: 'opaque', provider: 'x', item: cyclic }));
+  // Zero characters, so it costs exactly what an item with nothing to serialize costs: the part's
+  // own envelope and no more.
+  const empty = estimatePart({ type: 'opaque', provider: 'x', item: undefined });
+  assert.equal(estimatePart({ type: 'opaque', provider: 'x', item: cyclic }), empty);
 });
 
 test('estimateTokens is the sum over messages, and every message costs something', () => {
@@ -431,8 +436,10 @@ test('a turn holding opaque provider items is summarised or kept whole, never sp
   // The adapter replays the opaque items INSTEAD of the neutral parts, so a turn that lost half its
   // opaque items would send a reasoning block with no call behind it.
   const msgs: Msg[] = [];
+  const reasoningFor = new Map<string, string>();
   for (let i = 0; i < 6; i++) {
     const id = nextId();
+    reasoningFor.set(id, `r${i}`);
     msgs.push(userTurn(`turn ${i}`));
     msgs.push({
       role: 'assistant',
@@ -454,9 +461,16 @@ test('a turn holding opaque provider items is summarised or kept whole, never sp
     const hasCall = m.content.some((p) => p.type === 'tool_call');
     assert.equal(hasOpaque, hasCall, 'an opaque item was separated from the call it reasons about');
   }
-  // And the Responses adapter can still replay them.
-  const input = toInput(r.messages, 'chatgpt');
-  assert.ok(input.length > 0);
+  // And the Responses adapter still replays each kept call right behind the reasoning item it
+  // came with.
+  const input = toInput(r.messages, 'chatgpt') as Array<{ type: string; id?: string; call_id?: string }>;
+  const calls = input.filter((it) => it.type === 'function_call');
+  assert.equal(calls.length, 3, 'the kept turns each replay their call');
+  for (const call of calls) {
+    const before = input[input.indexOf(call) - 1];
+    assert.equal(before?.type, 'reasoning', `call ${call.call_id} was replayed without its reasoning item`);
+    assert.equal(before?.id, reasoningFor.get(call.call_id!), `call ${call.call_id} follows another turn's reasoning`);
+  }
 });
 
 test('the summary is one synthetic user message at the front, and the recent turns are verbatim', async () => {
@@ -468,14 +482,23 @@ test('the summary is one synthetic user message at the front, and the recent tur
   const text = first.content[0];
   assert.ok(text?.type === 'text' && text.text.startsWith(SUMMARY_PREFIX) && text.text.includes('THE SUMMARY'));
   assert.equal(r.messages.slice(1).filter(isUserTurnStart).length, 3, 'exactly K turns kept');
-  assert.equal(r.messages.at(-1)!.content[0]!.type, msgs.at(-1)!.content[0]!.type, 'the tail is untouched');
+  // All three kept turns follow the summary, in order. The oldest of them is outside elision's
+  // protected window and may have had a bulky result stubbed; the protected turns are byte for byte
+  // what came in.
+  assert.equal(r.messages.length, 1 + msgs.length - cutIndex(msgs, 3), 'every kept message is there');
+  const verbatim = msgs.slice(cutIndex(msgs, PROTECT_RECENT_TURNS));
+  assert.deepEqual(r.messages.slice(-verbatim.length), verbatim, 'the protected tail is untouched');
 });
 
-test('the summary prompt asks for the things a continuing agent needs', () => {
-  for (const must of ['GOALS', 'DECISIONS', 'SELECTORS', 'CURRENT PROPOSAL', 'OPEN PROBLEMS', 'LATEST REQUEST']) {
-    assert.ok(SUMMARY_SYSTEM_PROMPT.includes(must), `the summary prompt never mentions ${must}`);
-  }
-  assert.match(SUMMARY_SYSTEM_PROMPT, /stable/i);
+test('the summariser gets the plain prompt, or the draft prompt when the chat has a draft', async () => {
+  const systems: string[] = [];
+  const summarise = async (system: string) => {
+    systems.push(system);
+    return 'summary';
+  };
+  await compact(longHistory(8), { budget: 2000, summarise });
+  await compact(longHistory(8), { budget: 2000, summarise, hasDraft: true });
+  assert.deepEqual(systems, [SUMMARY_SYSTEM_PROMPT, SUMMARY_SYSTEM_PROMPT_WITH_DRAFT]);
 });
 
 test('an over-long summary is capped rather than becoming the new problem', async () => {

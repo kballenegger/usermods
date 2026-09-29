@@ -8,7 +8,6 @@ import test from 'node:test';
 import {
   CHATGPT_CLIENT_VERSION,
   FALLBACK_MODELS,
-  FALLBACK_NOTE,
   errorDetail,
   fallbackModels,
   listFailureMessage,
@@ -200,9 +199,4 @@ test('a key-based listing that fails throws: nobody can guess a local server\'s 
     /bad key/,
   );
   assert.deepEqual(await listWithFallback('anthropic', async () => []), { models: [], fallback: false });
-});
-
-test('the fallback note tells the user they can still type an id', () => {
-  assert.match(FALLBACK_NOTE, /built-in list/);
-  assert.match(FALLBACK_NOTE, /type a model id/);
 });

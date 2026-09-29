@@ -1,5 +1,5 @@
 import { defineConfig } from 'wxt';
-import { buildManifest, isSafariOnlyIcon } from './lib/manifest';
+import { buildManifest, isSafariOnlyIcon } from './lib/manifest.ts';
 
 /**
  * A storefront build drops subscription sign-in; see lib/buildflags.ts. Set by

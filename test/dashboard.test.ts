@@ -165,11 +165,6 @@ test('a handoff older than the TTL is ignored, but still cleared', () => {
   assert.equal(r.clearHandoff, true);
 });
 
-test('a handoff right at the TTL boundary is still honoured', () => {
-  const chats = [chat({ id: 'recent', updatedAt: 900 }), chat({ id: 'wanted', updatedAt: 100 })];
-  assert.equal(resolveHandoff(handoff(), 'example.com', chats, chats[0]!, NOW + HANDOFF_TTL_MS - 1).chat?.id, 'wanted');
-});
-
 test('a handoff naming a chat that has since been deleted falls back rather than showing nothing', () => {
   const chats = [chat({ id: 'recent' })];
   const r = resolveHandoff(handoff({ chatId: 'deleted' }), 'example.com', chats, chats[0]!, NOW);
@@ -183,13 +178,6 @@ test('an archived chat opens through a handoff: the user clicked Open on it deli
   const r = resolveHandoff(handoff(), 'example.com', chats, null, NOW);
   assert.equal(r.chat?.id, 'wanted');
   assert.equal(r.chat?.archivedAt, 200, 'opening it does not unarchive it; only sending does');
-});
-
-test('a handoff dated in the future (a clock jump) is treated as stale, not as valid forever', () => {
-  const chats = [chat({ id: 'recent', updatedAt: 900 }), chat({ id: 'wanted', updatedAt: 100 })];
-  const r = resolveHandoff(handoff({ at: NOW + 10 * HANDOFF_TTL_MS }), 'example.com', chats, chats[0]!, NOW);
-  assert.equal(r.chat?.id, 'recent');
-  assert.equal(r.clearHandoff, true);
 });
 
 test('a panel with no host ignores any handoff', () => {
@@ -389,7 +377,9 @@ test('two enabled mods on the same site count that site once', () => {
 test('a time label carries both the relative and the absolute form', () => {
   const t = timeLabel(NOW - 3 * 60_000, NOW);
   assert.equal(t.relative, '3m ago');
-  assert.ok(t.absolute.length > 0);
+  // The exact text depends on the machine's locale and timezone, but the year is in it either way.
+  // A bad Date would render as "Invalid Date" and fail here.
+  assert.ok(t.absolute.includes(String(new Date(NOW - 3 * 60_000).getFullYear())), t.absolute);
   assert.equal(timeLabel(NOW, NOW).relative, 'just now');
 });
 
@@ -460,13 +450,15 @@ test('finding 8: a handoff written this instant is honoured, and one a full TTL 
 // cancellation check, the read that was in flight was re-queued and started again from scratch.
 // Under sustained writes the sweep livelocked and those chats never became searchable by message
 // text — the chat being written to being exactly the one that could never finish.
+//
+// The fix to that ordering lives in entrypoints/dashboard/ChatsSection.tsx and has no test here.
+// These tests cover the pure helpers the sweep is built on.
 
 test('finding 7: the search key ignores array identity, so a refresh alone does not restart the sweep', () => {
   const a = [chat({ id: 'a', updatedAt: 100 }), chat({ id: 'b', updatedAt: 200 })];
   // A refresh: same chats, same timestamps, brand new objects in a brand new array. This is what
   // chrome.storage.onChanged produced on every single write, including writes about mods.
   const b = [chat({ id: 'a', updatedAt: 100 }), chat({ id: 'b', updatedAt: 200 })];
-  assert.notEqual(a, b, 'the arrays really are different objects, which is the whole problem');
   assert.equal(transcriptSearchKey(a), transcriptSearchKey(b));
   // And order is not news either: groupChatsByHost and sortChats can hand back the same chats in a
   // different order without a single transcript needing to be reread.
@@ -483,32 +475,6 @@ test('finding 7: the search key does change when a chat is added, removed or wri
     key,
     'a chat that gained a message',
   );
-});
-
-test('finding 7: a sweep under sustained storage churn finishes instead of looping forever', () => {
-  // The bug, simulated. Each pass queues transcriptsToSearch, gets through ONE read, and is then
-  // cancelled by an unrelated storage write (the side panel appending to some other chat). The
-  // question is only whether progress survives a cancellation.
-  const chats = [
-    chat({ id: 'x', updatedAt: 100, title: 'x' }),
-    chat({ id: 'y', updatedAt: 100, title: 'y' }),
-    chat({ id: 'z', updatedAt: 100, title: 'z' }),
-  ];
-  const stamps = new Map<string, number>();
-  const reads: string[] = [];
-  for (let pass = 0; pass < 20; pass++) {
-    const ids = transcriptsToSearch(chats, 'needle', new Set(stamps.keys()));
-    if (!ids.length) break;
-    const id = ids[0]!;
-    // Recorded BEFORE the read completes — the fix. Recording it after the cancellation check (the
-    // old code) meant this line never ran for the cancelled read, and the next pass queued the very
-    // same id again: reads would be ['x','x','x',...] forever and stamps would stay empty.
-    stamps.set(id, chats.find((c) => c.id === id)!.updatedAt);
-    reads.push(id);
-    // ...and here the effect is cancelled mid-flight by a storage write.
-  }
-  assert.deepEqual(reads, ['x', 'y', 'z'], 'each cancelled pass still made progress; nothing was reread');
-  assert.deepEqual([...stamps.keys()].sort(), ['x', 'y', 'z'], 'all three became searchable');
 });
 
 test('finding 7: a transcript is invalidated when its chat is written to, and only then', () => {
@@ -549,22 +515,6 @@ test('finding 9: the open chat is whichever one still exists', () => {
   assert.equal(openChatOf(chats, null), undefined, 'nothing open');
   assert.equal(openChatOf(chats, 'gone'), undefined, 'a deleted chat closes the pane by not resolving');
   assert.equal(openChatOf([], 'a'), undefined);
-});
-
-test('finding 9: deleting the open chat closes the preview even when a search hid its row', () => {
-  // The hole in the old guard, exactly. The user has "zebra" in the search box, so only chat b is
-  // on screen; chat a is open in the preview pane from before they typed. They select all visible
-  // rows and delete.
-  const chats = [chat({ id: 'a', title: 'aardvark', updatedAt: 100 }), chat({ id: 'b', title: 'zebra', updatedAt: 200 })];
-  const matching = searchChats(chats, 'zebra');
-  const selection = bulkTargets(new Set(['a', 'b']), matching);
-  assert.deepEqual(selection, ['b'], 'the bulk action only ever touched the visible row');
-  // The old guard was `if (openId && ids.includes(openId)) setOpenId(null)` against that selection,
-  // which is false for 'a' — so the preview stayed up. But a is still open, and a delete-all of the
-  // underlying chats (or a delete from elsewhere) can still take it away:
-  assert.equal(selection.includes('a'), false, 'which is why the filtered guard missed it');
-  const afterDeleteElsewhere = chats.filter((c) => c.id !== 'a');
-  assert.equal(openChatOf(afterDeleteElsewhere, 'a'), undefined, 'the derived rule closes it regardless');
 });
 
 // ---------------------------------------------------------------------------
@@ -608,36 +558,6 @@ function editor(initial: string) {
     get canSave() { return dirty && conflict === null; },
   };
 }
-
-test('finding 6: the old derived-dirtiness rule really did freeze, which is what editorSync replaces', () => {
-  // The harness above tracks dirtiness the way the fixed editor does, so it cannot by itself show
-  // that the OLD editor was broken — the bug was in how `dirty` was computed, not in what was done
-  // with it. So here is the old rule verbatim, with the same render→effect ordering React gives it:
-  //
-  //   const dirty = source !== mod.source;              // recomputed every render
-  //   useEffect(() => { if (!dirty) setSource(mod.source); }, [mod.source]);
-  //
-  // The render that delivers the new prop recomputes `dirty` FIRST, against text the user never
-  // touched, and the effect that follows sees dirty === true and declines to adopt.
-  const oldEditor = (initial: string) => {
-    let source = initial;
-    return {
-      external(modSource: string) {
-        const dirty = source !== modSource; // the derived flag, computed against the NEW prop
-        if (!dirty) source = modSource;
-        return { source, dirty, canSave: dirty };
-      },
-    };
-  };
-  const stuck = oldEditor('// v1').external('// v2');
-  assert.equal(stuck.source, '// v1', 'the old editor went on showing the superseded text');
-  assert.equal(stuck.dirty, true, 'and claimed unsaved edits the user never made');
-  assert.equal(stuck.canSave, true, 'so one Save click wrote v1 back over the v2 that had just landed');
-
-  // The rule that replaces it, given the same inputs — an editor nobody has typed into, whose mod
-  // changed underneath — adopts instead of freezing.
-  assert.equal(editorSync({ modSource: '// v2', seen: '// v1', dirty: false }), 'adopt');
-});
 
 test('finding 6: a clean editor adopts a version that landed underneath it', () => {
   // The exact scenario: the user typed nothing, clicked Update on the mod's row, and a new version

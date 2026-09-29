@@ -243,10 +243,10 @@ test('@connect is parsed, deduped and carried into the preview', () => {
   assert.deepEqual(normalizeMod({ id: 'x', source: SCRIPT }).connect, ['api.example.com', 'self']);
 });
 
-// Finding 16: "?" is a regex metacharacter and must be escaped; only "*" is a wildcard.
+// Finding 16: "." and "?" are regex metacharacters and must be escaped; only "*" is a wildcard.
 test('urlMatches escapes every metacharacter except the "*" wildcard', () => {
-  // Without escaping "?", the "m" would be optional and this would wrongly match.
-  assert.equal(urlMatches('https://example.co/a', ['https://example.com/*']), false);
+  // Without escaping ".", it would match any character and this would wrongly match.
+  assert.equal(urlMatches('https://exampleXcom/a', ['https://example.com/*']), false);
   // A literal "?" in the pattern matches only a literal "?" in the URL.
   assert.equal(urlMatches('https://example.com/a?b=1', ['https://example.com/a?b=1']), true);
   assert.equal(urlMatches('https://example.com/ab=1', ['https://example.com/a?b=1']), false);

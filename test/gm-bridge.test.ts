@@ -107,28 +107,43 @@ test('the shim works with no chrome in scope at all', async () => {
   assert.equal(world.logs.length, 1);
 });
 
-test('the chrome transport is what the generated code uses when no bridge is asked for', () => {
+test('the chrome transport is what the generated code uses when no bridge is asked for', async () => {
   const m = mod(HEADER + "GM_setValue('k', 1);");
-  const chromeCode = buildRegisteredCode(m, {});
-  const bridgeCode = buildRegisteredCode(m, {}, { transport: 'bridge', token: 't' });
-  assert.match(chromeCode, /chrome\.runtime\.sendMessage/);
-  assert.doesNotMatch(chromeCode, /__usermodsBridge/);
-  assert.match(bridgeCode, /__usermodsBridge/);
-  // The one line that would undo the whole model: the bridge path must not send a modId.
-  const sendBlock = bridgeCode.split('const __send')[1]?.split('\n\n')[0] ?? '';
-  assert.ok(sendBlock, 'the generated bridge code should have a __send block to inspect');
-  assert.doesNotMatch(sendBlock, /modId: __meta\.id/);
+  const world = bridgeWorld();
+  const viaChrome: any[] = [];
+  world.globals.chrome = {
+    runtime: {
+      lastError: undefined,
+      sendMessage(msg: any, cb: (r: unknown) => void) {
+        viaChrome.push(msg);
+        cb({ result: true });
+      },
+    },
+  };
+  run(buildRegisteredCode(m, {}), world);
+  await nextTick();
+  assert.deepEqual(
+    viaChrome.map((s) => s.type),
+    ['gm.setValue'],
+  );
+  assert.deepEqual(world.sent, [], 'nothing goes through the bridge when no bridge was asked for');
 });
 
 test('a mod with no bridge attached gets a clear error rather than a silent no-op', async () => {
-  const m = mod(HEADER + "GM_setValue('k', 1);");
+  const m = mod(
+    HEADER +
+      `GM_xmlhttpRequest({ url: 'https://api.example/x', onerror: (r) => { window.failed = r; } });`,
+  );
   const world = bridgeWorld();
   world.globals.__usermodsBridge = undefined;
-  // GM_setValue is fire-and-forget and swallows its own rejection, so the proof is negative:
-  // evaluating the code does not throw, and nothing leaves. A mod whose bridge went missing fails
-  // where it stands rather than taking the runner down with it.
+  // Evaluating the code does not throw, so a missing bridge fails the mod where it stands rather
+  // than taking the runner down. The mod still hears why through its own error callback.
   run(buildRegisteredCode(m, {}, { transport: 'bridge', token: 't' }), world);
   await nextTick();
+  await nextTick();
+  const failed = (world.globals.window as Record<string, any>).failed;
+  assert.ok(failed, 'onerror must be called');
+  assert.match(String(failed.error), /did not attach its bridge/);
   assert.deepEqual(world.sent, []);
 });
 

@@ -15,12 +15,15 @@ import {
   SLOW_DOWN_STEP_SEC,
   applyOutcome,
   clampInterval,
+  clearPending,
   expiredMessage,
   isExpired,
+  loadPending,
   msUntilNextPoll,
   pendingFrom,
   pendingKey,
   restore,
+  savePending,
   shouldPoll,
   slowDown,
   vendorName,
@@ -324,20 +327,40 @@ test('a code that runs out while nothing is polling ends as expired, not as pend
   assert.deepEqual(run.polledAt, [], 'no request is spent on a code the clock already rejected');
 });
 
-test('cancelling is just clearing the record, and a later tick finds nothing', () => {
-  // `oauth.cancel` removes the key; the machine then has nothing to resume, which is the point —
-  // a cancelled sign-in must not come back when the popup reopens.
-  const p: PendingLogin | null = makePending();
-  const cancelled: PendingLogin | null = null;
-  assert.deepEqual(restore(cancelled, T0), { status: 'idle' });
-  assert.equal(restore(p, T0).status, 'pending', 'and before the cancel it did come back');
+test('cancelling clears that vendor record, so a reopened popup finds nothing to resume', async () => {
+  // `oauth.cancel` calls clearPending. Run it against an in-memory chrome.storage.local.
+  const data: Record<string, unknown> = {};
+  const local = {
+    async get(key: string | string[]) {
+      const out: Record<string, unknown> = {};
+      for (const k of Array.isArray(key) ? key : [key]) if (k in data) out[k] = data[k];
+      return out;
+    },
+    async set(items: Record<string, unknown>) {
+      Object.assign(data, items);
+    },
+    async remove(key: string | string[]) {
+      for (const k of Array.isArray(key) ? key : [key]) delete data[k];
+    },
+  };
+  const g = globalThis as { chrome?: unknown };
+  const before = g.chrome;
+  g.chrome = { storage: { local } };
+  try {
+    await savePending(makePending({ kind: 'xai' }));
+    await savePending(makePending({ kind: 'chatgpt', deviceCode: 'gpt-dev' }));
+    await clearPending('xai');
+    assert.deepEqual(restore(await loadPending('xai'), T0), { status: 'idle' });
+    assert.equal((await loadPending('chatgpt'))?.deviceCode, 'gpt-dev', 'the other vendor is untouched');
+  } finally {
+    if (before === undefined) delete g.chrome;
+    else g.chrome = before;
+  }
 });
 
 test('both vendors can be pending at once without touching each other', () => {
   const gpt = pendingFrom('chatgpt', { deviceCode: 'gpt-dev', userCode: 'AAAA-1111', verificationUri: 'https://auth.openai.com/codex/device', intervalSec: 5, expiresAt: T0 + 9e5 }, T0);
   const grok = pendingFrom('xai', { deviceCode: 'xai-dev', userCode: 'BBBB-2222', verificationUri: 'https://auth.x.ai/device', intervalSec: 5, expiresAt: T0 + 6e5 }, T0);
-
-  assert.notEqual(pendingKey(gpt.kind), pendingKey(grok.kind));
 
   // One finishing leaves the other exactly as it was.
   const gptDone = applyOutcome(gpt, { kind: 'success', tokens: { access: 'a' } }, T0 + 5000);
@@ -349,10 +372,11 @@ test('both vendors can be pending at once without touching each other', () => {
   assert.equal(grokOn.next.userCode, 'BBBB-2222');
   assert.equal(restore(grokOn.next, T0 + 6000).status, 'pending');
 
-  // And one failing does not poison the other's rate.
+  // A slow_down returns a new record and leaves the one passed in as it was.
+  const grokBefore = structuredClone(grok);
   const grokSlow = applyOutcome(grok, { kind: 'slow_down' }, T0 + 5000);
   assert.equal(grokSlow.store, 'keep');
   if (grokSlow.store !== 'keep') return;
   assert.equal(grokSlow.next.intervalSec, 10);
-  assert.equal(gpt.intervalSec, 5, 'the ChatGPT record is untouched');
+  assert.deepEqual(grok, grokBefore, 'the input record is not mutated');
 });
