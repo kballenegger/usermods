@@ -50,6 +50,12 @@ const MAX_DATA_ATTRS = 4;
 const MAX_DATA_VALUE = 40;
 const MAX_DATA_REPEATS = 8;
 const SKIPPED_NAME = /^(ga|gtm|octo|hydro|analytics|track|tracking|event|log|beacon|ping|ved|hveid|turbo|pjax|hovercard)([-_]|$)|(click|[-_](url|text|src|href))$/;
+/**
+ * Names that carry credentials or contact details, anywhere in the name. This output goes to a
+ * third-party model and PRIVACY.md promises "a limited set of attributes": a short CSRF token or a
+ * data-email passes the value checks, so these are dropped by name, whatever their value.
+ */
+const SENSITIVE_NAME = /(^|[-_])(csrf|xsrf|token|nonce|secret|password|passwd|session|sid|auth|signature|sig|apikey|api-key|email|e-mail|mail|phone|tel|ssn)([-_]|$)/;
 
 function isVisible(el: Element): boolean {
   if (!(el instanceof HTMLElement)) return true;
@@ -67,6 +73,8 @@ function trunc(s: string, n: number): string {
 export function noisyDataValue(v: string): boolean {
   if (v.length > MAX_DATA_VALUE) return true;
   if (/^\s*[[{]/.test(v) || /^\d+$/.test(v)) return true;
+  // An email address or a phone number, whatever the attribute is called.
+  if (/[^\s@]+@[^\s@]+\.[a-z]{2,}/i.test(v) || /^\+?[\d\s().-]{7,}$/.test(v)) return true;
   return v.length >= 16 && /^[\w+/=-]+$/.test(v) && /\d/.test(v) && /[a-z]/i.test(v);
 }
 
@@ -80,7 +88,7 @@ export function dataAttrs(attrs: ReadonlyArray<readonly [string, string]>, seen:
     if (out.length >= MAX_DATA_ATTRS) break;
     if (!name.startsWith('data-') || name === 'data-testid') continue;
     const suffix = name.slice(5).toLowerCase();
-    if (!suffix || suffix.length > 30 || SKIPPED_NAME.test(suffix)) continue;
+    if (!suffix || suffix.length > 30 || SKIPPED_NAME.test(suffix) || SENSITIVE_NAME.test(suffix)) continue;
     if (isGeneratedClass(suffix) || /(^|[-_])(?=[a-z]*\d)[0-9a-f]{6,}$/i.test(suffix)) continue;
     if (value !== '' && noisyDataValue(value)) continue;
     const text = value === '' ? name : `${name}="${trunc(value, MAX_DATA_VALUE).replace(/"/g, '&quot;')}"`;
