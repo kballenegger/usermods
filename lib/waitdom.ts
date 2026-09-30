@@ -129,7 +129,12 @@ export function elementsWithText(root: Element, needle: string): DeepMatch[] {
  * selector AND a text both apply, so `div` + "Recommended" answers with the innermost div.
  */
 export function deepestOnly<T extends { el: Element }>(items: T[]): T[] {
-  return items.filter((a) => !items.some((b) => b !== a && a.el !== b.el && a.el.contains(b.el)));
+  // Marks every ancestor of every item: one walk up per item, rather than comparing each pair,
+  // which a broad selector (`div` plus a common word) made quadratic.
+  const els = new Set(items.map((i) => i.el));
+  const outer = new Set<Element>();
+  for (const { el } of items) for (let p = el.parentElement; p; p = p.parentElement) if (els.has(p)) outer.add(p);
+  return items.filter((i) => !outer.has(i.el));
 }
 
 /**
@@ -150,7 +155,9 @@ export function queryAllDeep(selector: string): { matches: DeepMatch[]; searched
   const visit = (scope: ParentNode, hosts: Element[]) => {
     for (const host of [...scope.querySelectorAll('*')]) {
       const sr = host.shadowRoot;
-      if (!sr) continue;
+      // Our own in-page UI (lib/pageui.ts) is an open shadow root too; without this, a selector
+      // the page lacks, like button.close, would be "found" in the usermods banner.
+      if (!sr || host.hasAttribute('data-usermods')) continue;
       searchedRoots++;
       const chain = [...hosts, host];
       for (const el of [...sr.querySelectorAll(selector)]) matches.push({ el, hosts: chain });

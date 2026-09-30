@@ -83,6 +83,15 @@ test('data-* noise is bounded: hashed and tracking names, long, JSON and random 
   assert.equal(noisyDataValue('12345'), true, 'a row index or record id says which, not what');
 });
 
+test('data-* attributes that carry credentials or contact details never reach the model', () => {
+  // Short enough to pass the value checks, so they must be dropped by name or by shape.
+  assert.deepEqual(dataAttrs([['data-csrf', 'Ab12Cd34Ef56'], ['data-auth-token', 'abc'], ['data-session-id', 'x1'], ['data-nonce', 'q']]), []);
+  assert.deepEqual(dataAttrs([['data-email', 'me@example.com'], ['data-user-phone', '+1 555 010 9999']]), []);
+  assert.deepEqual(dataAttrs([['data-owner', 'jane.doe@example.org'], ['data-contact', '(555) 010-9999']]), [], 'recognised by value too');
+  // Words that merely contain those letters are not caught.
+  assert.deepEqual(dataAttrs([['data-hotkey', 'g d'], ['data-state', 'open']]), ['data-hotkey="g d"', 'data-state="open"']);
+});
+
 test('the same data-* pair is printed a few times per snapshot, not on every element', () => {
   const seen = new Map<string, number>();
   const printed = Array.from({ length: 20 }, () => dataAttrs([['data-view-component', 'true'], ['data-row', 'x']], seen));
@@ -276,6 +285,28 @@ test('a selector that misses the document is found inside open shadow roots, wit
     reachFor(rows.matches[0]!, '.row'),
     'document.querySelector("#app").shadowRoot.querySelector("x-list.list").shadowRoot.querySelector(".row")',
   );
+});
+
+test('the extension\'s own in-page UI is never where a selector is found', () => {
+  const d = load('<html><body><p>page</p></body></html>');
+  const ours = d.createElement('div');
+  ours.setAttribute('data-usermods', 'banner');
+  ours.attachShadow({ mode: 'open' }).innerHTML = '<button class="close">×</button>';
+  d.documentElement.append(ours);
+  const r = queryAllDeep('button.close');
+  assert.equal(r.matches.length, 0);
+  assert.equal(r.searchedRoots, 0);
+});
+
+test('deepestOnly keeps the innermost of nested matches, and scales to many', () => {
+  const d = load(`<html><body>${'<div class="n">'.repeat(3)}x${'</div>'.repeat(3)}${'<div class="n">y</div>'.repeat(20000)}</body></html>`);
+  const items = [...d.querySelectorAll('div.n')].map((el) => ({ el, hosts: [] }));
+  const started = performance.now();
+  const kept = deepestOnly(items);
+  assert.ok(performance.now() - started < 1000);
+  assert.equal(kept.length, 20001, 'the two outer divs of the nested three are dropped');
+  assert.equal(kept[0]!.el.textContent, 'x');
+  assert.equal(kept[0]!.el.children.length, 0);
 });
 
 test('a miss everywhere says the shadow roots were searched and closed ones cannot be', () => {
