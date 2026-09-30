@@ -227,6 +227,8 @@ export function buildTree(root: Element, opts: { maxDepth?: number; includeHidde
 const FOLD_MIN = 6;
 /** How many examples of a folded run are always kept. */
 const FOLD_KEEP = 3;
+/** An element with fewer children than this is never cut, only collapsed. See cutPlan. */
+const CUT_MIN_KIDS = 20;
 
 /** How much of a parent's spare budget a child claims. See the section comment. */
 const shareWeight = (k: SNode) => k.size;
@@ -324,6 +326,9 @@ function planKids(n: SNode, avail: number): (string | SNode)[] | null {
  * again, so its content could not be read at all.
  */
 function cutPlan(n: SNode, avail: number): (string | SNode)[] | null {
+  // Only for a long list of children. With a few, the element's placeholder names more than a
+  // "cut: 1 more" would, and cutting them is how a page fills with cut markers.
+  if (n.nodes < CUT_MIN_KIDS || n.kids.filter((k) => typeof k !== 'string').length < CUT_MIN_KIDS) return null;
   const marker = (rest: number) => `<… cut: ${rest} more elements/>`;
   const elemsAfter: number[] = new Array(n.kids.length + 1).fill(0);
   for (let i = n.kids.length - 1; i >= 0; i--) elemsAfter[i] = elemsAfter[i + 1]! + (typeof n.kids[i] === 'string' ? 0 : 1);
