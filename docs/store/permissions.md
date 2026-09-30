@@ -36,10 +36,11 @@ usermods stores the user's saved userscripts, their enabled state, the values th
 ### `scripting`
 
 ```
-Two uses, both started by the user. (1) usermods reads the structure of the page the user is looking at so the model can write a script that targets the right elements. Its content script is normally injected declaratively, but a tab that was already open when usermods was installed or updated has no content script in it, so chrome.scripting.executeScript injects the packaged content script once, on demand, instead of asking the user to reload the tab (sendToContent in entrypoints/background.ts). (2) When the user chooses "Share as Gist", usermods opens GitHub's own gist editor in a new tab and runs one packaged function there to put the script's text into the editor; the user then presses GitHub's save button themselves (lib/sharecontroller.ts, lib/sharefill.ts). Only code shipped in the package is ever injected this way.
+Three uses, all of code shipped in the package. (1) usermods reads the structure of the page the user is looking at so the model can write a script that targets the right elements. Its content script is normally injected declaratively, but a tab that was already open when usermods was installed or updated has none, so chrome.scripting.executeScript injects the packaged content script once, on demand, instead of asking the user to reload (sendToContent in entrypoints/background.ts). (2) When the user chooses "Share as Gist", usermods opens GitHub's own gist editor in a new tab and runs one packaged function there to put the script's text into the editor; the user presses GitHub's save button themselves (lib/sharecontroller.ts). (3) While a script is being tested on a tab, one packaged function reads that document's start time, to tell a real navigation from a single-page app's route change (lib/navwatch.ts). No code string is ever injected this way.
 ```
 
-The second use is new in 0.1.1.
+The second use arrived in 0.1.1 with sharing, and the third with the fix that stopped a route change
+being reported as the page navigating away.
 
 ### `userScripts`
 
