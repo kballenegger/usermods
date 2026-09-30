@@ -642,6 +642,8 @@ function describeCall(name: string, input: Record<string, unknown>): string | un
     return input.selector.trim();
   }
   if (name === 'find_elements' && typeof input.text === 'string' && input.text.trim()) return `"${input.text.trim()}"`;
+  if (name === 'find_elements' && input.overlays === true) return 'overlays and fixed bars';
+  if (name === 'get_page' && input.text === true) return 'reading the text';
   return undefined;
 }
 
@@ -699,8 +701,10 @@ async function executeTool(
       case 'find_elements': {
         const selector = typeof input.selector === 'string' ? input.selector : undefined;
         const needle = typeof input.text === 'string' ? input.text : undefined;
-        if (!selector?.trim() && !needle?.trim()) return err('selector or text is required');
-        const r = await env.sendToContent<{ text: string }>({ type: 'query', selector, text: needle, limit: Number(input.limit) || 20 });
+        const overlays = input.overlays === true;
+        if (!selector?.trim() && !needle?.trim() && !overlays) return err('selector, text or overlays is required');
+        const styles = Array.isArray(input.styles) ? input.styles.filter((p): p is string => typeof p === 'string' && !!p.trim()).slice(0, 12) : undefined;
+        const r = await env.sendToContent<{ text: string }>({ type: 'query', selector, text: needle, limit: Number(input.limit) || 20, styles, overlays });
         return text(r.text);
       }
       case 'get_styles': {

@@ -73,12 +73,23 @@ test('find_elements sends text, alone or with a selector, and refuses neither', 
     step([call('c', 'find_elements', {})]),
   ]);
   assert.deepEqual(sent, [
-    { type: 'query', selector: undefined, text: 'Recommended for you', limit: 20 },
-    { type: 'query', selector: 'section', text: 'Trending', limit: 3 },
+    { type: 'query', selector: undefined, text: 'Recommended for you', limit: 20, styles: undefined, overlays: false },
+    { type: 'query', selector: 'section', text: 'Trending', limit: 3, styles: undefined, overlays: false },
   ]);
   const refused = out.messages.flatMap((m) => m.content).find((p) => p.type === 'tool_result' && p.toolCallId === 'c');
   assert.ok(refused && refused.type === 'tool_result' && refused.isError);
-  assert.match(texts([{ role: 'user', content: [refused] }]).join(''), /selector or text is required/);
+  assert.match(texts([{ role: 'user', content: [refused] }]).join(''), /selector, text or overlays is required/);
+});
+
+test('find_elements passes styles and overlays through, and overlays alone is a valid call', async () => {
+  const { sent } = await run([
+    step([call('a', 'find_elements', { overlays: true })]),
+    step([call('b', 'find_elements', { selector: 'li', styles: ['color', '', 7, 'margin'] })]),
+  ]);
+  assert.deepEqual(sent, [
+    { type: 'query', selector: undefined, text: undefined, limit: 20, styles: undefined, overlays: true },
+    { type: 'query', selector: 'li', text: undefined, limit: 20, styles: ['color', 'margin'], overlays: false },
+  ]);
 });
 
 test('get_page passes include_hidden through, and only when it is true', async () => {

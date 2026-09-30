@@ -104,7 +104,7 @@ export default defineContentScript({
           return;
         }
         case 'query':
-          sendResponse({ text: describeElements(msg.selector, msg.limit, msg.text) });
+          sendResponse({ text: describeElements(msg.selector, msg.limit, msg.text, { styles: msg.styles, overlays: msg.overlays }) });
           return;
         case 'styles':
           sendResponse({ text: computedStyles(msg.selector, msg.properties) });

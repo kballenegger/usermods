@@ -78,7 +78,7 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: 'find_elements',
-    description: 'List elements matching a CSS selector with their position, size, visibility and text preview. Use it to verify a selector before relying on it.',
+    description: 'List elements by selector and/or text: box, layout, text preview, and ancestors marking the likely unit to hide. Use it to verify a selector.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -87,6 +87,8 @@ export const TOOLS: ToolDef[] = [
         limit: { type: 'integer', description: 'Max elements to list. Default 20.' },
       },
       additionalProperties: false,
+        styles: { type: 'array', items: { type: 'string' }, description: 'Computed CSS properties to show for each match.' },
+        overlays: { type: 'boolean', description: 'List fixed/sticky layers, dialogs, backdrops and scroll locks.' },
     },
   },
   {
