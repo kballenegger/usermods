@@ -15,11 +15,11 @@ The base URL and the key are **not in this repository** and never go in it. They
 (project vault, item "Ornith API - chrome-app-review - 14 days"). The instructions block carries
 neither, so it is pasted straight from this file.
 
-**The reviewer key is time-limited.** The one issued for the first submission expires on
-2026-10-03. Before resubmitting, issue a new one that outlasts the review (give it a month), put
-it in the Password field, and check that the model name in step 4 below is still the one the
-endpoint serves. A reviewer who meets an expired key sees an auth error, which looks exactly like a
-broken extension.
+**The reviewer key is time-limited.** The one issued for the first submission was extended on
+2026-09-30 and now expires on **2026-10-17**; it is the same key and endpoint, so the Username and
+Password fields already hold the right values. If a review is still open a few days before that
+date, extend it again. A reviewer who meets an expired key sees an auth error, which looks exactly
+like a broken extension.
 
 `npm run reviewer-walkthrough` follows these instructions against the store build: a fresh profile,
 the toggle turned on through `chrome://extensions`, the buttons found by the words below, a script
@@ -147,7 +147,7 @@ they are what makes this a userscript manager rather than a chat window:
 
 ### Remote code
 
-The recommended answer in the form is **Yes**, with the justification in
+The answer in the form is **Yes**, with the justification in
 [permissions.md](permissions.md#are-you-using-remote-code): userscripts are JavaScript that is not in
 the package, and the User Scripts API is the documented way to run them. No code is fetched and
 evaluated for the extension's own use; all of the extension's own logic is in this

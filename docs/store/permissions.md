@@ -85,8 +85,8 @@ it. The dashboard will show one field fewer.
 
 ## Are you using remote code?
 
-**Recommended: Yes**, with the justification below. 0.1.0 answered No, on the reasoning that a
-userscript is the user's data and not the extension's code.
+**Yes**, with the justification below (decided 2026-09-30). 0.1.0 answered No, on the reasoning
+that a userscript is the user's data and not the extension's code.
 
 Why the answer changed: the dashboard defines remote code as any JavaScript that is not in the
 extension's package, and a userscript is exactly that, whoever it belongs to. usermods goes further

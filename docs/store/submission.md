@@ -59,10 +59,9 @@ listing against Google's policies the way a reviewer would:
   that do not need it. 0.1.1 does not ask for it. See [permissions.md](permissions.md#tabs-no-longer-requested).
 - **"Are you using remote code?" was answered No.** The model's draft is run on the page during the
   chat, and a userscript is by the dashboard's own definition code that is not in the package. The
-  recommended answer is now Yes, with a justification citing the User Scripts API, which the
-  Manifest V3 policy names as the permitted way. See [permissions.md](permissions.md#are-you-using-remote-code).
-  **This is the one judgement call in the resubmission**: Yes is the accurate answer and the
-  defensible one, and it costs a slower review.
+  answer is now **Yes**, with a justification citing the User Scripts API, which the Manifest V3
+  policy names as the permitted way. See [permissions.md](permissions.md#are-you-using-remote-code).
+  It is the accurate answer and the defensible one, and it costs a slower review.
 - **The first-run data notice left out two things that are sent**: what a script returns when the
   model runs one on the page, and images the user attaches. The listing's privacy paragraph said the
   notice "explains exactly what is sent" over a shorter list still. Both now name everything the
@@ -106,10 +105,9 @@ In the dashboard, on the item above. Nothing here needs a decision; it is upload
 4. **Privacy practices → justifications** → replace each of the seven texts (single purpose, five
    permissions, host permissions) with its block in [permissions.md](permissions.md).
 5. **Privacy practices → remote code** → change the answer to **Yes** and paste the block under
-   [Are you using remote code?](permissions.md#are-you-using-remote-code). Read the reasoning there
-   first; this is the one answer that is a judgement call.
-6. **Test instructions** → Username and Password from a **new** reviewer key (the old one expires
-   2026-10-03), Additional instructions from the block in
+   [Are you using remote code?](permissions.md#are-you-using-remote-code).
+6. **Test instructions** → leave Username and Password as they are (the reviewer key was extended
+   to 2026-10-17, same key and endpoint) and replace Additional instructions with the block in
    [reviewer-notes.md](reviewer-notes.md#test-instructions).
 7. Leave everything else as it is: category, language, icon, promo tiles, URLs, data-usage
    checkboxes, the three certifications, the privacy policy URL, distribution.
@@ -120,8 +118,8 @@ Before pressing Submit:
 - [ ] `npm run listing-check` prints `ok`.
 - [ ] `npm run reviewer-walkthrough` ends with `ok`.
 - [ ] The uploaded zip's SHA-256 matches [package-audit.md](package-audit.md).
-- [ ] The new reviewer key works: `curl -s -H "Authorization: Bearer $KEY" "$BASE_URL/models"` lists
-      the model that step 4 of the test instructions names.
+- [ ] The reviewer key still works: `curl -s -H "Authorization: Bearer $KEY" "$BASE_URL/models"`
+      lists the model that step 4 of the test instructions names.
 - [ ] `PRIVACY.md` on `main` is the updated one (its date reads 30 September 2026), since the
       dashboard links to it there.
 
