@@ -694,6 +694,8 @@ async function executeTool(
           selector: typeof input.selector === 'string' ? input.selector : undefined,
           maxChars: Math.min(60_000, Number(input.max_chars) || 20_000),
           includeHidden: input.include_hidden === true,
+          text: input.text === true,
+          offset: Number(input.offset) || 0,
         });
         if (r.error) return err(r.error);
         return text(`URL: ${r.url}\nTitle: ${r.title}\n\n${r.html}`);

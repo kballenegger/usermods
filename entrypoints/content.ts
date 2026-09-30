@@ -1,5 +1,6 @@
 import { createHolder } from '@/lib/keepalive-holder';
 import { computedStyles, describeElements } from '@/lib/inspect';
+import { pageText, sliceText, TEXT_DEFAULT_CHARS } from '@/lib/pagetext';
 import { reachFor, selectorFor, snapshot } from '@/lib/snapshot';
 import { queryAllDeep, waitForDom } from '@/lib/waitdom';
 import { initBanner } from '@/lib/bannerclient';
@@ -96,6 +97,12 @@ export default defineContentScript({
             }
             root = m.el;
             if (m.hosts.length) where = `<!-- inside an open shadow root: ${reachFor(m, msg.selector)} -->\n`;
+          }
+          if (msg.text) {
+            // A whole-page read puts content ahead of navigation; a selected element is read whole.
+            const full = root ? pageText(root, { skipChrome: !msg.selector }) : '';
+            sendResponse({ url: location.href, title: document.title, html: where + sliceText(full, msg.offset ?? 0, msg.maxChars ?? TEXT_DEFAULT_CHARS) });
+            return;
           }
           let html = snapshot({ root, maxChars: msg.maxChars, includeHidden: msg.includeHidden });
           // A hidden root used to come back as an empty page, which reads as "nothing there".

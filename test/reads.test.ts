@@ -92,6 +92,14 @@ test('find_elements passes styles and overlays through, and overlays alone is a 
   ]);
 });
 
+test('get_page passes text mode and its offset through', async () => {
+  const { sent } = await run([step([call('a', 'get_page', { text: true, offset: 20000 })]), step([call('b', 'get_page', {})])]);
+  assert.equal(sent[0]!.text, true);
+  assert.equal(sent[0]!.offset, 20000);
+  assert.equal(sent[1]!.text, false);
+  assert.equal(sent[1]!.offset, 0);
+});
+
 test('get_page passes include_hidden through, and only when it is true', async () => {
   const { sent } = await run([step([call('a', 'get_page', { include_hidden: true })]), step([call('b', 'get_page', { selector: 'main' })])]);
   assert.equal(sent[0]!.includeHidden, true);
