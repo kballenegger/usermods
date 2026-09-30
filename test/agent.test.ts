@@ -77,7 +77,7 @@ test('the nudge fires when the count first passes the budget, and names the coun
   assert.equal(readBudgetNudge(T(3), T(2)), null);
   assert.equal(
     readBudgetNudge(T(4), T(3)),
-    '[You have made 4 page reads without running or proposing anything. Act now: test with run_script or ask the user one question.]',
+    '[You have made 4 page reads without running or proposing anything. Stop reading: answer the user if you already can, try the change with run_script or test_mod if one is wanted, or ask the user one question.]',
   );
 });
 
