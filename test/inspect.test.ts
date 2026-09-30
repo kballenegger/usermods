@@ -58,9 +58,9 @@ const probe: Probe = {
 
 // ---------- describing an element ----------
 
-test('describeNode is a short, valid selector: tag, id, readable classes first, role, label, testid', () => {
+test('describeNode is a short, valid selector: tag, id, a readable class, role, label, testid', () => {
   load('<html><body><div id="feed" class="css-1a2b3c card big" role="article" aria-label="Post" data-testid="post"></div></body></html>');
-  assert.equal(describeNode(document.querySelector('div')!), 'div#feed.card.big[role="article"][aria-label="Post"][data-testid="post"]');
+  assert.equal(describeNode(document.querySelector('div')!), 'div#feed.card[role="article"][aria-label="Post"][data-testid="post"]');
   load(`<html><body><button class="x9f8e7d6" aria-label="${'a'.repeat(50)}" aria-modal="true"></button></body></html>`);
   assert.equal(describeNode(document.querySelector('button')!), `button.x9f8e7d6[aria-label^="${'a'.repeat(30)}"][aria-modal="true"]`, 'a generated class beats none; a long label is a prefix match');
 });
@@ -80,11 +80,17 @@ const FEED = `<html><body><main id="main" data-box="0,0,1000,3000">
     <article class="post" data-box="0,800,600,400">organic</article>
   </div></main></body></html>`;
 
-test('a chain walks up to body, collapses same-size wrappers, and marks the card in a list as the unit', () => {
+test('a chain collapses same-size wrappers, marks the card in a list as the unit, and stops one step above it', () => {
   load(FEED);
   const label = document.querySelector('span.label')!;
   const chain = ancestorChain(label, probe.box(label), probe, new Map(), 1);
-  assert.equal(chain, 'div.inner 600x40 › (1 same-size) › article.post 600x400 [unit? 1 of 3 like it] › div.feed 600x3000 › main#main 1000x3000');
+  assert.equal(chain, 'div.inner 600x40 › (1 same-size) › article.post 600x400 [unit? 1 of 3 like it] › div.feed 600x3000 › …');
+});
+
+test('a chain with no unit in it walks all the way up to body', () => {
+  load('<html><body><main id="m" data-box="0,0,1000,3000"><div class="col" data-box="0,0,600,3000"><p data-box="0,0,600,100"><b data-box="0,0,50,16">x</b></p></div></main></body></html>');
+  const b = document.querySelector('b')!;
+  assert.equal(ancestorChain(b, probe.box(b), probe, new Map(), 1), 'p 600x100 › div.col 600x3000 › main#m 1000x3000');
 });
 
 test('a later match whose ancestors were already printed ends with "then as in N."', () => {
@@ -134,7 +140,7 @@ test('find_elements prints layout and asked-for styles for every match, and chai
   assert.match(out, /1\. .* \[100x20 @0,0\] display:block item 0/);
   assert.match(out, /ancestors: li\.row 500x50 \[unit\? 1 of 6 like it\] › ul\.list 500x2000$/m);
   assert.match(out, /ancestors: li\.row 500x50 \[unit\? 1 of 6 like it\] › \(then as in 1\.\)$/m);
-  assert.match(out, /Ancestors are nearest first \(for the first 3 matches\)/);
+  assert.match(out, /Ancestors are listed for the first 3 matches only\.\n\[unit\? …\] = likely thing to hide/);
 });
 
 test('find_elements with only overlays needs no selector, and a plain call is unchanged in wording', () => {
@@ -174,6 +180,13 @@ test('the furniture inventory lists layers with cover, backdrop, dialog, nesting
 test('a page with nothing layered says so, and a normal page reports no scroll lock', () => {
   load('<html><body><p>plain</p></body></html>');
   assert.equal(describeFurniture(probe).split('\n').slice(1).join('\n'), 'Scroll lock: none (html and body scroll normally, nothing inert).\nNo fixed, sticky or dialog layers are showing.');
+});
+
+test('a layer below the fold is "off screen now", and a class that merely mentions dialog is not a lock', () => {
+  load('<html class="uls-dialog-sticky-hide"><body><div class="tabs" style="position:sticky" data-box="0,1200,900,48">Files</div></body></html>');
+  const out = describeFurniture(probe);
+  assert.match(out, /\nScroll lock: none/);
+  assert.match(out, /1\. div\.tabs sticky 900x48 @0,1200 off screen now "Files"/);
 });
 
 test('over the row cap, dialogs and the biggest layers are kept, in page order, and the rest counted', () => {

@@ -65,7 +65,7 @@ const size = (b: Box) => `${Math.round(b.w)}x${Math.round(b.h)}`;
 const area = (b: Box) => Math.max(0, b.w) * Math.max(0, b.h);
 
 /**
- * An element as a short, copyable CSS selector: tag, #id, up to two classes (readable ones first),
+ * An element as a short, copyable CSS selector: tag, #id, one class (a readable one if any),
  * then role, aria-label and data-testid when present. Not unique; it says what the element IS, which
  * is what a chain of ancestors or a list of layers needs, and a model can paste it into a rule.
  */
@@ -75,7 +75,9 @@ export function describeNode(el: Element): string {
   const classes = (el.getAttribute('class') ?? '').trim().split(/\s+/).filter(Boolean);
   const readable = classes.filter((c) => !isGeneratedClass(c));
   // A generated class still beats nothing: `[class*=…]` on its readable prefix is a real hook.
-  for (const c of (readable.length ? readable : classes).slice(0, 2)) out += `.${esc(c)}`;
+  // One class: a second rarely narrows what the element is, and chains print several of these.
+  const cls = readable[0] ?? classes[0];
+  if (cls) out += `.${esc(cls)}`;
   const role = el.getAttribute('role');
   if (role) out += `[role="${attrValue(role)}"]`;
   const label = el.getAttribute('aria-label')?.trim();
@@ -151,7 +153,11 @@ function unitReason(el: Element, box: Box, pos: string, matchBox: Box): string |
   return alike >= UNIT_MIN_ALIKE ? `1 of ${alike} like it` : null;
 }
 
-/** How many ancestors a chain prints, and how far it may walk to find them. */
+/**
+ * How many ancestors a chain prints, and how far it may walk to find them. A chain also stops one
+ * step after the unit: the unit's parent says what it repeats in, and above that is page layout
+ * (the content column, the page container) that costs characters and answers nothing.
+ */
 export const CHAIN_STEPS = 6;
 const CHAIN_WALK = 40;
 
@@ -167,6 +173,7 @@ export function ancestorChain(el: Element, matchBox: Box, probe: Probe, seen: Ma
   let last = matchBox;
   let skipped = 0;
   let unitFound = false;
+  let sinceUnit = 0;
   let cur = parentOf(el);
   for (let walked = 0; cur.el && walked < CHAIN_WALK; walked++) {
     const a = cur.el;
@@ -187,7 +194,7 @@ export function ancestorChain(el: Element, matchBox: Box, probe: Probe, seen: Ma
     if (sameBox && !unit && !layered) {
       skipped++;
     } else {
-      if (steps.length >= CHAIN_STEPS) {
+      if (steps.length >= CHAIN_STEPS || (unitFound && sinceUnit >= 1)) {
         // The cut is said, never silent: the model can ask again from the last step it saw.
         steps.push('…');
         return steps.join(' › ');
@@ -197,6 +204,7 @@ export function ancestorChain(el: Element, matchBox: Box, probe: Probe, seen: Ma
       const display = s('display') === 'contents' ? ' display:contents' : '';
       const layer = layered ? ` ${pos}${s('z-index') && s('z-index') !== 'auto' ? ` z-index:${s('z-index')}` : ''}` : '';
       steps.push(`${describeNode(a)}${cur.viaHost ? ' (shadow host)' : ''} ${size(box)}${display}${layer}${unit ? ` [unit? ${unit}]` : ''}`);
+      if (unitFound) sinceUnit++;
       if (unit) unitFound = true;
       last = box;
     }
@@ -207,11 +215,14 @@ export function ancestorChain(el: Element, matchBox: Box, probe: Probe, seen: Ma
 }
 
 /**
- * How many matches carry an ancestor chain. Measured on live pages (see the lane notes in
- * CHANGELOG): a chain costs 150-300 characters, and the question "which container?" is asked about
- * the first match or two, which is what a text search returns. Twenty chains for twenty list items
- * would say the same thing twenty times; three, deduplicated by "(then as in N.)", show whether
- * the matches share a unit, for about the cost of one.
+ * How many matches carry an ancestor chain. Measured in Chromium on Wikipedia, GitHub and a modal
+ * fixture: one chain line is 85-390 characters, and a single-match find grew by 270-370 characters
+ * in all (chain, layout and the one-line legend), about 90 tokens. The question "which container?"
+ * is asked about the first match or two, which is what a text search returns; twenty chains for
+ * twenty list items would say the same thing twenty times. Three, with a shared tail cut to
+ * "(then as in 1.)", show whether the matches share a unit: the second and third cost 60-150
+ * characters each on those pages. No flag to ask for more: every schema field is sent on every
+ * request, and a model that wants the chain of match 7 can search for it directly.
  */
 export const CHAIN_MATCHES = 3;
 
@@ -264,6 +275,7 @@ function describeMatches(sel: string | undefined, needle: string | undefined, li
   const what = sel && needle ? `match "${sel}" and contain "${needle}"` : sel ? `match "${sel}"` : `contain "${needle}"`;
   const seen = new Map<Element, number>();
   let chains = 0;
+  let units = 0;
   const lines = found.slice(0, limit).flatMap((m, i) => {
     const el = m.el;
     const r = probe.box(el);
@@ -279,6 +291,7 @@ function describeMatches(sel: string | undefined, needle: string | undefined, li
       if (chain) {
         out.push(`   ancestors: ${chain}`);
         chains++;
+        if (chain.includes('[unit? ')) units++;
       }
     }
     return out;
@@ -289,9 +302,9 @@ function describeMatches(sel: string | undefined, needle: string | undefined, li
     ...lines,
     '',
     'The bracketed label is how durable each selector is across site deploys. A [fragile: …] one is worth a second look; a [stable: …] one is not.',
-    ...(chains
-      ? [`Ancestors are nearest first${found.length > CHAIN_MATCHES ? ` (for the first ${CHAIN_MATCHES} matches)` : ''}. [unit? …] marks the nearest one much larger than the match that repeats among its siblings, or a dialog or fixed/sticky layer: likely what to hide. A layout guess; check it.`]
-      : []),
+    // Said only when there is something to explain: the chain itself reads as "nearest first".
+    ...(chains && found.length > CHAIN_MATCHES ? [`Ancestors are listed for the first ${CHAIN_MATCHES} matches only.`] : []),
+    ...(units ? ['[unit? …] = likely thing to hide (a dialog, a fixed/sticky layer, or a much larger ancestor repeated among its siblings); a layout guess.'] : []),
     ...(shadowed
       ? [`"(in shadow root)" ones are inside an open shadow root, where document.querySelector and page CSS do not reach. The selector is relative to that root: ${reachFor(shadowed, sel ?? selectorFor(shadowed.el))}`]
       : []),
@@ -314,7 +327,7 @@ const FURNITURE_SKIP = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE', 'LINK
 export const FURNITURE_ROWS = 12;
 
 /** A class on html or body that usually means "a modal has locked the page". */
-const LOCK_CLASS = /modal|overlay|lock|no-?scroll|noscroll|dialog|popup|overflow|fixed|frozen/i;
+const LOCK_CLASS = /(modal|dialog|popup|overlay).*(open|active|show|visible)|(open|active|show)[-_]?(modal|dialog|popup|overlay)|has-?(modal|dialog|overlay)|no-?scroll|scroll-?lock|overflow-?hidden|locked|frozen/i;
 
 export interface Layer {
   el: Element;
@@ -405,9 +418,10 @@ export function describeFurniture(probe: Probe = liveProbe, rows = FURNITURE_ROW
     if (l.cover >= 0.5 && l.text.length < 3 && !l.dialog) tags.push('backdrop?');
     let parent = l.inside;
     while (parent >= 0 && !number.has(parent)) parent = layers[parent]!.inside;
-    const pct = l.cover > 0 && l.cover < 0.01 ? '<1' : String(Math.round(l.cover * 100));
+    // Zero is a sticky bar or banner further down the page: there, but not covering anything now.
+    const covers = l.cover === 0 ? 'off screen now' : `covers ${l.cover < 0.01 ? '<1' : Math.round(l.cover * 100)}%`;
     out.push(
-      `${number.get(li)}. ${describeNode(l.el)} ${l.pos}${l.z && l.z !== 'auto' ? ` z-index:${l.z}` : ''} ${size(l.box)} @${Math.round(l.box.x)},${Math.round(l.box.y)} covers ${pct}%` +
+      `${number.get(li)}. ${describeNode(l.el)} ${l.pos}${l.z && l.z !== 'auto' ? ` z-index:${l.z}` : ''} ${size(l.box)} @${Math.round(l.box.x)},${Math.round(l.box.y)} ${covers}` +
         `${tags.length ? ` [${tags.join(', ')}]` : ''}${parent >= 0 ? ` (inside ${number.get(parent)}.)` : ''} ${l.text ? JSON.stringify(trunc(l.text, 60)) : '(no text)'}`,
     );
   }
