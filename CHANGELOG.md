@@ -12,6 +12,92 @@ The version resubmitted to the Chrome Web Store. 0.1.0 was submitted on 2026-09-
 same day for its listing text (keyword spam in the description), not for the package; everything
 merged since then ships here.
 
+### The agent tests a mod the way the saved mod will run
+
+An audit of the agent's tools, and then the owner's own chat histories (14 chats, 184 tool calls),
+showed where runs went wrong: "tested" meant only that some script had run without throwing.
+
+- **`test_mod`** runs the finished script as the saved mod will run it: with its header's world, its
+  `@grant` functions, its `@require` files and its `@run-at`. With `reload: true` the tab reloads and
+  the script runs at load on a clean page; on Chrome that is a temporary, reserved
+  `chrome.userScripts` registration that is always removed afterwards and swept at worker start.
+  Without reload it runs on the open page and says so. It reports an error at the model's own line,
+  the console output, what changed, and whether the change was still there two seconds later.
+- **The proposal card says how the proposed code was tested**: "tested as the saved mod on a fresh
+  page load", "tested on the open page only, not on a fresh load", "failed when tested as the saved
+  mod", or the existing "not tested on this page · reason". Nothing is refused that was allowed
+  before; the card tells the truth instead.
+- **Fixed: Try on a page-world mod** (`@grant none` / `unsafeWindow`) ran and then waited out its
+  timeout, because the result had no way back to the extension. It now reports normally.
+
+### run_script tells the model what it actually got
+
+In the owner's chats, 8 of 119 script results had been cut at 4,000 characters with nothing to say
+so.
+
+- **Returned values are readable.** An element comes back as `<div#app.shell> "its first text…"`
+  instead of `{}`, a NodeList one node per line with the total, a Map or Set as an array, an Error as
+  its name and message. Cycles and huge values no longer throw or hang. Plain JSON results are
+  exactly what they were.
+- **Nothing is cut silently.** A long result or stack ends in "[truncated: 4,000 of 18,230 chars;
+  return less, or slice]". Console lines are capped at 500 characters with a marker, and dropped
+  console lines are counted.
+- **"What changed" names the nodes:** "2 removed (div.modal-backdrop, div#newsletter), 1 added
+  (div.modal), 2 attributes changed (body[class,style])". This is how the model sees a site put back
+  what its script removed.
+- **Errors thrown later by a script's own observers, timers and listeners are no longer lost.** They
+  arrive with the model's next tool result, mapped to the line it wrote, and are still followed
+  across a single-page app's route changes. No new tool and no schema change. On Safari this
+  degrades to the previous behaviour if the engine cannot attribute them.
+
+### Cheaper, sharper page reads
+
+Half of the page snapshots in those chats had been truncated, and the cheap read tools were barely
+used: the models wrote scripts to look at the page instead.
+
+- **A page over budget keeps its shape.** `get_page` used to cut a long page at 20,000 characters in
+  document order, so the header and menus came through and the main content was what got lost.
+  Every region now appears: a region that does not fit collapses to one line saying how many
+  elements it holds and how it starts, a long run of similar items shows whole examples and a
+  count, and a very long list of unlike children shows its first ones and says how many were cut.
+  `get_page` with a selector opens any of them. A page that fits prints exactly as before.
+- **`find_elements` can search by visible text**, alone or with a selector, and answers with the
+  innermost matching elements.
+- **Open shadow roots are reachable.** A selector that matches nothing in the document is retried
+  inside open shadow roots by `find_elements`, `get_styles`, `get_page` and `wait_for`, and the
+  answer gives the `.shadowRoot.querySelector` chain a script needs. usermods' own banner is never
+  searched.
+- **The snapshot shows `data-*` attributes and ARIA state**, the durable hooks a mod should select
+  on, within limits: at most four per element, short readable values only, no hashed, tracking or
+  plumbing names, and never names or values that look like credentials or contact details. About 1%
+  more text on most pages, 9% on a GitHub repository page.
+- **`get_page` takes `include_hidden`.**
+- **Page reads are charged by size.** The read budget counted a one-line `find_elements` the same as
+  a full `get_page`, so a model that checked three selectors was told to stop looking. A read now
+  costs its length over 6,000 characters, between a quarter and one whole read; four full page reads
+  are still nudged, as before.
+
+### Fixed: a mod written in chat moved to the page's world on its second save
+
+- The header generated for a mod the model wrote said `@grant none`, which every userscript manager
+  (and usermods) reads as "run in the page". Only the first save kept the mod in the isolated world
+  it had been tested in; "Save & update mod", a dashboard edit or a re-imported export moved it to
+  the page. The generated header now has no `@grant` and marks the isolated world with
+  Violentmonkey's `@inject-into content` and Tampermonkey's `@sandbox DOM`, which usermods also
+  honours on import (in that direction only). An imported `@grant none` script still runs in the
+  page.
+- A mod saved once by an earlier build (isolated, with the old generated header byte for byte) shows
+  the new header when loaded, and so does a chat draft holding that header when it is saved into an
+  isolated mod. Nothing either mod does changes. A mod that a second save already moved to the page
+  is left as it is; saving it again from its chat moves it back.
+
+### Fixed: a route change on a single-page app read as "the page navigated, the result was lost"
+
+- Chrome reports a `history.pushState`, `replaceState` or hash change as the tab loading, and
+  `run_script` and the panel's Run once ended the run there. A run now ends on navigation only when
+  its document is really gone (`lib/navwatch.ts`). Real navigations, reloads included, are still
+  reported as soon as the new page commits.
+
 ### Fixed: a fresh install on Chrome did not work until the browser was restarted
 
 Found while checking the store reviewer's own steps against the store build. It had been there since
