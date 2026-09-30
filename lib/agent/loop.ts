@@ -7,7 +7,7 @@ import { ATTACHMENT_DROPPED_PANEL_NOTE } from '../providers/vision.ts';
 import type { Provider } from '../providers/types';
 import { renderRunResult, type RunResult } from '../runscript.ts';
 import { DEFAULT_CONTEXT_BUDGET, type AgentEventBody, type ModProposal, type Msg, type Part, type Settings, type UserTurn } from '../types.ts';
-import { MAX_ITERATIONS, countReads, readBudgetNudge, wrapUpNudge } from './budget.ts';
+import { MAX_ITERATIONS, NO_READS, countReads, readBudgetNudge, wrapUpNudge, type ReadCall } from './budget.ts';
 import { compact, estimateTokens, needsCompaction } from './compact.ts';
 import { SYSTEM_PROMPT } from './prompt.ts';
 import { checkProposal, type ProposalContext } from './propose.ts';
@@ -359,8 +359,9 @@ export async function runAgent(input: AgentInput): Promise<RunOutcome> {
   async function loop() {
     // Page reads since the model last ran or proposed anything. The prompt's read budget is only a
     // rule until something in the conversation contradicts the model when it breaks it; this is
-    // that something. Per turn, reset by run_script or propose_mod.
-    let reads = 0;
+    // that something. Per turn, reset by run_script or propose_mod, and charged by the size of what
+    // each read returned (lib/agent/budget.ts), so cheap lookups do not cost like full pages.
+    let reads = NO_READS;
     // Whether a run_script has completed since the last proposal, which is what propose_mod's
     // "test it first" check reads. Held here rather than derived from the message history, because
     // by the time the history is stored a tool result is provider-neutral text.
@@ -508,6 +509,7 @@ export async function runAgent(input: AgentInput): Promise<RunOutcome> {
       // Real time spent inside wait_for and run_script's then_wait this iteration, so the abuse
       // guard charges what waiting actually cost rather than what it was allowed to cost.
       let waitedMs = 0;
+      const charged: ReadCall[] = [];
       for (const call of calls) {
         emit({ type: 'tool_call', id: call.id, name: call.name, input: call.input });
         emit({ type: 'status', phase: 'tool', tool: call.name, detail: describeCall(call.name, call.input), iteration: i + 1 });
@@ -516,13 +518,18 @@ export async function runAgent(input: AgentInput): Promise<RunOutcome> {
         results.push({ type: 'tool_result', toolCallId: call.id, content: r.content, isError: r.isError });
         if (call.name === 'propose_mod' && !r.isError) proposed = true;
         waitedMs += r.waitedMs ?? 0;
+        charged.push({
+          name: call.name,
+          chars: r.content.reduce((n, p) => n + (p.type === 'text' ? p.text.length : 0), 0),
+          image: r.content.some((p) => p.type === 'image'),
+        });
       }
 
       // Both nudges ride along with the tool results rather than as a separate user message, so the
       // history keeps its assistant/tool-result pairing and no orphan turn appears in the panel.
       const before = reads;
       const names = calls.map((c) => c.name);
-      reads = countReads(reads, names);
+      reads = countReads(reads, charged);
       const budget = readBudgetNudge(reads, before);
       if (budget) results.push({ type: 'text', text: budget });
       // The waiting guard. A turn that waits, acts, waits, acts is using the tool as intended and
