@@ -4,6 +4,9 @@ import { isDomCondition, urlMatches, type WaitOutcome, type WaitSpec } from '@/l
 import { gmValuesKey, loadGmValues, type GmMessage } from '@/lib/gm';
 import { createExecAdapter } from '@/lib/exec/adapter';
 import { wrapForExecution } from '@/lib/exec/wrap';
+import { checkCode, composeTest, engineRunsModOn, inPageWorld, patternsForPage, recorderKey, relayCode, testRunId, TEST_RUN_TTL_MS } from '@/lib/exec/testrun';
+import type { TestRun } from '@/lib/exec/adapter';
+import type { PersistReport, TestModResult } from '@/lib/agent/testmod';
 import { checkConnect, connectOf } from '@/lib/connect';
 import { dependenciesChanged, fetchText, previewFromUrl, reparseEditedSource, resolveDependencies, toBase64 } from '@/lib/install';
 import { UPDATED_MARK } from '@/lib/importreport';
@@ -14,9 +17,9 @@ import { createShareController } from '@/lib/sharecontroller';
 import { createUpdateController } from '@/lib/updatecontroller';
 import { withRetry } from '@/lib/agent/retry';
 import { resyncPlan } from '@/lib/resync';
-import { mapStack, prepareRunScript, renderRunResult, type RunResult } from '@/lib/runscript';
+import { mapStack, parseError, prepareRunScript, renderRunResult, type RunResult } from '@/lib/runscript';
 import { shouldUpdate } from '@/lib/version';
-import { loadMods, modFromProposal, modFromSource, parseHeader, previewFromSource, upsertMod, deleteMod, saveMods } from '@/lib/mods';
+import { loadMods, matchPatternForUrl, modFromProposal, modFromSource, parseHeader, previewFromSource, upsertMod, deleteMod, saveMods } from '@/lib/mods';
 import { appendTurn, archiveChat, bulkChats, countTurns, createChat, deleteChat, getChat, hostFromUrl, isArchived, listChats, loadItems, loadMessages, markTitleRefreshed, renameChat, saveItems, saveMessages, setChatArtifact, setChatModel, setChatThinking, setModelTitle, touchChat } from '@/lib/chats';
 import { loadRuns, markInterrupted, pruneRuns, resumableRuns, saveRuns, type RunMap, type RunRecord } from '@/lib/runstate';
 import { AUTO_RESUMED_TEXT, autoResumable, countAutoResume, holdExpired, KEEPALIVE_MAX_HOLD_MS, KEEPALIVE_PORT, TAB_CLOSED_TEXT } from '@/lib/keepalive';
@@ -25,7 +28,7 @@ import { collectBlobs } from '@/lib/blobs';
 import { QUOTA_PANEL_NOTE, bytesInUse, quotaWarningNote, shouldWarn } from '@/lib/quota';
 import { CONTEXT_LIMITS_KEY, effectiveBudget, limitKey, loadContextLimits, rememberLimit, saveContextLimits } from '@/lib/contextlimits';
 import { reduceItems } from '@/lib/transcript';
-import { addVersion, adoptMod, currentVersion, detachFromMod, draftBlock, fromMod, loadArtifact, recordProposal, rollbackTo, saveArtifact, toProposal, toSource, type Artifact } from '@/lib/artifact';
+import { addVersion, adoptMod, createArtifact, currentVersion, detachFromMod, draftBlock, fromMod, loadArtifact, recordProposal, rollbackTo, saveArtifact, toProposal, toSource, type Artifact } from '@/lib/artifact';
 import { draftStanding, duplicateOf, editModPlan, likelyUrlFor, modsBlock, modsForUrl, openModDecision, runsOnPage } from '@/lib/modmatch';
 import { buildTitleInput, completedTurns, sanitizeTitle, titleDecision, TITLE_SYSTEM_PROMPT } from '@/lib/title';
 import { createProvider } from '@/lib/providers';
@@ -87,6 +90,10 @@ const exec = createExecAdapter({
 export default defineBackground(() => {
   // Before anything can await: MV3 only wakes a sleeping worker for listeners registered here.
   exec.install();
+  // A test_mod registration belongs to the worker that made it, and no test survives a worker. One
+  // left behind (the worker was killed between register and unregister) is removed here, before
+  // anything else can run. See lib/exec/testrun.ts for the other two locks.
+  void exec.sweepTestRuns().catch((e: unknown) => console.warn('[usermods] sweep test runs', e));
 
   // The window-level panel is configured from the stored scope, not unconditionally opened on every
   // tab: see applyPanelScope below and lib/sidepanel.ts for the two layers Chrome gives us.
@@ -808,7 +815,9 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
       history,
       turn,
       pullQueued: () => session.queue.splice(0),
-      env: envForTab(session.tabId),
+      // test_mod needs the draft (its kept header, its link to an installed mod), which only this
+      // closure has; `artifact` is read at call time, so a test after open_mod tests that mod.
+      env: { ...envForTab(session.tabId), testMod: (code, reload, sig) => testModInTab(session.tabId, code, reload, artifact, sig) },
       emit: post,
       signal,
       // Built here rather than inside the loop so it carries the two things only the background
@@ -900,6 +909,8 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
               : `\u201C${mod.name}\u201D is now this chat's draft (v${artifact!.current}), and Save will write over that mod in place. Its current script is below \u2014 read it before you change anything, and keep what it already does.`,
             mod.grants.length ? `It is granted: ${mod.grants.join(', ')}.` : '',
             mod.requires.length ? `It loads ${mod.requires.length} @require script(s), which are kept for you.` : '',
+            // run_script runs bare code: no GM shim, no @require bodies, always the isolated world.
+            mod.grants.length || mod.requires.length ? 'Test edits with test_mod, which runs them with this header, its grants and @require files; run_script does not.' : '',
             'Its ==UserScript== metadata block is kept and re-attached on save, so do NOT write one into your code.',
             '```javascript',
             mod.source,
@@ -1837,15 +1848,7 @@ async function saveArtifactAsMod(
 
   // `into` is the mod being written: the chat's link, or the one the user chose to overwrite.
   const into = linked ?? target;
-  let mod: Mod;
-  if (into) {
-    // In place: same id, same enabled flag, same GM value store, same createdAt. This is also what
-    // keeps a DISABLED mod disabled when it is edited in chat and saved.
-    mod = await saveEditedSource(into.id, toSource(artifact));
-  } else {
-    mod = modFromProposal(proposal as ModProposal);
-    await resolveDependencies(mod);
-  }
+  const mod = await modFromDraft(artifact, into);
   await upsertMod(mod);
   await syncRegistrations();
 
@@ -1857,6 +1860,179 @@ async function saveArtifactAsMod(
   // list are right the moment a first save creates the link.
   await setChatArtifact(chatId, next.id, next.versions.length, { id: mod.id, name: mod.name });
   return { artifact: next, mod, created: !into, relinked };
+}
+
+/**
+ * The Mod a Save of this draft writes, dependencies fetched. Save and test_mod both build through
+ * here, so what test_mod runs cannot drift from what Save installs.
+ *
+ * Into an existing mod it goes in place: same id, same enabled flag, same GM value store, same
+ * createdAt (which is also what keeps a DISABLED mod disabled when it is edited in chat and saved),
+ * and @require/@resource are refetched only when the header's dependency lines moved.
+ */
+async function modFromDraft(artifact: Artifact, into: Mod | undefined): Promise<Mod> {
+  if (into) return saveEditedSource(into.id, toSource(artifact));
+  const mod = modFromProposal(toProposal(artifact) as ModProposal);
+  await resolveDependencies(mod);
+  return mod;
+}
+
+// ---------- test_mod ----------
+
+/** How long a reload test waits for the script's result: a slow page load plus the run. */
+const TEST_LOAD_TIMEOUT_MS = 30_000;
+/** How long after the run the change is checked again. Pages that re-render do it within this. */
+const TEST_SETTLE_MS = 2_000;
+
+/**
+ * The mod test_mod runs for `code`: the draft as it would be with `code` as its next version, built
+ * exactly as Save would build it (modFromDraft). The name, description and matches are the draft's,
+ * because propose_mod has not said otherwise yet; a chat with no draft gets this page's site.
+ *
+ * Two departures from the saved mod, both said in `notes`: a draft whose patterns do not cover the
+ * tab is tested here anyway, under this page's site (the model is told the saved mod would not run
+ * here); and a mod that is not yet installed runs under a reserved id, so a GM_setValue during the
+ * test does not leave values behind under an id nothing will ever use.
+ */
+async function testModFor(artifact: Artifact | null, code: string, url: string, reservedId: string): Promise<{ mod: Mod; linked: boolean; notes: string[] }> {
+  const cur = artifact ? currentVersion(artifact) : undefined;
+  const version = {
+    name: cur?.name || 'Draft mod',
+    description: cur?.description ?? '',
+    matches: cur?.matches.length ? cur.matches : [matchPatternForUrl(url)],
+    code,
+    source: 'proposal' as const,
+  };
+  const draft = artifact ? addVersion(artifact, version) : createArtifact('test-mod', version);
+  const into = draft.linkedModId ? (await loadMods()).find((m) => m.id === draft.linkedModId) : undefined;
+  let mod = await modFromDraft(draft, into);
+  const notes: string[] = [];
+  if (!engineRunsModOn(mod, url, exec.engine)) {
+    const here = patternsForPage(url, exec.engine);
+    notes.push(`Note: the draft's @match (${[...mod.matches, ...mod.includeGlobs].join(', ') || 'none'}) does not cover this page, so the saved mod would not run here; tested under ${here.join(', ')} instead.`);
+    mod = { ...mod, matches: here, includeGlobs: [], excludeMatches: [], excludeGlobs: [] };
+  }
+  if (!into) mod = { ...mod, id: reservedId };
+  // The saved copy is registered too, so a reload runs the installed version as well. It cannot be
+  // switched off for one load without touching what every other tab runs, so the model is told.
+  else if (into.enabled && engineRunsModOn(into, url, exec.engine)) {
+    notes.push('Note: the installed version of this mod is enabled here, so a reload runs it too, alongside this test.');
+  }
+  return { mod, linked: !!into, notes };
+}
+
+/**
+ * test_mod: run `code` as the chat's draft would be saved and run, and report what happened.
+ *
+ * Without reload it goes through the same injection as the panel's Try (buildModCode, the mod's own
+ * world), on the page as it is. With reload the engine arms a one-shot run for the tab's next
+ * document (Chrome: a temporary chrome.userScripts registration; Safari: the runner's next claim),
+ * the tab is reloaded, and the browser runs it at the mod's own @run-at. Disarming is in a
+ * `finally`: a run that throws, times out or loses its tab still takes its registration with it.
+ *
+ * Either way the page is then given a moment to settle and asked whether the script's changes are
+ * still there (lib/exec/testrun.ts recorderCheck), because a page that re-renders and puts back
+ * what a mod removed is the second most common way a mod that "worked" fails.
+ */
+async function testModInTab(tabId: number, code: string, reload: boolean, artifact: Artifact | null, signal: AbortSignal): Promise<TestModResult> {
+  const status = exec.status();
+  if (!status.available) throw new Error(status.message);
+  await prepareEngine().catch((e: unknown) => console.warn('[usermods] prepare engine', e));
+  const runId = crypto.randomUUID();
+  const url = await tabUrl(tabId);
+  const found = await testModFor(artifact, code, url, testRunId(runId));
+  const { mod, linked } = found;
+  // The installed-copy note is about a reload; on the open page it is one of "earlier changes".
+  const notes = reload ? found.notes : found.notes.filter((n) => !n.includes('installed version'));
+  const base = { fresh: reload, runAt: mod.runAt, world: mod.world, requires: mod.requires.length, notes };
+  // A body that does not parse would fail inside the injected wrapper with no useful position.
+  const syntax = parseError(code);
+  if (syntax) return { ...base, fresh: false, run: { outcome: { kind: 'threw', error: syntax.message }, logs: [] } };
+
+  let map = { lineOffset: 0, bodyLines: 0 };
+  const compose = (registered: string) => {
+    const c = composeTest(registered, code, runId, exec.reportTransport, mod.world);
+    map = c;
+    return c.code;
+  };
+  const values = linked ? await loadGmValues(mod.id) : {};
+  let run: RunResult;
+  try {
+    if (!reload) {
+      const composed = compose(await exec.buildModCode(mod, values, { tabId, frameId: 0 }));
+      run = await runWrapped(tabId, runId, composed, mod.world, { lineOffset: map.lineOffset, codeLines: map.bodyLines, timeoutMs: 20_000 });
+    } else {
+      run = await runAtLoad(tabId, runId, mod, values, compose, () => map, signal);
+    }
+    let persisted: PersistReport | null | undefined;
+    if (run.outcome.kind === 'ok' && !signal.aborted) persisted = await recheck(tabId, runId, mod.world, signal);
+    return { ...base, run, ...(persisted === undefined ? {} : { persisted }) };
+  } finally {
+    // Values a not-yet-installed draft wrote during the test belong to no mod.
+    if (!linked) await chrome.storage.local.remove(gmValuesKey(mod.id)).catch(() => {});
+  }
+}
+
+/**
+ * Arm, reload, wait for the result, and ALWAYS disarm. The result listener is attached before the
+ * reload, so a document_start script cannot report before anyone is listening.
+ */
+async function runAtLoad(
+  tabId: number,
+  runId: string,
+  mod: Mod,
+  values: Record<string, unknown>,
+  compose: (registered: string) => string,
+  map: () => { lineOffset: number; bodyLines: number },
+  signal: AbortSignal,
+): Promise<RunResult> {
+  const test: TestRun = {
+    id: testRunId(runId),
+    runId,
+    tabId,
+    mod,
+    values,
+    compose,
+    ...(mod.world === 'MAIN' ? { relay: relayCode(runId, exec.reportTransport) } : {}),
+    expiresAt: Date.now() + TEST_RUN_TTL_MS,
+  };
+  const waiting = awaitRunResult(tabId, runId, { timeoutMs: TEST_LOAD_TIMEOUT_MS, navigationEnds: false, mapError: (stack) => mapStack(stack, map().lineOffset, map().bodyLines) });
+  // Stop ends the wait at once; the finally below still disarms.
+  const onAbort = () => waiting.settle({ outcome: { kind: 'injection-failed', reason: 'Stopped.' }, logs: [] });
+  signal.addEventListener('abort', onAbort, { once: true });
+  try {
+    await exec.armTestRun(test);
+    await chrome.tabs.reload(tabId);
+    return await waiting.result;
+  } catch (e) {
+    waiting.settle({ outcome: { kind: 'injection-failed', reason: e instanceof Error ? e.message : String(e) }, logs: [] });
+    return waiting.result;
+  } finally {
+    signal.removeEventListener('abort', onAbort);
+    await exec.disarmTestRun(test).catch((e: unknown) => console.warn('[usermods] disarm test run', e));
+  }
+}
+
+/** Let the page finish loading and settle, then ask whether the script's changes are still there. */
+async function recheck(tabId: number, runId: string, world: Mod['world'], signal: AbortSignal): Promise<PersistReport | null> {
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline && !signal.aborted) {
+    const tab = await chrome.tabs.get(tabId).catch(() => null);
+    if (!tab) return null;
+    if (tab.status === 'complete') break;
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  await new Promise((r) => setTimeout(r, TEST_SETTLE_MS));
+  if (signal.aborted) return null;
+  const r = await executeInTab(tabId, checkCode(recorderKey(runId)), { world, raw: true, timeoutMs: 5_000 }).catch(() => null);
+  if (r?.outcome.kind !== 'ok' || !r.outcome.result) return null;
+  try {
+    const p = JSON.parse(r.outcome.result) as Partial<PersistReport> & { missing?: boolean };
+    if (p.missing || typeof p.changes !== 'number') return null;
+    return { changes: p.changes, undone: Number(p.undone) || 0, examples: Array.isArray(p.examples) ? p.examples.map(String) : [] };
+  } catch {
+    return null;
+  }
 }
 
 // ---------- installing outside userscripts ----------
@@ -2337,12 +2513,46 @@ async function executeInTab(
   }
 
   const runId = crypto.randomUUID();
-  const { wrapped, lineOffset } = wrapForExecution(source, runId, exec.reportTransport);
-  const codeLines = source.split('\n').length;
+  // A page-world script has no chrome.runtime to report through, so it reports over a DOM event
+  // that a relay in the isolated world passes on (lib/exec/testrun.ts). Without this, Try on a
+  // `@grant none` mod ran and then waited out its timeout with nobody able to hear the result.
+  const pageWorld = world === 'MAIN';
+  const { wrapped, lineOffset } = wrapForExecution(source, runId, pageWorld ? 'bridge' : exec.reportTransport);
+  return runWrapped(tabId, runId, pageWorld ? inPageWorld(wrapped, runId) : wrapped, world, { lineOffset, codeLines: source.split('\n').length, timeoutMs });
+}
 
-  // Watching the tab is how a lost result stops looking like a timeout. The wrapper reports over
-  // chrome.runtime.sendMessage; a navigation or unload between the script finishing and that
-  // message flushing drops it silently, and the model used to be told only that 20s had passed.
+/** Inject code already wrapped for `runId` and collect its result. */
+function runWrapped(
+  tabId: number,
+  runId: string,
+  wrapped: string,
+  world: Mod['world'],
+  opts: { lineOffset: number; codeLines: number; timeoutMs: number },
+): Promise<RunResult> {
+  const waiting = awaitRunResult(tabId, runId, { timeoutMs: opts.timeoutMs, navigationEnds: true, mapError: (stack) => mapStack(stack, opts.lineOffset, opts.codeLines) });
+  // An injection that never starts is its own failure, and saying "timed out" for it is a lie.
+  void (async () => {
+    if (world === 'MAIN') await exec.injectOnce(tabId, relayCode(runId, exec.reportTransport), 'USER_SCRIPT');
+    await exec.injectOnce(tabId, wrapped, world);
+  })().catch((e: unknown) => waiting.settle({ outcome: { kind: 'injection-failed', reason: e instanceof Error ? e.message : String(e) }, logs: [] }));
+  return waiting.result;
+}
+
+/**
+ * Wait for the result of run `runId` in `tabId`: the wrapper's report, a timeout, or the tab going
+ * away. `navigationEnds` is for a run on the current document, where a navigation means the report
+ * was lost; test_mod's reload navigates on purpose, so it turns that off.
+ *
+ * Watching the tab is how a lost result stops looking like a timeout. The wrapper reports over
+ * runtime messaging; a navigation or unload between the script finishing and that message flushing
+ * drops it silently, and the model used to be told only that 20s had passed.
+ */
+function awaitRunResult(
+  tabId: number,
+  runId: string,
+  opts: { timeoutMs: number; navigationEnds: boolean; mapError: (stack: string) => string },
+): { result: Promise<RunResult>; settle: (r: RunResult) => void } {
+  let settle: (r: RunResult) => void = () => {};
   const result = new Promise<RunResult>((resolve) => {
     let settled = false;
     const finish = (r: RunResult) => {
@@ -2354,8 +2564,9 @@ async function executeInTab(
       chrome.tabs.onRemoved.removeListener(onRemoved);
       resolve(r);
     };
+    settle = finish;
 
-    const timer = setTimeout(() => finish({ outcome: { kind: 'timeout', seconds: timeoutMs / 1000 }, logs: [] }), timeoutMs);
+    const timer = setTimeout(() => finish({ outcome: { kind: 'timeout', seconds: opts.timeoutMs / 1000 }, logs: [] }), opts.timeoutMs);
 
     const listener = (msg: { type?: string; runId?: string } & Record<string, unknown>) => {
       if (msg?.type !== 'usermods:run-result' || msg.runId !== runId) return;
@@ -2371,14 +2582,13 @@ async function executeInTab(
           logs,
         });
       } else {
-        const stack = String(msg.error ?? '');
-        finish({ outcome: { kind: 'threw', error: mapStack(stack, lineOffset, codeLines) }, logs });
+        finish({ outcome: { kind: 'threw', error: opts.mapError(String(msg.error ?? '')) }, logs });
       }
     };
     exec.addResultListener(listener);
 
     const onUpdated = (id: number, change: chrome.tabs.OnUpdatedInfo, tab: chrome.tabs.Tab) => {
-      if (id !== tabId || change.status !== 'loading') return;
+      if (!opts.navigationEnds || id !== tabId || change.status !== 'loading') return;
       finish({ outcome: { kind: 'navigated', url: change.url ?? tab.url ?? 'a new page' }, logs: [] });
     };
     chrome.tabs.onUpdated.addListener(onUpdated);
@@ -2387,14 +2597,8 @@ async function executeInTab(
       if (id === tabId) finish({ outcome: { kind: 'navigated', url: 'a closed tab' }, logs: [] });
     };
     chrome.tabs.onRemoved.addListener(onRemoved);
-
-    // An injection that never starts is its own failure, and saying "timed out" for it is a lie.
-    exec
-      .injectOnce(tabId, wrapped, world)
-      .catch((e: unknown) => finish({ outcome: { kind: 'injection-failed', reason: e instanceof Error ? e.message : String(e) }, logs: [] }));
   });
-
-  return result;
+  return { result, settle };
 }
 
 /** The `{ok, result, logs, error}` shape `mods.try` and the panel have always spoken. */

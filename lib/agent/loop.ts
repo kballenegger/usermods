@@ -10,8 +10,9 @@ import { DEFAULT_CONTEXT_BUDGET, type AgentEventBody, type ModProposal, type Msg
 import { MAX_ITERATIONS, countReads, readBudgetNudge, wrapUpNudge } from './budget.ts';
 import { compact, estimateTokens, needsCompaction } from './compact.ts';
 import { SYSTEM_PROMPT } from './prompt.ts';
-import { checkProposal, type ProposalContext } from './propose.ts';
+import { checkProposal, testedAs, testedNote, type ProposalContext } from './propose.ts';
 import { isContextLengthError, withRetry, type RetryDeps, type RetryPolicy } from './retry.ts';
+import { describeTest, renderTestResult, sourceKey, type TestModResult } from './testmod.ts';
 import { toolsFor } from './tools.ts';
 import {
   EMPTY_TALLY,
@@ -62,6 +63,13 @@ export interface AgentEnv {
    * The signal is the run's own: Stop must end a 15s wait immediately rather than at its timeout.
    */
   wait(spec: WaitSpec, signal: AbortSignal): Promise<WaitOutcome>;
+  /**
+   * Run a script body as the chat's draft would be saved and run (test_mod): its header, world,
+   * GM shim and @require bodies, optionally on a fresh load at its own @run-at. The background owns
+   * the draft and the engine, so it owns this; a loop without one (the unit tests' default fake)
+   * reports the tool unavailable.
+   */
+  testMod?(code: string, reload: boolean, signal: AbortSignal): Promise<TestModResult>;
 }
 
 export interface AgentInput {
@@ -277,10 +285,35 @@ function testedSinceProposal(messages: Msg[]): boolean {
       const p = m.content[j]!;
       if (p.type !== 'tool_call') continue;
       if (p.name === 'propose_mod') return false;
-      if (p.name === 'run_script' && !failed.has(p.id)) return true;
+      if ((p.name === 'run_script' || p.name === 'test_mod') && !failed.has(p.id)) return true;
     }
   }
   return false;
+}
+
+/**
+ * The last test_mod since the last proposal, rebuilt from the history for a resumed run, for the
+ * same reason as testedSinceProposal: the flag lived in the run that died. `fresh` is read from
+ * what was asked (reload) and `ok` from whether the result was an error, which is what the live
+ * run records too.
+ */
+function lastTestSince(messages: Msg[]): ProposalContext['lastTest'] {
+  const failed = new Set<string>();
+  for (const m of messages) for (const p of m.content) if (p.type === 'tool_result' && p.isError) failed.add(p.toolCallId);
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i]!;
+    if (m.role === 'user' && !m.content.some((p) => p.type === 'tool_result')) return undefined;
+    if (m.role !== 'assistant') continue;
+    for (let j = m.content.length - 1; j >= 0; j--) {
+      const p = m.content[j]!;
+      if (p.type !== 'tool_call') continue;
+      if (p.name === 'propose_mod') return undefined;
+      if (p.name === 'test_mod' && typeof p.input.code === 'string') {
+        return { key: sourceKey(p.input.code), fresh: p.input.reload === true, ok: !failed.has(p.id) };
+      }
+    }
+  }
+  return undefined;
 }
 
 export async function runAgent(input: AgentInput): Promise<RunOutcome> {
@@ -366,7 +399,7 @@ export async function runAgent(input: AgentInput): Promise<RunOutcome> {
     // by the time the history is stored a tool result is provider-neutral text.
     const ctx: ProposalContext = input.turn
       ? { testedSinceProposal: false, userText: input.turn.text }
-      : { testedSinceProposal: testedSinceProposal(messages), userText: lastUserText(messages) };
+      : { testedSinceProposal: testedSinceProposal(messages), userText: lastUserText(messages), lastTest: lastTestSince(messages) };
     // How much this turn has waited (lib/agent/wait.ts). Waiting is neither a read nor an act, so
     // it has its own counter: it must not trip the read budget (polling was the problem wait_for
     // exists to remove, and charging for the fix would push the model straight back to polling),
@@ -522,7 +555,10 @@ export async function runAgent(input: AgentInput): Promise<RunOutcome> {
       // history keeps its assistant/tool-result pairing and no orphan turn appears in the panel.
       const before = reads;
       const names = calls.map((c) => c.name);
-      reads = countReads(reads, names);
+      // test_mod acts exactly as run_script does for the read budget: it runs the script on the
+      // page. It is folded in here rather than added to budget.ts's ACT_TOOLS only to keep this
+      // change out of that file; the effect is the same.
+      reads = countReads(reads, names.map((n) => (n === 'test_mod' ? 'run_script' : n)));
       const budget = readBudgetNudge(reads, before);
       if (budget) results.push({ type: 'text', text: budget });
       // The waiting guard. A turn that waits, acts, waits, acts is using the tool as intended and
@@ -585,6 +621,7 @@ function describeCall(name: string, input: Record<string, unknown>): string | un
   // "opening a mod" rather than the raw id: the user is watching this line to see what the agent is
   // doing, and a uuid tells them nothing they can act on.
   if (name === 'open_mod') return 'opening an installed mod';
+  if (name === 'test_mod') return describeTest(input);
   if (name === 'run_script' && typeof input.description === 'string' && input.description.trim()) return input.description.trim();
   if ((name === 'find_elements' || name === 'get_styles' || name === 'get_page') && typeof input.selector === 'string' && input.selector.trim()) {
     return input.selector.trim();
@@ -686,6 +723,19 @@ async function executeTool(
         const isError = outcome.failure ? true : navigatedAsExpected ? false : rendered.isError;
         return { content: [{ type: 'text', text: combined }], isError: isError || undefined, waitedMs };
       }
+      case 'test_mod': {
+        if (typeof input.code !== 'string' || !input.code.trim()) return err('code is required: the script body, as you will pass it to propose_mod.');
+        if (!env.testMod) return err('test_mod is not available in this session; test with run_script.');
+        const reload = input.reload === true;
+        const r = await env.testMod(input.code, reload, signal);
+        const rendered = renderTestResult(r);
+        const ok = r.run.outcome.kind === 'ok';
+        // A successful test_mod is a successful run for the old check too, so nothing that used to
+        // pass the gate stops passing it. What it adds is WHICH code ran and how, for the card.
+        if (ok) ctx.testedSinceProposal = true;
+        ctx.lastTest = { key: sourceKey(input.code), fresh: r.fresh, ok };
+        return rendered.isError ? err(rendered.text) : text(rendered.text);
+      }
       case 'wait_for': {
         const parsed = parseWaitInput(input);
         // Invalid input is the one thing here that IS an error: the model wrote a condition that
@@ -720,28 +770,32 @@ async function executeTool(
         const untestedReason = typeof p.untested_reason === 'string' && p.untested_reason.trim() ? p.untested_reason.trim() : undefined;
         const problem = checkProposal({ code: p.code, matches: p.matches, untestedReason }, ctx);
         if (problem) return err(problem);
+        const tested = testedAs(ctx, p.code);
+        const note = testedNote(ctx, p.code);
         const proposal: ModProposal = {
           name: p.name,
           description: p.description ?? '',
           matches: p.matches,
           code: p.code,
           ...(untestedReason ? { untestedReason } : {}),
+          ...(tested ? { tested } : {}),
         };
         // A fresh proposal starts a fresh testing obligation: a revision written after this one has
         // to be run before it can be proposed in turn. This is unchanged by drafts: an EDIT to the
         // draft is still a proposal, and still has to have been run.
         ctx.testedSinceProposal = false;
+        ctx.lastTest = undefined;
         // The draft is versioned before the card is shown, so the panel never renders a proposal
         // whose version does not exist yet. A storage failure here is not the user's problem — the
         // proposal is still valid and still worth showing — so it degrades to an unversioned card.
         const version = onProposal ? await onProposal(proposal).catch(() => null) : null;
         emit({ type: 'proposal', proposal });
         if (version != null) emit({ type: 'artifact', version });
-        return text(
+        const shown =
           version == null
-            ? 'The mod has been shown to the user with Try and Save buttons. Wait for their feedback.'
-            : `The draft mod is now v${version} in the user's artifact panel, where they can try, save or roll it back. Wait for their feedback.`,
-        );
+            ? 'The mod has been shown to the user with Try and Save buttons.'
+            : `The draft mod is now v${version} in the user's artifact panel, where they can try, save or roll it back.`;
+        return text(`${shown}${note ? ` ${note}` : ''} Wait for their feedback.`);
       }
       default:
         return err(`Unknown tool: ${name}`);

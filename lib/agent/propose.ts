@@ -8,12 +8,45 @@
 // Pure: no chrome APIs, no DOM. Tested under node.
 
 import { parseError } from '../runscript.ts';
+import { sourceKey } from './testmod.ts';
 
 export interface ProposalContext {
-  /** Whether a run_script has completed successfully since the last accepted proposal. */
+  /** Whether a run_script or test_mod has completed successfully since the last accepted proposal. */
   testedSinceProposal: boolean;
   /** The user's message for this turn, used to decide whether a site-wide match was asked for. */
   userText: string;
+  /** The last test_mod since the last proposal: which code it ran (sourceKey), how, and whether it ran. */
+  lastTest?: { key: string; fresh: boolean; ok: boolean };
+}
+
+/**
+ * How the proposed code was tested, as the card shows it. `undefined` is "not tested": the gate
+ * has already refused it unless the model gave an untested_reason, which the card shows instead.
+ *
+ *   fresh-load  test_mod with reload ran THIS code as the saved mod, on a clean page load
+ *   open-page   something ran on the already-loaded page: test_mod without reload, a test_mod of
+ *               different code, or run_script — evidence, but not that this mod works on a visit
+ */
+export type TestedAs = 'fresh-load' | 'open-page';
+
+export function testedAs(ctx: ProposalContext, code: string): TestedAs | undefined {
+  const t = ctx.lastTest;
+  if (t?.ok && t.key === sourceKey(code)) return t.fresh ? 'fresh-load' : 'open-page';
+  return ctx.testedSinceProposal ? 'open-page' : undefined;
+}
+
+/**
+ * The sentence the model gets back about testing, so it knows what the user was told. Stated, not
+ * demanded: a model told to go back and test tends to loop, and a mod whose target only appears
+ * after interaction cannot be tested on load at all. The card telling the truth is the point.
+ */
+export function testedNote(ctx: ProposalContext, code: string): string {
+  const state = testedAs(ctx, code);
+  if (state === 'fresh-load') return 'The card says it was tested as the saved mod on a fresh load.';
+  if (state !== 'open-page') return '';
+  const t = ctx.lastTest;
+  const why = !t ? '' : t.key !== sourceKey(code) ? ' (this code is not what test_mod last ran)' : !t.ok ? ' (test_mod failed on this code)' : '';
+  return `The card says it was tested on the open page only, not as the saved mod on a fresh load${why}.`;
 }
 
 export interface ProposalCandidate {
@@ -55,7 +88,7 @@ const BANNED: Array<{ re: RegExp; what: string }> = [
  */
 export function checkProposal(candidate: ProposalCandidate, ctx: ProposalContext): string | null {
   if (!ctx.testedSinceProposal && !candidate.untestedReason) {
-    return 'Test the script with run_script before proposing it. Run it once on this page and confirm it does what you expect; if you genuinely cannot test it here, call propose_mod again with untested_reason explaining why, and the user will be told it is untested.';
+    return 'Test the script with test_mod before proposing it, and confirm it does what you expect; if you genuinely cannot test it here, call propose_mod again with untested_reason explaining why, and the user will be told it is untested.';
   }
 
   const syntax = parseError(candidate.code);

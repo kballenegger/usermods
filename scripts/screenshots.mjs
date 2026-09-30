@@ -2052,8 +2052,8 @@ async function guardrails() {
       fail('the read-budget nudge reached the mock without its instruction');
     }
 
-    // FIX 6: the first propose_mod had no run_script behind it, so the loop refused it and said so.
-    if (!/Test the script with run_script before proposing it/.test(sent)) {
+    // FIX 6: the first propose_mod had no test behind it, so the loop refused it and said so.
+    if (!/Test the script with test_mod before proposing it/.test(sent)) {
       fail('propose_mod without a test was not refused, or the refusal never reached the mock');
     }
 

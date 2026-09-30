@@ -292,10 +292,15 @@ export interface ModProposal {
   /** Script body without the userscript header. */
   code: string;
   /**
-   * Set when the model proposed without a successful run_script and said why. Shown on the
+   * Set when the model proposed without a successful run_script or test_mod and said why. Shown on the
    * proposal card so the user knows this one was never run on a real page.
    */
   untestedReason?: string;
+  /**
+   * How this exact code was tested (lib/agent/propose.ts testedAs): as the saved mod on a fresh
+   * load, or only on the page as it already was. Absent when untested. Shown on the card.
+   */
+  tested?: 'fresh-load' | 'open-page';
 }
 
 // Events streamed from the background agent loop to the side panel over a Port.

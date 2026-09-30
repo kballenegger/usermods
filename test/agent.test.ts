@@ -99,7 +99,7 @@ test('a tested, parseable, narrow proposal is accepted', () => {
 
 test('proposing without running anything is refused, and says what to do', () => {
   const msg = checkProposal(good, untested);
-  assert.match(msg ?? '', /^Test the script with run_script before proposing it\./);
+  assert.match(msg ?? '', /^Test the script with test_mod before proposing it,/);
   assert.match(msg ?? '', /untested_reason/);
 });
 
