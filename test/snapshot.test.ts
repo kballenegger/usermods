@@ -156,12 +156,53 @@ test('a collapsed element says how big it is, what its children look like, and h
   assert.match(out, /<section class="a">…\d+ nodes, 50× div\.row, "Row 0"<\/section>/);
 });
 
-test('a root whose children cannot be listed at all falls back to the old tail cut', () => {
+test('children that cannot all be listed show the first ones and count the rest', () => {
   // Five hundred children with nothing in common, so there is no run to fold either.
   const kids = Array.from({ length: 500 }, (_, i) => `<p class="c${i}">${i}</p>`).join('');
   const out = renderTree(tree(`<html><body>${kids}</body></html>`), 400);
-  assert.ok(out.length <= 400 + 80);
-  assert.match(out, /truncated at 400 chars/);
+  assert.ok(out.length <= 400, `within budget (${out.length})`);
+  assert.match(out, /^<body><p class="c0">0<\/p><p class="c1">1<\/p>/);
+  assert.match(out, /<… cut: \d+ more elements\/><\/body>/);
+});
+
+test('one big region of unlike children is opened, not collapsed to a line that get_page cannot open', () => {
+  // The old failure: the region collapsed to "<div>…5000 nodes</div>" inside a 20,000 budget, and
+  // get_page on that div collapsed it the same way again, so its content was unreadable.
+  const kids = Array.from({ length: 5000 }, (_, i) => `<p class="c${i}">Paragraph ${i}</p>`).join('');
+  const t = tree(`<html><body><header id="top">Site</header><div>${kids}</div></body></html>`);
+  const out = renderTree(t, 20_000);
+  assert.ok(out.length <= 20_000);
+  assert.ok(out.length > 15_000, `the budget is used, not wasted (${out.length})`);
+  assert.match(out, /<header id="top">Site<\/header><div><p class="c0">Paragraph 0<\/p>/);
+  assert.match(out, /<… cut: \d+ more elements\/><\/div>/);
+});
+
+test('a long run of similar items fills the budget rather than folding to one example', () => {
+  const items = Array.from({ length: 5000 }, (_, i) => `<li class="item">Item ${i}</li>`).join('');
+  const out = renderTree(tree(`<html><body><ul>${items}</ul></body></html>`), 20_000);
+  assert.ok(out.length <= 20_000);
+  assert.ok(out.length > 10_000, `most of the budget holds items (${out.length})`);
+  assert.match(out, /<li class="item">Item 100<\/li>/);
+  assert.match(out, /<… \d+ more li\.item\/>/);
+});
+
+test('an enormous flat page renders in well under a second', () => {
+  // Grouping siblings used to copy the group array per child: quadratic, about 3s at this size.
+  const items = Array.from({ length: 50_000 }, (_, i) => `<li class="item">Item ${i}</li>`).join('');
+  const t = tree(`<html><body><ul>${items}</ul></body></html>`);
+  const started = performance.now();
+  const out = renderTree(t, 20_000);
+  const ms = performance.now() - started;
+  assert.ok(ms < 1000, `took ${Math.round(ms)}ms`);
+  // And the run still fills the budget: at this size the fold used to fall to its tight form, one
+  // example and "<… 49999 more li.item/>", 237 characters out of 20,000.
+  assert.ok(out.length > 10_000 && out.length <= 20_000, `length ${out.length}`);
+});
+
+test('a budget too small for anything else still returns the start of the page', () => {
+  const out = renderTree(tree(`<html><body><main>${'<p class="x">hello world</p>'.repeat(50)}</main></body></html>`), 100);
+  assert.match(out, /^<body><main>/);
+  assert.match(out, /truncated at 100 chars/);
 });
 
 // ---------- text search ----------

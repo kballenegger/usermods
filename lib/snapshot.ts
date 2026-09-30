@@ -243,25 +243,34 @@ function renderFull(n: SNode, out: string[]): void {
 }
 
 /**
- * Which children to print, and the fold markers standing in for the rest. Null when even the
- * tightest folding does not fit `avail`, in which case the parent prints this node's placeholder.
+ * Which children to print, and the fold markers standing in for the rest. Null when not even a
+ * cut list fits `avail`, in which case the parent prints this node's placeholder.
  */
 function planKids(n: SNode, avail: number): (string | SNode)[] | null {
   const elems = n.kids.filter((k): k is SNode => typeof k !== 'string');
   const fixed = n.kids.reduce((s, k) => s + (typeof k === 'string' ? k.length : 0), 0);
   const weight = (k: SNode) => shareWeight(k);
   const totalW = elems.reduce((s, k) => s + weight(k), 0) || 1;
+  // Pushed in place: rebuilding the array per child was quadratic, seconds on a 50,000-item list.
   const groups = new Map<string, SNode[]>();
-  for (const k of elems) groups.set(k.sig, [...(groups.get(k.sig) ?? []), k]);
+  for (const k of elems) {
+    const g = groups.get(k.sig);
+    if (g) g.push(k);
+    else groups.set(k.sig, [k]);
+  }
 
-  const attempt = (tight: boolean): (string | SNode)[] | null => {
+  // `scale` shrinks each run's share of the budget. The share is computed on whole sizes and
+  // leaves no room for the fold marker or the other children's placeholders, so a run that
+  // exactly fills its share does not fit; rather than dropping straight to one example (the tight
+  // attempt), try smaller shares first.
+  const attempt = (tight: boolean, scale = 1): (string | SNode)[] | null => {
     const dropped = new Set<SNode>();
     const markerAt = new Map<SNode, string>();
     for (const [sig, members] of groups) {
       if (members.length < (tight ? FOLD_KEEP : FOLD_MIN)) continue;
       let keep = tight ? 1 : FOLD_KEEP;
       if (!tight) {
-        const share = ((avail - fixed) * members.reduce((s, k) => s + weight(k), 0)) / totalW;
+        const share = (scale * (avail - fixed) * members.reduce((s, k) => s + weight(k), 0)) / totalW;
         let used = 0;
         let fit = 0;
         for (const m of members) {
@@ -292,7 +301,43 @@ function planKids(n: SNode, avail: number): (string | SNode)[] | null {
     }
     return min <= avail ? plan : null;
   };
-  return attempt(false) ?? attempt(true);
+  for (const scale of [1, 0.8, 0.6, 0.4, 0.2, 0]) {
+    const plan = attempt(false, scale);
+    if (plan) return plan;
+  }
+  return attempt(true) ?? cutPlan(n, avail);
+}
+
+/**
+ * The last resort for one element: its children in order, as many as fit (each at least as its
+ * placeholder), then one marker counting the elements left out. Used when the children cannot all
+ * be listed even as placeholders and folded, e.g. thousands of unlike siblings. Without it the
+ * whole element collapsed to one placeholder, and opening it with get_page(selector) collapsed it
+ * again, so its content could not be read at all.
+ */
+function cutPlan(n: SNode, avail: number): (string | SNode)[] | null {
+  const marker = (rest: number) => `<… cut: ${rest} more elements/>`;
+  const elemsAfter: number[] = new Array(n.kids.length + 1).fill(0);
+  for (let i = n.kids.length - 1; i >= 0; i--) elemsAfter[i] = elemsAfter[i + 1]! + (typeof n.kids[i] === 'string' ? 0 : 1);
+  const plan: (string | SNode)[] = [];
+  let min = 0;
+  let i = 0;
+  for (; i < n.kids.length; i++) {
+    const k = n.kids[i]!;
+    const cost = typeof k === 'string' ? k.length : minSize(k);
+    const tail = elemsAfter[i + 1] ? marker(elemsAfter[i + 1]!).length : 0;
+    if (min + cost + tail > avail) break;
+    plan.push(k);
+    min += cost;
+  }
+  // Nothing kept: the element's own placeholder says more ("…N nodes, 50× div.row, …").
+  if (!plan.some((k) => typeof k !== 'string')) return null;
+  if (i < n.kids.length && elemsAfter[i]) {
+    const m = marker(elemsAfter[i]!);
+    if (min + m.length > avail) return null;
+    plan.push(m);
+  }
+  return plan;
 }
 
 /** Render `n` in at most `budget` characters, which is never less than minSize(n). */
