@@ -7,7 +7,17 @@
 //   npm test
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { formatDomEffect, mapStack, parseError, prepareRunScript, renderRunResult } from '../lib/runscript.ts';
+import {
+  describeCallbackError,
+  formatDomEffect,
+  mapStack,
+  mergeLateErrors,
+  parseError,
+  prepareRunScript,
+  renderLateErrors,
+  renderRunResult,
+  type RunSource,
+} from '../lib/runscript.ts';
 
 /** The transformed code, or the failure message, as one string — convenient for assertions. */
 function prep(code: string): string {
@@ -197,4 +207,122 @@ test('a thrown stack is trimmed to the user code frames and its lines are mapped
 
 test('a stack with no recognizable frames is returned as-is', () => {
   assert.equal(mapStack('Error: boom', 14, 5), 'Error: boom');
+});
+
+// ---------- naming what changed ----------
+
+test('the DOM summary names the nodes it counted, most frequent first, collapsing repeats', () => {
+  const text = formatDomEffect({
+    added: 1,
+    removed: 2,
+    attributes: 2,
+    targets: {
+      added: [['div.modal', 1]],
+      removed: [['div.modal-backdrop', 1], ['div#newsletter', 1]],
+      attributes: [['body', ['class', 'style'], 2]],
+    },
+  });
+  assert.equal(text, '2 removed (div.modal-backdrop, div#newsletter), 1 added (div.modal), 2 attributes changed (body[class,style])');
+  const many = formatDomEffect({
+    added: 0,
+    removed: 60,
+    attributes: 0,
+    targets: { added: [], removed: [['a', 1], ['li.ad', 40], ['b', 1], ['c', 1], ['d', 1], ['e', 1], ['f', 15]], attributes: [] },
+    // 60 nodes, 7 names: the top five cover 58 of them.
+  });
+  assert.equal(many, '60 removed (li.ad ×40, f ×15, a, b, c, +2 more), 0 added, 0 attributes changed');
+});
+
+test('+N more stays true when the page stopped tallying names', () => {
+  // 20 names tallied, but 500 nodes removed: the rest are counted and not named.
+  const removed = Array.from({ length: 20 }, (_, i) => [`div.n${i}`, 1] as [string, number]);
+  const text = formatDomEffect({ added: 0, removed: 500, attributes: 0, targets: { added: [], removed, attributes: [] } });
+  assert.equal(text, '500 removed (div.n0, div.n1, div.n2, div.n3, div.n4, +495 more), 0 added, 0 attributes changed');
+});
+
+test('the named summary adds nothing when nothing changed', () => {
+  const r = renderRunResult({ outcome: { kind: 'ok', returnedValue: true, result: '3', dom: { added: 0, removed: 0, attributes: 0 } }, logs: [], callbackErrors: [] });
+  assert.equal(r.text, 'Result: 3');
+});
+
+// ---------- callback errors ----------
+
+const SRC: RunSource = { sourceName: 'usermods-run-abc.js', lineOffset: 14, codeLines: 20 };
+
+test('a callback error is described with the line the model wrote', () => {
+  const chrome = describeCallbackError(
+    { message: 'TypeError: x is null', stack: 'TypeError: x is null\n    at MutationObserver.<anonymous> (usermods-run-abc.js:26:9)', count: 3 },
+    SRC,
+  );
+  assert.deepEqual(chrome, { text: 'TypeError: x is null (line 12)', count: 3 });
+  // Safari's frame format, and a wrapper frame (outside the model's lines) skipped for the next one.
+  const safari = describeCallbackError({ message: 'Error: y', stack: '@usermods-run-abc.js:90:1\nf@usermods-run-abc.js:16:4' }, SRC);
+  assert.deepEqual(safari, { text: 'Error: y (line 2)', count: 1 });
+  // No usable frame: the message alone, never a guessed line.
+  assert.deepEqual(describeCallbackError({ message: 'Error: z', stack: 'Error: z\n    at other.js:3:1' }, SRC), { text: 'Error: z', count: 1 });
+  assert.deepEqual(describeCallbackError({}, SRC), { text: 'Uncaught error', count: 1 });
+});
+
+test('callback errors from the run itself are listed under its result', () => {
+  const r = renderRunResult({
+    outcome: { kind: 'ok', returnedValue: true, result: '"armed"' },
+    logs: [],
+    callbackErrors: [
+      { text: 'TypeError: x is null (line 12)', count: 40 },
+      { text: 'Error: a', count: 1 },
+      { text: 'Error: b', count: 1 },
+      { text: 'Error: c', count: 1 },
+    ],
+  });
+  assert.equal(r.text, 'Result: "armed"\nUncaught in its callbacks: TypeError: x is null (line 12) ×40; Error: a; Error: b; +1 more');
+  assert.equal(r.isError, false);
+});
+
+test('dropped console lines are counted', () => {
+  const logs = Array.from({ length: 50 }, (_, i) => `l${i}`);
+  const r = renderRunResult({ outcome: { kind: 'ok', returnedValue: false }, logs, logCount: 312 });
+  assert.match(r.text, /\nConsole \(last 50 of 312 lines\):\nl0\n/);
+  const few = renderRunResult({ outcome: { kind: 'ok', returnedValue: false }, logs: ['a'], logCount: 1 });
+  assert.match(few.text, /\nConsole:\na$/);
+});
+
+// ---------- late errors ----------
+
+test('late errors merge by run and message, each report adding to the count, capped at five', () => {
+  let buf = mergeLateErrors([], 'r1', [{ text: 'TypeError: x (line 2)', count: 1 }]);
+  buf = mergeLateErrors(buf, 'r1', [{ text: 'TypeError: x (line 2)', count: 6 }]);
+  assert.deepEqual(buf, [{ runId: 'r1', text: 'TypeError: x (line 2)', count: 7 }]);
+  // The same text from another run is another error: its line is in other code.
+  buf = mergeLateErrors(buf, 'r2', [{ text: 'TypeError: x (line 2)', count: 1 }]);
+  assert.equal(buf.length, 2);
+  for (let i = 0; i < 10; i++) buf = mergeLateErrors(buf, 'r2', [{ text: `E${i}`, count: 1 }]);
+  assert.equal(buf.length, 5);
+});
+
+test('the late line names the latest run\'s errors plainly and an earlier run\'s as such', () => {
+  assert.equal(renderLateErrors([], 'r1'), null);
+  assert.equal(
+    renderLateErrors([{ runId: 'r2', text: 'TypeError: x is null (line 12)', count: 1 }], 'r2'),
+    '[Uncaught in your run_script callbacks since the last result: TypeError: x is null (line 12)]',
+  );
+  assert.equal(
+    renderLateErrors(
+      [
+        { runId: 'r2', text: 'TypeError: x is null (line 12)', count: 3 },
+        { runId: 'r1', text: 'Error: old (line 4)', count: 1 },
+      ],
+      'r2',
+    ),
+    '[Uncaught in your run_script callbacks since the last result: TypeError: x is null (line 12) ×3; Error: old (line 4) [earlier run]]',
+  );
+});
+
+test('a repeat after the buffer was handed to a tool result counts only what happened since', () => {
+  // The page reports deltas, so once takeLateErrors has emptied the buffer the next line says how
+  // many times it threw since the model last heard, not since the run.
+  let buf = mergeLateErrors([], 'r1', [{ text: 'TypeError: x (line 2)', count: 40 }]);
+  assert.match(renderLateErrors(buf, 'r1')!, /×40\]$/);
+  buf = [];
+  buf = mergeLateErrors(buf, 'r1', [{ text: 'TypeError: x (line 2)', count: 3 }]);
+  assert.match(renderLateErrors(buf, 'r1')!, /line 2\) ×3\]$/);
 });

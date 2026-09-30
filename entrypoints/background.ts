@@ -14,7 +14,7 @@ import { createShareController } from '@/lib/sharecontroller';
 import { createUpdateController } from '@/lib/updatecontroller';
 import { withRetry } from '@/lib/agent/retry';
 import { resyncPlan } from '@/lib/resync';
-import { mapStack, prepareRunScript, renderRunResult, type RunResult } from '@/lib/runscript';
+import { describeCallbackError, mapStack, mergeLateErrors, prepareRunScript, renderLateErrors, renderRunResult, type DomEffect, type LateError, type RawCallbackError, type RunResult, type RunSource } from '@/lib/runscript';
 import { shouldUpdate } from '@/lib/version';
 import { loadMods, modFromProposal, modFromSource, parseHeader, previewFromSource, upsertMod, deleteMod, saveMods } from '@/lib/mods';
 import { appendTurn, archiveChat, bulkChats, countTurns, createChat, deleteChat, getChat, hostFromUrl, isArchived, listChats, loadItems, loadMessages, markTitleRefreshed, renameChat, saveItems, saveMessages, setChatArtifact, setChatModel, setChatThinking, setModelTitle, touchChat } from '@/lib/chats';
@@ -2337,8 +2337,13 @@ async function executeInTab(
   }
 
   const runId = crypto.randomUUID();
-  const { wrapped, lineOffset } = wrapForExecution(source, runId, exec.reportTransport);
+  const { wrapped, lineOffset, sourceName } = wrapForExecution(source, runId, exec.reportTransport);
   const codeLines = source.split('\n').length;
+  const src: RunSource = { sourceName, lineOffset, codeLines };
+  const describe = (list: unknown) => (Array.isArray(list) ? list.map((e: RawCallbackError) => describeCallbackError(e, src)) : []);
+  // Only the agent's own runs are followed after they report: a Try from the panel is the user's,
+  // and its errors surfacing in the model's next tool result would read as the model's doing.
+  if (!raw) trackLateErrors(tabId, runId, src);
 
   // Watching the tab is how a lost result stops looking like a timeout. The wrapper reports over
   // chrome.runtime.sendMessage; a navigation or unload between the script finishing and that
@@ -2358,21 +2363,28 @@ async function executeInTab(
     const timer = setTimeout(() => finish({ outcome: { kind: 'timeout', seconds: timeoutMs / 1000 }, logs: [] }), timeoutMs);
 
     const listener = (msg: { type?: string; runId?: string } & Record<string, unknown>) => {
-      if (msg?.type !== 'usermods:run-result' || msg.runId !== runId) return;
+      if (msg?.type !== 'usermods:run-result' || msg.runId !== runId || msg.late) return;
       const logs = (msg.logs as string[]) ?? [];
+      const extra = {
+        ...(typeof msg.logCount === 'number' ? { logCount: msg.logCount } : {}),
+        callbackErrors: describe(msg.callbackErrors),
+      };
       if (msg.ok) {
         finish({
           outcome: {
             kind: 'ok',
             returnedValue: !!msg.returnedValue,
             result: msg.result as string | undefined,
-            dom: msg.dom as { added: number; removed: number; attributes: number } | undefined,
+            dom: msg.dom as DomEffect | undefined,
           },
           logs,
+          ...extra,
         });
       } else {
-        const stack = String(msg.error ?? '');
-        finish({ outcome: { kind: 'threw', error: mapStack(stack, lineOffset, codeLines) }, logs });
+        // The run's frames name its sourceURL; put back the <anonymous> they always said, so a
+        // thrown error reads exactly as it did before the wrapper named its source.
+        const stack = String(msg.error ?? '').split(sourceName).join('<anonymous>');
+        finish({ outcome: { kind: 'threw', error: mapStack(stack, lineOffset, codeLines) }, logs, ...extra });
       }
     };
     exec.addResultListener(listener);
@@ -2395,6 +2407,66 @@ async function executeInTab(
   });
 
   return result;
+}
+
+// ---------- late errors from run_script callbacks ----------
+//
+// A run reports when its code returns, but the code a mod is told to write (an observer, a timer, a
+// listener) does its work later, and an error thrown there used to be lost. The wrapper keeps
+// listening after it reports (lib/exec/wrap.ts __catchLate) and sends each new error back tagged
+// with its runId; the background holds them per tab and the loop prepends them to the next tool
+// result (takeLateErrors), so the model hears about them without a tool of its own to ask with.
+//
+// All of this lives in the worker's memory. A worker that sleeps between two tool calls loses the
+// buffer, and the report that would have woken it is dropped because this listener is registered
+// on first use rather than at startup. That costs a late error nobody sees, which is what happened
+// before; it never shows one that did not happen.
+
+/** Runs whose late errors are wanted, newest last. Bounded, oldest forgotten first. */
+const lateRuns = new Map<string, RunSource & { tabId: number }>();
+const LATE_RUNS_KEPT = 30;
+const lateByTab = new Map<number, LateError[]>();
+const latestRunByTab = new Map<number, string>();
+let lateWired = false;
+
+function trackLateErrors(tabId: number, runId: string, src: RunSource): void {
+  wireLateErrors();
+  lateRuns.set(runId, { ...src, tabId });
+  latestRunByTab.set(tabId, runId);
+  while (lateRuns.size > LATE_RUNS_KEPT) lateRuns.delete(lateRuns.keys().next().value!);
+}
+
+function wireLateErrors(): void {
+  if (lateWired) return;
+  lateWired = true;
+  exec.addResultListener((msg) => {
+    if (!msg.late) return;
+    const run = lateRuns.get(msg.runId);
+    if (!run || !Array.isArray(msg.errors)) return;
+    const described = (msg.errors as RawCallbackError[]).map((e) => describeCallbackError(e, run));
+    lateByTab.set(run.tabId, mergeLateErrors(lateByTab.get(run.tabId) ?? [], msg.runId, described));
+  });
+  // What was buffered before a navigation was about a page that is gone, so it is dropped. The runs
+  // themselves stay followed: Chrome fires 'loading' for a history.pushState too (seen in a real
+  // browser), and there the script's observers live on and a route change is exactly when they
+  // start to throw. After a real navigation their listeners are gone with the document, so keeping
+  // them costs nothing, and lateRuns is bounded anyway. A closed tab is forgotten entirely.
+  chrome.tabs.onUpdated.addListener((tabId, change) => {
+    if (change.status === 'loading') lateByTab.delete(tabId);
+  });
+  chrome.tabs.onRemoved.addListener((tabId) => {
+    lateByTab.delete(tabId);
+    latestRunByTab.delete(tabId);
+    for (const [id, run] of lateRuns) if (run.tabId === tabId) lateRuns.delete(id);
+  });
+}
+
+/** The late-error line for a tab's next tool result, once; null when there is none. */
+function takeLateErrors(tabId: number): string | null {
+  const buffer = lateByTab.get(tabId);
+  if (!buffer?.length) return null;
+  lateByTab.delete(tabId);
+  return renderLateErrors(buffer, latestRunByTab.get(tabId) ?? null);
 }
 
 /** The `{ok, result, logs, error}` shape `mods.try` and the panel have always spoken. */
@@ -2617,6 +2689,7 @@ function envForTab(tabId: number): AgentEnv {
   return {
     sendToContent: (req) => sendToContent(tabId, req as ContentRequest),
     runScript: (code) => executeInTab(tabId, code),
+    takeLateErrors: () => takeLateErrors(tabId),
     wait: (spec, signal) => waitInTab(tabId, spec, signal),
     async screenshot() {
       const tab = await chrome.tabs.get(tabId);
