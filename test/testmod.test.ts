@@ -68,11 +68,15 @@ test('proposing code other than what test_mod ran is only "open page", and the m
   assert.match(testedNote(c, edited), /not what test_mod last ran/);
 });
 
-test('a test_mod that failed does not count as a fresh-load test, even of the same code', () => {
+test('a test_mod that failed on this code says so on the card, rather than "tested"', () => {
   // run_script succeeded earlier; test_mod of this code then threw at load.
   const c = ctx({ testedSinceProposal: true, lastTest: { key: sourceKey(CODE), fresh: true, ok: false } });
-  assert.equal(testedAs(c, CODE), 'open-page');
-  assert.match(testedNote(c, CODE), /test_mod failed on this code/);
+  assert.equal(testedAs(c, CODE), 'mod-failed');
+  assert.match(testedNote(c, CODE), /failed when test_mod ran it/);
+  // Also when the model gave an untested_reason instead of a successful run: the failure is not hidden.
+  assert.equal(testedAs(ctx({ lastTest: { key: sourceKey(CODE), fresh: false, ok: false } }), CODE), 'mod-failed');
+  // A failure of OTHER code says nothing about this one: back to what the other runs showed.
+  assert.equal(testedAs(c, CODE.replace('none', 'block')), 'open-page');
 });
 
 test('run_script alone is "open page"; nothing run is untested and the card says nothing', () => {
@@ -336,6 +340,16 @@ test('a test_mod that throws at load leaves propose refused unless something els
   assert.match((results[0]!.content[0] as { text: string }).text, /Error: TypeError: x is null/);
   assert.equal(results[1]!.isError, true, 'the failed test does not satisfy the gate');
   assert.ok(!h.events.some((e) => e.type === 'proposal'));
+});
+
+test('run_script worked but test_mod of the proposed code threw: proposed, and the card says it failed', async () => {
+  const threw = ok({ run: { outcome: { kind: 'threw', error: 'TypeError: x is null' }, logs: [] } });
+  const h = loopHarness([step([toolCall('r1', 'run_script', { code: CODE })]), step([toolCall('t1', 'test_mod', { code: CODE, reload: true })]), step([propose(CODE)]), step([])], threw);
+  const out = await runAgent({ settings: SETTINGS, history: [], turn: { id: 'u', text: 'hide the ads' }, pullQueued: () => [], env: h.env, emit: (e) => h.events.push(e), signal: new AbortController().signal, provider: h.provider });
+  const proposal = h.events.find((e): e is Extract<AgentEventBody, { type: 'proposal' }> => e.type === 'proposal')?.proposal as ModProposal;
+  assert.equal(proposal.tested, 'mod-failed');
+  const results = out.messages.flatMap((m) => m.content).filter((p): p is Extract<Part, { type: 'tool_result' }> => p.type === 'tool_result');
+  assert.match((results[2]!.content[0] as { text: string }).text, /failed when test_mod ran it as the saved mod/);
 });
 
 test('without a testMod in the environment the tool says so instead of pretending', async () => {

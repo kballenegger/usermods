@@ -26,12 +26,15 @@ export interface ProposalContext {
  *   fresh-load  test_mod with reload ran THIS code as the saved mod, on a clean page load
  *   open-page   something ran on the already-loaded page: test_mod without reload, a test_mod of
  *               different code, or run_script — evidence, but not that this mod works on a visit
+ *   mod-failed  test_mod ran THIS code as the saved mod and it failed. The gate still lets it through
+ *               (an earlier run_script, or untested_reason), but the card must not read as "tested":
+ *               a mod that failed as a mod is the one the user most needs to hear about.
  */
-export type TestedAs = 'fresh-load' | 'open-page';
+export type TestedAs = 'fresh-load' | 'open-page' | 'mod-failed';
 
 export function testedAs(ctx: ProposalContext, code: string): TestedAs | undefined {
   const t = ctx.lastTest;
-  if (t?.ok && t.key === sourceKey(code)) return t.fresh ? 'fresh-load' : 'open-page';
+  if (t && t.key === sourceKey(code)) return !t.ok ? 'mod-failed' : t.fresh ? 'fresh-load' : 'open-page';
   return ctx.testedSinceProposal ? 'open-page' : undefined;
 }
 
@@ -43,9 +46,10 @@ export function testedAs(ctx: ProposalContext, code: string): TestedAs | undefin
 export function testedNote(ctx: ProposalContext, code: string): string {
   const state = testedAs(ctx, code);
   if (state === 'fresh-load') return 'The card says it was tested as the saved mod on a fresh load.';
+  if (state === 'mod-failed') return 'The card says it failed when test_mod ran it as the saved mod.';
   if (state !== 'open-page') return '';
   const t = ctx.lastTest;
-  const why = !t ? '' : t.key !== sourceKey(code) ? ' (this code is not what test_mod last ran)' : !t.ok ? ' (test_mod failed on this code)' : '';
+  const why = t && t.key !== sourceKey(code) ? ' (this code is not what test_mod last ran)' : '';
   return `The card says it was tested on the open page only, not as the saved mod on a fresh load${why}.`;
 }
 

@@ -1702,8 +1702,12 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
                   {/* How this exact code was tested (lib/agent/propose.ts testedAs). "Tested" alone
                       used to mean any script had run; the card now says which kind of test it was. */}
                   {it.proposal.tested && (
-                    <div className="label tested" data-testid="card-tested" data-tested={it.proposal.tested}>
-                      {it.proposal.tested === 'fresh-load' ? 'tested as the saved mod on a fresh page load' : 'tested on the open page only, not on a fresh load'}
+                    <div className={`label ${it.proposal.tested === 'mod-failed' ? 'untested' : 'tested'}`} data-testid="card-tested" data-tested={it.proposal.tested}>
+                      {it.proposal.tested === 'fresh-load'
+                        ? 'tested as the saved mod on a fresh page load'
+                        : it.proposal.tested === 'mod-failed'
+                          ? 'failed when tested as the saved mod'
+                          : 'tested on the open page only, not on a fresh load'}
                     </div>
                   )}
                   {/* The model said it could not run this one. Worth knowing before you save it. */}

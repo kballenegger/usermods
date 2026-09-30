@@ -298,9 +298,10 @@ export interface ModProposal {
   untestedReason?: string;
   /**
    * How this exact code was tested (lib/agent/propose.ts testedAs): as the saved mod on a fresh
-   * load, or only on the page as it already was. Absent when untested. Shown on the card.
+   * load, or only on the page as it already was, or it failed when run as the saved mod. Absent
+   * when untested. Shown on the card.
    */
-  tested?: 'fresh-load' | 'open-page';
+  tested?: 'fresh-load' | 'open-page' | 'mod-failed';
 }
 
 // Events streamed from the background agent loop to the side panel over a Port.
