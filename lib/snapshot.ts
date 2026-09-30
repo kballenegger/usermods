@@ -60,7 +60,13 @@ const SENSITIVE_NAME = /(^|[-_])(csrf|xsrf|token|nonce|secret|password|passwd|se
 /** Rendered and not display:none or visibility:hidden. Shared with lib/inspect.ts. */
 export function isVisible(el: Element): boolean {
   if (!(el instanceof HTMLElement)) return true;
-  if (typeof el.checkVisibility === 'function') return el.checkVisibility({ visibilityProperty: true } as CheckVisibilityOptions);
+  if (typeof el.checkVisibility === 'function') {
+    if (el.checkVisibility({ visibilityProperty: true } as CheckVisibilityOptions)) return true;
+    // display:contents has no box of its own, so checkVisibility is false for it by definition, and
+    // every read dropped the whole subtree under it. Substack wraps its article and its subscribe
+    // dialog in one. Its children are laid out and checked one by one as usual.
+    return getComputedStyle(el).display === 'contents';
+  }
   const cs = getComputedStyle(el);
   return cs.display !== 'none' && cs.visibility !== 'hidden';
 }

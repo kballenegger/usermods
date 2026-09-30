@@ -10,7 +10,7 @@ import test from 'node:test';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { parseHTML } from 'linkedom';
-import { buildTree, dataAttrs, noisyDataValue, reachFor, renderTree, type SNode } from '../lib/snapshot.ts';
+import { buildTree, dataAttrs, isVisible, noisyDataValue, reachFor, renderTree, type SNode } from '../lib/snapshot.ts';
 import { describeElements } from '../lib/inspect.ts';
 import { deepestOnly, elementsWithText, hasText, normalizeText, queryAllDeep } from '../lib/waitdom.ts';
 
@@ -333,4 +333,23 @@ test('a miss everywhere says the shadow roots were searched and closed ones cann
 test('an invalid selector is reported, not thrown', () => {
   shadowPage();
   assert.match(describeElements('div[', 20), /^Invalid selector:/);
+});
+
+// ---------- visibility ----------
+
+test('display:contents counts as visible, so the subtree under it is still read', () => {
+  class FakeEl {
+    checkVisibility() {
+      return false;
+    }
+  }
+  Object.assign(globalThis, { HTMLElement: FakeEl, getComputedStyle: () => ({ display: 'contents' }) });
+  try {
+    assert.equal(isVisible(new FakeEl() as unknown as Element), true);
+    Object.assign(globalThis, { getComputedStyle: () => ({ display: 'none' }) });
+    assert.equal(isVisible(new FakeEl() as unknown as Element), false);
+  } finally {
+    delete (globalThis as { getComputedStyle?: unknown }).getComputedStyle;
+    Object.assign(globalThis, { HTMLElement: class {} });
+  }
 });
