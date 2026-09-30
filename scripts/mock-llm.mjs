@@ -333,9 +333,11 @@ document.head.appendChild(style);`,
 
   {
     // The store reviewer's own test, for scripts/reviewer-walkthrough.mjs. The one conversation
-    // here that DOES call run_script and proposes without untested_reason: that script turns the
-    // "Allow User Scripts" toggle on through chrome://extensions first, the way a reviewer does, so
-    // the run is real and the proposal is a tested one.
+    // here that DOES call run_script and test_mod and proposes without untested_reason: that script
+    // turns the "Allow User Scripts" toggle on through chrome://extensions first, the way a reviewer
+    // does, so the runs are real. It tries the idea with run_script, then runs the final script with
+    // test_mod on a fresh load (a real temporary chrome.userScripts registration and a reload), and
+    // proposes exactly that code, so the card says it was tested as the saved mod on a fresh load.
     name: 'reviewer-walkthrough',
     match: /hide the table of contents/i,
     steps: [
@@ -359,7 +361,21 @@ getComputedStyle(document.querySelector('.vector-column-start')).display;`,
         ],
       },
       {
-        text: 'It is hidden. Here it is as a mod.',
+        text: 'It is hidden. Checking it works as a saved mod on a fresh load.',
+        calls: [
+          {
+            name: 'test_mod',
+            args: {
+              reload: true,
+              code: `const style = document.createElement('style');
+style.textContent = '#vector-toc-pinned-container, .vector-column-start { display: none !important; }';
+document.head.appendChild(style);`,
+            },
+          },
+        ],
+      },
+      {
+        text: 'It works on load. Here it is as a mod.',
         calls: [
           {
             name: 'propose_mod',
