@@ -1,5 +1,12 @@
 // DOM serialization for the model. Runs inside the content script.
 // Produces a compact, pruned HTML-like view with a hard character budget.
+//
+// Two stages: buildTree walks the live DOM once into plain objects (the only part that needs a
+// real page: visibility, shadow roots), and renderTree turns that into text under the budget. The
+// second is a pure function, which is what lets the overflow behaviour be tested on saved pages.
+
+// The .ts extension: see lib/agent/tools.ts. node's test runner loads this file directly.
+import { deepestOnly, elementsWithText, hasText, queryAllDeep, type DeepMatch } from './waitdom.ts';
 
 const SKIP_TAGS = new Set([
   'SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE', 'LINK', 'META', 'HEAD', 'PATH', 'DEFS', 'CLIPPATH',
@@ -8,9 +15,38 @@ const SKIP_TAGS = new Set([
 const KEEP_ATTRS = [
   'id', 'class', 'href', 'src', 'alt', 'title', 'role', 'name', 'type', 'placeholder', 'value',
   'aria-label', 'aria-expanded', 'aria-hidden', 'data-testid', 'for', 'action', 'method', 'target', 'disabled', 'checked', 'selected',
+  // The state half of ARIA: which tab is selected, which item is current, whether a toggle is on.
+  // A mod that styles "the active tab" needs exactly these, and they are short.
+  'aria-selected', 'aria-checked', 'aria-current', 'aria-pressed', 'aria-disabled',
 ];
 const MAX_ATTR = 120;
 const MAX_TEXT = 200;
+
+/**
+ * data-* attributes, within limits.
+ *
+ * The prompt tells the model to prefer data attributes for selectors, and they are usually the
+ * most durable hook a site offers (`data-component="shelf"` survives redesigns that rename every
+ * class), so the snapshot has to show them. But they are also where frameworks put their bulk:
+ * Vue's `data-v-7ba5bd90` scoping marker on every node, tracking payloads of serialized JSON,
+ * per-render ids and nonces, click-tracking payloads. So:
+ *   - at most MAX_DATA_ATTRS per element, in document order (data-testid is kept separately above);
+ *   - a name whose suffix looks generated (a hash, like data-v-7ba5bd90), or that belongs to
+ *     analytics (data-ga-*, data-track*, data-*-click…), is skipped;
+ *   - a value is kept only if it is short and readable. A long value, JSON, a long unbroken token
+ *     mixing letters and digits (a hash, an id) or a bare number (a row index, a line number, a
+ *     record id) skips the attribute: it would cost tokens, and a mod selects on what an element
+ *     IS, not on which one of forty it happens to be;
+ *   - an empty value is shown as the bare name, the way a boolean flag reads in HTML;
+ *   - the same name="value" pair is printed at most MAX_DATA_REPEATS times per snapshot. A marker
+ *     every component carries (GitHub's data-view-component="true") tells the model nothing after
+ *     it has seen it a few times, and a list of cards has made its point by then too.
+ * On the saved GitHub and gist pages this adds about 5% to a full snapshot.
+ */
+const MAX_DATA_ATTRS = 4;
+const MAX_DATA_VALUE = 40;
+const MAX_DATA_REPEATS = 8;
+const TRACKING_NAME = /^(ga|gtm|octo|hydro|analytics|track|tracking|event|log|beacon|ping|ved|hveid)([-_]|$)|click$/;
 
 function isVisible(el: Element): boolean {
   if (!(el instanceof HTMLElement)) return true;
@@ -24,6 +60,34 @@ function trunc(s: string, n: number): string {
   return s.length > n ? s.slice(0, n) + '…' : s;
 }
 
+/** Is this attribute value noise to the model: too long, JSON, or a random-looking token? */
+export function noisyDataValue(v: string): boolean {
+  if (v.length > MAX_DATA_VALUE) return true;
+  if (/^\s*[[{]/.test(v) || /^\d+$/.test(v)) return true;
+  return v.length >= 16 && /^[\w+/=-]+$/.test(v) && /\d/.test(v) && /[a-z]/i.test(v);
+}
+
+/**
+ * The data-* attributes worth printing for one element, already formatted. See MAX_DATA_ATTRS.
+ * `seen` counts name="value" pairs across one snapshot, for MAX_DATA_REPEATS.
+ */
+export function dataAttrs(attrs: ReadonlyArray<readonly [string, string]>, seen: Map<string, number> = new Map()): string[] {
+  const out: string[] = [];
+  for (const [name, value] of attrs) {
+    if (out.length >= MAX_DATA_ATTRS) break;
+    if (!name.startsWith('data-') || name === 'data-testid') continue;
+    const suffix = name.slice(5).toLowerCase();
+    if (!suffix || suffix.length > 30 || TRACKING_NAME.test(suffix)) continue;
+    if (isGeneratedClass(suffix) || /(^|[-_])(?=[a-z]*\d)[0-9a-f]{6,}$/i.test(suffix)) continue;
+    if (value !== '' && noisyDataValue(value)) continue;
+    const text = value === '' ? name : `${name}="${trunc(value, MAX_DATA_VALUE).replace(/"/g, '&quot;')}"`;
+    const n = (seen.get(text) ?? 0) + 1;
+    seen.set(text, n);
+    if (n <= MAX_DATA_REPEATS) out.push(text);
+  }
+  return out;
+}
+
 export interface SnapshotOptions {
   root?: Element | null;
   maxChars?: number;
@@ -31,62 +95,275 @@ export interface SnapshotOptions {
   includeHidden?: boolean;
 }
 
-export function snapshot(opts: SnapshotOptions = {}): string {
-  const root = opts.root ?? document.body;
-  const maxChars = opts.maxChars ?? 20_000;
+/**
+ * One element of the snapshot, before rendering. `kids` holds rendered text and the `<…/>` depth
+ * marker as strings, and child elements as nodes.
+ */
+export interface SNode {
+  open: string;
+  close: string;
+  kids: (string | SNode)[];
+  /** Characters of the full rendering. */
+  size: number;
+  /** Element descendants, for the "…N nodes" placeholder. */
+  nodes: number;
+  /** What makes siblings "similar": the tag and first class, e.g. `li.item`. */
+  sig: string;
+  /** ", 38× li.item" when most children look alike, for the placeholder. */
+  hint: string;
+  /** The first text inside, short, so a collapsed region still says what it is. */
+  firstText: string;
+}
+
+function makeNode(open: string, close: string, kids: (string | SNode)[], sig: string): SNode {
+  let size = open.length + close.length;
+  let nodes = 0;
+  let firstText = '';
+  const sigs = new Map<string, number>();
+  for (const k of kids) {
+    if (typeof k === 'string') {
+      size += k.length;
+      if (!firstText && k !== '<…/>') firstText = k.trim();
+    } else {
+      size += k.size;
+      nodes += 1 + k.nodes;
+      if (!firstText) firstText = k.firstText;
+      sigs.set(k.sig, (sigs.get(k.sig) ?? 0) + 1);
+    }
+  }
+  let hint = '';
+  let best = 0;
+  for (const [s, n] of sigs) {
+    if (n >= 3 && n > best) {
+      best = n;
+      hint = `, ${n}× ${s}`;
+    }
+  }
+  return { open, close, kids, size, nodes, sig, hint, firstText };
+}
+
+/**
+ * Walk the DOM into SNodes. Hidden elements, scripts and styles are left out, as before; an open
+ * shadow root becomes a `#shadow-root` child ahead of the light children (which are what it slots).
+ * `visible` is injectable so node tests can run this on a parsed page that has no layout.
+ */
+export function buildTree(root: Element, opts: { maxDepth?: number; includeHidden?: boolean } = {}, visible: (el: Element) => boolean = isVisible): SNode | null {
   const maxDepth = opts.maxDepth ?? 40;
-  if (!root) return '';
-  const out: string[] = [];
-  let used = 0;
-  let truncated = false;
-
-  const push = (s: string) => {
-    if (truncated) return;
-    if (used + s.length > maxChars) {
-      truncated = true;
-      return;
+  const seen = new Map<string, number>();
+  const walkKids = (nodes: Iterable<Node>, depth: number): (string | SNode)[] => {
+    const out: (string | SNode)[] = [];
+    for (const k of nodes) {
+      const r = walk(k, depth);
+      if (r) out.push(r);
     }
-    out.push(s);
-    used += s.length;
+    return out;
   };
-
-  const walk = (node: Node, depth: number) => {
-    if (truncated) return;
-    if (node.nodeType === Node.TEXT_NODE) {
+  const walk = (node: Node, depth: number): string | SNode | null => {
+    // nodeType numbers rather than Node.TEXT_NODE: the global Node does not exist in a node test.
+    if (node.nodeType === 3) {
       const t = trunc(node.textContent ?? '', MAX_TEXT);
-      if (t) push(t + ' ');
-      return;
+      return t ? t + ' ' : null;
     }
-    if (node.nodeType !== Node.ELEMENT_NODE) return;
+    if (node.nodeType !== 1) return null;
     const el = node as Element;
-    if (SKIP_TAGS.has(el.tagName)) return;
-    if (!opts.includeHidden && !isVisible(el)) return;
-    if (depth > maxDepth) {
-      push('<…/>');
-      return;
-    }
+    if (SKIP_TAGS.has(el.tagName.toUpperCase())) return null;
+    if (!opts.includeHidden && !visible(el)) return null;
+    if (depth > maxDepth) return '<…/>';
     const tag = el.tagName.toLowerCase();
     const attrs: string[] = [];
     for (const a of KEEP_ATTRS) {
       const v = el.getAttribute(a);
       if (v != null && v !== '') attrs.push(`${a}="${trunc(v, MAX_ATTR).replace(/"/g, '&quot;')}"`);
     }
-    if (tag === 'svg') {
-      push(`<svg${attrs.length ? ' ' + attrs.join(' ') : ''}/>`);
-      return;
-    }
-    push(`<${tag}${attrs.length ? ' ' + attrs.join(' ') : ''}>`);
-    const kids = el.shadowRoot ? [...el.shadowRoot.childNodes, ...el.childNodes] : [...el.childNodes];
-    if (el.shadowRoot) push('<#shadow-root>');
-    for (const k of kids) walk(k, depth + 1);
-    if (el.shadowRoot) push('</#shadow-root>');
-    push(`</${tag}>`);
+    attrs.push(...dataAttrs(el.getAttributeNames().map((n) => [n, el.getAttribute(n) ?? ''] as const), seen));
+    const a = attrs.length ? ' ' + attrs.join(' ') : '';
+    const cls = (el.getAttribute('class') ?? '').trim().split(/\s+/)[0];
+    const sig = cls ? `${tag}.${cls}` : tag;
+    if (tag === 'svg') return makeNode(`<svg${a}/>`, '', [], sig);
+    const kids: (string | SNode)[] = [];
+    if (el.shadowRoot) kids.push(makeNode('<#shadow-root>', '</#shadow-root>', walkKids(el.shadowRoot.childNodes, depth + 1), '#shadow-root'));
+    kids.push(...walkKids(el.childNodes, depth + 1));
+    return makeNode(`<${tag}${a}>`, `</${tag}>`, kids, sig);
   };
+  const r = walk(root, 0);
+  return r && typeof r !== 'string' ? r : null;
+}
 
-  walk(root, 0);
-  let s = out.join('').replace(/\s+</g, '<').replace(/>\s+/g, '>');
-  if (truncated) s += `\n<!-- truncated at ${maxChars} chars; ask for a narrower selector -->`;
-  return s;
+// ---------------------------------------------------------------------------
+// Rendering under a budget
+// ---------------------------------------------------------------------------
+//
+// A page that fits is printed whole, exactly as it always was. A page that does not used to be cut
+// at the budget in document order, which on a real site means the header and navigation were
+// printed in full and the main content, the part the user is asking about, was what got lost.
+//
+// Now the page keeps its SHAPE instead. Every region appears; the ones that do not fit are
+// collapsed to one line saying how big they are and what they start with, and the model opens one
+// with get_page(selector). How the budget is shared out:
+//   - each element gets at least its one-line placeholder, so nothing disappears;
+//   - what is left is shared between siblings in proportion to their size, so the biggest region,
+//     usually the content, gets the most detail. Equal or even square-root shares let a dozen small
+//     menu items together outweigh one large article and starve it again (tried on the saved
+//     GitHub page: the code lines came out as placeholders); the small ones lose little, since the
+//     placeholder already names them;
+//   - siblings are rendered smallest first, and whatever a small one did not use goes back into
+//     the pot for the larger ones, so the budget is filled rather than rationed;
+//   - a run of similar siblings (a feed, a result list, table rows) shows as many whole examples
+//     as its share allows, at least FOLD_KEEP, then one `<… 35 more li.item/>` line. Three whole
+//     items and a count say more than forty truncated ones.
+
+/** Similar siblings below this count are never folded. */
+const FOLD_MIN = 6;
+/** How many examples of a folded run are always kept. */
+const FOLD_KEEP = 3;
+
+/** How much of a parent's spare budget a child claims. See the section comment. */
+const shareWeight = (k: SNode) => k.size;
+
+function placeholder(n: SNode): string {
+  const text = n.firstText ? `, "${n.firstText.length > 32 ? n.firstText.slice(0, 32) + '…' : n.firstText}"` : '';
+  return `${n.open}…${n.nodes} nodes${n.hint}${text}${n.close}`;
+}
+
+/** The least an element can be printed as: whole if that is shorter than its placeholder. */
+function minSize(n: SNode): number {
+  return Math.min(n.size, placeholder(n).length);
+}
+
+function renderFull(n: SNode, out: string[]): void {
+  out.push(n.open);
+  for (const k of n.kids) {
+    if (typeof k === 'string') out.push(k);
+    else renderFull(k, out);
+  }
+  out.push(n.close);
+}
+
+/**
+ * Which children to print, and the fold markers standing in for the rest. Null when even the
+ * tightest folding does not fit `avail`, in which case the parent prints this node's placeholder.
+ */
+function planKids(n: SNode, avail: number): (string | SNode)[] | null {
+  const elems = n.kids.filter((k): k is SNode => typeof k !== 'string');
+  const fixed = n.kids.reduce((s, k) => s + (typeof k === 'string' ? k.length : 0), 0);
+  const weight = (k: SNode) => shareWeight(k);
+  const totalW = elems.reduce((s, k) => s + weight(k), 0) || 1;
+  const groups = new Map<string, SNode[]>();
+  for (const k of elems) groups.set(k.sig, [...(groups.get(k.sig) ?? []), k]);
+
+  const attempt = (tight: boolean): (string | SNode)[] | null => {
+    const dropped = new Set<SNode>();
+    const markerAt = new Map<SNode, string>();
+    for (const [sig, members] of groups) {
+      if (members.length < (tight ? FOLD_KEEP : FOLD_MIN)) continue;
+      let keep = tight ? 1 : FOLD_KEEP;
+      if (!tight) {
+        const share = ((avail - fixed) * members.reduce((s, k) => s + weight(k), 0)) / totalW;
+        let used = 0;
+        let fit = 0;
+        for (const m of members) {
+          used += m.size;
+          if (used > share) break;
+          fit++;
+        }
+        keep = Math.max(FOLD_KEEP, fit);
+      }
+      // Folding one or two costs about what it saves, and hides them for nothing.
+      if (members.length - keep < 3) continue;
+      markerAt.set(members[keep]!, `<… ${members.length - keep} more ${sig}/>`);
+      for (const m of members.slice(keep)) dropped.add(m);
+    }
+    const plan: (string | SNode)[] = [];
+    let min = 0;
+    for (const k of n.kids) {
+      if (typeof k === 'string') {
+        plan.push(k);
+        min += k.length;
+      } else if (markerAt.has(k)) {
+        plan.push(markerAt.get(k)!);
+        min += markerAt.get(k)!.length;
+      } else if (!dropped.has(k)) {
+        plan.push(k);
+        min += minSize(k);
+      }
+    }
+    return min <= avail ? plan : null;
+  };
+  return attempt(false) ?? attempt(true);
+}
+
+/** Render `n` in at most `budget` characters, which is never less than minSize(n). */
+function renderBudget(n: SNode, budget: number, out: string[]): number {
+  if (n.size <= budget) {
+    renderFull(n, out);
+    return n.size;
+  }
+  const ph = placeholder(n);
+  const avail = budget - n.open.length - n.close.length;
+  const plan = avail > 0 ? planKids(n, avail) : null;
+  if (!plan) {
+    out.push(ph);
+    return ph.length;
+  }
+  const kids = plan.filter((k): k is SNode => typeof k !== 'string');
+  let extra = avail - plan.reduce((s, k) => s + (typeof k === 'string' ? k.length : minSize(k)), 0);
+  let remainingW = kids.reduce((s, k) => s + shareWeight(k), 0);
+  const rendered = new Map<SNode, string[]>();
+  for (const k of [...kids].sort((a, b) => a.size - b.size)) {
+    const w = shareWeight(k);
+    const share = remainingW > 0 ? (extra * w) / remainingW : 0;
+    const buf: string[] = [];
+    const used = renderBudget(k, Math.floor(minSize(k) + share), buf);
+    extra -= used - minSize(k);
+    remainingW -= w;
+    rendered.set(k, buf);
+  }
+  let used = n.open.length + n.close.length;
+  out.push(n.open);
+  for (const k of plan) {
+    if (typeof k === 'string') {
+      out.push(k);
+      used += k.length;
+    } else {
+      for (const s of rendered.get(k)!) {
+        out.push(s);
+        used += s.length;
+      }
+    }
+  }
+  out.push(n.close);
+  return used;
+}
+
+/** The `>\s+` / `\s+<` squeeze every snapshot has always had. */
+function squeeze(s: string): string {
+  return s.replace(/\s+</g, '<').replace(/>\s+/g, '>');
+}
+
+/** Render a tree under `maxChars`. Pure: see the section comment above. */
+export function renderTree(tree: SNode, maxChars: number): string {
+  const out: string[] = [];
+  if (tree.size <= maxChars) {
+    renderFull(tree, out);
+    return squeeze(out.join(''));
+  }
+  const note = `\n<!-- over ${maxChars} chars, so parts are collapsed: "…N nodes" is an unopened element and "<… N more x/>" repeats the one before; get_page with a selector opens one -->`;
+  renderBudget(tree, maxChars - note.length, out);
+  // The last resort, for a root whose children cannot all be listed even as placeholders (the
+  // root came back as its own one-line placeholder): the old tail cut, so there is still a page.
+  if (out.length === 1) {
+    const full: string[] = [];
+    renderFull(tree, full);
+    return squeeze(full.join('').slice(0, maxChars)) + `\n<!-- truncated at ${maxChars} chars; ask for a narrower selector -->`;
+  }
+  return squeeze(out.join('')) + note;
+}
+
+export function snapshot(opts: SnapshotOptions = {}): string {
+  const root = opts.root ?? document.body;
+  if (!root) return '';
+  const tree = buildTree(root, { maxDepth: opts.maxDepth, includeHidden: opts.includeHidden });
+  return tree ? renderTree(tree, opts.maxChars ?? 20_000) : '';
 }
 
 // ---------------------------------------------------------------------------
@@ -164,33 +441,85 @@ export function selectorFor(el: Element): string {
   return parts.join(' > ');
 }
 
-export function describeElements(selector: string, limit = 20): string {
-  let els: Element[];
-  try {
-    els = [...document.querySelectorAll(selector)];
-  } catch (e) {
-    return `Invalid selector: ${String(e)}`;
+/**
+ * How to reach a match from a script: the document for an ordinary element, and a
+ * `.shadowRoot.querySelector` chain for one inside open shadow roots, since a selector alone cannot
+ * cross into them.
+ */
+export function reachFor(m: DeepMatch, selector: string): string {
+  if (!m.hosts.length) return `document.querySelector(${JSON.stringify(selector)})`;
+  return 'document' + m.hosts.map((h) => `.querySelector(${JSON.stringify(selectorFor(h))}).shadowRoot`).join('') + `.querySelector(${JSON.stringify(selector)})`;
+}
+
+/** The note for a selector that matched nothing anywhere, naming the shadow roots it also tried. */
+function missNote(searchedRoots: number): string {
+  return searchedRoots ? ` Also searched ${searchedRoots} open shadow root(s); closed shadow roots cannot be searched.` : '';
+}
+
+/**
+ * find_elements: by selector, by visible text, or both.
+ *
+ * With `text`, the answer is the deepest elements containing it (see elementsWithText), so asking
+ * for "the shelf that says Recommended for you" costs one short list rather than a full get_page.
+ * A selector that matches nothing in the document is retried inside open shadow roots, and those
+ * matches say how to reach them.
+ */
+export function describeElements(selector: string | undefined, limit = 20, text?: string): string {
+  const sel = selector?.trim() || undefined;
+  const needle = text?.trim() || undefined;
+  if (!sel && !needle) return 'Give a selector, a text, or both.';
+  let found: DeepMatch[];
+  let searchedRoots = 0;
+  if (sel) {
+    try {
+      ({ matches: found, searchedRoots } = queryAllDeep(sel));
+    } catch (e) {
+      return `Invalid selector: ${String(e)}`;
+    }
+    if (!found.length) return `No elements match "${sel}".${missNote(searchedRoots)}`;
+    if (needle) {
+      const all = found.length;
+      found = deepestOnly(found.filter((m) => hasText(m.el, needle)));
+      if (!found.length) return `${all} element(s) match "${sel}", but none contain "${needle}".`;
+    }
+  } else {
+    found = document.body ? elementsWithText(document.body, needle!) : [];
+    if (!found.length) return `No element's text contains "${needle}".`;
   }
-  if (!els.length) return `No elements match "${selector}".`;
-  const lines = els.slice(0, limit).map((el, i) => {
+  const what = sel && needle ? `match "${sel}" and contain "${needle}"` : sel ? `match "${sel}"` : `contain "${needle}"`;
+  const lines = found.slice(0, limit).map((m, i) => {
+    const el = m.el;
     const r = el.getBoundingClientRect();
-    const sel = selectorFor(el);
-    return `${i + 1}. ${sel} ${durabilityLabel(sel)} [${Math.round(r.width)}x${Math.round(r.height)} @${Math.round(r.x)},${Math.round(r.y)}] ${isVisible(el) ? '' : '(hidden) '}${trunc(el.textContent ?? '', 120)}`;
+    const s = selectorFor(el);
+    return `${i + 1}. ${s} ${durabilityLabel(s)} [${Math.round(r.width)}x${Math.round(r.height)} @${Math.round(r.x)},${Math.round(r.y)}] ${m.hosts.length ? '(in shadow root) ' : ''}${isVisible(el) ? '' : '(hidden) '}${trunc(el.textContent ?? '', 120)}`;
   });
+  const shadowed = found.slice(0, limit).find((m) => m.hosts.length);
   return [
-    `${els.length} element(s) match "${selector}"${els.length > limit ? `, showing ${limit}` : ''}:`,
+    `${found.length} element(s) ${what}${found.length > limit ? `, showing ${limit}` : ''}:`,
     ...lines,
     '',
     'The bracketed label is how durable each selector is across site deploys. A [fragile: …] one is worth a second look; a [stable: …] one is not.',
+    ...(shadowed
+      ? [`"(in shadow root)" ones are inside an open shadow root, where document.querySelector and page CSS do not reach. The selector is relative to that root: ${reachFor(shadowed, sel ?? selectorFor(shadowed.el))}`]
+      : []),
   ].join('\n');
 }
 
 export function computedStyles(selector: string, properties?: string[]): string {
-  const el = document.querySelector(selector);
-  if (!el) return `No element matches "${selector}".`;
-  const cs = getComputedStyle(el);
+  let found: DeepMatch[];
+  let searchedRoots: number;
+  try {
+    ({ matches: found, searchedRoots } = queryAllDeep(selector));
+  } catch (e) {
+    return `Invalid selector: ${String(e)}`;
+  }
+  const m = found[0];
+  if (!m) return `No element matches "${selector}".${missNote(searchedRoots)}`;
+  const cs = getComputedStyle(m.el);
   const props = properties?.length
     ? properties
     : ['display', 'position', 'width', 'height', 'margin', 'padding', 'color', 'background-color', 'font-size', 'font-family', 'z-index', 'overflow', 'visibility', 'opacity'];
-  return props.map((p) => `${p}: ${cs.getPropertyValue(p)}`).join('\n');
+  const lines = props.map((p) => `${p}: ${cs.getPropertyValue(p)}`);
+  if (m.hosts.length) lines.unshift(`(inside an open shadow root: ${reachFor(m, selector)})`);
+  return lines.join('\n');
 }

@@ -59,8 +59,106 @@ function pageText(): string {
   return (document.body?.innerText ?? document.body?.textContent ?? '').toLowerCase();
 }
 
+/**
+ * Text as the matchers compare it: whitespace collapsed, trimmed, lowercased. Shared by wait_for's
+ * `text` filter and find_elements' `text`, so "contains this text" means one thing in both tools.
+ * The collapse is what lets "Recommended for you" match a heading whose markup breaks the line.
+ */
+export function normalizeText(s: string): string {
+  return s.replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+/** innerText where there is one (rendered text, with block breaks), textContent otherwise. */
 function elementText(el: Element): string {
-  return ((el as HTMLElement).innerText ?? el.textContent ?? '').toLowerCase();
+  return normalizeText((el as HTMLElement).innerText ?? el.textContent ?? '');
+}
+
+/** Does this element's text contain `needle`? Case-insensitive, whitespace-normalised. */
+export function hasText(el: Element, needle: string): boolean {
+  return elementText(el).includes(normalizeText(needle));
+}
+
+/** Where a match was found: the element, and the shadow hosts above it, outermost first. */
+export interface DeepMatch {
+  el: Element;
+  /** Empty for an element in the document itself. */
+  hosts: Element[];
+}
+
+const TEXT_SKIP = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE']);
+
+/**
+ * The DEEPEST elements under `root` whose text contains `needle`, open shadow roots included.
+ *
+ * Deepest, because every ancestor of a match also "contains" its text: asked for "Recommended for
+ * you", a naive filter answers with the heading, its shelf, the column, the page and body, and the
+ * one the model wanted is somewhere in the middle of that list. The walk descends only into
+ * children that contain the text too, so it is pruned to the matching branches rather than asking
+ * every element on the page for its text.
+ *
+ * Shadow content is not part of its host's text, so a host's open root is always searched.
+ */
+export function elementsWithText(root: Element, needle: string): DeepMatch[] {
+  const n = normalizeText(needle);
+  const out: DeepMatch[] = [];
+  if (!n) return out;
+  const visit = (el: Element, hosts: Element[]): boolean => {
+    if (TEXT_SKIP.has(el.tagName)) return false;
+    let found = false;
+    const sr = el.shadowRoot;
+    if (sr) for (const k of [...sr.children]) if (visit(k, [...hosts, el])) found = true;
+    if (!elementText(el).includes(n)) {
+      // Pruned, except for shadow roots further down, whose text this element's does not include.
+      // Pruned subtrees never overlap, so this stays one pass over the page.
+      for (const host of [...el.querySelectorAll('*')]) {
+        if (!host.shadowRoot) continue;
+        for (const k of [...host.shadowRoot.children]) if (visit(k, [...hosts, host])) found = true;
+      }
+      return found;
+    }
+    for (const k of [...el.children]) if (visit(k, hosts)) found = true;
+    if (!found) out.push({ el, hosts });
+    return true;
+  };
+  visit(root, []);
+  return out;
+}
+
+/**
+ * Of a set of elements, the ones that do not contain another of them: the deepest. Used when a
+ * selector AND a text both apply, so `div` + "Recommended" answers with the innermost div.
+ */
+export function deepestOnly<T extends { el: Element }>(items: T[]): T[] {
+  return items.filter((a) => !items.some((b) => b !== a && a.el !== b.el && a.el.contains(b.el)));
+}
+
+/**
+ * Every element matching `selector`, reaching into open shadow roots when the document has none.
+ * Throws on an invalid selector, like querySelectorAll.
+ *
+ * The snapshot prints open shadow roots, so a model that saw an element there and asked for it by
+ * selector used to be told "No elements match" by a document.querySelectorAll that cannot see
+ * inside them. The document is still asked first, and the shadow walk only happens on a miss, so a
+ * selector that matches normally costs what it always did. Closed roots stay unreachable: a
+ * content script cannot see into them any more than the page can.
+ */
+export function queryAllDeep(selector: string): { matches: DeepMatch[]; searchedRoots: number } {
+  const light = [...document.querySelectorAll(selector)];
+  if (light.length) return { matches: light.map((el) => ({ el, hosts: [] })), searchedRoots: 0 };
+  const matches: DeepMatch[] = [];
+  let searchedRoots = 0;
+  const visit = (scope: ParentNode, hosts: Element[]) => {
+    for (const host of [...scope.querySelectorAll('*')]) {
+      const sr = host.shadowRoot;
+      if (!sr) continue;
+      searchedRoots++;
+      const chain = [...hosts, host];
+      for (const el of [...sr.querySelectorAll(selector)]) matches.push({ el, hosts: chain });
+      visit(sr, chain);
+    }
+  };
+  visit(document, []);
+  return { matches, searchedRoots };
 }
 
 /** A short `<li class="result">…` for the "what matched" half of a success message. */
@@ -77,8 +175,8 @@ export function describeElement(el: Element): string {
 
 /** The elements a selector condition currently counts as matching. Throws on an invalid selector. */
 function matchesFor(c: Extract<WaitCondition, { kind: 'selector' }>): Element[] {
-  const all = [...document.querySelectorAll(c.selector)];
-  const filtered = c.text ? all.filter((el) => elementText(el).includes(c.text!.toLowerCase())) : all;
+  const all = queryAllDeep(c.selector).matches.map((m) => m.el);
+  const filtered = c.text ? all.filter((el) => hasText(el, c.text!)) : all;
   switch (c.state) {
     case 'attached':
       return filtered;
@@ -136,7 +234,7 @@ function diagnose(c: WaitCondition, mutations: number, elapsedMs: number): strin
     case 'selector': {
       const all = (() => {
         try {
-          return [...document.querySelectorAll(c.selector)];
+          return queryAllDeep(c.selector).matches.map((m) => m.el);
         } catch {
           return [];
         }
@@ -147,7 +245,7 @@ function diagnose(c: WaitCondition, mutations: number, elapsedMs: number): strin
         const closest = closestSelector(c.selector);
         if (closest) lines.push(`closest: ${closest}`);
       } else if (c.text) {
-        const withText = all.filter((el) => elementText(el).includes(c.text!.toLowerCase()));
+        const withText = all.filter((el) => hasText(el, c.text!));
         lines.push(`${all.length} element(s) match ${c.selector}, but ${withText.length} contain "${c.text}".`);
         if (all.length && !withText.length) lines.push(`first one's text: ${JSON.stringify(((all[0] as HTMLElement).innerText ?? '').replace(/\s+/g, ' ').trim().slice(0, 120))}`);
       } else {

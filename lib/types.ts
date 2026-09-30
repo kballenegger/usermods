@@ -458,8 +458,8 @@ export interface ElementRef extends PickedElement {
 
 // Messages between the side panel / background and the content script.
 export type ContentRequest =
-  | { type: 'snapshot'; selector?: string; maxChars?: number }
-  | { type: 'query'; selector: string; limit?: number }
+  | { type: 'snapshot'; selector?: string; maxChars?: number; includeHidden?: boolean }
+  | { type: 'query'; selector?: string; limit?: number; text?: string }
   | { type: 'styles'; selector: string; properties?: string[] }
   | { type: 'pick' }
   /**

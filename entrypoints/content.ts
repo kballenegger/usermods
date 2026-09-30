@@ -1,6 +1,6 @@
 import { createHolder } from '@/lib/keepalive-holder';
-import { computedStyles, describeElements, selectorFor, snapshot } from '@/lib/snapshot';
-import { waitForDom } from '@/lib/waitdom';
+import { computedStyles, describeElements, reachFor, selectorFor, snapshot } from '@/lib/snapshot';
+import { queryAllDeep, waitForDom } from '@/lib/waitdom';
 import { initBanner } from '@/lib/bannerclient';
 import { handleShareMessage } from '@/lib/shareclient';
 import type { ContentEvent, ContentRequest } from '@/lib/types';
@@ -76,27 +76,34 @@ export default defineContentScript({
           return;
         case 'snapshot': {
           let root: Element | null = document.body;
+          // Where a selected root lives, when it is inside an open shadow root: the model needs
+          // the host chain to reach it, because the selector alone will not from a script.
+          let where = '';
           if (msg.selector) {
+            let found: ReturnType<typeof queryAllDeep>;
             try {
-              root = document.querySelector(msg.selector);
+              found = queryAllDeep(msg.selector);
             } catch (e) {
               sendResponse({ error: `Invalid selector: ${String(e)}` });
               return;
             }
-            if (!root) {
-              sendResponse({ error: `No element matches "${msg.selector}".` });
+            const m = found.matches[0];
+            if (!m) {
+              const tried = found.searchedRoots ? ` Also searched ${found.searchedRoots} open shadow root(s); closed shadow roots cannot be searched.` : '';
+              sendResponse({ error: `No element matches "${msg.selector}".${tried}` });
               return;
             }
+            root = m.el;
+            if (m.hosts.length) where = `<!-- inside an open shadow root: ${reachFor(m, msg.selector)} -->\n`;
           }
-          sendResponse({
-            url: location.href,
-            title: document.title,
-            html: snapshot({ root, maxChars: msg.maxChars }),
-          });
+          let html = snapshot({ root, maxChars: msg.maxChars, includeHidden: msg.includeHidden });
+          // A hidden root used to come back as an empty page, which reads as "nothing there".
+          if (!html && msg.selector && !msg.includeHidden) html = `<!-- "${msg.selector}" is hidden; pass include_hidden: true to see it -->`;
+          sendResponse({ url: location.href, title: document.title, html: where + html });
           return;
         }
         case 'query':
-          sendResponse({ text: describeElements(msg.selector, msg.limit) });
+          sendResponse({ text: describeElements(msg.selector, msg.limit, msg.text) });
           return;
         case 'styles':
           sendResponse({ text: computedStyles(msg.selector, msg.properties) });

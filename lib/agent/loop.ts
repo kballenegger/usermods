@@ -589,6 +589,7 @@ function describeCall(name: string, input: Record<string, unknown>): string | un
   if ((name === 'find_elements' || name === 'get_styles' || name === 'get_page') && typeof input.selector === 'string' && input.selector.trim()) {
     return input.selector.trim();
   }
+  if (name === 'find_elements' && typeof input.text === 'string' && input.text.trim()) return `"${input.text.trim()}"`;
   return undefined;
 }
 
@@ -631,13 +632,16 @@ async function executeTool(
           type: 'snapshot',
           selector: typeof input.selector === 'string' ? input.selector : undefined,
           maxChars: Math.min(60_000, Number(input.max_chars) || 20_000),
+          includeHidden: input.include_hidden === true,
         });
         if (r.error) return err(r.error);
         return text(`URL: ${r.url}\nTitle: ${r.title}\n\n${r.html}`);
       }
       case 'find_elements': {
-        if (typeof input.selector !== 'string') return err('selector is required');
-        const r = await env.sendToContent<{ text: string }>({ type: 'query', selector: input.selector, limit: Number(input.limit) || 20 });
+        const selector = typeof input.selector === 'string' ? input.selector : undefined;
+        const needle = typeof input.text === 'string' ? input.text : undefined;
+        if (!selector?.trim() && !needle?.trim()) return err('selector or text is required');
+        const r = await env.sendToContent<{ text: string }>({ type: 'query', selector, text: needle, limit: Number(input.limit) || 20 });
         return text(r.text);
       }
       case 'get_styles': {

@@ -65,12 +65,13 @@ export const TOOLS: ToolDef[] = [
   {
     name: 'get_page',
     description:
-      'Return a pruned HTML view of the current page (or of one element and its subtree). Scripts, styles and hidden elements are removed; long text is truncated. Start here. Use a selector to zoom in when the page is large.',
+      'Return a pruned HTML view of the current page (or of one element and its subtree). Scripts, styles and hidden elements are removed; long text is truncated. Start here. A page over budget is outlined, its regions collapsed to "…N nodes"; open one with a selector.',
     inputSchema: {
       type: 'object',
       properties: {
         selector: { type: 'string', description: 'Optional CSS selector for the root element to serialize.' },
         max_chars: { type: 'integer', description: 'Character budget for the output. Default 20000, max 60000.' },
+        include_hidden: { type: 'boolean', description: 'Keep hidden elements too.' },
       },
       additionalProperties: false,
     },
@@ -82,9 +83,9 @@ export const TOOLS: ToolDef[] = [
       type: 'object',
       properties: {
         selector: { type: 'string' },
+        text: { type: 'string', description: 'Visible text to find (case-insensitive), alone or with selector; lists the deepest elements containing it.' },
         limit: { type: 'integer', description: 'Max elements to list. Default 20.' },
       },
-      required: ['selector'],
       additionalProperties: false,
     },
   },
