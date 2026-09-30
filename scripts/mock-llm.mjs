@@ -629,7 +629,8 @@ setTimeout(() => observer.disconnect(), 10000);`,
     // The agent-guardrails conversation, for the smoke run. It deliberately misbehaves twice, so
     // the smoke can assert that the loop pushes back rather than going along with it:
     //
-    //   steps 0-3  four page reads in a row and nothing acted on  -> lib/agent/budget.ts nudges
+    //   steps 0-3  four full page reads in a row, nothing acted on -> lib/agent/budget.ts nudges
+    //              (full get_page reads: small lookups are charged by size and would not)
     //   step 4     propose_mod with no run_script behind it       -> lib/agent/propose.ts refuses
     //   step 5     propose_mod again with untested_reason         -> accepted, card says untested
     //
@@ -640,9 +641,9 @@ setTimeout(() => observer.disconnect(), 10000);`,
     match: /tidy up the references section/i,
     steps: [
       { text: 'Looking at the page.', calls: [{ name: 'get_page', args: { max_chars: 6000 } }] },
-      { text: 'Checking the reference list.', calls: [{ name: 'find_elements', args: { selector: '.reflist', limit: 3 } }] },
-      { text: 'And the citations inside it.', calls: [{ name: 'find_elements', args: { selector: '.reference', limit: 3 } }] },
-      { text: 'One more look at the styling.', calls: [{ name: 'get_styles', args: { selector: '.reflist', properties: ['font-size'] } }] },
+      { text: 'Checking the article body.', calls: [{ name: 'get_page', args: { selector: '#mw-content-text' } }] },
+      { text: 'And the content column around it.', calls: [{ name: 'get_page', args: { selector: '#bodyContent' } }] },
+      { text: 'One more look at the whole content area.', calls: [{ name: 'get_page', args: { selector: '#content' } }] },
       {
         text: 'That should be enough to write it.',
         calls: [

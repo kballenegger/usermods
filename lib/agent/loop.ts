@@ -7,7 +7,7 @@ import { ATTACHMENT_DROPPED_PANEL_NOTE } from '../providers/vision.ts';
 import type { Provider } from '../providers/types';
 import { renderRunResult, type RunResult } from '../runscript.ts';
 import { DEFAULT_CONTEXT_BUDGET, type AgentEventBody, type ModProposal, type Msg, type Part, type Settings, type UserTurn } from '../types.ts';
-import { MAX_ITERATIONS, countReads, readBudgetNudge, wrapUpNudge } from './budget.ts';
+import { MAX_ITERATIONS, NO_READS, countReads, readBudgetNudge, wrapUpNudge, type ReadCall } from './budget.ts';
 import { compact, estimateTokens, needsCompaction } from './compact.ts';
 import { SYSTEM_PROMPT } from './prompt.ts';
 import { checkProposal, testedAs, testedNote, type ProposalContext } from './propose.ts';
@@ -398,8 +398,9 @@ export async function runAgent(input: AgentInput): Promise<RunOutcome> {
   async function loop() {
     // Page reads since the model last ran or proposed anything. The prompt's read budget is only a
     // rule until something in the conversation contradicts the model when it breaks it; this is
-    // that something. Per turn, reset by run_script or propose_mod.
-    let reads = 0;
+    // that something. Per turn, reset by run_script or propose_mod, and charged by the size of what
+    // each read returned (lib/agent/budget.ts), so cheap lookups do not cost like full pages.
+    let reads = NO_READS;
     // Whether a run_script has completed since the last proposal, which is what propose_mod's
     // "test it first" check reads. Held here rather than derived from the message history, because
     // by the time the history is stored a tool result is provider-neutral text.
@@ -547,6 +548,7 @@ export async function runAgent(input: AgentInput): Promise<RunOutcome> {
       // Real time spent inside wait_for and run_script's then_wait this iteration, so the abuse
       // guard charges what waiting actually cost rather than what it was allowed to cost.
       let waitedMs = 0;
+      const charged: ReadCall[] = [];
       for (const call of calls) {
         emit({ type: 'tool_call', id: call.id, name: call.name, input: call.input });
         emit({ type: 'status', phase: 'tool', tool: call.name, detail: describeCall(call.name, call.input), iteration: i + 1 });
@@ -560,16 +562,18 @@ export async function runAgent(input: AgentInput): Promise<RunOutcome> {
         results.push({ type: 'tool_result', toolCallId: call.id, content, isError: r.isError });
         if (call.name === 'propose_mod' && !r.isError) proposed = true;
         waitedMs += r.waitedMs ?? 0;
+        charged.push({
+          name: call.name,
+          chars: r.content.reduce((n, p) => n + (p.type === 'text' ? p.text.length : 0), 0),
+          image: r.content.some((p) => p.type === 'image'),
+        });
       }
 
       // Both nudges ride along with the tool results rather than as a separate user message, so the
       // history keeps its assistant/tool-result pairing and no orphan turn appears in the panel.
       const before = reads;
       const names = calls.map((c) => c.name);
-      // test_mod acts exactly as run_script does for the read budget: it runs the script on the
-      // page. It is folded in here rather than added to budget.ts's ACT_TOOLS only to keep this
-      // change out of that file; the effect is the same.
-      reads = countReads(reads, names.map((n) => (n === 'test_mod' ? 'run_script' : n)));
+      reads = countReads(reads, charged);
       const budget = readBudgetNudge(reads, before);
       if (budget) results.push({ type: 'text', text: budget });
       // The waiting guard. A turn that waits, acts, waits, acts is using the tool as intended and
@@ -637,6 +641,7 @@ function describeCall(name: string, input: Record<string, unknown>): string | un
   if ((name === 'find_elements' || name === 'get_styles' || name === 'get_page') && typeof input.selector === 'string' && input.selector.trim()) {
     return input.selector.trim();
   }
+  if (name === 'find_elements' && typeof input.text === 'string' && input.text.trim()) return `"${input.text.trim()}"`;
   return undefined;
 }
 
@@ -686,13 +691,16 @@ async function executeTool(
           type: 'snapshot',
           selector: typeof input.selector === 'string' ? input.selector : undefined,
           maxChars: Math.min(60_000, Number(input.max_chars) || 20_000),
+          includeHidden: input.include_hidden === true,
         });
         if (r.error) return err(r.error);
         return text(`URL: ${r.url}\nTitle: ${r.title}\n\n${r.html}`);
       }
       case 'find_elements': {
-        if (typeof input.selector !== 'string') return err('selector is required');
-        const r = await env.sendToContent<{ text: string }>({ type: 'query', selector: input.selector, limit: Number(input.limit) || 20 });
+        const selector = typeof input.selector === 'string' ? input.selector : undefined;
+        const needle = typeof input.text === 'string' ? input.text : undefined;
+        if (!selector?.trim() && !needle?.trim()) return err('selector or text is required');
+        const r = await env.sendToContent<{ text: string }>({ type: 'query', selector, text: needle, limit: Number(input.limit) || 20 });
         return text(r.text);
       }
       case 'get_styles': {

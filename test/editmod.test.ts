@@ -398,9 +398,9 @@ test('open_mod on the mod this chat already edits is a no-op, not an error', () 
 test('open_mod is a page-read budget neutral', () => {
   assert.ok(NEUTRAL_TOOLS.has('open_mod'));
   // Neither charged as a read (which would make the wanted behaviour cost investigation budget)…
-  assert.equal(countReads(3, ['open_mod']), 3);
+  assert.deepEqual(countReads({ units: 3, calls: 3 }, ['open_mod']), { units: 3, calls: 3 });
   // …nor credited as an act (which would clear a streak of reads that had earned a nudge).
-  assert.equal(countReads(3, ['get_page', 'open_mod']), 4);
+  assert.deepEqual(countReads({ units: 3, calls: 3 }, ['get_page', 'open_mod']), { units: 4, calls: 4 });
 });
 
 test('the open_mod tool is declared with mod_id and replace', () => {
