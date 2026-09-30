@@ -18,6 +18,7 @@ import { createUpdateController } from '@/lib/updatecontroller';
 import { withRetry } from '@/lib/agent/retry';
 import { resyncPlan } from '@/lib/resync';
 import { describeCallbackError, mapStack, mergeLateErrors, parseError, prepareRunScript, renderLateErrors, renderRunResult, type DomEffect, type LateError, type RawCallbackError, type RunResult, type RunSource } from '@/lib/runscript';
+import { watchDocument } from '@/lib/navwatch';
 import { shouldUpdate } from '@/lib/version';
 import { loadMods, matchPatternForUrl, modFromProposal, modFromSource, parseHeader, previewFromSource, upsertMod, deleteMod, saveMods } from '@/lib/mods';
 import { appendTurn, archiveChat, bulkChats, countTurns, createChat, deleteChat, getChat, hostFromUrl, isArchived, listChats, loadItems, loadMessages, markTitleRefreshed, renameChat, saveItems, saveMessages, setChatArtifact, setChatModel, setChatThinking, setModelTitle, touchChat } from '@/lib/chats';
@@ -2560,6 +2561,10 @@ function runWrapped(
  * Watching the tab is how a lost result stops looking like a timeout. The wrapper reports over
  * runtime messaging; a navigation or unload between the script finishing and that message flushing
  * drops it silently, and the model used to be told only that 20s had passed.
+ *
+ * But a tabs.onUpdated 'loading' is not proof the document went: Chrome fires it for a pushState or
+ * a hash change too, and there the script runs on and its report arrives. So 'loading' only ends
+ * the wait when the document the run started in is really gone (lib/navwatch.ts).
  */
 function awaitRunResult(
   tabId: number,
@@ -2586,9 +2591,26 @@ function awaitRunResult(
       exec.removeResultListener(listener);
       chrome.tabs.onUpdated.removeListener(onUpdated);
       chrome.tabs.onRemoved.removeListener(onRemoved);
+      docWatch?.stop();
       resolve(r);
     };
     settle = finish;
+
+    // Started before the caller injects the run, so its first read is of the document the run
+    // goes into.
+    const docWatch = opts.navigationEnds
+      ? watchDocument(
+          {
+            docToken: () => documentToken(tabId),
+            tabStatus: () => chrome.tabs.get(tabId).then((t) => t.status, () => undefined),
+            schedule: (fn, ms) => {
+              const t = setTimeout(fn, ms);
+              return () => clearTimeout(t);
+            },
+          },
+          (url) => finish({ outcome: { kind: 'navigated', url }, logs: [] }),
+        )
+      : null;
 
     const timer = setTimeout(() => finish({ outcome: { kind: 'timeout', seconds: opts.timeoutMs / 1000 }, logs: [] }), opts.timeoutMs);
 
@@ -2617,8 +2639,7 @@ function awaitRunResult(
     exec.addResultListener(listener);
 
     const onUpdated = (id: number, change: chrome.tabs.OnUpdatedInfo, tab: chrome.tabs.Tab) => {
-      if (!opts.navigationEnds || id !== tabId || change.status !== 'loading') return;
-      finish({ outcome: { kind: 'navigated', url: change.url ?? tab.url ?? 'a new page' }, logs: [] });
+      if (id === tabId) docWatch?.onUpdated(change, tab.url);
     };
     chrome.tabs.onUpdated.addListener(onUpdated);
 
@@ -2628,6 +2649,32 @@ function awaitRunResult(
     chrome.tabs.onRemoved.addListener(onRemoved);
   });
   return { result, settle };
+}
+
+/** How long a document-identity read may take before it counts as unreadable. Chrome takes ~5ms. */
+const DOC_TOKEN_TIMEOUT_MS = 1_000;
+
+/**
+ * Which document the tab's top frame holds now, for lib/navwatch.ts: its performance.timeOrigin,
+ * fixed for a document's life and new for every new one, readable from the isolated world. null
+ * when the frame cannot be scripted (a chrome:// or store page, an error page, a closed tab).
+ * injectImmediately, so a new document that is still loading answers now rather than at idle.
+ *
+ * The function is ours and fixed, never model code, so this is not the "code string through
+ * executeScript" docs/safari.md rules out. The timeout is for Safari, where this is unverified: a
+ * read that never answers must cost a moment, not turn a real navigation back into a timeout.
+ */
+async function documentToken(tabId: number): Promise<string | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const read = chrome.scripting
+    .executeScript({ target: { tabId, frameIds: [0] }, injectImmediately: true, func: () => String(performance.timeOrigin) })
+    .then(([r]) => (typeof r?.result === 'string' ? r.result : null), () => null);
+  const late = new Promise<null>((resolve) => (timer = setTimeout(() => resolve(null), DOC_TOKEN_TIMEOUT_MS)));
+  try {
+    return await Promise.race([read, late]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // ---------- late errors from run_script callbacks ----------
