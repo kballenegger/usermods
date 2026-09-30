@@ -165,3 +165,72 @@ test('stop() cancels a pending recheck', async () => {
   await tab.advance(RECHECK_MS);
   assert.deepEqual(seen, []);
 });
+
+test('ready settles only once the starting document has been read, and also when it cannot be', async () => {
+  // The caller injects the run after `ready`, so a script whose first statement navigates cannot
+  // have its NEW document read as the start (that would make its navigation look like a pushState).
+  let release: (t: string | null) => void = () => {};
+  const deps: NavWatchDeps = {
+    docToken: () => new Promise((r) => (release = r)),
+    tabStatus: async () => 'complete',
+    schedule: () => () => {},
+  };
+  const w = watchDocument(deps, () => {});
+  let ready = false;
+  void w.ready.then(() => (ready = true));
+  await settle();
+  assert.equal(ready, false, 'not before the read answers');
+  release('doc-1');
+  await settle();
+  assert.equal(ready, true);
+  const failing = watchDocument({ ...deps, docToken: () => Promise.reject(new Error('no access')) }, () => {});
+  await failing.ready; // resolves, never rejects
+  w.stop();
+  failing.stop();
+});
+
+test('a read still in flight when the run ends reports nothing afterwards', async () => {
+  let reads = 0;
+  let late: (t: string) => void = () => {};
+  const deps: NavWatchDeps = {
+    docToken: () => (++reads === 1 ? Promise.resolve('doc-1') : new Promise((r) => (late = r))),
+    tabStatus: async () => 'loading',
+    schedule: () => () => {},
+  };
+  const seen: string[] = [];
+  const w = watchDocument(deps, (u) => seen.push(u));
+  await settle();
+  w.onUpdated({ status: 'loading', url: 'https://example.com/next' });
+  await settle();
+  w.stop();
+  late('doc-2');
+  await settle();
+  assert.deepEqual(seen, []);
+});
+
+test('a loading that lands while a read is in flight gets a read of its own', async () => {
+  // pushState, then a real navigation a moment later: the first read sees the old document, and
+  // the second event must not be swallowed by it.
+  const tab = fakeTab();
+  const seen: string[] = [];
+  const w = watchDocument(tab.deps, (u) => seen.push(u));
+  await settle();
+  tab.state.status = 'loading';
+  w.onUpdated({ status: 'loading', url: 'https://app.example/route' });
+  tab.state.token = 'doc-2';
+  w.onUpdated({ status: 'loading', url: 'https://example.com/elsewhere' });
+  await settle();
+  await settle();
+  assert.deepEqual(seen, ['https://example.com/elsewhere']);
+});
+
+test('a tab that disappears during a recheck ends the run as closed', async () => {
+  const tab = fakeTab();
+  const seen: string[] = [];
+  const w = watchDocument(tab.deps, (u) => seen.push(u));
+  await settle();
+  tab.state.status = undefined;
+  w.onUpdated({ status: 'loading' });
+  await settle();
+  assert.deepEqual(seen, ['a closed tab']);
+});

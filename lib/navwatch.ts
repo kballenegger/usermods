@@ -23,6 +23,10 @@
 // still caught within one interval. If the start value could not be read at all, nothing can be
 // compared and 'loading' ends the wait as it always did, which is no worse than before.
 //
+// The start read has to land in the document the run starts in. The caller waits for `ready`
+// before injecting (a few milliseconds in Chrome), so a script whose first statement navigates
+// cannot win that race and have its new document read as the start.
+//
 // Pure, with its browser calls passed in, so test/navwatch.test.ts drives it with no browser.
 
 /** How often a document that still answers is re-read while its tab reports it is loading. */
@@ -50,6 +54,12 @@ export function judgeDocument(start: string | null, now: string | null): DocVerd
 }
 
 export interface NavWatch {
+  /**
+   * Settles once the starting document has been read (or found unreadable). A caller that injects
+   * the run only after this cannot have the start read land in a document the run itself navigated
+   * to, which would make that navigation look like the same document and cost a full timeout.
+   */
+  ready: Promise<void>;
   /** Feed every tabs.onUpdated event for the watched tab. */
   onUpdated(change: { status?: string; url?: string }, tabUrl?: string): void;
   /** Stop checking; the run is over. */
@@ -107,6 +117,7 @@ export function watchDocument(deps: NavWatchDeps, onNavigated: (url: string) => 
   };
 
   return {
+    ready: start.then(() => undefined),
     onUpdated(change, tabUrl) {
       if (stopped || change.status !== 'loading') return;
       url = change.url ?? tabUrl ?? url;

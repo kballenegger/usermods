@@ -2549,6 +2549,8 @@ function runWrapped(
   const waiting = awaitRunResult(tabId, runId, { timeoutMs: opts.timeoutMs, navigationEnds: true, src: () => opts.src });
   // An injection that never starts is its own failure, and saying "timed out" for it is a lie.
   void (async () => {
+    // The document the run starts in is read before the run can navigate away from it.
+    await waiting.ready;
     if (world === 'MAIN') await exec.injectOnce(tabId, relayCode(runId, exec.reportTransport), 'USER_SCRIPT');
     await exec.injectOnce(tabId, wrapped, world);
   })().catch((e: unknown) => waiting.settle({ outcome: { kind: 'injection-failed', reason: e instanceof Error ? e.message : String(e) }, logs: [] }));
@@ -2572,8 +2574,9 @@ function awaitRunResult(
   tabId: number,
   runId: string,
   opts: { timeoutMs: number; navigationEnds: boolean; src: () => RunSource },
-): { result: Promise<RunResult>; settle: (r: RunResult) => void } {
+): { result: Promise<RunResult>; settle: (r: RunResult) => void; ready: Promise<void> } {
   let settle: (r: RunResult) => void = () => {};
+  let ready: Promise<void> = Promise.resolve();
   // Asked for when a report arrives, not now: a test on a fresh load only knows where the script's
   // own lines sit once its code has been composed for the document that claimed it.
   const describe = (list: unknown) => (Array.isArray(list) ? list.map((e: RawCallbackError) => describeCallbackError(e, opts.src())) : []);
@@ -2613,6 +2616,7 @@ function awaitRunResult(
           (url) => finish({ outcome: { kind: 'navigated', url }, logs: [] }),
         )
       : null;
+    if (docWatch) ready = docWatch.ready;
 
     const timer = setTimeout(() => finish({ outcome: { kind: 'timeout', seconds: opts.timeoutMs / 1000 }, logs: [] }), opts.timeoutMs);
 
@@ -2650,7 +2654,7 @@ function awaitRunResult(
     };
     chrome.tabs.onRemoved.addListener(onRemoved);
   });
-  return { result, settle };
+  return { result, settle, ready };
 }
 
 /** How long a document-identity read may take before it counts as unreadable. Chrome takes ~5ms. */
