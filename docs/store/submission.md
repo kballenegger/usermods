@@ -84,9 +84,22 @@ listing against Google's policies the way a reviewer would:
   or that a new extension's icon is inside the puzzle-piece menu.
 - The README said the listing was pending review.
 
+**A privacy bug, found in review of the read tools and present since the first version.** The page
+snapshot printed the `value` of every input, so on a site that writes keystrokes back into the page
+(React does) a typed password, an autofilled card number or a hidden token could be sent to the
+model provider. 0.1.1 never sends form field values. The privacy policy and the first-run notice
+say what is sent.
+
+**Two more fixes to the package:** a mod written in chat no longer moves to the page's own world
+the second time it is saved, and a route change on a single-page app is no longer reported to the
+model as the page navigating away.
+
 0.1.1 also carries everything merged since 0.1.0 (see [CHANGELOG.md](../../CHANGELOG.md)): markdown
 replies, the one-row composer, per-chat thinking levels, reviewed updates, sharing, the install
-banner, and the fixes from the first user report.
+banner, the fixes from the first user report, and the agent's reworked tools: `test_mod` (the
+finished script is tested the way the saved mod will run, and the proposal card says how), honest
+`run_script` results, and page reads that keep a long page's shape, search by text, list overlays
+and read a page's text. None of it changes the permissions or what the listing has to say.
 
 ---
 
