@@ -1,8 +1,9 @@
 // run_script's source transform and result rendering.
 //
-// chrome.userScripts is unavailable under automation (the "Allow User Scripts" toggle cannot be
-// flipped programmatically), so none of this can be exercised in the browser smoke run. Keeping
-// the whole decision in pure functions is what makes it testable at all.
+// The smoke run leaves Chrome's "Allow User Scripts" toggle off, so chrome.userScripts is not there
+// and none of this is exercised by it (scripts/reviewer-walkthrough.mjs does turn the toggle on,
+// for one conversation). Keeping the whole decision in pure functions is what makes every case of
+// it testable.
 //   npm test
 import assert from 'node:assert/strict';
 import test from 'node:test';

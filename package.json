@@ -1,6 +1,6 @@
 {
   "name": "usermods",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Vibe-code userscripts in place. Customize any website by chatting with any LLM.",
   "license": "MIT",
@@ -47,6 +47,8 @@
     "screenshots:settings": "USERMODS_TEST_BUILD=1 wxt build && USERMODS_TEST_BUILD=1 node scripts/screenshots.mjs --settings-capture",
     "screenshots:markdown": "USERMODS_TEST_BUILD=1 wxt build && USERMODS_TEST_BUILD=1 node scripts/screenshots.mjs --markdown-capture",
     "store-assets": "USERMODS_TEST_BUILD=1 wxt build && USERMODS_TEST_BUILD=1 node scripts/store-assets.mjs",
+    "listing-check": "node scripts/listing-check.mjs",
+    "reviewer-walkthrough": "USERMODS_STORE=1 wxt build && node scripts/reviewer-walkthrough.mjs",
     "video": "npm --prefix video ci --no-audit --no-fund && npm --prefix video run render",
     "video:all": "npm --prefix video ci --no-audit --no-fund && npm --prefix video run render:all",
     "video:readme": "npm --prefix video run readme",

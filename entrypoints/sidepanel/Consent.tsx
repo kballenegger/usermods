@@ -30,6 +30,8 @@ export function Consent({ onAccept, onDismiss }: { onAccept: () => void; onDismi
           <li>A pruned copy of the page's HTML: text and structure, with scripts and styles stripped out.</li>
           <li>Details of elements you point at, or that the model looks up by selector.</li>
           <li>A screenshot of the visible part of the tab, but only when the model asks for one.</li>
+          <li>What a script returns when the model runs one on the page to test its work.</li>
+          <li>Any images you attach to a message.</li>
         </ul>
         <span className="muted" style={{ fontSize: 'var(--fs-meta)' }}>
           If the page holds something private — a mailbox, a bank page, a medical record — that content goes to the

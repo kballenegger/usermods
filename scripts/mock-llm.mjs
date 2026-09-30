@@ -42,10 +42,12 @@
 // one at index = (number of assistant messages so far), which makes the loop deterministic: the
 // agent calls back after each round of tool results and gets the next step.
 //
-// What the scripts deliberately avoid: run_script and screenshot. chrome.userScripts is
-// unavailable in an automated profile (the "Allow User Scripts" toggle cannot be flipped
-// programmatically), so those tools would fail and put an error row in the transcript. get_page,
-// find_elements and get_styles all go through the content script and work fine.
+// What the scripts deliberately avoid: run_script and screenshot. The flows that use them leave
+// Chrome's "Allow User Scripts" toggle off, so chrome.userScripts is not there and those tools
+// would fail and put an error row in the transcript. get_page, find_elements and get_styles all go
+// through the content script and work fine. (The toggle CAN be turned on from an automated profile,
+// by clicking it on chrome://extensions; the one script that relies on that is
+// `reviewer-walkthrough` below.)
 //
 // A consequence, since propose_mod started refusing untested scripts: every propose_mod here
 // passes `untested_reason`, because in this profile a mod genuinely cannot be run first. That is
@@ -139,6 +141,19 @@ Reference: [the Vector 2022 notes](https://www.mediawiki.org/wiki/Skin:Vector).
 [do not click me](javascript:alert(1))
 
 <img src="https://example.invalid/tracker.gif">`;
+
+/**
+ * What the hero conversation says on its way to the proposal.
+ *
+ * Everywhere but the store captures it is MARKDOWN_REPLY, the renderer's specimen. The store
+ * screenshots (scripts/store-assets.mjs, which sets MOCK_LLM_PLAIN_HERO) get the two sentences a
+ * model would actually write here instead: the specimen ends in three lines that exist to be
+ * refused by the sanitiser, one of them reading "do not click me", and the panel scrolls to the end
+ * of the reply, so they were the part of the transcript the store picture showed.
+ */
+const HERO_REPLY = process.env.MOCK_LLM_PLAIN_HERO
+  ? 'The container is capped at ~1600px with the sidebar reserving space on the left. Hiding the sidebar and lifting the cap gives the article the full window.'
+  : MARKDOWN_REPLY;
 
 /**
  * The resume flow's markers and prompts. Four conversations, one per thing that can go wrong: a
@@ -282,7 +297,7 @@ const SCRIPTS = [
         // lines are the ones the SANITISER has to refuse, and the flow checks those too — an <img>
         // is a tracking pixel a model could aim at the page it just read, and a `javascript:` href
         // would run in the panel's own origin, which is where the API keys live.
-        text: MARKDOWN_REPLY,
+        text: HERO_REPLY,
         calls: [
           {
             name: 'propose_mod',
@@ -308,6 +323,52 @@ const SCRIPTS = [
 
 const style = document.createElement('style');
 style.textContent = css;
+document.head.appendChild(style);`,
+            },
+          },
+        ],
+      },
+    ],
+  },
+
+  {
+    // The store reviewer's own test, for scripts/reviewer-walkthrough.mjs. The one conversation
+    // here that DOES call run_script and proposes without untested_reason: that script turns the
+    // "Allow User Scripts" toggle on through chrome://extensions first, the way a reviewer does, so
+    // the run is real and the proposal is a tested one.
+    name: 'reviewer-walkthrough',
+    match: /hide the table of contents/i,
+    steps: [
+      {
+        text: 'Let me look at the page first.',
+        calls: [{ name: 'get_page', args: { max_chars: 12000 } }],
+      },
+      {
+        text: 'The table of contents is #vector-toc-pinned-container, inside .vector-column-start. Trying it.',
+        calls: [
+          {
+            name: 'run_script',
+            args: {
+              description: 'Hide the table of contents',
+              code: `const style = document.createElement('style');
+style.textContent = '#vector-toc-pinned-container, .vector-column-start { display: none !important; }';
+document.head.appendChild(style);
+getComputedStyle(document.querySelector('.vector-column-start')).display;`,
+            },
+          },
+        ],
+      },
+      {
+        text: 'It is hidden. Here it is as a mod.',
+        calls: [
+          {
+            name: 'propose_mod',
+            args: {
+              name: 'Wikipedia: no table of contents',
+              description: 'Hides the pinned table of contents on Wikipedia articles.',
+              matches: ['*://*.wikipedia.org/wiki/*'],
+              code: `const style = document.createElement('style');
+style.textContent = '#vector-toc-pinned-container, .vector-column-start { display: none !important; }';
 document.head.appendChild(style);`,
             },
           },

@@ -139,6 +139,9 @@ export default defineBackground(() => {
 
   chrome.runtime.onInstalled.addListener(() => void bootstrap());
   chrome.runtime.onStartup.addListener(() => void bootstrap());
+  // Every other wake of the worker: catch up if the toggle was turned on while it slept and no
+  // surface was open to ask. Cheap when there is nothing to do; see prepareEngine.
+  void prepareEngine().catch((e: unknown) => console.warn('[usermods] prepare engine', e));
 
   watchUserJsNavigations();
 
@@ -1009,10 +1012,52 @@ async function applyPanelScope() {
   }
 }
 
+/**
+ * Make the engine usable: configure it, and register the saved mods if they are not registered.
+ *
+ * Browser start and install are not the only moments this is needed. On Chrome the "Allow User
+ * Scripts" toggle is off on a fresh install, so the run at install does nothing; and when the user
+ * then turns the toggle on, Chrome adds the API to the worker that is already running and fires
+ * neither onInstalled nor onStartup. Left to those two events, a new install stayed broken until
+ * the browser was restarted: the USER_SCRIPT world had never been given messaging, so every run
+ * finished on the page and then waited out its 20 seconds with nobody able to hear the result, and
+ * no saved mod was registered. So this is also called when the worker starts, whenever a surface
+ * asks for the status (on open, on focus, and every two seconds while the setup banner shows) and
+ * before any one-off run.
+ *
+ * It is cheap when there is nothing to do, which is nearly always: configuring is one idempotent
+ * call, and the mods are re-registered only when what is registered differs from what should be
+ * (`needsSync`). That matters because a full sync unregisters everything before registering it
+ * again, and a page that loads in between gets no mods. It also makes this a no-op on Safari, whose
+ * engine registers nothing, and whose sync would otherwise revoke the capability of a disabled mod
+ * that "Run once" had just been handed one for.
+ *
+ * Nothing is remembered between calls except the attempt in flight, which a second caller joins.
+ * The toggle can be turned off and on again with no surface open to notice, so "already prepared"
+ * is not a fact this worker can hold on to.
+ */
+let preparing: Promise<void> | null = null;
+
+function prepareEngine(force = false): Promise<void> {
+  if (!exec.status().available) return Promise.resolve();
+  if (preparing && !force) return preparing;
+  const after = preparing ?? Promise.resolve();
+  const mine: Promise<void> = after
+    .catch(() => {})
+    .then(async () => {
+      await exec.configure();
+      if (force || (await exec.needsSync(await loadMods()))) await syncRegistrations();
+    })
+    .finally(() => {
+      if (preparing === mine) preparing = null;
+    });
+  preparing = mine;
+  return mine;
+}
+
 async function bootstrap() {
   try {
-    await exec.configure();
-    await syncRegistrations();
+    await prepareEngine(true);
   } catch (e) {
     console.warn('[usermods] bootstrap', e);
   }
@@ -1443,6 +1488,9 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
       return legacyRunShape(await executeInTab(req.tabId, req.code, { raw: true }));
     }
     case 'userScripts.status':
+      // The panel asks on open and on focus, which is the first thing that happens after the user
+      // comes back from turning the toggle on. See prepareEngine.
+      void prepareEngine().catch((e: unknown) => console.warn('[usermods] prepare engine', e));
       return exec.status();
     case 'page.pick':
       await sendToContent(req.tabId, { type: 'pick' });
@@ -2246,8 +2294,15 @@ function userScriptsAvailable(): boolean {
  * adapter's; this stays as the one name the rest of the background calls after any change to the
  * mod list.
  */
-async function syncRegistrations(): Promise<void> {
-  await exec.sync(await loadMods(), loadGmValues);
+let syncQueue: Promise<void> = Promise.resolve();
+
+function syncRegistrations(): Promise<void> {
+  // One at a time. A sync reads what is registered, unregisters it and registers the new list, and
+  // two of those interleaved end with a duplicate-id error or with a mod the user just disabled
+  // still registered. The mod list is read inside the queued step, so each run sees the latest.
+  const run = syncQueue.catch(() => {}).then(async () => exec.sync(await loadMods(), loadGmValues));
+  syncQueue = run;
+  return run;
 }
 
 
@@ -2267,6 +2322,10 @@ async function executeInTab(
   const { world = 'USER_SCRIPT', timeoutMs = 20_000, raw = false } = opts;
   const status = exec.status();
   if (!status.available) throw new Error(status.message);
+  // The result comes back over messaging the engine has to have been configured for; see
+  // prepareEngine for how a worker can reach this line without that having happened. A failure in
+  // there (registering the saved mods, say) is not a reason to refuse a one-off run.
+  await prepareEngine().catch((e: unknown) => console.warn('[usermods] prepare engine', e));
 
   let source = code;
   if (!raw) {

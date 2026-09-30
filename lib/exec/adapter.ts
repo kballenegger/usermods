@@ -20,7 +20,7 @@
  */
 
 import { buildRegisteredCode, type GmMessage } from '../gm.ts';
-import { execStatus, pickEngine, type ExecEngine, type ExecStatus, type RuntimeProbe } from './engine.ts';
+import { execStatus, pickEngine, readProbe, type ExecEngine, type ExecStatus, type ProbeSource, type RuntimeProbe } from './engine.ts';
 import { GrantTable } from './grants.ts';
 import { modsToRun, RunLedger } from './plan.ts';
 import {
@@ -64,6 +64,12 @@ export interface ExecAdapter {
   install(): void;
   /** Async startup that can wait: configuring the userScripts world. */
   configure(): Promise<void>;
+  /**
+   * Whether what is registered differs from what `mods` says should be, so a sync is owed even
+   * though the mod list has not changed. True on Chrome when the saved mods were never registered
+   * (the toggle was off when they were saved). Never true where nothing is registered ahead of time.
+   */
+  needsSync(mods: Mod[]): Promise<boolean>;
   /** Every enabled mod, re-registered. Called after any change to the mod list. */
   sync(mods: Mod[], values: (modId: string) => Promise<Record<string, unknown>>): Promise<void>;
   /** One mod's GM value snapshot moved. */
@@ -90,23 +96,10 @@ export interface AdapterEnv {
 }
 
 function probeRuntime(): RuntimeProbe {
-  const api = typeof chrome !== 'undefined' && typeof (chrome as { userScripts?: unknown }).userScripts !== 'undefined';
-  let permitted = false;
-  if (api) {
-    try {
-      // Throws when Chrome's per-extension permission toggle is off.
-      chrome.userScripts.getScripts();
-      permitted = true;
-    } catch {
-      permitted = false;
-    }
-  }
-  return {
-    api,
-    permitted,
-    sidePanel: typeof chrome !== 'undefined' && typeof (chrome as { sidePanel?: unknown }).sidePanel !== 'undefined',
-    userAgent: typeof navigator === 'undefined' ? '' : navigator.userAgent,
-  };
+  return readProbe(
+    typeof chrome === 'undefined' ? undefined : (chrome as unknown as ProbeSource),
+    typeof navigator === 'undefined' ? '' : navigator.userAgent,
+  );
 }
 
 export function createExecAdapter(env: AdapterEnv): ExecAdapter {
@@ -114,6 +107,14 @@ export function createExecAdapter(env: AdapterEnv): ExecAdapter {
 }
 
 // ---------- Chrome / Firefox: chrome.userScripts ----------
+
+/**
+ * The mods that get registered. register() rejects a script with neither matches nor includeGlobs,
+ * which would take the whole batch down with it, so those are left out.
+ */
+function registrable(mods: Mod[]): Mod[] {
+  return mods.filter((m) => m.enabled && (m.matches.length || m.includeGlobs.length));
+}
 
 /**
  * What shipped, moved behind the interface. Every call and its ordering is unchanged; the only new
@@ -168,13 +169,18 @@ class UserScriptsAdapter implements ExecAdapter {
     await chrome.userScripts.configureWorld({ messaging: true });
   }
 
+  async needsSync(mods: Mod[]): Promise<boolean> {
+    if (!this.available()) return false;
+    const have = new Set((await chrome.userScripts.getScripts()).map((s) => s.id));
+    const want = registrable(mods).map((m) => m.id);
+    return want.length !== have.size || want.some((id) => !have.has(id));
+  }
+
   async sync(mods: Mod[], values: (modId: string) => Promise<Record<string, unknown>>): Promise<void> {
     if (!this.available()) return;
     const existing = await chrome.userScripts.getScripts();
     if (existing.length) await chrome.userScripts.unregister({ ids: existing.map((s) => s.id) });
-    // register() rejects a script with neither matches nor includeGlobs, which would take the whole
-    // batch down with it, so those are dropped here.
-    const enabled = mods.filter((m) => m.enabled && (m.matches.length || m.includeGlobs.length));
+    const enabled = registrable(mods);
     if (!enabled.length) return;
     const scripts = await Promise.all(
       enabled.map(async (m) => ({
@@ -353,6 +359,11 @@ class ContentScriptAdapter implements ExecAdapter {
   async configure(): Promise<void> {
     // There is no world to configure: the runner is a declared content script the manifest already
     // carries, and everything it needs was registered by install().
+  }
+
+  async needsSync(): Promise<boolean> {
+    // Nothing is registered ahead of time, so there is never a registration to catch up on.
+    return false;
   }
 
   async sync(mods: Mod[]): Promise<void> {
