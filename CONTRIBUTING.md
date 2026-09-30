@@ -37,6 +37,8 @@ You do not need a real model at all for the tests or the smoke run — both use 
 | `npm run smoke` | Builds to `.output/test-chrome-mv3`, then drives the real side panel headless in Playwright against `scripts/mock-llm.mjs`, asserting the whole chat loop end to end. |
 | `npm run screenshots` | Regenerates the README and [docs/screenshots.md](docs/screenshots.md) images through the same harness. |
 | `npm run store-assets` | Regenerates the Chrome Web Store screenshots and promo tiles into `docs/store/assets/`. |
+| `npm run listing-check` | Checks the store description against Google's keyword-spam rules, and the other dashboard texts against the dashboard's field limits. |
+| `npm run reviewer-walkthrough` | Builds the store variant and follows the store reviewer's test instructions against it from a fresh profile, turning on "Allow User Scripts" through `chrome://extensions` and running a script for real. |
 | `npm run styleguide` | Rebuilds and recaptures the living style guide into `docs/design/`, which `docs/design.md` embeds. |
 
 ### Three output folders, on purpose

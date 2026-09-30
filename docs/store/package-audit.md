@@ -1,42 +1,42 @@
-# Store package audit — v0.1.0
+# Store package audit — v0.1.1
 
-What is actually inside the zip that goes to the Chrome Web Store, checked file by file before the
-first submission. Rebuild and re-audit with `npm run zip:store` whenever the package changes.
+What is inside the zip that goes to the Chrome Web Store, checked before the resubmission. Rebuild
+and re-audit with `npm run zip:store` whenever the package changes.
 
-**Audited:** 2026-09-21 · **Commit:** `12fc38a` · **Build:** `npm run zip:store`
-(`USERMODS_STORE=1 wxt zip`), output moved to `.output/store-chrome-mv3` (see CONTRIBUTING.md
-"Three output folders, on purpose")
+**Audited:** 2026-09-30 · **Build:** `npm run zip:store` (`USERMODS_STORE=1 wxt zip`), built into
+`.output/store-chrome-mv3` · **Source:** the commit that introduces this audit; the zip depends only
+on the source tree, and rebuilding at that commit reproduces the checksum below.
 
 | | |
 |---|---|
-| Artifact | `.output/usermods-0.1.0-chrome.zip` (built from `.output/store-chrome-mv3`) |
-| Size | **410,791 bytes** (401.2 KiB) |
-| SHA-256 | `8b7c23dd7e5fcd539be151328f13fec6ee33b9c9e6a38f79666ac3db2226c01b` |
-| Unpacked | 1,098,114 bytes (1,072.4 KiB) across **35 files**, 63% compression |
+| Artifact | `.output/usermods-0.1.1-chrome.zip` |
+| Size | **494,796 bytes** (483.2 KiB) |
+| SHA-256 | `9f86ba0f0d085f9cebf17a11294af8bd281037e7c128bdd7f1a8101b5385ce87` |
+| Unpacked | 1,374,889 bytes across **36 files** |
 
-Re-derived at `12fc38a`, two days after the prior audit (`2a752fd`) and after PR #13 (Safari
-support) merged and touched shared code (`lib/oauth.ts`, `lib/exec/adapter.ts` among others). File
-count is unchanged at 35, but every content hash and the zip's own bytes and sha256 changed —
-expected, since the shared code the store build also pulls in moved. Rebuilt twice for this audit:
-same sha256 both times, byte-identical zip. The bundler's content hashes are still deterministic
-for an unchanged tree.
+Built twice for this audit with the same SHA-256 both times: the build is deterministic for an
+unchanged tree.
+
+The 0.1.0 package (410,791 bytes, 35 files, `8b7c23dd…`, commit `12fc38a`) is the one that was
+submitted on 2026-09-22. It is superseded: besides the listing problem it was rejected for, it had a
+first-run bug that would have failed review (see [submission.md](submission.md#what-the-resubmission-changes)).
 
 ---
 
 ## manifest.json
 
-Read from the unzipped package, not from `wxt.config.ts`. Every line the store cares about:
+Read from the unzipped package, not from `lib/manifest.ts`.
 
 | Key | Value | OK |
 |---|---|---|
 | `manifest_version` | `3` | ✅ |
 | `name` | `usermods` | ✅ |
-| `version` | `0.1.0` — matches `package.json` | ✅ |
-| `description` | `Vibe-code userscripts in place. Customize any website by chatting with any LLM.` (79 chars, under the 132-char manifest limit) | ✅ |
-| `icons` | 16, 32, 48, 96, 128 — all five present in `icon/` | ✅ |
-| `permissions` | `sidePanel`, `storage`, `scripting`, `tabs`, `userScripts`, `declarativeNetRequest` — exactly these six, no more | ✅ |
+| `version` | `0.1.1`, matches `package.json` | ✅ |
+| `description` | `Vibe-code userscripts in place. Customize any website by chatting with any LLM.` (79 chars, under the 132-char limit) | ✅ |
+| `icons` | 16, 32, 48, 96, 128, all five present in `icon/` | ✅ |
+| `permissions` | `sidePanel`, `storage`, `scripting`, `userScripts`, `declarativeNetRequest`: exactly these five. **`tabs` is gone since 0.1.0** ([why](permissions.md#tabs-no-longer-requested)) | ✅ |
 | `host_permissions` | `["<all_urls>"]` | ✅ |
-| `minimum_chrome_version` | `135` (the `userScripts` API's floor) | ✅ |
+| `minimum_chrome_version` | `135` | ✅ |
 | `side_panel` | `{ "default_path": "sidepanel.html" }` | ✅ |
 | `options_ui` | `{ "page": "dashboard.html", "open_in_tab": true }` | ✅ |
 | `action` | `default_title: "Open usermods"`, `default_icon` at 16/32/48/128 | ✅ |
@@ -44,157 +44,77 @@ Read from the unzipped package, not from `wxt.config.ts`. Every line the store c
 | `content_scripts` | one, `<all_urls>` at `document_idle` | ✅ |
 | `web_accessible_resources` | `install.html` only (needed by the `.user.js` redirect rule) | ✅ |
 
-No `activeTab` — `<all_urls>` already grants everything it would, and nothing in the code reads it.
-No `declarative_net_request` ruleset key — `declarativeNetRequest` is declared only as a permission
-(above); the extension registers rules at runtime via the API, not through a static
-`declarative_net_request.rule_resources` manifest entry, so there is nothing further to check here.
+No `activeTab` and no `tabs`: `<all_urls>` covers what either would add for anything usermods does.
+No `declarative_net_request` ruleset key: the two rules are registered at runtime with
+`updateDynamicRules`.
 
 ## What is not in the package
 
 | Checked for | Found | How |
 |---|---|---|
-| Source maps | **0** | no `*.map` files; no `sourceMappingURL` comment in any file |
+| Source maps | **0** | no `*.map` files; no `sourceMappingURL` in any file |
 | `.DS_Store` | **0** | `find -name .DS_Store` |
 | Test files, scripts, TypeScript sources, `package.json`, `tsconfig.json`, Markdown | **0** | `find` over `*.ts *.tsx *.test.* *.mjs package.json tsconfig.json *.md` |
-| Subscription OAuth endpoints | **0** | `grep -aroF -e auth.openai.com -e auth.x.ai -e chatgpt.com/backend-api -e cli-chat-proxy.grok.com` over the unzipped tree prints nothing (the store-build gate) |
-| Safari-only files | **0** | `find` for `*popup*` / `*modrunner*` by name, and `grep -rl` for `modrunner`, `popup-size`, `Safari toolbar popup` across every unzipped file — both empty. `icon/` has exactly the five Chrome sizes (16/32/48/96/128), not the 256/512 Safari adds. See "Safari support and the store package" below. |
+| Subscription sign-in endpoints | **0** | `grep -aroF -e auth.openai.com -e auth.x.ai -e chatgpt.com/backend-api -e cli-chat-proxy.grok.com` over the unzipped tree prints nothing |
+| Safari-only files | **0** | no file named `*popup*` or `*modrunner*`; no `popup-size` or "Safari toolbar popup" string; `icon/` has the five Chrome sizes, not the 256/512 Safari adds |
+| Remotely loaded scripts | **0** | every `<script src>` in the four HTML files is a package path (`/chunks/…`, `/theme-boot.js`); no `importScripts` |
+| `eval(` / `new Function(` calls | **0** | the only two matches in the package are inside the regular expressions in `background.js` that *refuse* a proposed script using them (`lib/agent/propose.ts`) |
 
-The grep now also checks the two subscription base URLs by name (`CHATGPT_CODEX_BASE` /
-`chatgpt.com/backend-api/codex` and `XAI_PROXY_BASE` / `cli-chat-proxy.grok.com`, both defined in
-`lib/buildflags.ts`), not just their auth hosts, and still finds nothing. The `__STORE_BUILD__`
-define does its job: `lib/oauth.ts` is loaded only via `import('@/lib/oauth')` behind `if
-(STORE_BUILD)` checks in `entrypoints/background.ts`, so the bundler drops that dynamic import —
-and the device-code flow it contains — from the store build entirely. What survives in
-`background.js` is the stub side of the RPC surface: `oauth.status` returns `{signedIn:false}`,
-`oauth.start`/`oauth.poll` return the "not available in the Chrome Web Store build" message from
-`unavailableProviderMessage()`, and `oauth.signout`/`oauth.cancel` return `{ok:true}` — confirmed
-directly in the minified `background.js` (`case'oauth.status':return{signedIn:!1}`). This is what
-lets a connection profile saved by the GitHub build degrade gracefully instead of throwing: see
-"Store build and a GitHub-saved subscription connection" below.
+**Subscription wording.** The words "subscription sign-in", "ChatGPT" and "SuperGrok" do still
+appear in `background.js` and one chunk, in two places only, both deliberate: the message that a
+provider carried over from the GitHub build "is not available in the Chrome Web Store build", and
+the labels that name such a provider in the list. Nothing in the store build offers or describes
+signing in. Three strings that did (the line by the message box, the empty model picker, the hint
+under Base URL) were found in this audit and are now compiled out.
 
-A plain `grep oauth background.js` does still match other strings, all of them inside the bundled
-`@anthropic-ai/sdk` (`urn:ietf:params:oauth:grant-type:jwt-bearer`, the `oauth-2025-04-20` beta
-header, `user_oauth` config names, `/v1/oauth/token`). Still accurate: these remain vendor SDK
-constants on a code path usermods does not call, not usermods' own sign-in.
+A plain `grep oauth background.js` also matches strings inside the bundled `@anthropic-ai/sdk`
+(`urn:ietf:params:oauth:grant-type:jwt-bearer` and similar). They are vendor SDK constants on a code
+path usermods does not call.
 
-## Safari support and the store package
+## Things that are in the package and look odd
 
-PR #13 added Safari support: a `modrunner` content script (`entrypoints/modrunner.content.ts`,
-declared with `include: ['safari']`), a toolbar `popup` entrypoint (`entrypoints/popup/`, including
-`popup-size.css`, gated the same way via `<meta name="wxt.include" content="['safari']" />`), and
-two extra icon renders (256, 512) that Safari's Extensions list needs at a size Chrome never
-requests. None of the three should reach the Chrome store zip, and none do:
+- **`content-scripts/modrunner.js` is named in `background.js` but is not in the package.** Both
+  execution engines (`lib/exec/adapter.ts`) are compiled into every build, and that string belongs to
+  Safari's. Since 0.1.1 the engine is chosen from the manifest, which asks for `userScripts` on
+  Chrome, so the Safari engine cannot be picked here. (In 0.1.0 it could be, and was, on every fresh
+  install: that was the first-run bug.)
+- **Two debug switches** (`debug:safariMode`, `debug:retryPolicy`) are read from extension storage.
+  Nothing in the UI sets them; the smoke flows do.
+- **`styleguide.html`** ships, about 6 KB zipped. It is linked from nowhere in the shipped UI, is
+  not web accessible, and makes no `chrome.*` or network call.
 
-- **`modrunner.content.ts` / `popup/`** — both are WXT entrypoints scoped with `include: ['safari']`,
-  so they are dropped at entrypoint-discovery time for a Chrome build, not filtered out afterward.
-  `find . -iname '*popup*' -o -iname '*modrunner*'` over the unzipped package is empty, and a
-  content grep for `modrunner`, `popup-size`, and the `popup/index.html` file's own comment text
-  ("Safari toolbar popup") matches nothing.
-- **256/512 icons** — kept out by the `build:publicAssets` hook in `wxt.config.ts`, which strips
-  `SAFARI_ONLY_ICON_SIZES` (`lib/manifest.ts`) from `files` for every target but `browser ===
-  'safari'`. `icon/` in the unzipped package has exactly the five Chrome sizes: 16, 32, 48, 96, 128.
-
-One string *does* legitimately appear: `background.js` contains the literal
-`content-scripts/modrunner.js` (inside a minified `ContentScriptAdapter` class). That is not the
-Safari-only file leaking in — it is `lib/exec/adapter.ts`'s `createExecAdapter()`, which picks
-between `UserScriptsAdapter` and `ContentScriptAdapter` at runtime by feature-detecting
-`chrome.userScripts` (`lib/exec/engine.ts`'s `pickEngine`), not by build target. Both adapter
-classes ship in every build's `background.js`, Chrome included; only the actual
-`content-scripts/modrunner.js` *file* the string names is Safari-only, and it is absent, confirmed
-above. This is shared fallback code, not an exclusion-gate miss.
-
-## Store build and a GitHub-saved subscription connection
-
-The two subscription providers (ChatGPT, SuperGrok/xAI) are unavailable in the store build, but a
-profile carried over from the GitHub build is not rewritten or deleted. Per the comment in
-`lib/buildflags.ts` and the logic in `lib/connections.ts`: `providerAvailable()` returns `false` for
-a subscription kind when `STORE_BUILD` is true, `connectionStatus()` maps that straight to the
-`'unavailable'` status (`canAdd()` also blocks adding a new one), `pickerGroups()` leaves an
-unavailable connection out of the in-chat model picker, and Settings shows it with the
-`unavailableProviderMessage()` explanation instead of a sign-in control. Nothing migrates or
-deletes the stored connection, so reopening the same profile in the GitHub build finds it exactly
-as it was. (There is no `oauth.status` stub involved in this path — that RPC only backs the
-sign-in UI's status poll — and no `migrateSettingsForBuild` function exists in the codebase; this
-is pure runtime gating on `STORE_BUILD`, not a settings migration.)
+None of the three does anything a reviewer would need explained, and removing them is not worth a
+change to the package under review. They are listed so that nobody rediscovers them as a surprise.
 
 ## What is in the package
 
 | Group | Files | Zipped |
 |---|---|---|
-| `background.js` (service worker, incl. the bundled Anthropic SDK) | 1 | 141.2 KiB |
-| `chunks/` (React runtime, side panel, dashboard, install + install preview, Tampermonkey import, style guide, a shared browser-polyfill chunk) | 8 | 127.7 KiB |
-| `assets/` CSS | 6 | 12.0 KiB |
-| `assets/` webfonts — IBM Plex Mono 400/500/600 and Jersey 10, each as `.woff2` + `.woff` | 8 | 102.8 KiB |
-| `icon/` — 16, 32, 48, 96, 128 PNG | 5 | 1.4 KiB |
-| HTML entry points — `sidepanel`, `dashboard`, `install`, `styleguide` | 4 | 3.6 KiB |
-| `content-scripts/content.js`, `theme-boot.js`, `manifest.json` | 3 | 7.9 KiB |
+| `background.js` (service worker, including the bundled Anthropic SDK) | 1 | 156.2 KiB |
+| `chunks/` (React runtime, side panel, dashboard, install and update review, a shared menu chunk, style guide, browser polyfill) | 8 | 185.1 KiB |
+| `assets/` CSS | 7 | 13.9 KiB |
+| `assets/` webfonts: IBM Plex Mono 400/500/600 and Jersey 10, each as `.woff2` and `.woff` | 8 | 102.8 KiB |
+| `icon/`: 16, 32, 48, 96, 128 PNG | 5 | 1.4 KiB |
+| HTML entry points: `sidepanel`, `dashboard`, `install`, `styleguide` | 4 | 3.6 KiB |
+| `content-scripts/content.js`, `theme-boot.js`, `manifest.json` | 3 | 15.6 KiB |
 
-(Group totals sum to the 406,113-byte zipped total across all 35 files — the 410,791-byte archive
-figure above also includes the zip container's own overhead, e.g. the central directory; group byte
-figures above are rounded to one decimal KiB.) The fonts are the single largest group after the
-code. They are self-hosted on purpose: an extension must not pull a stylesheet or a font from a CDN
-at runtime, and both faces carry the brand.
+The fonts are self-hosted on purpose: an extension must not pull a stylesheet or a font from a CDN
+at runtime.
 
-The group structure (file count and names per group, including the shared `browser-*.js` polyfill
-chunk noted in the prior audit) is unchanged since `2a752fd`. Every group's zipped weight grew
-somewhat — `background.js` 138.4 → 141.2 KiB, `chunks/` 121.7 → 127.7 KiB — which tracks PR #13
-(Safari support): the shared code the Safari build depends on (`lib/oauth.ts`'s new `AUTH_HOSTS`
-diagnostics, `lib/exec/adapter.ts`'s adapter-selection logic, related plumbing) is not
-`__SAFARI_BUILD__`-gated out of `background.js`, so it ships — inert but present — in the Chrome
-store build too. All per-file names changed with the rebuild, per the content-hash caveat above.
+Growth since 0.1.0 (410,791 → 494,796 bytes, 35 → 36 files) is the features merged in between:
+markdown rendering, reviewed updates, sharing, the install banner, thinking levels.
 
-## Decision: the style guide ships
+## How the package was tested
 
-`styleguide.html` + its chunk and CSS total **5,839 bytes zipped — 1.4% of the package**
-(`styleguide.html` 781 B + `chunks/styleguide-BiJsjzEY.js` 4,362 B +
-`assets/styleguide-BtR_4bFh.css` 696 B, against the 406,113-byte group-summed zipped total). It
-stays in the store build.
+- `npm test`: 1,140 unit tests pass.
+- `npm run smoke`: every flow passes against the test build.
+- `npm run reviewer-walkthrough`: against **this store build**, from a fresh profile. The setup
+  banner shows with the toggle off; the toggle is turned on through `chrome://extensions` under the
+  running worker; a script installed before that starts running; the toggle survives off and on
+  again; a provider is added and a model chosen by the words in the test instructions; the model's
+  script really runs on the page; the mod is saved, applies after a reload, and is gone after being
+  deleted.
 
-The reasoning, so a reviewer of this decision does not have to redo it:
-
-- **It is not reachable by accident.** The dashboard's link to it renders only in a dev build or
-  when the URL carries `?styleguide` (`StyleGuideLink` in `entrypoints/dashboard/Dashboard.tsx`).
-  Nothing in the shipped UI points at it, and it is not in `web_accessible_resources`, so no web
-  page can frame or navigate to it — it is reachable only by typing the
-  `chrome-extension://…/styleguide.html` URL.
-- **It is inert.** `entrypoints/styleguide/main.tsx` makes zero `chrome.*` calls, zero `fetch`
-  calls and touches no storage. It renders swatches and components. It cannot leak anything or do
-  anything, so it adds no attack surface and raises no question a reviewer would need answered.
-- **It does not bloat anything.** 1.4% is below the noise floor of a single webfont weight.
-- **Excluding it would cost more than it saves.** The specimen exists to be checked against the
-  real build; a style guide dropped from the build it documents is one that goes stale silently,
-  which is the failure mode its own source comment calls out.
-
-If that ever stops being true — if it grows, gains a `chrome.*` call, or becomes linkable from a
-shipped surface — exclude it from store builds behind the existing `__STORE_BUILD__` mechanism and
-re-run this audit.
-
-## Non-store build
-
-`.output/chrome-mv3` was not rebuilt for this audit — per instruction, it is the folder the owner's
-browser loads unpacked, and only a deliberate `npm run build` / `npm run dev` is meant to touch it
-(CONTRIBUTING.md "Three output folders, on purpose"). It was already present, built from `12fc38a`
-minutes before this audit ran (`manifest.json` mtime and its content both confirm this: `version`
-still `0.1.0`, and `background.js` already contains the post-Safari-merge `auth.x.ai` diagnostic
-string checked below), so the grep below is read against that existing build, not a fresh one.
-
-The original two-pattern grep from the first audit, `grep -aroF -e auth.openai.com -e auth.x.ai`,
-over `.output/chrome-mv3` now prints **4** matches, not the 2 recorded in the prior audit — still
-all in `background.js`, still the positive control proving the store gate is a real difference and
-not an empty check, but doubled since PR #13. The cause is `lib/oauth.ts`'s new `AUTH_HOSTS` map
-(added for Safari, where a blocked host and a dead network both surface as the same opaque `Failed
-to fetch`/`Load failed`, so the extension now needs to name the host itself to the user rather than
-rely on the browser's error): `AUTH_HOSTS` lists `auth.openai.com` and `auth.x.ai` a second time
-each, alongside the pre-existing `OAI_ISSUER`/`XAI_ISSUER` constants — 2 + 2 instead of 1 + 1. This
-is user-facing permission-troubleshooting text, not a new sign-in code path; it is still entirely
-inside `lib/oauth.ts`, which the store build's `__STORE_BUILD__` define still tree-shakes out (see
-"What is not in the package" above — the store zip's own four-pattern grep is still 0).
-
-The broader four-pattern grep used above (in "What is not in the package") now finds **11**
-matches when run against this non-store build (`auth.openai.com` 2, `auth.x.ai` 2,
-`chatgpt.com/backend-api` 3, `cli-chat-proxy.grok.com` 4), not the 8 recorded previously —
-consistent with the same `AUTH_HOSTS`
-addition plus the general growth of `lib/oauth.ts` (69 → 262 lines changed between `2a752fd` and
-`12fc38a`). This is expected and not a regression: the non-store build is supposed to contain all
-of it, and the count moving is a side effect of auditing a later commit against unchanged source in
-that file, not evidence the store gate weakened.
+What none of this covers: a real model. The walk-through uses the scripted mock, so the reviewer key
+and its endpoint have to be checked by hand before submitting (see
+[submission.md](submission.md#resubmitting)).

@@ -1,6 +1,6 @@
 # usermods Privacy Policy
 
-**Last updated: 18 September 2026**
+**Last updated: 30 September 2026**
 
 usermods is an open-source browser extension that lets you customize websites by chatting with a
 large language model of your choosing. It is published by Kenneth Ballenegger as a personal,
@@ -48,7 +48,7 @@ entirely.
 
 usermods is useless unless the model can see the page you want changed. When you send a message, the
 extension sends the following **directly from your browser to the one provider that chat is using**
-— the model named under the message box, on a provider you connected in Settings. If you have
+— the model named in the chat bar, on a provider you connected in Settings. If you have
 connected several, the others receive nothing from that message. If you change the model in the
 middle of a conversation, the conversation so far is sent to the newly picked provider with your
 next message, because a model cannot continue a conversation it has not been shown:
@@ -80,8 +80,8 @@ Three consequences are worth stating plainly:
 3. **The provider's own policies apply to that data once it arrives.** usermods is not a party to
    that relationship. Read the privacy policy and data-retention terms of whichever provider you
    configure — Anthropic, OpenAI, xAI, OpenRouter, or your own server. If you point usermods at a
-   model running on your own machine (Ollama, LM Studio, vLLM, mlx_lm), nothing leaves your computer
-   at all.
+   model running on your own machine (Ollama, LM Studio, vLLM, mlx_lm), nothing from your chats or
+   the pages you open leaves your computer.
 
 **Consent.** Before the first message is ever sent, usermods shows a notice describing the above and
 requires you to acknowledge it. You can re-read it at any time from Settings → *Review data notice*.
@@ -93,17 +93,21 @@ your chats is included. It happens only when you press that button.
 
 ## 3. Other network requests
 
-Besides the model endpoint, usermods makes network requests only in these cases, all of them started
-by an explicit action of yours:
+Besides the model endpoint, usermods makes network requests only in these cases. Each is started by
+an explicit action of yours, except the update check, which runs by itself and can be turned off:
 
-- **Installing an outside userscript.** When you install from a URL, click a `.user.js` link or use
-  *Fetch models*, usermods requests that URL. `@require` libraries and `@resource` files named in a
+- **Listing a provider's models.** *Fetch models* in Settings, and opening the model picker, ask
+  the provider you connected for its list of models, authenticated with your key.
+- **Installing an outside userscript.** When you install from a URL or click a `.user.js` link,
+  usermods requests that URL. `@require` libraries and `@resource` files named in a
   script's header are downloaded at install time from the addresses the script names, and stored
   with the mod.
 - **Checking installed scripts for updates.** At most once a day per script (and only while
-  *Check installed mods for updates* is on, which it is by default), usermods requests the
-  `@updateURL` or `@downloadURL` that script's own header names, to see whether a newer version
-  exists. Nothing is installed by a check.
+  *Check installed mods for updates* is on in Settings, which it is by default), usermods requests
+  the `@updateURL` or `@downloadURL` that script's own header names, to see whether a newer version
+  exists. The request carries no cookies and nothing about you or your browsing; the host sees that
+  a copy of its script asked for an update, as it would from any userscript manager. Nothing is
+  installed by a check.
 - **Signing in to a subscription** *(GitHub build only)*. The ChatGPT and xAI device-code sign-in flows contact those
   vendors' own authentication servers.
 - **`GM_xmlhttpRequest` from a userscript.** Scripts you installed can make cross-origin requests,
@@ -158,7 +162,8 @@ requirements.
 Specifically, and as described above: usermods handles user data only as necessary for its single
 purpose of building and running userscripts at your direction; it transmits data only to the model
 endpoints you connect and to hosts you explicitly ask it to contact; it transfers data to no third
-party, sells no data, uses no data for advertising or creditworthiness purposes, and permits no
+party other than the model provider you choose, at your direction, to provide the feature; it sells
+no data, uses no data for advertising or creditworthiness purposes, and permits no
 human access to user data, because no data ever reaches the developer.
 
 ## 8. Changes to this policy

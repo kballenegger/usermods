@@ -15,14 +15,14 @@ https://github.com/user-attachments/assets/b2102d80-e0ff-447f-a1c9-9c62583c4786
 ## Why
 
 - **Any backend.** Anthropic's API, OpenAI, OpenRouter, or anything OpenAI-compatible: Ollama, LM Studio, vLLM, mlx_lm. Your key, your machine, no account, no hosted service.
-- **Use the subscription you already pay for.** Sign in with ChatGPT (Plus, Pro, Team) or SuperGrok / X Premium+ straight from Settings. No API key, no local proxy, no per-token bill.
+- **Use the subscription you already pay for.** Sign in with ChatGPT (Plus, Pro, Team) or SuperGrok / X Premium+ straight from Settings. No API key, no local proxy, no per-token bill. (In the build from this repository; the Chrome Web Store version leaves sign-in out.)
 - **The model actually sees the page.** It reads a pruned DOM, lists elements, reads computed styles, takes screenshots, and runs scripts to test its work before proposing anything.
 - **One-off tasks too.** "Scroll to the bottom, open every carousel, and give me download links for all the photos" runs as a script, no mod required.
 - **Portable.** Mods are plain userscripts with a `==UserScript==` header. Nothing proprietary. **MIT.**
 
 ## Status
 
-Early, and working end to end: chat, page inspection, live testing, propose, save, run on load, edit an installed mod in chat, import and export. v0.1.0 is submitted to the Chrome Web Store and pending review; the Safari build runs on Mac, iPhone and iPad. See [Roadmap](docs/roadmap.md).
+Early, and working end to end: chat, page inspection, live testing, propose, save, run on load, edit an installed mod in chat, import and export. A Chrome Web Store listing is on its way; the Safari build runs on Mac, iPhone and iPad. See [Roadmap](docs/roadmap.md).
 
 ## Screenshots
 

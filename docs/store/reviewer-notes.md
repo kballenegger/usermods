@@ -1,97 +1,54 @@
 # Notes for reviewers
 
-The text to paste into the developer dashboard's **Notes for reviewers** field (Privacy practices
-tab, below the permission justifications).
+What goes in the developer dashboard's **Test instructions** form, and the longer explanation to
+answer a reviewer's follow-up from.
 
-**Before pasting:** the placeholders `[reviewer key: PASTE HERE]` and
-`[reviewer base URL: PASTE HERE]` must be replaced with the real reviewer key and base URL. Do not
-do it by hand and do not commit either one back into this file — run:
+The form has three fields, and none of them takes a long note:
 
-```sh
-USERMODS_REVIEWER_KEY='…' USERMODS_REVIEWER_BASE_URL='…' node scripts/reviewer-notes.mjs | pbcopy
-```
+| Field | Limit | What goes in it |
+|---|---|---|
+| Username | 100 characters | The reviewer endpoint's base URL (starts with `https://`). |
+| Password | 100 characters | The reviewer API key. |
+| Additional instructions | 500 characters | The block under [Test instructions](#test-instructions) below, as it is. |
 
-which prints the short version with both substituted, ready to paste.
+The base URL and the key are **not in this repository** and never go in it. They live in 1Password
+(project vault, item "Ornith API - chrome-app-review - 14 days"). The instructions block carries
+neither, so it is pasted straight from this file.
 
-**The reviewer key is time-limited.** The current one is for an OpenAI-compatible endpoint (the
-reviewer endpoint, base URL kept in 1Password, project vault, item "Ornith API - chrome-app-review -
-14 days"; model `ornith`) and **expires 2026-10-03**. If a review runs
-past that date the reviewer will hit an auth error, which is why the pasted text tells them to ask
-via the support URL rather than conclude the extension is broken. Re-issue the key and update the
-listing's note if the review is still open near that date.
+**The reviewer key is time-limited.** The one issued for the first submission expires on
+2026-10-03. Before resubmitting, issue a new one that outlasts the review (give it a month), put
+it in the Password field, and check that the model name in step 4 below is still the one the
+endpoint serves. A reviewer who meets an expired key sees an auth error, which looks exactly like a
+broken extension.
 
-A note on the field itself: Google does not document this field or its character limit anywhere on
-developer.chrome.com — it exists in the dashboard UI but not in the published docs. The short
-version below is **about 2,490 characters** with a 51-character key and a 40-character base URL
-substituted (the script prints the exact count), which is under every limit the field has been
-reported to have. Paste the short version. If the field turns out to accept more, the long version underneath
-adds the detail; it is otherwise reference material for answering a reviewer's follow-up email.
+`npm run reviewer-walkthrough` follows these instructions against the store build: a fresh profile,
+the toggle turned on through `chrome://extensions`, the buttons found by the words below, a script
+really run on the page, the mod saved and applied again after a reload. Run it after any change to
+the panel's wording. `node scripts/listing-check.mjs` checks the block is within 500 characters.
 
 ---
 
-## Short version — paste this
+## Test instructions
 
 ```
-WHAT IT IS
-usermods is a user script manager. You describe a change to the page you are on in plain language,
-a language model writes a userscript for it, and usermods saves and runs that script on matching
-pages — the same job Tampermonkey does, with the script written by chat instead of by hand.
-
-REQUIRED SETUP: ALLOW USER SCRIPTS
-Chrome requires this of every user script manager; nothing works without it:
-  1. Open chrome://extensions
-  2. Click Details on usermods
-  3. Turn on "Allow User Scripts"
-The extension shows a banner with these steps until the toggle is on.
-
-MODEL API KEY
-The chat needs a model API key the user supplies. None is bundled; there is no account and no
-server of ours. We provide one for your review. In the side panel open Settings (slider icon, top
-right), click "Custom OpenAI API" under "Add provider", and in its card set:
-
-  Base URL   [reviewer base URL: PASTE HERE]
-  API key    [reviewer key: PASTE HERE]
-
-(Replace the http://localhost: stub.) It autosaves (no Save button). Back in Chat, click the
-model button under the message box, type ornith, press Enter. This key expires 2026-10-03 — if
-expired, please ask for a new one via our listing's support URL.
-
-5-MINUTE TEST
-  1. Open https://en.wikipedia.org/wiki/Common_kingfisher
-  2. Click the usermods toolbar icon to open the side panel; accept the first-run data notice.
-  3. Type "hide the table of contents" and press Enter. It inspects the page and proposes a script.
-  4. On the proposal card click "Run once" to see it applied, then "Open in draft". In the Draft
-     panel at the bottom, click "Save".
-  5. Reload the page — the table of contents stays hidden. Then Mods tab → Delete on that mod.
-
-NO KEY NEEDED FOR THE IMPORT PATHS
-Installing and running scripts needs no model or key. Open this URL for the install preview, then
-Install (it exercises @require and GM.* grants):
-https://update.greasyfork.org/scripts/478687/GitHub%20Custom%20Global%20Navigation.user.js
-The Mods tab also imports from a file and from a Tampermonkey backup.
-
-PRIVACY
-No data goes to the developer. No account, no server, no telemetry — requests go only to the
-model provider the user picked.
-Policy: https://github.com/kballenegger/usermods/blob/main/PRIVACY.md
-
-SINGLE PURPOSE
-To create, install and run userscripts that customize the websites the user visits.
-
-Each permission is justified individually above.
-Source (MIT): https://github.com/kballenegger/usermods
+Username = API base URL, Password = API key (test AI model; no login).
+1. chrome://extensions > usermods > Details > turn on "Allow User Scripts".
+2. Open en.wikipedia.org/wiki/Common_kingfisher. Click the usermods icon (puzzle menu), then "I understand".
+3. Settings (sliders icon) > Add provider > "Custom OpenAI API". Replace all of Base URL with Username; API key = Password.
+4. Chat > "Pick a model" > type ornith, Enter.
+5. Send: hide the table of contents. Click "Save & enable", reload.
 ```
 
 ---
 
-## Long version — reference, and for answering follow-up questions
+## Long version: reference, and for answering follow-up questions
 
 ### What the extension is
 
 usermods is a user script manager in the same category as Tampermonkey, Violentmonkey and
 Greasemonkey: it stores userscripts with standard `==UserScript==` headers and registers them
 through `chrome.userScripts` so they run on the pages their `@match` patterns cover. What
-distinguishes it is how a script gets written — the user describes the change they want to a
+distinguishes it is how a script gets written: the user describes the change they want to a
 language model they connect, and the model writes the script by inspecting the real page, rather
 than the user typing the JavaScript themselves.
 
@@ -100,11 +57,10 @@ than the user typing the JavaScript themselves.
 Since Chrome 138 the `chrome.userScripts` API is gated behind a per-extension **Allow User
 Scripts** toggle (before that, behind Developer mode). Chrome requires this of every user script
 manager; it is not specific to usermods and the extension cannot turn it on for the user. Until it
-is on, `chrome.userScripts` is undefined and the extension shows a banner with the three steps
-above on every surface. `minimum_chrome_version` is 135 for this reason.
-
-This is also why some of the automated test flows in the repository cannot test a script end to
-end: an automated Chrome profile cannot flip that toggle either.
+is on, `chrome.userScripts` is undefined, and the extension shows a banner with the three steps
+in the side panel and the dashboard. The side panel's banner goes away by itself within a couple of
+seconds of the toggle being turned on, and the extension works from that moment: no reload of the
+extension or restart of the browser is needed. `minimum_chrome_version` is 135 for this reason.
 
 ### About the API key
 
@@ -116,22 +72,21 @@ the developer, who operates no server. Removing a provider deletes its key.
 Settings opens on a **Providers** list (empty on a fresh install, with the line "No provider yet")
 followed by an **Add provider** row of preset buttons. The key supplied to the reviewer is for an
 **OpenAI-compatible** endpoint, not a named vendor, so the preset to click is **"Custom OpenAI
-API"** — the last button in the Add provider row. Clicking it adds a provider card and opens it.
+API"**, the last button in the Add provider row. Clicking it adds a provider card and opens it.
 
-The card's fields are labelled exactly **Name**, **Base URL**, **API key** and **Images**, in that
-order, followed by a **Fetch models** button and a status line. The preset seeds **Base URL** with
-the stub `http://localhost:`, which has to be replaced — that is the one place a reviewer could get
-stuck, which is why the short version says so. Name and Images can be left alone. Settings autosaves
-about 300 ms after the last keystroke — there is no Save button to look for — and once the base URL
-and key are in, the card's summary line reads **Connected**.
+The card's first three fields are labelled exactly **Name**, **Base URL** and **API key**. The
+preset seeds **Base URL** with the stub `http://localhost:`, which has to be replaced; that is the
+one place a reviewer could get stuck. Name and the fields below the key can be left alone. Settings
+autosaves as you type, so there is no Save button to look for.
 
-There is no Model field in Settings. The model is chosen in the chat: under the message box is a
-button that reads **Pick a model** until one is chosen (or **No provider connected** before a
-provider is added). Clicking it opens a list of the connected provider's models with a text field
-on top; typing `ornith` and pressing Enter selects that model whether or not the endpoint lists its
-models, because a typed id is offered as *Use "ornith" on Custom OpenAI API* when nothing listed
-matches. Until a model is picked, **Send** is disabled and the line under the message box says what
-is missing, so a reviewer who skips this step sees an instruction rather than an error.
+There is no Model field in Settings. The model is chosen in the chat: in the bar above the
+conversation is a button that reads **Pick a model** until one is chosen (or **No provider
+connected** before a provider is added). Clicking it opens a list of the connected provider's
+models with a text field on top; typing `ornith` and pressing Enter selects that model whether or
+not the endpoint lists its models, because a typed id is offered as *Use "ornith" on Custom OpenAI
+API* when nothing listed matches. Until a model is picked, **Send** is disabled and a line by the
+message box says what is missing, so a reviewer who skips this step sees an instruction rather than
+an error.
 
 The named presets behave differently and are worth knowing about if a reviewer explores: the
 **Anthropic**, **OpenAI**, **xAI Grok** and **OpenRouter** presets each fill in a real base URL and
@@ -140,68 +95,87 @@ and need no key, but need a model server running on the reviewer's own machine, 
 usable for review. Several providers can be connected at once, and the model can be changed in the
 middle of a conversation; none of that is needed for the test above.
 
-The reviewer key is **time-limited and expires 2026-10-03**. After that the endpoint returns an
-auth error, which would look exactly like a broken extension — hence the line in the pasted notes
-telling the reviewer to request a fresh key through the listing's support URL instead. If a review
-is still open near that date, re-issue the key and update the notes field in the dashboard.
+Subscription sign-in (ChatGPT, SuperGrok) is **not in this package**. It ships only in the GitHub
+build. The Chrome Web Store build is compiled with a flag that removes that code entirely (see
+`lib/buildflags.ts`), because signing in with a vendor subscription uses endpoints the vendors do
+not document for third parties, which does not belong in a listing that has to state exactly what it
+talks to. None of the store screenshots shows it. If a profile carried over from the GitHub build
+holds a subscription provider, the store build keeps it in the list marked **Not available in this
+build**, leaves it out of the model picker, and says why.
 
-The two **subscription** presets visible in the screenshots (ChatGPT, SuperGrok) are **not in this
-package**. They ship only in the GitHub build. The Chrome Web Store build is compiled with a flag
-that removes that code entirely — see `lib/buildflags.ts` — because signing in with a vendor
-subscription uses endpoints the vendors do not document for third parties, which does not belong in
-a listing that has to state exactly what it talks to. If a profile carried over from the GitHub
-build holds a subscription provider, the store build keeps it in the list marked **Not available in
-this build**, leaves it out of the model picker, and says why.
+### What the test does, step by step
+
+After step 5's message is sent, the model reads the page, runs a draft of its script on it once
+(the table of contents disappears at that point), and posts a **Proposed mod** card with the code
+and three controls: **Run once**, **Save & enable** and **Open in draft**. **Save & enable** stores
+the script and registers it with `chrome.userScripts`, and the button then reads **Saved ·
+enabled**. Reloading the page shows the saved mod applied with nothing else running. To clean up:
+**Mods** tab, **Delete** on that mod.
 
 ### What is sent where, during the test above
 
 When the user sends a message with the panel open on a tab, what goes to the provider that chat is
-using — the one named under the message box, and no other — is: their message, a pruned snapshot of that page's DOM, details of any elements the model
-queries, and — only if the model asks for one — a screenshot of the visible tab. That is the whole
-list, and the first-run data notice states it before the first message leaves. Nothing else is
+using (the one named in the chat bar, and no other) is: their message, a pruned snapshot of that
+page's DOM, details of any elements the model queries, the output of a script the model runs on the
+page, and, only if the model asks for one, a screenshot of the visible tab. That is the whole list,
+and the first-run data notice states it before the first message leaves. Nothing else is
 transmitted anywhere. Saved mods, chat history, stored `GM_setValue` values and the API keys stay in
 local extension storage.
 
 ### The paths that need no model
 
-Three features are entirely independent of the chat and of any API key, and are worth exercising
-because they are what makes this a userscript manager rather than an AI toy:
+These features are independent of the chat and of any API key, and are worth exercising because
+they are what makes this a userscript manager rather than a chat window:
 
 1. **Install from URL.** The `declarativeNetRequest` rule redirects top-level navigations to
    `.user.js` URLs to the extension's own install page, which previews what the script matches,
-   what `GM_*` grants it asks for and what it `@require`s, before anything is saved. The Greasy Fork
-   URL in the short version is a real, popular script (GitHub Custom Global Navigation, ~170 KB,
-   v1.7.0) chosen because it has both a `@require` library and `GM.*` grants, so the preview shows
-   everything it can show.
+   what `GM_*` grants it asks for and what it `@require`s, before anything is saved. A real,
+   popular script with both a `@require` library and `GM.*` grants, so the preview shows everything
+   it can show:
+   `https://update.greasyfork.org/scripts/478687/GitHub%20Custom%20Global%20Navigation.user.js`
 2. **File import.** Mods tab → import a `.user.js` file from disk.
 3. **Tampermonkey migration.** Mods tab → "Migrate from Tampermonkey" → import a Tampermonkey
    backup file, which restores each script with its on/off state and its stored values.
+4. **Updates.** Installed scripts are checked for a newer version at most once a day, from the
+   address their own header names. Nothing is installed by a check: an update is shown on the row,
+   and installing it means opening a review screen and clicking **Install update**. *Check installed
+   mods for updates* in Settings turns the check off.
+5. **Export and share.** The Export menu on a mod downloads it, copies it, or opens GitHub's gist
+   editor (or Greasy Fork's form) in a new tab with the script filled in, where the user presses
+   the site's own save button. usermods holds no credentials for either site and submits nothing
+   itself.
 
 ### Remote code
 
-The answer in the form is **No, I am not using remote code**, and that is accurate. No code is
-fetched and evaluated for the extension's own use; everything the extension runs is in this
+The recommended answer in the form is **Yes**, with the justification in
+[permissions.md](permissions.md#are-you-using-remote-code): userscripts are JavaScript that is not in
+the package, and the User Scripts API is the documented way to run them. No code is fetched and
+evaluated for the extension's own use; all of the extension's own logic is in this
 package. Userscripts are user data, not extension code: each one is written by a model at the
-user's request or imported by the user, shown in full in a preview, saved only on an explicit click,
-and executed only through `chrome.userScripts` in the world its header requests. The extension uses
+user's request or brought in by the user (an install from a file or URL is previewed in full first;
+a Tampermonkey backup is imported when the user picks the file), and executed only through
+`chrome.userScripts` in the world its header requests. During a chat the model's draft is run once
+on the page to test it, which the transcript shows; nothing is registered until the user saves it. The extension uses
 no `eval`, no `new Function`, no inline handlers and no remotely hosted `<script>` tags, and the
 system prompt instructs the model not to write scripts that use `eval` or `new Function`. Scripts'
 `@require` and `@resource` dependencies are fetched once at install time, listed in the install
-preview, and stored with the mod — not fetched at page load.
+preview, and stored with the mod, not fetched at page load. An update to an installed script is
+never applied without the user reviewing it and clicking **Install update**.
 
 ### Permissions
 
-Each is justified in its own field on this tab; `docs/store/permissions.md` in the repository is the
-source those justifications are pasted from. In brief: `sidePanel` is the entire UI, `storage` holds
-the user's mods and settings, `scripting` injects the content script into tabs that predate the
-install, `tabs` finds the active tab and captures it for the screenshot tool, `userScripts` is the
-core mechanism, `declarativeNetRequest` is the single `.user.js` install redirect, and
-`<all_urls>` is required because a userscript manager cannot know in advance which sites its user
-will want to change.
+Each is justified in its own field on the Privacy practices tab; `docs/store/permissions.md` in the
+repository is the source those justifications are pasted from. In brief: `sidePanel` is the UI,
+`storage` holds the user's mods and settings, `scripting` injects the content script into tabs that
+predate the install and fills GitHub's gist editor when the user shares a mod, `userScripts` is the
+core mechanism,
+`declarativeNetRequest` is the `.user.js` install redirect and its one exception, and `<all_urls>`
+is required because a userscript manager cannot know in advance which sites its user will want to
+change. `tabs` is not requested: host access already covers everything it was used for.
 
 ### Source
 
 MIT licensed, full history public: https://github.com/kballenegger/usermods
 
 The exact package submitted is built with `npm run zip:store`; `docs/store/package-audit.md`
-records its checksum and a file-by-file audit of what is in it.
+records its checksum and an audit of what is in it.
