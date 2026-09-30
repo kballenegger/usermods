@@ -62,6 +62,12 @@ export interface AgentEnv {
    * The signal is the run's own: Stop must end a 15s wait immediately rather than at its timeout.
    */
   wait(spec: WaitSpec, signal: AbortSignal): Promise<WaitOutcome>;
+  /**
+   * Errors thrown by an earlier run_script's own callbacks after it reported, as one line to put in
+   * front of the next tool result, once; null when there are none. Optional: an env without it
+   * simply never has any. See takeLateErrors in entrypoints/background.ts.
+   */
+  takeLateErrors?(): string | null;
 }
 
 export interface AgentInput {
@@ -513,7 +519,12 @@ export async function runAgent(input: AgentInput): Promise<RunOutcome> {
         emit({ type: 'status', phase: 'tool', tool: call.name, detail: describeCall(call.name, call.input), iteration: i + 1 });
         const r = await executeTool(call.name, call.input, env, emit, ctx, signal, input.onProposal, input.onOpenMod);
         emit({ type: 'tool_result', id: call.id, summary: summarize(r.content), isError: !!r.isError });
-        results.push({ type: 'tool_result', toolCallId: call.id, content: r.content, isError: r.isError });
+        // Late errors ride on whichever tool result comes next, taken after the tool ran so an
+        // error its wait or its own run provoked is not held back a whole step. The panel's summary
+        // above is of the tool's own result.
+        const late = env.takeLateErrors?.() ?? null;
+        const content = late ? withLeadingLine(late, r.content) : r.content;
+        results.push({ type: 'tool_result', toolCallId: call.id, content, isError: r.isError });
         if (call.name === 'propose_mod' && !r.isError) proposed = true;
         waitedMs += r.waitedMs ?? 0;
       }
@@ -598,6 +609,13 @@ function summarize(parts: Part[]): string {
   if (p.type === 'image') return '[image]';
   if (p.type === 'text') return p.text.length > 160 ? p.text.slice(0, 160) + '…' : p.text;
   return '';
+}
+
+/** `line` in front of a tool result: joined to its first text part, or as its own part before an image. */
+export function withLeadingLine(line: string, content: Part[]): Part[] {
+  const [first, ...rest] = content;
+  if (first?.type === 'text') return [{ type: 'text', text: `${line}\n${first.text}` }, ...rest];
+  return [{ type: 'text', text: line }, ...content];
 }
 
 /** What one tool call produced. `waitedMs` is real time spent waiting, for the abuse guard. */
