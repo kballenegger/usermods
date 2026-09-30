@@ -298,6 +298,21 @@ test('the extension\'s own in-page UI is never where a selector is found', () =>
   assert.equal(r.searchedRoots, 0);
 });
 
+test('wait_for may reuse the list of shadow roots briefly; one-off reads always walk', () => {
+  const d = load('<html><body><x-a></x-a></body></html>');
+  d.querySelector('x-a')!.attachShadow({ mode: 'open' }).innerHTML = '<i>a</i>';
+  assert.equal(queryAllDeep('.late', { rootsMaxAgeMs: 60_000 }).matches.length, 0);
+  const b = d.createElement('x-b');
+  d.body.append(b);
+  b.attachShadow({ mode: 'open' }).innerHTML = '<b class="late">b</b>';
+  // Within the window the new host is not walked yet; a read without a window finds it at once.
+  assert.equal(queryAllDeep('.late', { rootsMaxAgeMs: 60_000 }).matches.length, 0);
+  assert.equal(queryAllDeep('.late').matches.length, 1);
+  // A root's own contents are always queried fresh, cached list or not.
+  d.querySelector('x-a')!.shadowRoot!.innerHTML = '<i class="now">a</i>';
+  assert.equal(queryAllDeep('.now', { rootsMaxAgeMs: 60_000 }).matches.length, 1);
+});
+
 test('deepestOnly keeps the innermost of nested matches, and scales to many', () => {
   const d = load(`<html><body>${'<div class="n">'.repeat(3)}x${'</div>'.repeat(3)}${'<div class="n">y</div>'.repeat(20000)}</body></html>`);
   const items = [...d.querySelectorAll('div.n')].map((el) => ({ el, hosts: [] }));

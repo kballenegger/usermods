@@ -147,26 +147,46 @@ export function deepestOnly<T extends { el: Element }>(items: T[]): T[] {
  * selector that matches normally costs what it always did. Closed roots stay unreachable: a
  * content script cannot see into them any more than the page can.
  */
-export function queryAllDeep(selector: string): { matches: DeepMatch[]; searchedRoots: number } {
+export function queryAllDeep(selector: string, opts: { rootsMaxAgeMs?: number } = {}): { matches: DeepMatch[]; searchedRoots: number } {
   const light = [...document.querySelectorAll(selector)];
   if (light.length) return { matches: light.map((el) => ({ el, hosts: [] })), searchedRoots: 0 };
   const matches: DeepMatch[] = [];
-  let searchedRoots = 0;
+  const roots = openRoots(opts.rootsMaxAgeMs ?? 0);
+  for (const { root, hosts } of roots) for (const el of [...root.querySelectorAll(selector)]) matches.push({ el, hosts });
+  return { matches, searchedRoots: roots.length };
+}
+
+/**
+ * Every open shadow root in the document, nested ones included, with the hosts above each.
+ *
+ * Finding them means visiting every element (about 10ms on a 50,000-node page), and wait_for asks
+ * on every mutation batch and every 100ms poll. So a wait may reuse the list for `maxAgeMs`: the
+ * roots' contents are still queried fresh each time, and only a shadow host added in that window
+ * is seen late. One-off reads pass 0 and always walk.
+ */
+let rootsCache: { at: number; roots: { root: ShadowRoot; hosts: Element[] }[] } | null = null;
+function openRoots(maxAgeMs: number): { root: ShadowRoot; hosts: Element[] }[] {
+  const now = Date.now();
+  if (maxAgeMs > 0 && rootsCache && now - rootsCache.at <= maxAgeMs) return rootsCache.roots.filter((r) => r.root.host.isConnected);
+  const roots: { root: ShadowRoot; hosts: Element[] }[] = [];
   const visit = (scope: ParentNode, hosts: Element[]) => {
     for (const host of [...scope.querySelectorAll('*')]) {
       const sr = host.shadowRoot;
       // Our own in-page UI (lib/pageui.ts) is an open shadow root too; without this, a selector
       // the page lacks, like button.close, would be "found" in the usermods banner.
       if (!sr || host.hasAttribute('data-usermods')) continue;
-      searchedRoots++;
       const chain = [...hosts, host];
-      for (const el of [...sr.querySelectorAll(selector)]) matches.push({ el, hosts: chain });
+      roots.push({ root: sr, hosts: chain });
       visit(sr, chain);
     }
   };
   visit(document, []);
-  return { matches, searchedRoots };
+  rootsCache = { at: now, roots };
+  return roots;
 }
+
+/** How long wait_for may reuse the list of shadow roots between checks. See openRoots. */
+const WAIT_ROOTS_MAX_AGE_MS = 1000;
 
 /** A short `<li class="result">…` for the "what matched" half of a success message. */
 export function describeElement(el: Element): string {
@@ -182,7 +202,7 @@ export function describeElement(el: Element): string {
 
 /** The elements a selector condition currently counts as matching. Throws on an invalid selector. */
 function matchesFor(c: Extract<WaitCondition, { kind: 'selector' }>): Element[] {
-  const all = queryAllDeep(c.selector).matches.map((m) => m.el);
+  const all = queryAllDeep(c.selector, { rootsMaxAgeMs: WAIT_ROOTS_MAX_AGE_MS }).matches.map((m) => m.el);
   const filtered = c.text ? all.filter((el) => hasText(el, c.text!)) : all;
   switch (c.state) {
     case 'attached':
