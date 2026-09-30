@@ -23,6 +23,10 @@ export interface Header {
   noFrames: boolean;
   downloadUrl?: string;
   updateUrl?: string;
+  /** Violentmonkey's @inject-into (page | content | auto), as written. */
+  injectInto?: string;
+  /** Tampermonkey's @sandbox (raw | JavaScript | DOM), as written. */
+  sandbox?: string;
   warnings: string[];
   /** All raw key/value pairs, for GM_info.script. */
   raw: Record<string, string[]>;
@@ -89,6 +93,8 @@ export function parseHeader(source: string): Header {
       case 'noframes': h.noFrames = true; break;
       case 'downloadURL': h.downloadUrl = value; break;
       case 'updateURL': h.updateUrl = value; break;
+      case 'inject-into': if (h.injectInto === undefined) h.injectInto = value; break;
+      case 'sandbox': if (h.sandbox === undefined) h.sandbox = value; break;
     }
   }
   if (!h.name && localized['name']) h.name = localized['name']!;
@@ -134,6 +140,17 @@ export function stripHeader(source: string): string {
   return source.replace(/\/\/\s*==UserScript==[\s\S]*?\/\/\s*==\/UserScript==\s*/, '');
 }
 
+/**
+ * The header of a mod the model wrote. The model tests in the isolated USER_SCRIPT world, so the
+ * header has to say "isolated" in a way that survives every rebuild from this text: a later Save,
+ * the dashboard's source editor, an export installed somewhere else. It used to say `@grant none`,
+ * which every userscript manager (and worldFor below) reads as "run in the page", so the first
+ * save's forced world was lost on the second. There is no `@grant` line now (no GM functions, and
+ * nothing that means the page), plus the two managers' own isolated-world markers: Violentmonkey's
+ * `@inject-into content` and Tampermonkey's `@sandbox DOM`. worldFor honours both.
+ */
+export const ISOLATED_MARKERS = ['// @inject-into content', '// @sandbox     DOM'];
+
 export function buildSource(p: ModProposal): string {
   const lines = [
     '// ==UserScript==',
@@ -141,7 +158,7 @@ export function buildSource(p: ModProposal): string {
     `// @description ${p.description}`,
     '// @version     1.0',
     ...p.matches.map((m) => `// @match       ${m}`),
-    '// @grant       none',
+    ...ISOLATED_MARKERS,
     '// ==/UserScript==',
     '',
     p.code.trim(),
@@ -150,15 +167,26 @@ export function buildSource(p: ModProposal): string {
   return lines.join('\n');
 }
 
-function worldFor(h: Header): Mod['world'] {
-  // @grant none means "run in the page context" in Tampermonkey; unsafeWindow needs it too.
+/**
+ * The world a header asks for. `@grant none` means "run in the page context" in Tampermonkey and
+ * Violentmonkey, and unsafeWindow needs the page too — unless the header also names the isolated
+ * world outright, with Violentmonkey's `@inject-into content` or Tampermonkey's `@sandbox DOM`, which
+ * both managers let override it. Only that direction is honoured: `@inject-into page` on a script
+ * with GM grants would cost it its GM functions here (the page world gets no capability), so the
+ * other values leave the @grant rule to decide, as before.
+ */
+export function worldFor(h: Pick<Header, 'grants' | 'injectInto' | 'sandbox'>): Mod['world'] {
+  if (h.injectInto?.toLowerCase() === 'content' || h.sandbox?.toLowerCase() === 'dom') return 'USER_SCRIPT';
   if (h.grants.includes('none') || h.grants.includes('unsafeWindow')) return 'MAIN';
   return 'USER_SCRIPT';
 }
 
-/** Mods written by the model: our own scripts, no GM API, isolated world. */
+/**
+ * Mods written by the model: our own scripts, no GM API, isolated world. The world comes from the
+ * header like any other mod's; forcing it here is what used to hide that the header disagreed.
+ */
 export function modFromProposal(p: ModProposal, existing?: Mod): Mod {
-  return modFromSource(buildSource(p), existing, { world: 'USER_SCRIPT' });
+  return modFromSource(buildSource(p), existing);
 }
 
 export function modFromSource(source: string, existing?: Mod, overrides: Partial<Mod> = {}): Mod {
@@ -225,8 +253,35 @@ export const SUPPORTED_GRANTS = new Set([
   'GM_removeValueChangeListener', 'GM_getTab', 'GM_saveTab', 'GM_getTabs', 'window.close', 'window.focus', 'window.onurlchange',
 ]);
 
+/** The `@grant none` line the generated header carried before ISOLATED_MARKERS replaced it. */
+const LEGACY_GRANT_NONE = /^\/\/ @grant       none$/m;
+
+/**
+ * A mod saved by an older version whose header disagrees with the world it runs in, in the one
+ * case that can be told apart for certain: isolated, yet its header is exactly the old generated
+ * one, `@grant none` and all. Only modFromProposal's forced world ever produced that pair (any
+ * other path reads `@grant none` as the page), so this is a first save from chat that has always
+ * run isolated. Its header is rewritten to the current one so the NEXT rebuild from the text (a
+ * dashboard edit, an open_mod in a chat) keeps it isolated; nothing it does changes.
+ *
+ * A generated mod that a second save already moved to the page is NOT repaired: its later versions
+ * were tested by test_mod in the page world, and the same header typed by a person means the page.
+ * Which one a given mod is cannot be told from what was stored, so it is left as it is.
+ */
+function repairGeneratedHeader(m: Partial<Mod> & { source: string }): (Partial<Mod> & { source: string }) | null {
+  if (m.world !== 'USER_SCRIPT' || !LEGACY_GRANT_NONE.test(m.source)) return null;
+  const block = m.source.match(/^\/\/ ==UserScript==\n((?:\/\/ @\S+.*\n)*?)\/\/ ==\/UserScript==\n/);
+  if (!block || block.index !== 0) return null;
+  const keys = block[1]!.split('\n').filter(Boolean).map((l) => l.match(/^\/\/ @(\S+)/)?.[1]);
+  if (!keys.every((k) => k === 'name' || k === 'description' || k === 'version' || k === 'match' || k === 'grant')) return null;
+  if (keys.filter((k) => k === 'grant').length !== 1 || !/^\/\/ @version     1\.0$/m.test(block[1]!)) return null;
+  const source = m.source.replace(LEGACY_GRANT_NONE, ISOLATED_MARKERS.join('\n'));
+  return { ...m, source, grants: (m.grants ?? []).filter((g) => g !== 'none') };
+}
+
 /** Fill defaults for mods saved by older versions. */
-export function normalizeMod(m: Partial<Mod> & { id: string; source: string }): Mod {
+export function normalizeMod(stored: Partial<Mod> & { id: string; source: string }): Mod {
+  const m = repairGeneratedHeader(stored) ?? stored;
   const fresh = modFromSource(m.source, undefined);
   return { ...fresh, ...m, requires: m.requires ?? [], resources: m.resources ?? [], grants: m.grants ?? fresh.grants, connect: m.connect ?? fresh.connect, world: m.world ?? fresh.world, runAt: m.runAt ?? fresh.runAt, allFrames: m.allFrames ?? fresh.allFrames, excludeMatches: m.excludeMatches ?? [], includeGlobs: m.includeGlobs ?? [], excludeGlobs: m.excludeGlobs ?? [], version: m.version ?? fresh.version };
 }

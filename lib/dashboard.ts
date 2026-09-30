@@ -308,9 +308,10 @@ export function modSource(mod: Pick<Mod, 'downloadUrl' | 'source'>): string {
       return mod.downloadUrl;
     }
   }
-  // Mods the model writes go through buildSource, which always emits this exact header shape.
+  // Mods the model writes go through buildSource, which always emits this exact header shape: its
+  // isolated-world marker now, `@grant none` before that (see ISOLATED_MARKERS in lib/mods.ts).
   // Anything else with no @downloadURL was brought in from a file or a Tampermonkey backup.
-  return /^\/\/\s*@grant\s+none\s*$/m.test(mod.source) && /^\/\/\s*@version\s+1\.0\s*$/m.test(mod.source)
+  return /^\/\/\s*(@inject-into\s+content|@grant\s+none)\s*$/m.test(mod.source) && /^\/\/\s*@version\s+1\.0\s*$/m.test(mod.source)
     ? 'written in chat'
     : 'imported';
 }
