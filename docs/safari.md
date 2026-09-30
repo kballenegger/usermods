@@ -945,6 +945,25 @@ check, and it is the one thing worth looking at first after installing this buil
 
 ### The gaps, and why
 
+**What 0.1.1 added that has not been run on Safari.** Every one of these was built and verified on
+Chrome only; each is written to fail safe here, and none has been seen working:
+
+- `test_mod` on a fresh load: the one-shot run is served through the runner's next claim, and a
+  page-world script reports through a DOM-event relay.
+- Late errors from a script's own callbacks: they depend on JavaScriptCore honouring `//# sourceURL`
+  inside `new Function` and on `error` / `unhandledrejection` firing in the content-script world.
+  If either does not hold, they are simply not reported, as before.
+- The document-identity read that tells a route change from a navigation (`lib/navwatch.ts`) uses
+  `scripting.executeScript` with a packaged function. If it cannot run, a run behaves as it did
+  before the fix, after at most a one-second wait.
+- The engine still revokes a mod's GM capability and forgets its claims on every `tabs.onUpdated`
+  `loading`. If Safari fires that for `pushState`, as Chrome does, a running mod loses GM access on
+  a single-page app's route change. It fails closed, so it was left alone rather than changed on a
+  guess; it is the first thing to check on a Mac.
+- The page reads use `checkVisibility` only where it exists (17.4 and later) and fall back to
+  computed style before that.
+
+
 **Nothing can tap.** `simctl` boots a simulator, installs an app, opens a URL and takes a screenshot.
 It has no tap. The GUI that would is no longer Simulator.app at all — Xcode 27 does not ship one; the
 simulator window lives in Xcode (Window > Devices) or in

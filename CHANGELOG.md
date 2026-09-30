@@ -30,6 +30,48 @@ showed where runs went wrong: "tested" meant only that some script had run witho
 - **Fixed: Try on a page-world mod** (`@grant none` / `unsafeWindow`) ran and then waited out its
   timeout, because the result had no way back to the extension. It now reports normally.
 
+### Fixed: page reads could send what you had typed into a form
+
+Found in review of the read tools, and present since the first version.
+
+- **Form field values are never sent to the model.** `get_page` printed the `value` attribute of
+  every input. For a plain form that is only its default, but a site that writes each keystroke back
+  into the attribute, as React does for a controlled input, put whatever you had typed there into
+  the snapshot: a password, an autofilled card number, a hidden anti-forgery token when hidden
+  elements were asked for, the text of a text area. The `value` of text, password, card and hidden
+  inputs and the contents of text areas are now left out; a button's or a checkbox's value, which is
+  its label or identity, is kept. Text typed into an editable region of a page (a message draft in a
+  webmail editor) is still visible page text and is still read, which the privacy policy now says.
+
+### The page reads answer in one call what scripts were being written for
+
+In the owner's exported chats, 55 of 119 `run_script` calls changed nothing: scripts of about 1,200
+characters walking up from a label to the card worth hiding, listing overlays and scroll locks,
+measuring a few elements, or reading a terms page in 4,000-character bites. `find_elements`, which
+already had each element's box, was called 4 times.
+
+- **`find_elements` says which container.** The first three matches carry one line of ancestors,
+  nearest first, with wrappers of the same size counted instead of printed, and `[unit? …]` marking
+  the likely thing to hide: a dialog, a fixed or sticky layer, or a card repeated among its
+  siblings. It is labelled a guess from layout.
+- **Layout for every match**: display always; visibility, opacity, position and z-index when set.
+  `styles` asks for any computed properties, for every match at once. `get_styles` says when it read
+  only the first of several matches.
+- **The page's furniture in one call.** `find_elements` with `overlays: true` lists fixed and sticky
+  layers, dialogs and backdrops (inside open shadow roots too) with their size, z-index and how much
+  of the screen they cover, and says what is locking the page's scrolling.
+- **Reading a page to answer a question about it.** `get_page` with `text: true` returns the
+  readable text: headings, lists and table rows kept, the main content first, long navigation and
+  footers shortened to one line with the selector that reads them. Long pages come in parts, each
+  saying where it is and how to continue. Nothing is cut silently.
+- **The agent no longer assumes you want a mod.** The system prompt names the three things you may
+  want: a change that sticks, a one-off task you explicitly ask for, or an answer about the page.
+  After four page reads the nudge says to answer if it can, try the change if one is wanted, or ask
+  one question; before, it said to run a script. Operating the page stays an explicit one-off, and
+  the prompt now says never to submit, buy, send or delete anything you did not ask for.
+- **Fixed: everything inside a `display: contents` wrapper was invisible to the page reads.**
+  Substack wraps its article and its subscribe dialog in one.
+
 ### run_script tells the model what it actually got
 
 In the owner's chats, 8 of 119 script results had been cut at 4,000 characters with nothing to say

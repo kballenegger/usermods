@@ -81,8 +81,8 @@ things live:
   over raw fetch; `responses.ts` speaks the Responses API that the subscription backends use.
   `index.ts` is the factory that maps a `ProviderKind` to one of them.
 - **`lib/agent/`** — provider-neutral. `prompt.ts` is the system prompt, `tools.ts` the tool
-  definitions (`get_page`, `find_elements`, `get_styles`, `run_script`, `screenshot`,
-  `propose_mod`), `loop.ts` the turn loop that streams text, dispatches tool calls and feeds results
+  definitions (`get_page`, `find_elements`, `get_styles`, `run_script`, `test_mod`, `wait_for`,
+  `screenshot`, `open_mod`, `propose_mod`), `loop.ts` the turn loop that streams text, dispatches tool calls and feeds results
   back.
 - **`lib/mods.ts`** — userscript header parsing and match logic. `lib/gm.ts` — the `GM_*` / `GM.*`
   shim injected around every registered script. `lib/connect.ts` — `@connect` enforcement.

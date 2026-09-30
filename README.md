@@ -63,7 +63,7 @@ More, including every screen in both themes and the iPhone build: **[docs/screen
 
 ## Features
 
-- **Chat that inspects the page and writes a mod** — it reads the real DOM, tests its draft with `run_script`, and only then proposes something you can Try and Save.
+- **Chat that inspects the page and writes a mod** — it reads the real DOM, tries things with `run_script`, tests the finished script the way the saved mod will run (on a fresh page load when that matters), and only then proposes something you can Try and Save. The proposal says how it was tested.
 - **Any provider, including subscriptions** — Anthropic, OpenAI, xAI, OpenRouter, any OpenAI-compatible endpoint, ChatGPT and SuperGrok sign-in. Connect several; pick the model and its thinking level per chat, and switch mid-conversation.
 - **Edit any installed mod in chat** — including ones you imported. *Update mod* writes back over the same mod, header and stored values intact.
 - **Tampermonkey import and GM compatibility** — one backup file brings the whole library across, with the `GM_*` API, `@require`, `@resource` and `@connect` the scripts expect.

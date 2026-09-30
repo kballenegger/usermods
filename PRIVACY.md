@@ -55,12 +55,16 @@ next message, because a model cannot continue a conversation it has not been sho
 
 - **Your messages**, and the conversation so far.
 - **The address (URL) and title of the page** in the active tab.
-- **A pruned copy of the page's HTML** when the model calls the `get_page` tool: visible text,
-  element structure and a limited set of attributes. Scripts, stylesheets and hidden elements are
-  removed and long text is truncated.
+- **A pruned copy of the page's HTML, or its readable text,** when the model calls the `get_page`
+  tool: visible text, element structure and a limited set of attributes (ids, classes, roles, labels,
+  and short `data-*` values that are not tokens or contact details). Scripts, stylesheets and hidden
+  elements are removed. In text mode the model can read the page's whole visible text, in parts.
+  Form field values are never sent: not what you typed into a text, password or card field, not
+  hidden fields, and not the contents of a text area.
 - **Element details** when the model calls `find_elements` or `get_styles`, or when you point at an
-  element with the picker: its selector, its position and size, a preview of its text, and its
-  computed CSS.
+  element with the picker: its selector, position and size, a preview of its text, its computed CSS,
+  a short description of its ancestors, and for overlays a preview of the text of fixed or pop-up
+  layers.
 - **A screenshot of the visible area of the tab**, but only when the model calls the `screenshot`
   tool.
 - **The output of scripts the model runs** with `run_script` on the page, including anything they
@@ -72,8 +76,8 @@ Three consequences are worth stating plainly:
 
 1. **Page content includes whatever is on the page.** If you open the panel on your webmail, your
    bank, a medical portal or a private document, the content of that page — which may include
-   personal information, message text or form values that are present in the DOM — is part of what
-   is sent to the model. Close the panel on pages you do not want to share. usermods shows this
+   personal information, message text, or text you have typed into an editable area such as a
+   message draft (form field values themselves are not sent) — is part of what is sent to the model. Close the panel on pages you do not want to share. usermods shows this
    notice before your first message for exactly this reason.
 2. **Your API key or subscription token is sent to that endpoint**, as the authentication header of
    your own request. It is not sent anywhere else.
