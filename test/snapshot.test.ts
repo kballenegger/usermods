@@ -70,6 +70,7 @@ test('data-* attributes are kept: short values as they are, bare names for flags
 test('data-* noise is bounded: hashed and tracking names, long, JSON and random values skipped, at most four', () => {
   assert.deepEqual(dataAttrs([['data-v-7ba5bd90', '']]), [], 'Vue scoping markers say nothing');
   assert.deepEqual(dataAttrs([['data-ga-click', 'nav'], ['data-octo-dimensions', 'x'], ['data-track', 'y'], ['data-hydro-view', 'z']]), []);
+  assert.deepEqual(dataAttrs([['data-hovercard-url', '/u/x'], ['data-turbo-frame', 'repo'], ['data-error-text', 'Oops']]), []);
   assert.deepEqual(dataAttrs([['data-track', '{"event":"click","pos":3}']]), []);
   assert.deepEqual(dataAttrs([['data-payload', '{"a":1}']]), [], 'JSON');
   assert.deepEqual(dataAttrs([['data-id', 'a8f7c2e91b3d4f56a8f7c2e9']]), [], 'a hash');

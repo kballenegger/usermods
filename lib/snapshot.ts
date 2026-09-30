@@ -31,8 +31,9 @@ const MAX_TEXT = 200;
  * Vue's `data-v-7ba5bd90` scoping marker on every node, tracking payloads of serialized JSON,
  * per-render ids and nonces, click-tracking payloads. So:
  *   - at most MAX_DATA_ATTRS per element, in document order (data-testid is kept separately above);
- *   - a name whose suffix looks generated (a hash, like data-v-7ba5bd90), or that belongs to
- *     analytics (data-ga-*, data-track*, data-*-click…), is skipped;
+ *   - a name whose suffix looks generated (a hash, like data-v-7ba5bd90), that belongs to
+ *     analytics (data-ga-*, data-track*, data-*-click…) or to navigation plumbing (turbo, pjax,
+ *     hovercards), or that carries a URL or a UI string (data-*-url, data-*-text), is skipped;
  *   - a value is kept only if it is short and readable. A long value, JSON, a long unbroken token
  *     mixing letters and digits (a hash, an id) or a bare number (a row index, a line number, a
  *     record id) skips the attribute: it would cost tokens, and a mod selects on what an element
@@ -41,12 +42,14 @@ const MAX_TEXT = 200;
  *   - the same name="value" pair is printed at most MAX_DATA_REPEATS times per snapshot. A marker
  *     every component carries (GitHub's data-view-component="true") tells the model nothing after
  *     it has seen it a few times, and a list of cards has made its point by then too.
- * On the saved GitHub and gist pages this adds about 5% to a full snapshot.
+ * Measured on live pages, a full snapshot grows by about 1% on Wikipedia, YouTube and Hacker News
+ * and about 7% on a GitHub repository page, most of it Primer's data-component, which is exactly
+ * the kind of hook a mod wants.
  */
 const MAX_DATA_ATTRS = 4;
 const MAX_DATA_VALUE = 40;
 const MAX_DATA_REPEATS = 8;
-const TRACKING_NAME = /^(ga|gtm|octo|hydro|analytics|track|tracking|event|log|beacon|ping|ved|hveid)([-_]|$)|click$/;
+const SKIPPED_NAME = /^(ga|gtm|octo|hydro|analytics|track|tracking|event|log|beacon|ping|ved|hveid|turbo|pjax|hovercard)([-_]|$)|(click|[-_](url|text|src|href))$/;
 
 function isVisible(el: Element): boolean {
   if (!(el instanceof HTMLElement)) return true;
@@ -77,7 +80,7 @@ export function dataAttrs(attrs: ReadonlyArray<readonly [string, string]>, seen:
     if (out.length >= MAX_DATA_ATTRS) break;
     if (!name.startsWith('data-') || name === 'data-testid') continue;
     const suffix = name.slice(5).toLowerCase();
-    if (!suffix || suffix.length > 30 || TRACKING_NAME.test(suffix)) continue;
+    if (!suffix || suffix.length > 30 || SKIPPED_NAME.test(suffix)) continue;
     if (isGeneratedClass(suffix) || /(^|[-_])(?=[a-z]*\d)[0-9a-f]{6,}$/i.test(suffix)) continue;
     if (value !== '' && noisyDataValue(value)) continue;
     const text = value === '' ? name : `${name}="${trunc(value, MAX_DATA_VALUE).replace(/"/g, '&quot;')}"`;
@@ -491,7 +494,7 @@ export function describeElements(selector: string | undefined, limit = 20, text?
     const el = m.el;
     const r = el.getBoundingClientRect();
     const s = selectorFor(el);
-    return `${i + 1}. ${s} ${durabilityLabel(s)} [${Math.round(r.width)}x${Math.round(r.height)} @${Math.round(r.x)},${Math.round(r.y)}] ${m.hosts.length ? '(in shadow root) ' : ''}${isVisible(el) ? '' : '(hidden) '}${trunc(el.textContent ?? '', 120)}`;
+    return `${i + 1}. ${s} ${durabilityLabel(s)} [${Math.round(r.width)}x${Math.round(r.height)} @${Math.round(r.x)},${Math.round(r.y)}] ${m.hosts.length ? '(in shadow root) ' : ''}${isVisible(el) ? '' : '(hidden) '}${trunc((el as HTMLElement).innerText ?? el.textContent ?? '', 120)}`;
   });
   const shadowed = found.slice(0, limit).find((m) => m.hosts.length);
   return [
