@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { addVersion, createArtifact, fromMod, toProposal, toSource, type Artifact } from '../lib/artifact.ts';
 import { reparseEditedSource } from '../lib/install.ts';
-import { buildSource, modFromProposal, modFromSource, normalizeMod, parseHeader, previewFromSource } from '../lib/mods.ts';
+import { buildSource, draftSourceFor, modFromProposal, modFromSource, normalizeMod, parseHeader, previewFromSource, upgradeGeneratedHeader } from '../lib/mods.ts';
 import { powersDiff } from '../lib/updates.ts';
 import type { Mod, ModProposal } from '../lib/types.ts';
 
@@ -183,4 +183,85 @@ test('an isolated mod whose header has anything else in it is left alone', () =>
   const src = LEGACY.replace('// @grant       none', '// @grant       none\n// @run-at      document-start');
   const m = normalizeMod({ ...modFromSource(src), id: 'm2', world: 'USER_SCRIPT' });
   assert.equal(m.source, src);
+});
+
+test('the on-load repair touches nothing but that one header line, and keeps the mod\'s dates and version', () => {
+  const before = stored({ world: 'USER_SCRIPT', grants: ['none'], createdAt: 1000, updatedAt: 2000 });
+  const m = normalizeMod(before);
+  assert.equal(m.updatedAt, 2000);
+  assert.equal(m.createdAt, 1000);
+  assert.equal(m.version, '1.0');
+  assert.equal(m.id, 'm1');
+  // Line for line: the grant line became the two markers, nothing else moved.
+  const want = LEGACY.replace('// @grant       none', '// @inject-into content\n// @sandbox     DOM');
+  assert.equal(m.source, want);
+  // Idempotent: a second load finds nothing to do.
+  assert.equal(normalizeMod(m).source, want);
+});
+
+test('"exactly the old generated header" is exact: near misses are left alone', () => {
+  const nearMisses: Array<[string, string]> = [
+    ['one space before none, as a person types it', LEGACY.replace('// @grant       none', '// @grant none')],
+    ['reordered keys', LEGACY.replace('// @version     1.0\n// @match       *://*.example.com/*', '// @match       *://*.example.com/*\n// @version     1.0')],
+    ['another version', LEGACY.replace('1.0', '1.0.1')],
+    ['an extra key', LEGACY.replace('// @grant       none', '// @run-at      document-start\n// @grant       none')],
+    ['a second grant', LEGACY.replace('// @grant       none', '// @grant       none\n// @grant       GM_addStyle')],
+    ['a locale variant', LEGACY.replace('// @description', '// @name:fr     Cacher\n// @description')],
+    ['a downloadURL', LEGACY.replace('// @grant       none', '// @downloadURL https://x.example/a.user.js\n// @grant       none')],
+    ['CRLF line endings', LEGACY.replace(/\n/g, '\r\n')],
+    ['something before the header', `// my script\n${LEGACY}`],
+    ['a blank line inside the header', LEGACY.replace('// @grant       none', '\n// @grant       none')],
+  ];
+  for (const [why, src] of nearMisses) {
+    assert.equal(upgradeGeneratedHeader(src), null, why);
+    const m = normalizeMod({ ...modFromSource(src), id: 'x', world: 'USER_SCRIPT' });
+    assert.equal(m.source, src, why);
+  }
+});
+
+test('an isolated mod whose BODY holds the old grant line keeps its body byte for byte', () => {
+  // A real GM grant makes it isolated for its own reasons; the text in a template string is data.
+  const src = [
+    '// ==UserScript==',
+    '// @name        GMish',
+    '// @description d',
+    '// @version     1.0',
+    '// @match       *://*.example.com/*',
+    '// @grant       GM_addStyle',
+    '// ==/UserScript==',
+    '',
+    'const tpl = `',
+    '// @grant       none',
+    '`;',
+    '',
+  ].join('\n');
+  const m = normalizeMod({ ...modFromSource(src), id: 'gm' });
+  assert.equal(m.world, 'USER_SCRIPT');
+  assert.equal(m.source, src);
+});
+
+test('an imported @grant none script with the generated look is never repaired: its world says the page', () => {
+  const m = normalizeMod({ ...modFromSource(LEGACY), id: 'imp' });
+  assert.equal(m.world, 'MAIN');
+  assert.equal(m.source, LEGACY);
+});
+
+test('a draft stored with the old header, saved into the isolated mod it was opened on, keeps it isolated', () => {
+  // open_mod before the fix copied the header onto the draft; the draft is still in storage.
+  const isolated = stored({ world: 'USER_SCRIPT', grants: ['none'] });
+  let a = fromMod('chat', isolated, 1, 'art');
+  assert.match(toSource(a), /@grant       none/, 'the draft carries the old header');
+  a = addVersion(a, version(V2), 2);
+  const into = normalizeMod(isolated);
+  const saved = reparseEditedSource(into, draftSourceFor(toSource(a), into));
+  assert.equal(saved.world, 'USER_SCRIPT');
+  assert.match(saved.source, /@inject-into content/);
+  assert.ok(saved.source.includes(V2));
+  // A page-world mod, or an imported one, is saved exactly as written.
+  const page = stored({ world: 'MAIN', grants: ['none'] });
+  assert.equal(draftSourceFor(toSource(a), page), toSource(a));
+  assert.equal(reparseEditedSource(page, draftSourceFor(toSource(a), page)).world, 'MAIN');
+  // And a header someone wrote is not the generated one, whatever the mod's world.
+  const typed = toSource(a).replace('// @grant       none', '// @grant none');
+  assert.equal(draftSourceFor(typed, into), typed);
 });

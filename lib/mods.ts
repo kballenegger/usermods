@@ -254,7 +254,48 @@ export const SUPPORTED_GRANTS = new Set([
 ]);
 
 /** The `@grant none` line the generated header carried before ISOLATED_MARKERS replaced it. */
-const LEGACY_GRANT_NONE = /^\/\/ @grant       none$/m;
+const LEGACY_GRANT_NONE = '// @grant       none';
+
+/**
+ * `source` with its header moved to the current generated one, when that header is EXACTLY what
+ * buildSource used to write (unchanged from the first commit until ISOLATED_MARKERS): the block
+ * opens the source, and holds `@name`, `@description`, `@version 1.0`, any `@match` lines and
+ * `@grant none`, in that order, with buildSource's own spacing, and nothing else. Only the
+ * `@grant none` line inside that block is swapped; the body is never touched, even when it contains
+ * the same text. null for anything else, including a header a person retyped or reordered.
+ *
+ * It says nothing about the world by itself: `@grant none` means the page. Callers use it only
+ * where the world is already known to be isolated.
+ */
+export function upgradeGeneratedHeader(source: string): string | null {
+  const end = source.indexOf('\n// ==/UserScript==\n');
+  if (!source.startsWith('// ==UserScript==\n') || end < 0) return null;
+  const lines = source.slice('// ==UserScript==\n'.length, end).split('\n');
+  const matches = lines.slice(3, -1);
+  const exact =
+    lines.length >= 4 &&
+    /^\/\/ @name        \S/.test(lines[0]!) &&
+    /^\/\/ @description /.test(lines[1]!) &&
+    lines[2] === '// @version     1.0' &&
+    matches.every((l) => /^\/\/ @match       \S+$/.test(l)) &&
+    lines[lines.length - 1] === LEGACY_GRANT_NONE &&
+    // No line may be anything but a header key: a stray line would be a header someone wrote.
+    lines.every((l) => /^\/\/ @\S/.test(l));
+  if (!exact) return null;
+  lines[lines.length - 1] = ISOLATED_MARKERS.join('\n');
+  return `// ==UserScript==\n${lines.join('\n')}${source.slice(end)}`;
+}
+
+/**
+ * The source a chat's draft saves as (and test_mod runs as). A draft stored before ISOLATED_MARKERS
+ * — one a chat opened on a model-written mod with open_mod — still carries the old generated header,
+ * `@grant none` and all, and saving it would move the isolated mod it updates into the page. When the
+ * mod being written is isolated and the draft's header is exactly the old generated one, the header
+ * is moved to the current one; anything else is saved as written.
+ */
+export function draftSourceFor(source: string, into: Pick<Mod, 'world'> | undefined): string {
+  return into?.world === 'USER_SCRIPT' ? upgradeGeneratedHeader(source) ?? source : source;
+}
 
 /**
  * A mod saved by an older version whose header disagrees with the world it runs in, in the one
@@ -269,13 +310,9 @@ const LEGACY_GRANT_NONE = /^\/\/ @grant       none$/m;
  * Which one a given mod is cannot be told from what was stored, so it is left as it is.
  */
 function repairGeneratedHeader(m: Partial<Mod> & { source: string }): (Partial<Mod> & { source: string }) | null {
-  if (m.world !== 'USER_SCRIPT' || !LEGACY_GRANT_NONE.test(m.source)) return null;
-  const block = m.source.match(/^\/\/ ==UserScript==\n((?:\/\/ @\S+.*\n)*?)\/\/ ==\/UserScript==\n/);
-  if (!block || block.index !== 0) return null;
-  const keys = block[1]!.split('\n').filter(Boolean).map((l) => l.match(/^\/\/ @(\S+)/)?.[1]);
-  if (!keys.every((k) => k === 'name' || k === 'description' || k === 'version' || k === 'match' || k === 'grant')) return null;
-  if (keys.filter((k) => k === 'grant').length !== 1 || !/^\/\/ @version     1\.0$/m.test(block[1]!)) return null;
-  const source = m.source.replace(LEGACY_GRANT_NONE, ISOLATED_MARKERS.join('\n'));
+  if (m.world !== 'USER_SCRIPT') return null;
+  const source = upgradeGeneratedHeader(m.source);
+  if (source === null) return null;
   return { ...m, source, grants: (m.grants ?? []).filter((g) => g !== 'none') };
 }
 

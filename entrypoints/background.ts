@@ -20,7 +20,7 @@ import { resyncPlan } from '@/lib/resync';
 import { describeCallbackError, mapStack, mergeLateErrors, parseError, prepareRunScript, renderLateErrors, renderRunResult, type DomEffect, type LateError, type RawCallbackError, type RunResult, type RunSource } from '@/lib/runscript';
 import { watchDocument } from '@/lib/navwatch';
 import { shouldUpdate } from '@/lib/version';
-import { loadMods, matchPatternForUrl, modFromProposal, modFromSource, parseHeader, previewFromSource, upsertMod, deleteMod, saveMods } from '@/lib/mods';
+import { draftSourceFor, loadMods, matchPatternForUrl, modFromProposal, modFromSource, parseHeader, previewFromSource, upsertMod, deleteMod, saveMods } from '@/lib/mods';
 import { appendTurn, archiveChat, bulkChats, countTurns, createChat, deleteChat, getChat, hostFromUrl, isArchived, listChats, loadItems, loadMessages, markTitleRefreshed, renameChat, saveItems, saveMessages, setChatArtifact, setChatModel, setChatThinking, setModelTitle, touchChat } from '@/lib/chats';
 import { loadRuns, markInterrupted, pruneRuns, resumableRuns, saveRuns, type RunMap, type RunRecord } from '@/lib/runstate';
 import { AUTO_RESUMED_TEXT, autoResumable, countAutoResume, holdExpired, KEEPALIVE_MAX_HOLD_MS, KEEPALIVE_PORT, TAB_CLOSED_TEXT } from '@/lib/keepalive';
@@ -1872,7 +1872,9 @@ async function saveArtifactAsMod(
  * and @require/@resource are refetched only when the header's dependency lines moved.
  */
 async function modFromDraft(artifact: Artifact, into: Mod | undefined): Promise<Mod> {
-  if (into) return saveEditedSource(into.id, toSource(artifact));
+  // draftSourceFor: a draft stored before the generated header stopped saying `@grant none` must
+  // not move the isolated mod it updates into the page.
+  if (into) return saveEditedSource(into.id, draftSourceFor(toSource(artifact), into));
   const mod = modFromProposal(toProposal(artifact) as ModProposal);
   await resolveDependencies(mod);
   return mod;
