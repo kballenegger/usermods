@@ -174,7 +174,9 @@ test('a mod the model wrote still gets a generated header, as it always did', ()
   const a = createArtifact('chat-1', draftOf());
   const source = toSource(a);
   assert.ok(source.includes('==UserScript=='));
-  assert.ok(source.includes('@grant       none'));
+  // Marked isolated, never `@grant none`: that means the page, and a later save would move it there.
+  assert.ok(source.includes('@inject-into content'));
+  assert.ok(!source.includes('@grant'));
   assert.ok(source.includes('@match       *://*.example.com/*'));
 });
 

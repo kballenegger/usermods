@@ -9,7 +9,7 @@
 //
 // The .ts extensions on value imports are load-bearing, for the node test runner.
 import { diffText } from './artifact.ts';
-import { parseHeader, type Header } from './mods.ts';
+import { parseHeader, worldFor, type Header } from './mods.ts';
 import { compareVersions } from './version.ts';
 import type { Mod } from './types';
 
@@ -156,7 +156,8 @@ function listChange(a: string[], b: string[]): ListChange {
   return { added: [...B].filter((x) => !A.has(x)), removed: [...A].filter((x) => !B.has(x)) };
 }
 
-const worldOf = (h: Header): 'isolated' | 'page' => (h.grants.includes('none') || h.grants.includes('unsafeWindow') ? 'page' : 'isolated');
+// The same rule the saved mod will run under, markers and all, so the review cannot disagree with it.
+const worldOf = (h: Header): 'isolated' | 'page' => (worldFor(h) === 'MAIN' ? 'page' : 'isolated');
 
 /** Grants that give a script reach beyond the page it is on, named for the notes. */
 const RISKY_GRANTS: Record<string, string> = {

@@ -18,8 +18,9 @@ import { createUpdateController } from '@/lib/updatecontroller';
 import { withRetry } from '@/lib/agent/retry';
 import { resyncPlan } from '@/lib/resync';
 import { describeCallbackError, mapStack, mergeLateErrors, parseError, prepareRunScript, renderLateErrors, renderRunResult, type DomEffect, type LateError, type RawCallbackError, type RunResult, type RunSource } from '@/lib/runscript';
+import { watchDocument } from '@/lib/navwatch';
 import { shouldUpdate } from '@/lib/version';
-import { loadMods, matchPatternForUrl, modFromProposal, modFromSource, parseHeader, previewFromSource, upsertMod, deleteMod, saveMods } from '@/lib/mods';
+import { draftSourceFor, loadMods, matchPatternForUrl, modFromProposal, modFromSource, parseHeader, previewFromSource, upsertMod, deleteMod, saveMods } from '@/lib/mods';
 import { appendTurn, archiveChat, bulkChats, countTurns, createChat, deleteChat, getChat, hostFromUrl, isArchived, listChats, loadItems, loadMessages, markTitleRefreshed, renameChat, saveItems, saveMessages, setChatArtifact, setChatModel, setChatThinking, setModelTitle, touchChat } from '@/lib/chats';
 import { loadRuns, markInterrupted, pruneRuns, resumableRuns, saveRuns, type RunMap, type RunRecord } from '@/lib/runstate';
 import { AUTO_RESUMED_TEXT, autoResumable, countAutoResume, holdExpired, KEEPALIVE_MAX_HOLD_MS, KEEPALIVE_PORT, TAB_CLOSED_TEXT } from '@/lib/keepalive';
@@ -1871,7 +1872,9 @@ async function saveArtifactAsMod(
  * and @require/@resource are refetched only when the header's dependency lines moved.
  */
 async function modFromDraft(artifact: Artifact, into: Mod | undefined): Promise<Mod> {
-  if (into) return saveEditedSource(into.id, toSource(artifact));
+  // draftSourceFor: a draft stored before the generated header stopped saying `@grant none` must
+  // not move the isolated mod it updates into the page.
+  if (into) return saveEditedSource(into.id, draftSourceFor(toSource(artifact), into));
   const mod = modFromProposal(toProposal(artifact) as ModProposal);
   await resolveDependencies(mod);
   return mod;
@@ -2546,6 +2549,8 @@ function runWrapped(
   const waiting = awaitRunResult(tabId, runId, { timeoutMs: opts.timeoutMs, navigationEnds: true, src: () => opts.src });
   // An injection that never starts is its own failure, and saying "timed out" for it is a lie.
   void (async () => {
+    // The document the run starts in is read before the run can navigate away from it.
+    await waiting.ready;
     if (world === 'MAIN') await exec.injectOnce(tabId, relayCode(runId, exec.reportTransport), 'USER_SCRIPT');
     await exec.injectOnce(tabId, wrapped, world);
   })().catch((e: unknown) => waiting.settle({ outcome: { kind: 'injection-failed', reason: e instanceof Error ? e.message : String(e) }, logs: [] }));
@@ -2560,13 +2565,18 @@ function runWrapped(
  * Watching the tab is how a lost result stops looking like a timeout. The wrapper reports over
  * runtime messaging; a navigation or unload between the script finishing and that message flushing
  * drops it silently, and the model used to be told only that 20s had passed.
+ *
+ * But a tabs.onUpdated 'loading' is not proof the document went: Chrome fires it for a pushState or
+ * a hash change too, and there the script runs on and its report arrives. So 'loading' only ends
+ * the wait when the document the run started in is really gone (lib/navwatch.ts).
  */
 function awaitRunResult(
   tabId: number,
   runId: string,
   opts: { timeoutMs: number; navigationEnds: boolean; src: () => RunSource },
-): { result: Promise<RunResult>; settle: (r: RunResult) => void } {
+): { result: Promise<RunResult>; settle: (r: RunResult) => void; ready: Promise<void> } {
   let settle: (r: RunResult) => void = () => {};
+  let ready: Promise<void> = Promise.resolve();
   // Asked for when a report arrives, not now: a test on a fresh load only knows where the script's
   // own lines sit once its code has been composed for the document that claimed it.
   const describe = (list: unknown) => (Array.isArray(list) ? list.map((e: RawCallbackError) => describeCallbackError(e, opts.src())) : []);
@@ -2586,9 +2596,27 @@ function awaitRunResult(
       exec.removeResultListener(listener);
       chrome.tabs.onUpdated.removeListener(onUpdated);
       chrome.tabs.onRemoved.removeListener(onRemoved);
+      docWatch?.stop();
       resolve(r);
     };
     settle = finish;
+
+    // Started before the caller injects the run, so its first read is of the document the run
+    // goes into.
+    const docWatch = opts.navigationEnds
+      ? watchDocument(
+          {
+            docToken: () => documentToken(tabId),
+            tabStatus: () => chrome.tabs.get(tabId).then((t) => t.status, () => undefined),
+            schedule: (fn, ms) => {
+              const t = setTimeout(fn, ms);
+              return () => clearTimeout(t);
+            },
+          },
+          (url) => finish({ outcome: { kind: 'navigated', url }, logs: [] }),
+        )
+      : null;
+    if (docWatch) ready = docWatch.ready;
 
     const timer = setTimeout(() => finish({ outcome: { kind: 'timeout', seconds: opts.timeoutMs / 1000 }, logs: [] }), opts.timeoutMs);
 
@@ -2617,8 +2645,7 @@ function awaitRunResult(
     exec.addResultListener(listener);
 
     const onUpdated = (id: number, change: chrome.tabs.OnUpdatedInfo, tab: chrome.tabs.Tab) => {
-      if (!opts.navigationEnds || id !== tabId || change.status !== 'loading') return;
-      finish({ outcome: { kind: 'navigated', url: change.url ?? tab.url ?? 'a new page' }, logs: [] });
+      if (id === tabId) docWatch?.onUpdated(change, tab.url);
     };
     chrome.tabs.onUpdated.addListener(onUpdated);
 
@@ -2627,7 +2654,33 @@ function awaitRunResult(
     };
     chrome.tabs.onRemoved.addListener(onRemoved);
   });
-  return { result, settle };
+  return { result, settle, ready };
+}
+
+/** How long a document-identity read may take before it counts as unreadable. Chrome takes ~5ms. */
+const DOC_TOKEN_TIMEOUT_MS = 1_000;
+
+/**
+ * Which document the tab's top frame holds now, for lib/navwatch.ts: its performance.timeOrigin,
+ * fixed for a document's life and new for every new one, readable from the isolated world. null
+ * when the frame cannot be scripted (a chrome:// or store page, an error page, a closed tab).
+ * injectImmediately, so a new document that is still loading answers now rather than at idle.
+ *
+ * The function is ours and fixed, never model code, so this is not the "code string through
+ * executeScript" docs/safari.md rules out. The timeout is for Safari, where this is unverified: a
+ * read that never answers must cost a moment, not turn a real navigation back into a timeout.
+ */
+async function documentToken(tabId: number): Promise<string | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const read = chrome.scripting
+    .executeScript({ target: { tabId, frameIds: [0] }, injectImmediately: true, func: () => String(performance.timeOrigin) })
+    .then(([r]) => (typeof r?.result === 'string' ? r.result : null), () => null);
+  const late = new Promise<null>((resolve) => (timer = setTimeout(() => resolve(null), DOC_TOKEN_TIMEOUT_MS)));
+  try {
+    return await Promise.race([read, late]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // ---------- late errors from run_script callbacks ----------
