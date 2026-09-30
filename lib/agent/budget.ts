@@ -113,8 +113,13 @@ export function countReads(previous: ReadTally, calls: readonly ReadCall[]): Rea
 /**
  * The read-budget nudge, or null while under budget. It fires on the step where the cost first
  * exceeds the budget, and again only after an act has reset it and it has climbed back over.
+ *
+ * The advice is true for all three things a user may be asking for. It used to say "Act now: test
+ * with run_script", which in a chat about why a link would not load told a model that had been
+ * asked a question to go and run scripts. The prefix is unchanged: the scripted conversations and
+ * the smoke run match on it.
  */
 export function readBudgetNudge(reads: ReadTally, previousReads: ReadTally, budget = READ_BUDGET): string | null {
   if (reads.units <= budget || previousReads.units > budget) return null;
-  return `[You have made ${reads.calls} page reads without running or proposing anything. Act now: test with run_script or ask the user one question.]`;
+  return `[You have made ${reads.calls} page reads without running or proposing anything. Stop reading: answer the user if you already can, try the change with run_script or test_mod if one is wanted, or ask the user one question.]`;
 }

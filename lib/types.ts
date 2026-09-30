@@ -464,8 +464,10 @@ export interface ElementRef extends PickedElement {
 
 // Messages between the side panel / background and the content script.
 export type ContentRequest =
-  | { type: 'snapshot'; selector?: string; maxChars?: number; includeHidden?: boolean }
-  | { type: 'query'; selector?: string; limit?: number; text?: string }
+  /** `text`: readable text instead of HTML (lib/pagetext.ts), from character `offset`. */
+  | { type: 'snapshot'; selector?: string; maxChars?: number; includeHidden?: boolean; text?: boolean; offset?: number }
+  /** `styles` and `overlays`: see FindOptions in lib/inspect.ts. */
+  | { type: 'query'; selector?: string; limit?: number; text?: string; styles?: string[]; overlays?: boolean }
   | { type: 'styles'; selector: string; properties?: string[] }
   | { type: 'pick' }
   /**

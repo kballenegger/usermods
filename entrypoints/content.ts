@@ -1,5 +1,7 @@
 import { createHolder } from '@/lib/keepalive-holder';
-import { computedStyles, describeElements, reachFor, selectorFor, snapshot } from '@/lib/snapshot';
+import { computedStyles, describeElements } from '@/lib/inspect';
+import { pageText, sliceText, TEXT_DEFAULT_CHARS } from '@/lib/pagetext';
+import { reachFor, selectorFor, snapshot } from '@/lib/snapshot';
 import { queryAllDeep, waitForDom } from '@/lib/waitdom';
 import { initBanner } from '@/lib/bannerclient';
 import { handleShareMessage } from '@/lib/shareclient';
@@ -96,6 +98,12 @@ export default defineContentScript({
             root = m.el;
             if (m.hosts.length) where = `<!-- inside an open shadow root: ${reachFor(m, msg.selector)} -->\n`;
           }
+          if (msg.text) {
+            // A whole-page read puts content ahead of navigation; a selected element is read whole.
+            const full = root ? pageText(root, { wholePage: !msg.selector }) : '';
+            sendResponse({ url: location.href, title: document.title, html: where + sliceText(full, msg.offset ?? 0, msg.maxChars ?? TEXT_DEFAULT_CHARS) });
+            return;
+          }
           let html = snapshot({ root, maxChars: msg.maxChars, includeHidden: msg.includeHidden });
           // A hidden root used to come back as an empty page, which reads as "nothing there".
           if (!html && msg.selector && !msg.includeHidden) html = `<!-- "${msg.selector}" is hidden; pass include_hidden: true to see it -->`;
@@ -103,7 +111,7 @@ export default defineContentScript({
           return;
         }
         case 'query':
-          sendResponse({ text: describeElements(msg.selector, msg.limit, msg.text) });
+          sendResponse({ text: describeElements(msg.selector, msg.limit, msg.text, { styles: msg.styles, overlays: msg.overlays }) });
           return;
         case 'styles':
           sendResponse({ text: computedStyles(msg.selector, msg.properties) });

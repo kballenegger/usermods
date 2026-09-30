@@ -2048,7 +2048,7 @@ async function guardrails() {
     if (!/You have made 4 page reads without running or proposing anything/.test(sent)) {
       fail('the read-budget nudge never reached the mock');
     }
-    if (!/Act now: test with run_script or ask the user one question/.test(sent)) {
+    if (!/Stop reading: answer the user if you already can, try the change with run_script or test_mod if one is wanted, or ask the user one question/.test(sent)) {
       fail('the read-budget nudge reached the mock without its instruction');
     }
 
