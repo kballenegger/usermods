@@ -132,6 +132,15 @@ test('a deep chain stops at CHAIN_STEPS and says it was cut', () => {
   assert.equal(steps.at(-1), '…');
 });
 
+test('a chain that runs out of walk before body says it was cut, rather than ending on a count', () => {
+  let html = '<html><body>';
+  for (let i = 0; i < 45; i++) html += '<div data-box="0,0,500,20">';
+  html += '<i data-box="0,0,500,20">x</i>' + '</div>'.repeat(45) + '</body></html>';
+  load(html);
+  const i = document.querySelector('i')!;
+  assert.equal(ancestorChain(i, probe.box(i), probe, new Map(), 1), '(40 same-size) › …');
+});
+
 test('find_elements prints layout and asked-for styles for every match, and chains for the first few only', () => {
   let html = '<html><body><ul class="list" data-box="0,0,500,2000">';
   for (let n = 0; n < 6; n++) html += `<li class="row" style="display:flex" data-box="0,${n * 50},500,50"><a class="t" data-box="0,${n * 50},100,20">item ${n}</a></li>`;
@@ -143,7 +152,7 @@ test('find_elements prints layout and asked-for styles for every match, and chai
   assert.match(out, /1\. .* \[100x20 @0,0\] display:block item 0/);
   assert.match(out, /ancestors: li\.row 500x50 \[unit\? 1 of 6 like it\] › ul\.list 500x2000$/m);
   assert.match(out, /ancestors: li\.row 500x50 \[unit\? 1 of 6 like it\] › \(then as in 1\.\)$/m);
-  assert.match(out, /Ancestors are listed for the first 3 matches only\.\n\[unit\? …\] = likely thing to hide/);
+  assert.match(out, /Ancestors are listed for the first 3 matches only\.\n\[unit\? …\] = likely thing to hide; a guess from layout\.$/m);
 });
 
 test('find_elements with only overlays needs no selector, and a plain call is unchanged in wording', () => {
@@ -178,6 +187,13 @@ test('the furniture inventory lists layers with cover, backdrop, dialog, nesting
   assert.equal(lines[6], '4. div.modal-root fixed z-index:1000 1000x800 @0,0 covers 100% "Subscribe to our newsletter"');
   assert.equal(lines[7], '5. div.modal[role="dialog"][aria-modal="true"] static 400x300 @300,250 covers 15% [dialog] (inside 4.) "Subscribe to our newsletter"');
   assert.equal(lines[8], 'Also 1 hidden fixed/sticky/dialog element(s) (display:none or zero size).');
+});
+
+test('a modal inside an open shadow root is listed too', () => {
+  load('<html><body><div id="app" data-box="0,0,1000,800"></div></body></html>');
+  const root = document.querySelector('#app')!.attachShadow({ mode: 'open' });
+  root.innerHTML = '<div class="sheet" role="dialog" style="position:fixed;z-index:5" data-box="200,100,600,400">Sign in to continue</div>';
+  assert.match(describeFurniture(probe), /1\. div\.sheet\[role="dialog"\] fixed z-index:5 600x400 @200,100 covers 30% \[dialog\] "Sign in to continue"/);
 });
 
 test('a page with nothing layered says so, and a normal page reports no scroll lock', () => {

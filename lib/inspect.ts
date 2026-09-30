@@ -215,6 +215,8 @@ export function ancestorChain(el: Element, matchBox: Box, probe: Probe, seen: Ma
     cur = parentOf(a);
   }
   if (skipped) steps.push(`(${skipped} same-size)`);
+  // Out of walk before reaching body: a cut like any other, so it is said.
+  if (cur.el && cur.el.tagName !== 'BODY' && cur.el.tagName !== 'HTML') steps.push('…');
   return steps.join(' › ');
 }
 
@@ -308,7 +310,8 @@ function describeMatches(sel: string | undefined, needle: string | undefined, li
     'The bracketed label is how durable each selector is across site deploys. A [fragile: …] one is worth a second look; a [stable: …] one is not.',
     // Said only when there is something to explain: the chain itself reads as "nearest first".
     ...(chains && found.length > CHAIN_MATCHES ? [`Ancestors are listed for the first ${CHAIN_MATCHES} matches only.`] : []),
-    ...(units ? ['[unit? …] = likely thing to hide (a dialog, a fixed/sticky layer, or a much larger ancestor repeated among its siblings); a layout guess.'] : []),
+    // The reason is printed inside each mark, so the legend only says what the mark means.
+    ...(units ? ['[unit? …] = likely thing to hide; a guess from layout.'] : []),
     ...(shadowed
       ? [`"(in shadow root)" ones are inside an open shadow root, where document.querySelector and page CSS do not reach. The selector is relative to that root: ${reachFor(shadowed, sel ?? selectorFor(shadowed.el))}`]
       : []),
@@ -402,7 +405,9 @@ export function describeFurniture(probe: Probe = liveProbe, rows = FURNITURE_ROW
         here = layers.length - 1;
       }
     }
-    const kids = [...el.children];
+    // An open shadow root first, as it renders ahead of the light children it slots: web-component
+    // sites put their modals there.
+    const kids = [...(el.shadowRoot?.children ?? []), ...el.children];
     for (let i = kids.length - 1; i >= 0; i--) stack.push({ el: kids[i]!, inside: here });
   }
 

@@ -100,6 +100,15 @@ test('get_page passes text mode and its offset through', async () => {
   assert.equal(sent[1]!.offset, 0);
 });
 
+test('a text read is at least 1,000 characters a part, and styles drop names no property has', async () => {
+  const { sent } = await run([
+    step([call('a', 'get_page', { text: true, max_chars: 1 })]),
+    step([call('b', 'find_elements', { selector: 'p', styles: ['color', 'x'.repeat(5000)] })]),
+  ]);
+  assert.equal(sent[0]!.maxChars, 1000);
+  assert.deepEqual(sent[1]!.styles, ['color']);
+});
+
 test('get_page passes include_hidden through, and only when it is true', async () => {
   const { sent } = await run([step([call('a', 'get_page', { include_hidden: true })]), step([call('b', 'get_page', { selector: 'main' })])]);
   assert.equal(sent[0]!.includeHidden, true);
