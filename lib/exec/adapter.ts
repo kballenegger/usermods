@@ -33,6 +33,7 @@ import {
   type ClaimResponse,
   type ScriptToRun,
 } from './protocol.ts';
+import { guardOnce, isTestRunId, markerCode, testRunsToSweep, unmarkerCode } from './testrun.ts';
 import type { ReportTransport } from './wrap.ts';
 import type { Mod } from '../types';
 
@@ -40,6 +41,26 @@ import type { Mod } from '../types';
 export interface RunContext {
   tabId?: number;
   frameId?: number;
+}
+
+/**
+ * One test_mod run armed for the next document a tab loads (lib/exec/testrun.ts).
+ *
+ * `compose` turns the engine's registered code for `mod` into what is actually injected (recorder,
+ * one-off wrapper). It is a function because Safari builds the code at claim time, when the GM
+ * capability for the new document can be minted, and Chrome builds it at once.
+ */
+export interface TestRun {
+  /** A reserved id (testRunId), unique to this run. */
+  id: string;
+  runId: string;
+  tabId: number;
+  mod: Mod;
+  values: Record<string, unknown>;
+  compose: (registered: string) => string;
+  /** Isolated-world code to run at document_start first, for a page-world mod's report (relayCode). */
+  relay?: string;
+  expiresAt: number;
 }
 
 export interface RunResultMessage {
@@ -84,6 +105,15 @@ export interface ExecAdapter {
   broadcast(modId: string, key: string, oldValue: unknown, newValue: unknown, from: chrome.runtime.MessageSender): void;
   /** A mod was disabled, deleted or rewritten: drop any capability its running copies still hold. */
   revokeMod(modId: string): void;
+  /**
+   * Arm a one-shot run of `run.mod` for the next document `run.tabId` loads, at the mod's own
+   * @run-at. Resolves once armed; the caller reloads the tab. Always pair with disarmTestRun.
+   */
+  armTestRun(run: TestRun): Promise<void>;
+  /** Undo armTestRun. Safe to call twice, and after the run already happened. */
+  disarmTestRun(run: TestRun): Promise<void>;
+  /** Remove every armed test a previous worker left behind. Called at worker start. */
+  sweepTestRuns(): Promise<void>;
 }
 
 /** Everything the adapters need from the background, injected so neither imports it. */
@@ -171,7 +201,9 @@ class UserScriptsAdapter implements ExecAdapter {
 
   async needsSync(mods: Mod[]): Promise<boolean> {
     if (!this.available()) return false;
-    const have = new Set((await chrome.userScripts.getScripts()).map((s) => s.id));
+    // A test_mod registration in flight is not a saved mod out of step: counting it would make the
+    // next prepareEngine resync, which unregisters everything, in the middle of the test.
+    const have = new Set((await chrome.userScripts.getScripts()).map((s) => s.id).filter((id) => !isTestRunId(id)));
     const want = registrable(mods).map((m) => m.id);
     return want.length !== have.size || want.some((id) => !have.has(id));
   }
@@ -238,6 +270,44 @@ class UserScriptsAdapter implements ExecAdapter {
     // browser tears down with the document. Unregistering (done by sync) is the whole story.
   }
 
+  /**
+   * Register the draft under its reserved id, with the mod's own patterns, timing and world, so the
+   * browser runs it on the reload exactly as it would run the saved mod. chrome.userScripts cannot
+   * target one tab, so the tab is marked first and the code runs only where it finds the mark
+   * (guardOnce). A page-world mod's relay is a second registration at document_start.
+   */
+  async armTestRun(run: TestRun): Promise<void> {
+    if (!this.available()) throw new Error('chrome.userScripts is unavailable, so nothing can be registered for the reload.');
+    await chrome.userScripts.execute({ target: { tabId: run.tabId }, js: [{ code: markerCode(run.runId) }], world: 'USER_SCRIPT' });
+    const m = run.mod;
+    const where = {
+      ...(m.matches.length ? { matches: m.matches } : {}),
+      ...(m.excludeMatches.length ? { excludeMatches: m.excludeMatches } : {}),
+      ...(m.includeGlobs.length ? { includeGlobs: m.includeGlobs } : {}),
+      ...(m.excludeGlobs.length ? { excludeGlobs: m.excludeGlobs } : {}),
+      allFrames: false,
+    };
+    const scripts: chrome.userScripts.RegisteredUserScript[] = [
+      { id: run.id, js: [{ code: guardOnce(run.compose(buildRegisteredCode(m, run.values)), run.runId, run.expiresAt) }], ...where, runAt: m.runAt, world: m.world },
+    ];
+    if (run.relay) scripts.unshift({ id: `${run.id}.relay`, js: [{ code: run.relay }], ...where, runAt: 'document_start', world: 'USER_SCRIPT' });
+    await chrome.userScripts.register(scripts);
+  }
+
+  async disarmTestRun(run: TestRun): Promise<void> {
+    if (!this.available()) return;
+    const ids = (await chrome.userScripts.getScripts({ ids: [run.id, `${run.id}.relay`] })).map((s) => s.id);
+    if (ids.length) await chrome.userScripts.unregister({ ids });
+    // A load that never came (a timeout, a closed tab) leaves the mark behind; take it back.
+    await chrome.userScripts.execute({ target: { tabId: run.tabId }, js: [{ code: unmarkerCode(run.runId) }], world: 'USER_SCRIPT' }).catch(() => {});
+  }
+
+  async sweepTestRuns(): Promise<void> {
+    if (!this.available()) return;
+    const stale = testRunsToSweep((await chrome.userScripts.getScripts()).map((s) => s.id));
+    if (stale.length) await chrome.userScripts.unregister({ ids: stale });
+  }
+
   private registerGmPort(port: chrome.runtime.Port): void {
     const modId = port.name.slice('gm:'.length);
     if (!modId) return;
@@ -283,6 +353,8 @@ class ContentScriptAdapter implements ExecAdapter {
   private readonly resultListeners = new Set<(msg: RunResultMessage) => void>();
   /** Mods a grant has ever been minted for, so sync() knows whose capability to take back. */
   private readonly issuedModIds = new Set<string>();
+  /** test_mod runs armed per tab, served once by the next top-frame claim. Memory only, on purpose. */
+  private readonly testRuns = new Map<number, TestRun>();
   private wired = false;
   private readonly env: AdapterEnv;
 
@@ -353,6 +425,7 @@ class ContentScriptAdapter implements ExecAdapter {
     chrome.tabs.onRemoved.addListener((tabId) => {
       this.grants.revokeTab(tabId);
       this.ledger.forgetTab(tabId);
+      this.testRuns.delete(tabId);
     });
   }
 
@@ -447,6 +520,24 @@ class ContentScriptAdapter implements ExecAdapter {
   }
 
   /**
+   * Safari's faithful half: nothing is registered, so the armed run waits in memory for the tab's
+   * next top-frame claim, which serves it alongside the saved mods and through the same runner, at
+   * the same @run-at. Held in memory only: a worker that is torn down forgets it, which is the safe
+   * direction (the test times out; nothing runs later).
+   */
+  async armTestRun(run: TestRun): Promise<void> {
+    this.testRuns.set(run.tabId, run);
+  }
+
+  async disarmTestRun(run: TestRun): Promise<void> {
+    if (this.testRuns.get(run.tabId) === run) this.testRuns.delete(run.tabId);
+  }
+
+  async sweepTestRuns(): Promise<void> {
+    this.testRuns.clear();
+  }
+
+  /**
    * Answer a document's claim: which mods run here, built and bound to this frame.
    *
    * Idempotent by document key, so a claim the background was suspended before answering can be
@@ -484,6 +575,27 @@ class ContentScriptAdapter implements ExecAdapter {
         world: mod.world,
         token: grant?.token,
       });
+    }
+    const test = frame.frameId === 0 ? this.testRuns.get(frame.tabId) : undefined;
+    if (test) {
+      // Once, and only while it is fresh and the mod would run on this URL at all.
+      this.testRuns.delete(frame.tabId);
+      if (now < test.expiresAt && modsToRun([{ ...test.mod, enabled: true, allFrames: false }], { url, topFrame: true }).length) {
+        const grant =
+          test.mod.world === 'USER_SCRIPT'
+            ? this.grants.issue({ modId: test.mod.id, world: test.mod.world, documentId: req.docKey, tabId: frame.tabId, frameId: 0 }, now)
+            : null;
+        if (grant) this.issuedModIds.add(test.mod.id);
+        if (test.relay) scripts.push({ modId: `${test.id}.relay`, name: 'test relay', code: test.relay, runAt: 'document_start', world: 'USER_SCRIPT' });
+        scripts.push({
+          modId: test.id,
+          name: test.mod.name,
+          code: test.compose(buildRegisteredCode(test.mod, test.values, { transport: 'bridge', token: grant?.token })),
+          runAt: test.mod.runAt,
+          world: test.mod.world,
+          token: grant?.token,
+        });
+      }
     }
     const response: ClaimResponse = { scripts, replayed: false };
     this.ledger.record(req.docKey, frame, response, now);
