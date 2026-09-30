@@ -11,8 +11,11 @@
 // It starts where a reviewer starts: a fresh install with "Allow User Scripts" off. It checks the
 // extension says so, turns the toggle on through chrome://extensions under the service worker that
 // is already running (no restart, as for a person), and then does the whole test for real: the
-// scripted model (scripts/mock-llm.mjs) runs its script on the page, proposes it, and the saved mod
-// is applied again when the page is reloaded.
+// scripted model (scripts/mock-llm.mjs) runs its script on the page, tests the final script as the
+// saved mod on a fresh load (test_mod with reload: a temporary chrome.userScripts registration and a
+// real reload), proposes it, and the saved mod is applied again when the page is reloaded. After the
+// test, only saved mods may be registered: a temporary registration left behind would run an unsaved
+// script on every visit.
 //
 // The toggle is an ordinary control on an ordinary page, so it can be clicked. That a fresh install
 // worked at all after turning it on is exactly what this caught failing on 2026-09-30, in the
@@ -60,6 +63,22 @@ async function startMock() {
     child.on('exit', (code) => reject(new Error(`mock-llm exited early with code ${code}`)));
   });
   return child;
+}
+
+/** Every tool message the mock was sent, across all requests: what the model was told. */
+async function toolResultsSeen() {
+  const r = await fetch(`http://127.0.0.1:${PORT}/__requests`).then((x) => x.json());
+  const seen = new Set();
+  for (const req of r.requests) {
+    for (const m of req.messages ?? []) if (m.role === 'tool') seen.add(typeof m.content === 'string' ? m.content : JSON.stringify(m.content));
+  }
+  return [...seen];
+}
+
+/** What chrome.userScripts holds right now, read in the service worker itself. */
+async function registeredIds(ctx) {
+  const [sw] = ctx.serviceWorkers();
+  return sw.evaluate(async () => (await chrome.userScripts.getScripts()).map((s) => s.id));
 }
 
 async function main() {
@@ -180,6 +199,23 @@ async function main() {
     if (failedCalls) fail(`${failedCalls} tool call(s) failed in the transcript`);
     log('the model inspected the page, ran its script there, and proposed a tested mod');
 
+    // test_mod reloaded the tab and ran the script at load as the saved mod, and the model was told so.
+    const told = (await toolResultsSeen()).find((t) => t.startsWith('Ran as the saved mod'));
+    if (!told) fail('the model never received a test_mod result');
+    log(`test_mod told the model:\n    ${told.split('\n').join('\n    ')}`);
+    if (!told.startsWith('Ran as the saved mod: tab reloaded, script ran at document_idle')) fail('test_mod did not run on a fresh load');
+    if (!/2s later: all \d+ changes? still in place\./.test(told)) fail('test_mod did not confirm the change was still there after the page settled');
+    // The card says which kind of test it was.
+    const tested = panel.locator('.card [data-testid="card-tested"]');
+    if ((await tested.count()) !== 1 || (await tested.getAttribute('data-tested')) !== 'fresh-load') fail('the proposal card does not say it was tested as the saved mod on a fresh load');
+    if (!(await tested.isVisible())) fail('the tested line is in the DOM but not visible');
+    log(`the card says: "${await tested.textContent()}"`);
+    // And nothing of the test is left registered: only the saved (seed) mod.
+    const savedIds = new Set((await panel.evaluate(async () => (await chrome.storage.local.get('mods')).mods ?? [])).map((m) => m.id));
+    const afterTest = await registeredIds(ctx);
+    if (afterTest.some((id) => !savedIds.has(id))) fail(`a temporary registration outlived test_mod: ${JSON.stringify(afterTest)}`);
+    log(`registered after the test: ${afterTest.length} script(s), all saved mods`);
+
     // "Click 'Save & enable'."
     await save.click();
     await panel.getByRole('button', { name: 'Saved · enabled', exact: true }).waitFor({ timeout: 10_000 });
@@ -187,6 +223,8 @@ async function main() {
     const saved = mods.find((m) => m.name !== 'Seeded before the toggle');
     if (mods.length !== 2 || !saved?.enabled) fail(`expected the seed and one new enabled mod after saving, got ${JSON.stringify(mods.map((m) => ({ name: m.name, enabled: m.enabled })))}`);
     log(`saved and enabled: ${saved.name}`);
+    const afterSave = await registeredIds(ctx);
+    if (afterSave.length !== 2 || afterSave.some((id) => !mods.some((m) => m.id === id))) fail(`after saving, registered ${JSON.stringify(afterSave)}, expected exactly the two saved mods`);
 
     // "Reload." The saved mod is registered, so the change is there on a fresh load with nobody asking.
     await site.reload({ waitUntil: 'domcontentloaded', timeout: 60_000 });

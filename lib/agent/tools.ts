@@ -104,7 +104,7 @@ export const TOOLS: ToolDef[] = [
   {
     name: 'run_script',
     description:
-      'Run JavaScript once on the current page, right now, in the same isolated world a saved mod would use. Returns the value of the last expression (or of an explicit return, or the resolved value of a promise), a count of what the DOM did while it ran, console output, and any thrown error. Code whose last statement is a bare expression returns that expression; code that only mutates the page reports "Completed. No return value." with the DOM counts, which is a successful run, not a failure. Use it to test a draft mod or to perform a one-off task. Code may use await at top level.',
+      'Run JavaScript once on the current page, right now, in the same isolated world a saved mod would use. Returns the value of the last expression (or of an explicit return, or the resolved value of a promise), a count of what the DOM did while it ran, console output, and any thrown error. Code whose last statement is a bare expression returns that expression; code that only mutates the page reports "Completed. No return value." with the DOM counts, which is a successful run, not a failure. Use it to explore, try an idea, or do a one-off task; test a finished mod with test_mod. Code may use await at top level.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -119,6 +119,20 @@ export const TOOLS: ToolDef[] = [
         },
       },
       required: ['code', 'description'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'test_mod',
+    description:
+      'Run a finished script exactly as the saved mod will: its header\'s world, @grant functions, @require files and @run-at. reload: true reloads the tab and runs it at page load; use that before propose_mod when the change should be there on every visit. Reports errors, console output, what changed, and whether it was still there 2s later.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        code: { type: 'string', description: 'The script body, exactly as you will pass it to propose_mod.' },
+        reload: { type: 'boolean', description: 'Reload the tab and run at page load. Default false.' },
+      },
+      required: ['code'],
       additionalProperties: false,
     },
   },
@@ -161,7 +175,7 @@ export const TOOLS: ToolDef[] = [
   {
     name: 'propose_mod',
     description:
-      'Present a finished userscript to the user, who can try it, save it, and enable it. Call this once the script has been tested with run_script. It is refused if nothing has been run since your last proposal, if the code does not parse, if it uses eval, new Function, document.write or an inline handler attribute, or if a match pattern covers every site the user visits without them having asked for that. Do not include a ==UserScript== header; it is generated from the other fields.',
+      'Present a finished userscript to the user, who can try it, save it, and enable it. Call this after test_mod has run the same code. It is refused if nothing has been run since your last proposal, if the code does not parse, if it uses eval, new Function, document.write or an inline handler attribute, or if a match pattern covers every site the user visits without them having asked for that. Do not include a ==UserScript== header; it is generated from the other fields.',
     inputSchema: {
       type: 'object',
       properties: {
