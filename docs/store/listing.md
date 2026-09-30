@@ -86,7 +86,7 @@ HOW IT WORKS
 
 YOUR OWN AI
 
-There is no account and no server behind this extension. Connect the AI service you already use with your own API key, or a model running on your own computer, in which case nothing leaves your machine. Presets for the common services are built in, and any endpoint that speaks a standard chat API works too.
+There is no account and no server behind this extension. Connect the AI service you already use with your own API key, or a model running on your own computer, in which case your pages and messages never leave your machine. Presets for the common services are built in, and any endpoint that speaks a standard chat API works too.
 
 A FULL USERSCRIPT MANAGER
 
