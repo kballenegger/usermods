@@ -2446,16 +2446,19 @@ function wireLateErrors(): void {
     const described = (msg.errors as RawCallbackError[]).map((e) => describeCallbackError(e, run));
     lateByTab.set(run.tabId, mergeLateErrors(lateByTab.get(run.tabId) ?? [], msg.runId, described));
   });
-  // A navigation ends every run on the page, and whatever they threw was about a page that is gone.
-  const forget = (tabId: number) => {
+  // What was buffered before a navigation was about a page that is gone, so it is dropped. The runs
+  // themselves stay followed: Chrome fires 'loading' for a history.pushState too (seen in a real
+  // browser), and there the script's observers live on and a route change is exactly when they
+  // start to throw. After a real navigation their listeners are gone with the document, so keeping
+  // them costs nothing, and lateRuns is bounded anyway. A closed tab is forgotten entirely.
+  chrome.tabs.onUpdated.addListener((tabId, change) => {
+    if (change.status === 'loading') lateByTab.delete(tabId);
+  });
+  chrome.tabs.onRemoved.addListener((tabId) => {
     lateByTab.delete(tabId);
     latestRunByTab.delete(tabId);
     for (const [id, run] of lateRuns) if (run.tabId === tabId) lateRuns.delete(id);
-  };
-  chrome.tabs.onUpdated.addListener((tabId, change) => {
-    if (change.status === 'loading') forget(tabId);
   });
-  chrome.tabs.onRemoved.addListener(forget);
 }
 
 /** The late-error line for a tab's next tool result, once; null when there is none. */
