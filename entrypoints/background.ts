@@ -2001,6 +2001,12 @@ async function runAtLoad(
   const onAbort = () => waiting.settle({ outcome: { kind: 'injection-failed', reason: 'Stopped.' }, logs: [] });
   signal.addEventListener('abort', onAbort, { once: true });
   try {
+    // A Stop that landed while the draft was being built (a @require fetch can take seconds) fired
+    // before the listener existed; it must not still reload the user's tab.
+    if (signal.aborted) {
+      onAbort();
+      return await waiting.result;
+    }
     await exec.armTestRun(test);
     await chrome.tabs.reload(tabId);
     return await waiting.result;
