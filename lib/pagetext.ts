@@ -9,8 +9,10 @@
 //   - headings become "#"-prefixed lines, list items "- ", table cells are joined by " | ", and
 //     paragraphs are separated by a blank line, so the structure a reader relies on survives;
 //   - hidden elements, scripts and our own UI are left out, open shadow roots are read;
-//   - reading the whole page, a large nav or footer outside the main content is replaced by one
-//     line saying how big it is and which selector reads it, so the content comes first;
+//   - reading the whole page, the one <main> (or role=main) is read first and the rest after it
+//     under a marker, and a large nav or footer outside the content is replaced by one line saying
+//     how big it is and which selector reads it. On Wikipedia the menus, the contents list and the
+//     appearance panel came to 1,500 characters before the article's first word;
 //   - the result is sliced by character offset, and every slice says where it is and how to get the
 //     next part. Nothing is cut silently.
 // Two pure halves: pageText (DOM in, text out, visibility injectable for node tests) and sliceText.
@@ -41,10 +43,24 @@ function isChrome(el: Element): boolean {
 }
 
 /**
- * The readable text under `root`. `skipChrome` (reading the whole page) summarises big navs and
- * footers; reading one element by selector prints everything inside it.
+ * The readable text under `root`. `wholePage` puts the main content first and summarises big navs
+ * and footers; reading one element by selector prints everything inside it, in order.
  */
-export function pageText(root: Element, opts: { skipChrome?: boolean } = {}, visible: (el: Element) => boolean = isVisible): string {
+export function pageText(root: Element, opts: { wholePage?: boolean } = {}, visible: (el: Element) => boolean = isVisible): string {
+  if (!opts.wholePage) return render(root, false, null, visible);
+  const mains = [...root.querySelectorAll('main, [role="main"]')].filter((m) => visible(m) && !m.parentElement?.closest('main, [role="main"]'));
+  if (mains.length !== 1) return render(root, true, null, visible);
+  const main = render(mains[0]!, true, null, visible);
+  const rest = render(root, true, mains[0]!, visible);
+  return rest ? `${main}
+
+[Outside the main content:]
+
+${rest}` : main;
+}
+
+/** One pass of pageText: `root`'s text, with `skip` (the main content, already read) left out. */
+function render(root: Element, skipChrome: boolean, skip: Element | null, visible: (el: Element) => boolean): string {
   const lines: string[] = [];
   let line = '';
   let prefix = '';
@@ -78,7 +94,7 @@ export function pageText(root: Element, opts: { skipChrome?: boolean } = {}, vis
     if (node.nodeType !== 1) return;
     const el = node as Element;
     const tag = el.tagName.toUpperCase();
-    if (SKIP.has(el.tagName) || SKIP.has(tag) || el.hasAttribute('data-usermods') || !visible(el)) return;
+    if (el === skip || SKIP.has(el.tagName) || SKIP.has(tag) || el.hasAttribute('data-usermods') || !visible(el)) return;
     if (tag === 'BR') {
       brk(1);
       return;
@@ -88,7 +104,7 @@ export function pageText(root: Element, opts: { skipChrome?: boolean } = {}, vis
       if (alt) line += ` [image: ${trunc(alt, 80)}] `;
       return;
     }
-    if (opts.skipChrome && isChrome(el)) {
+    if (skipChrome && isChrome(el)) {
       const t = ((el as HTMLElement).innerText ?? el.textContent ?? '').replace(/\s+/g, ' ').trim();
       if (t.length >= CHROME_MIN_CHARS) {
         brk(2);

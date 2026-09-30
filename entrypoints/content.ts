@@ -100,7 +100,7 @@ export default defineContentScript({
           }
           if (msg.text) {
             // A whole-page read puts content ahead of navigation; a selected element is read whole.
-            const full = root ? pageText(root, { skipChrome: !msg.selector }) : '';
+            const full = root ? pageText(root, { wholePage: !msg.selector }) : '';
             sendResponse({ url: location.href, title: document.title, html: where + sliceText(full, msg.offset ?? 0, msg.maxChars ?? TEXT_DEFAULT_CHARS) });
             return;
           }

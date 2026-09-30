@@ -29,14 +29,14 @@ test('page text keeps headings, paragraphs, lists and table rows, and leaves hid
   );
 });
 
-test('reading the whole page leaves a long nav or footer out with a pointer to it; reading it by selector does not', () => {
+test('reading the whole page puts <main> first and leaves a long nav or footer out with a pointer; by selector it does not', () => {
   const links = Array.from({ length: 60 }, (_, i) => `<a>Link ${i}</a>`).join(' ');
   const d = load(`<html><body><nav id="menu">${links}</nav><main><h1>Title</h1><p>Body text.</p></main><footer class="f">${links}</footer></body></html>`);
-  const whole = pageText(d.body, { skipChrome: true }, shown);
-  assert.match(whole, /^\[navigation left out, \d+ characters: "Link 0 Link 1 .*"; get_page with text and selector "#menu" reads it\]\n\n# Title\n\nBody text\.\n\n\[footer left out, /);
+  const whole = pageText(d.body, { wholePage: true }, shown);
+  assert.match(whole, /^# Title\n\nBody text\.\n\n\[Outside the main content:\]\n\n\[navigation left out, \d+ characters: "Link 0 Link 1 .*"; get_page with text and selector "#menu" reads it\]\n\n\[footer left out, /);
   assert.match(pageText(d.querySelector('nav')!, {}, shown), /^Link 0 Link 1 .* Link 59$/);
   const short = load('<html><body><nav><a>Home</a></nav><p>x</p></body></html>');
-  assert.equal(pageText(short.body, { skipChrome: true }, shown), 'Home\n\nx', 'a small nav costs less than its summary');
+  assert.equal(pageText(short.body, { wholePage: true }, shown), 'Home\n\nx', 'a small nav costs less than its summary');
 });
 
 test('a text slice says where it is and how to continue; the last one says it is the end', () => {
@@ -51,4 +51,11 @@ test('a text slice says where it is and how to continue; the last one says it is
   assert.match(last, /\[End of the text\.\]$/);
   assert.equal(sliceText(full, 99999, 300), `(Offset 99999 is past the end: the text is ${full.length} characters.)`);
   assert.equal(sliceText('', 0, 300), '(The page has no visible text.)');
+});
+
+test('the main content goes first only when there is exactly one', () => {
+  const d = load('<html><body><p>Intro</p><main><p>A</p></main><main><p>B</p></main></body></html>');
+  assert.equal(pageText(d.body, { wholePage: true }, shown), 'Intro\n\nA\n\nB');
+  const only = load('<html><body><div role="main"><p>All of it</p></div></body></html>');
+  assert.equal(pageText(only.body, { wholePage: true }, shown), 'All of it', 'no marker when nothing is outside');
 });
