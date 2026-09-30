@@ -1482,6 +1482,12 @@ details > summary::-webkit-details-marker {
   color: var(--text-2);
 }
 
+/* "failed when tested as the saved mod" is a warning, so it takes .untested's colour, but not its
+   class: .label.untested is the untested_reason line, which scripts and screenshots select by. */
+.label.tested.failed {
+  color: var(--warn-text);
+}
+
 .list {
   display: flex;
   flex-direction: column;
