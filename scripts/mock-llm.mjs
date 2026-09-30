@@ -42,10 +42,12 @@
 // one at index = (number of assistant messages so far), which makes the loop deterministic: the
 // agent calls back after each round of tool results and gets the next step.
 //
-// What the scripts deliberately avoid: run_script and screenshot. chrome.userScripts is
-// unavailable in an automated profile (the "Allow User Scripts" toggle cannot be flipped
-// programmatically), so those tools would fail and put an error row in the transcript. get_page,
-// find_elements and get_styles all go through the content script and work fine.
+// What the scripts deliberately avoid: run_script and screenshot. The flows that use them leave
+// Chrome's "Allow User Scripts" toggle off, so chrome.userScripts is not there and those tools
+// would fail and put an error row in the transcript. get_page, find_elements and get_styles all go
+// through the content script and work fine. (The toggle CAN be turned on from an automated profile,
+// by clicking it on chrome://extensions; the one script that relies on that is
+// `reviewer-walkthrough` below.)
 //
 // A consequence, since propose_mod started refusing untested scripts: every propose_mod here
 // passes `untested_reason`, because in this profile a mod genuinely cannot be run first. That is
@@ -139,6 +141,19 @@ Reference: [the Vector 2022 notes](https://www.mediawiki.org/wiki/Skin:Vector).
 [do not click me](javascript:alert(1))
 
 <img src="https://example.invalid/tracker.gif">`;
+
+/**
+ * What the hero conversation says on its way to the proposal.
+ *
+ * Everywhere but the store captures it is MARKDOWN_REPLY, the renderer's specimen. The store
+ * screenshots (scripts/store-assets.mjs, which sets MOCK_LLM_PLAIN_HERO) get the two sentences a
+ * model would actually write here instead: the specimen ends in three lines that exist to be
+ * refused by the sanitiser, one of them reading "do not click me", and the panel scrolls to the end
+ * of the reply, so they were the part of the transcript the store picture showed.
+ */
+const HERO_REPLY = process.env.MOCK_LLM_PLAIN_HERO
+  ? 'The container is capped at ~1600px with the sidebar reserving space on the left. Hiding the sidebar and lifting the cap gives the article the full window.'
+  : MARKDOWN_REPLY;
 
 /**
  * The resume flow's markers and prompts. Four conversations, one per thing that can go wrong: a
@@ -282,7 +297,7 @@ const SCRIPTS = [
         // lines are the ones the SANITISER has to refuse, and the flow checks those too — an <img>
         // is a tracking pixel a model could aim at the page it just read, and a `javascript:` href
         // would run in the panel's own origin, which is where the API keys live.
-        text: MARKDOWN_REPLY,
+        text: HERO_REPLY,
         calls: [
           {
             name: 'propose_mod',
@@ -308,6 +323,68 @@ const SCRIPTS = [
 
 const style = document.createElement('style');
 style.textContent = css;
+document.head.appendChild(style);`,
+            },
+          },
+        ],
+      },
+    ],
+  },
+
+  {
+    // The store reviewer's own test, for scripts/reviewer-walkthrough.mjs. The one conversation
+    // here that DOES call run_script and test_mod and proposes without untested_reason: that script
+    // turns the "Allow User Scripts" toggle on through chrome://extensions first, the way a reviewer
+    // does, so the runs are real. It tries the idea with run_script, then runs the final script with
+    // test_mod on a fresh load (a real temporary chrome.userScripts registration and a reload), and
+    // proposes exactly that code, so the card says it was tested as the saved mod on a fresh load.
+    name: 'reviewer-walkthrough',
+    match: /hide the table of contents/i,
+    steps: [
+      {
+        text: 'Let me look at the page first.',
+        calls: [{ name: 'get_page', args: { max_chars: 12000 } }],
+      },
+      {
+        text: 'The table of contents is #vector-toc-pinned-container, inside .vector-column-start. Trying it.',
+        calls: [
+          {
+            name: 'run_script',
+            args: {
+              description: 'Hide the table of contents',
+              code: `const style = document.createElement('style');
+style.textContent = '#vector-toc-pinned-container, .vector-column-start { display: none !important; }';
+document.head.appendChild(style);
+getComputedStyle(document.querySelector('.vector-column-start')).display;`,
+            },
+          },
+        ],
+      },
+      {
+        text: 'It is hidden. Checking it works as a saved mod on a fresh load.',
+        calls: [
+          {
+            name: 'test_mod',
+            args: {
+              reload: true,
+              code: `const style = document.createElement('style');
+style.textContent = '#vector-toc-pinned-container, .vector-column-start { display: none !important; }';
+document.head.appendChild(style);`,
+            },
+          },
+        ],
+      },
+      {
+        text: 'It works on load. Here it is as a mod.',
+        calls: [
+          {
+            name: 'propose_mod',
+            args: {
+              name: 'Wikipedia: no table of contents',
+              description: 'Hides the pinned table of contents on Wikipedia articles.',
+              matches: ['*://*.wikipedia.org/wiki/*'],
+              code: `const style = document.createElement('style');
+style.textContent = '#vector-toc-pinned-container, .vector-column-start { display: none !important; }';
 document.head.appendChild(style);`,
             },
           },
@@ -552,7 +629,8 @@ setTimeout(() => observer.disconnect(), 10000);`,
     // The agent-guardrails conversation, for the smoke run. It deliberately misbehaves twice, so
     // the smoke can assert that the loop pushes back rather than going along with it:
     //
-    //   steps 0-3  four page reads in a row and nothing acted on  -> lib/agent/budget.ts nudges
+    //   steps 0-3  four full page reads in a row, nothing acted on -> lib/agent/budget.ts nudges
+    //              (full get_page reads: small lookups are charged by size and would not)
     //   step 4     propose_mod with no run_script behind it       -> lib/agent/propose.ts refuses
     //   step 5     propose_mod again with untested_reason         -> accepted, card says untested
     //
@@ -563,9 +641,9 @@ setTimeout(() => observer.disconnect(), 10000);`,
     match: /tidy up the references section/i,
     steps: [
       { text: 'Looking at the page.', calls: [{ name: 'get_page', args: { max_chars: 6000 } }] },
-      { text: 'Checking the reference list.', calls: [{ name: 'find_elements', args: { selector: '.reflist', limit: 3 } }] },
-      { text: 'And the citations inside it.', calls: [{ name: 'find_elements', args: { selector: '.reference', limit: 3 } }] },
-      { text: 'One more look at the styling.', calls: [{ name: 'get_styles', args: { selector: '.reflist', properties: ['font-size'] } }] },
+      { text: 'Checking the article body.', calls: [{ name: 'get_page', args: { selector: '#mw-content-text' } }] },
+      { text: 'And the content column around it.', calls: [{ name: 'get_page', args: { selector: '#bodyContent' } }] },
+      { text: 'One more look at the whole content area.', calls: [{ name: 'get_page', args: { selector: '#content' } }] },
       {
         text: 'That should be enough to write it.',
         calls: [

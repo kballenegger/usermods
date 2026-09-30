@@ -7,11 +7,12 @@ import { ATTACHMENT_DROPPED_PANEL_NOTE } from '../providers/vision.ts';
 import type { Provider } from '../providers/types';
 import { renderRunResult, type RunResult } from '../runscript.ts';
 import { DEFAULT_CONTEXT_BUDGET, type AgentEventBody, type ModProposal, type Msg, type Part, type Settings, type UserTurn } from '../types.ts';
-import { MAX_ITERATIONS, countReads, readBudgetNudge, wrapUpNudge } from './budget.ts';
+import { MAX_ITERATIONS, NO_READS, countReads, readBudgetNudge, wrapUpNudge, type ReadCall } from './budget.ts';
 import { compact, estimateTokens, needsCompaction } from './compact.ts';
 import { SYSTEM_PROMPT } from './prompt.ts';
-import { checkProposal, type ProposalContext } from './propose.ts';
+import { checkProposal, testedAs, testedNote, type ProposalContext } from './propose.ts';
 import { isContextLengthError, withRetry, type RetryDeps, type RetryPolicy } from './retry.ts';
+import { describeTest, renderTestResult, sourceKey, type TestModResult } from './testmod.ts';
 import { toolsFor } from './tools.ts';
 import {
   EMPTY_TALLY,
@@ -62,6 +63,19 @@ export interface AgentEnv {
    * The signal is the run's own: Stop must end a 15s wait immediately rather than at its timeout.
    */
   wait(spec: WaitSpec, signal: AbortSignal): Promise<WaitOutcome>;
+  /**
+   * Errors thrown by an earlier run_script's own callbacks after it reported, as one line to put in
+   * front of the next tool result, once; null when there are none. Optional: an env without it
+   * simply never has any. See takeLateErrors in entrypoints/background.ts.
+   */
+  takeLateErrors?(): string | null;
+  /**
+   * Run a script body as the chat's draft would be saved and run (test_mod): its header, world,
+   * GM shim and @require bodies, optionally on a fresh load at its own @run-at. The background owns
+   * the draft and the engine, so it owns this; a loop without one (the unit tests' default fake)
+   * reports the tool unavailable.
+   */
+  testMod?(code: string, reload: boolean, signal: AbortSignal): Promise<TestModResult>;
 }
 
 export interface AgentInput {
@@ -277,10 +291,35 @@ function testedSinceProposal(messages: Msg[]): boolean {
       const p = m.content[j]!;
       if (p.type !== 'tool_call') continue;
       if (p.name === 'propose_mod') return false;
-      if (p.name === 'run_script' && !failed.has(p.id)) return true;
+      if ((p.name === 'run_script' || p.name === 'test_mod') && !failed.has(p.id)) return true;
     }
   }
   return false;
+}
+
+/**
+ * The last test_mod since the last proposal, rebuilt from the history for a resumed run, for the
+ * same reason as testedSinceProposal: the flag lived in the run that died. `fresh` is read from
+ * what was asked (reload) and `ok` from whether the result was an error, which is what the live
+ * run records too.
+ */
+function lastTestSince(messages: Msg[]): ProposalContext['lastTest'] {
+  const failed = new Set<string>();
+  for (const m of messages) for (const p of m.content) if (p.type === 'tool_result' && p.isError) failed.add(p.toolCallId);
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i]!;
+    if (m.role === 'user' && !m.content.some((p) => p.type === 'tool_result')) return undefined;
+    if (m.role !== 'assistant') continue;
+    for (let j = m.content.length - 1; j >= 0; j--) {
+      const p = m.content[j]!;
+      if (p.type !== 'tool_call') continue;
+      if (p.name === 'propose_mod') return undefined;
+      if (p.name === 'test_mod' && typeof p.input.code === 'string') {
+        return { key: sourceKey(p.input.code), fresh: p.input.reload === true, ok: !failed.has(p.id) };
+      }
+    }
+  }
+  return undefined;
 }
 
 export async function runAgent(input: AgentInput): Promise<RunOutcome> {
@@ -359,14 +398,15 @@ export async function runAgent(input: AgentInput): Promise<RunOutcome> {
   async function loop() {
     // Page reads since the model last ran or proposed anything. The prompt's read budget is only a
     // rule until something in the conversation contradicts the model when it breaks it; this is
-    // that something. Per turn, reset by run_script or propose_mod.
-    let reads = 0;
+    // that something. Per turn, reset by run_script or propose_mod, and charged by the size of what
+    // each read returned (lib/agent/budget.ts), so cheap lookups do not cost like full pages.
+    let reads = NO_READS;
     // Whether a run_script has completed since the last proposal, which is what propose_mod's
     // "test it first" check reads. Held here rather than derived from the message history, because
     // by the time the history is stored a tool result is provider-neutral text.
     const ctx: ProposalContext = input.turn
       ? { testedSinceProposal: false, userText: input.turn.text }
-      : { testedSinceProposal: testedSinceProposal(messages), userText: lastUserText(messages) };
+      : { testedSinceProposal: testedSinceProposal(messages), userText: lastUserText(messages), lastTest: lastTestSince(messages) };
     // How much this turn has waited (lib/agent/wait.ts). Waiting is neither a read nor an act, so
     // it has its own counter: it must not trip the read budget (polling was the problem wait_for
     // exists to remove, and charging for the fix would push the model straight back to polling),
@@ -508,21 +548,32 @@ export async function runAgent(input: AgentInput): Promise<RunOutcome> {
       // Real time spent inside wait_for and run_script's then_wait this iteration, so the abuse
       // guard charges what waiting actually cost rather than what it was allowed to cost.
       let waitedMs = 0;
+      const charged: ReadCall[] = [];
       for (const call of calls) {
         emit({ type: 'tool_call', id: call.id, name: call.name, input: call.input });
         emit({ type: 'status', phase: 'tool', tool: call.name, detail: describeCall(call.name, call.input), iteration: i + 1 });
         const r = await executeTool(call.name, call.input, env, emit, ctx, signal, input.onProposal, input.onOpenMod);
         emit({ type: 'tool_result', id: call.id, summary: summarize(r.content), isError: !!r.isError });
-        results.push({ type: 'tool_result', toolCallId: call.id, content: r.content, isError: r.isError });
+        // Late errors ride on whichever tool result comes next, taken after the tool ran so an
+        // error its wait or its own run provoked is not held back a whole step. The panel's summary
+        // above is of the tool's own result.
+        const late = env.takeLateErrors?.() ?? null;
+        const content = late ? withLeadingLine(late, r.content) : r.content;
+        results.push({ type: 'tool_result', toolCallId: call.id, content, isError: r.isError });
         if (call.name === 'propose_mod' && !r.isError) proposed = true;
         waitedMs += r.waitedMs ?? 0;
+        charged.push({
+          name: call.name,
+          chars: r.content.reduce((n, p) => n + (p.type === 'text' ? p.text.length : 0), 0),
+          image: r.content.some((p) => p.type === 'image'),
+        });
       }
 
       // Both nudges ride along with the tool results rather than as a separate user message, so the
       // history keeps its assistant/tool-result pairing and no orphan turn appears in the panel.
       const before = reads;
       const names = calls.map((c) => c.name);
-      reads = countReads(reads, names);
+      reads = countReads(reads, charged);
       const budget = readBudgetNudge(reads, before);
       if (budget) results.push({ type: 'text', text: budget });
       // The waiting guard. A turn that waits, acts, waits, acts is using the tool as intended and
@@ -585,10 +636,14 @@ function describeCall(name: string, input: Record<string, unknown>): string | un
   // "opening a mod" rather than the raw id: the user is watching this line to see what the agent is
   // doing, and a uuid tells them nothing they can act on.
   if (name === 'open_mod') return 'opening an installed mod';
+  if (name === 'test_mod') return describeTest(input);
   if (name === 'run_script' && typeof input.description === 'string' && input.description.trim()) return input.description.trim();
   if ((name === 'find_elements' || name === 'get_styles' || name === 'get_page') && typeof input.selector === 'string' && input.selector.trim()) {
     return input.selector.trim();
   }
+  if (name === 'find_elements' && typeof input.text === 'string' && input.text.trim()) return `"${input.text.trim()}"`;
+  if (name === 'find_elements' && input.overlays === true) return 'overlays and fixed bars';
+  if (name === 'get_page' && input.text === true) return 'reading the text';
   return undefined;
 }
 
@@ -598,6 +653,13 @@ function summarize(parts: Part[]): string {
   if (p.type === 'image') return '[image]';
   if (p.type === 'text') return p.text.length > 160 ? p.text.slice(0, 160) + '…' : p.text;
   return '';
+}
+
+/** `line` in front of a tool result: joined to its first text part, or as its own part before an image. */
+export function withLeadingLine(line: string, content: Part[]): Part[] {
+  const [first, ...rest] = content;
+  if (first?.type === 'text') return [{ type: 'text', text: `${line}\n${first.text}` }, ...rest];
+  return [{ type: 'text', text: line }, ...content];
 }
 
 /** What one tool call produced. `waitedMs` is real time spent waiting, for the abuse guard. */
@@ -630,14 +692,22 @@ async function executeTool(
         const r = await env.sendToContent<{ html?: string; url?: string; title?: string; error?: string }>({
           type: 'snapshot',
           selector: typeof input.selector === 'string' ? input.selector : undefined,
-          maxChars: Math.min(60_000, Number(input.max_chars) || 20_000),
+          // A text part of a few characters would take thousands of calls to read a page.
+          maxChars: Math.max(input.text === true ? 1000 : 0, Math.min(60_000, Number(input.max_chars) || 20_000)),
+          includeHidden: input.include_hidden === true,
+          text: input.text === true,
+          offset: Number(input.offset) || 0,
         });
         if (r.error) return err(r.error);
         return text(`URL: ${r.url}\nTitle: ${r.title}\n\n${r.html}`);
       }
       case 'find_elements': {
-        if (typeof input.selector !== 'string') return err('selector is required');
-        const r = await env.sendToContent<{ text: string }>({ type: 'query', selector: input.selector, limit: Number(input.limit) || 20 });
+        const selector = typeof input.selector === 'string' ? input.selector : undefined;
+        const needle = typeof input.text === 'string' ? input.text : undefined;
+        const overlays = input.overlays === true;
+        if (!selector?.trim() && !needle?.trim() && !overlays) return err('selector, text or overlays is required');
+        const styles = Array.isArray(input.styles) ? input.styles.filter((p): p is string => typeof p === 'string' && !!p.trim() && p.length <= 60).slice(0, 12) : undefined;
+        const r = await env.sendToContent<{ text: string }>({ type: 'query', selector, text: needle, limit: Number(input.limit) || 20, styles, overlays });
         return text(r.text);
       }
       case 'get_styles': {
@@ -686,6 +756,19 @@ async function executeTool(
         const isError = outcome.failure ? true : navigatedAsExpected ? false : rendered.isError;
         return { content: [{ type: 'text', text: combined }], isError: isError || undefined, waitedMs };
       }
+      case 'test_mod': {
+        if (typeof input.code !== 'string' || !input.code.trim()) return err('code is required: the script body, as you will pass it to propose_mod.');
+        if (!env.testMod) return err('test_mod is not available in this session; test with run_script.');
+        const reload = input.reload === true;
+        const r = await env.testMod(input.code, reload, signal);
+        const rendered = renderTestResult(r);
+        const ok = r.run.outcome.kind === 'ok';
+        // A successful test_mod is a successful run for the old check too, so nothing that used to
+        // pass the gate stops passing it. What it adds is WHICH code ran and how, for the card.
+        if (ok) ctx.testedSinceProposal = true;
+        ctx.lastTest = { key: sourceKey(input.code), fresh: r.fresh, ok };
+        return rendered.isError ? err(rendered.text) : text(rendered.text);
+      }
       case 'wait_for': {
         const parsed = parseWaitInput(input);
         // Invalid input is the one thing here that IS an error: the model wrote a condition that
@@ -720,28 +803,32 @@ async function executeTool(
         const untestedReason = typeof p.untested_reason === 'string' && p.untested_reason.trim() ? p.untested_reason.trim() : undefined;
         const problem = checkProposal({ code: p.code, matches: p.matches, untestedReason }, ctx);
         if (problem) return err(problem);
+        const tested = testedAs(ctx, p.code);
+        const note = testedNote(ctx, p.code);
         const proposal: ModProposal = {
           name: p.name,
           description: p.description ?? '',
           matches: p.matches,
           code: p.code,
           ...(untestedReason ? { untestedReason } : {}),
+          ...(tested ? { tested } : {}),
         };
         // A fresh proposal starts a fresh testing obligation: a revision written after this one has
         // to be run before it can be proposed in turn. This is unchanged by drafts: an EDIT to the
         // draft is still a proposal, and still has to have been run.
         ctx.testedSinceProposal = false;
+        ctx.lastTest = undefined;
         // The draft is versioned before the card is shown, so the panel never renders a proposal
         // whose version does not exist yet. A storage failure here is not the user's problem — the
         // proposal is still valid and still worth showing — so it degrades to an unversioned card.
         const version = onProposal ? await onProposal(proposal).catch(() => null) : null;
         emit({ type: 'proposal', proposal });
         if (version != null) emit({ type: 'artifact', version });
-        return text(
+        const shown =
           version == null
-            ? 'The mod has been shown to the user with Try and Save buttons. Wait for their feedback.'
-            : `The draft mod is now v${version} in the user's artifact panel, where they can try, save or roll it back. Wait for their feedback.`,
-        );
+            ? 'The mod has been shown to the user with Try and Save buttons.'
+            : `The draft mod is now v${version} in the user's artifact panel, where they can try, save or roll it back.`;
+        return text(`${shown}${note ? ` ${note}` : ''} Wait for their feedback.`);
       }
       default:
         return err(`Unknown tool: ${name}`);

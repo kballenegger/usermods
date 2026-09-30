@@ -64,6 +64,8 @@ function chromeMock() {
       onMessage,
       onConnect,
       lastError: undefined,
+      // Safari's manifest: no userScripts permission, which is what makes this the Safari engine.
+      getManifest: () => ({ permissions: ['storage', 'scripting', 'tabs', 'declarativeNetRequest'] }),
     },
     tabs: {
       onUpdated,
@@ -180,4 +182,63 @@ test('sync revokes a disabled mod and Try injects the runner by file path only',
   assert.deepEqual(injected, [{ tabId: 8, files: ['content-scripts/modrunner.js'] }]);
   assert.match(String((sends[0]!.message as { code: string }).code), /alert\(1\)/);
   assert.equal((sends[0]!.message as { world: string }).world, 'USER_SCRIPT');
+});
+
+test('a Chrome build with the toggle off still gets the userScripts adapter, reporting unavailable', async () => {
+  // What a fresh Chrome install presents: the permission is in the manifest, the namespace is not
+  // there yet. Picking the Safari adapter here is the bug that shipped in 0.1.0.
+  (globalThis as any).chrome = {
+    runtime: {
+      onMessage: event(),
+      onConnect: event(),
+      onUserScriptMessage: event(),
+      getManifest: () => ({ permissions: ['sidePanel', 'storage', 'scripting', 'userScripts', 'declarativeNetRequest'] }),
+    },
+    sidePanel: {},
+  };
+  const adapter = createExecAdapter({ handleGm: async () => 'ok', loadMods: async () => [mod()], loadGmValues: async () => ({}) });
+  assert.equal(adapter.engine, 'user-scripts');
+  const status = adapter.status();
+  assert.equal(status.available, false);
+  assert.match(status.message, /usermods needs/);
+  // Nothing is owed while it cannot be called, and nothing throws on the missing namespace.
+  assert.equal(await adapter.needsSync([mod()]), false);
+  await adapter.configure();
+  await adapter.sync([mod()], async () => ({}));
+});
+
+test('the userScripts adapter owes a sync exactly when the registered ids differ from the enabled mods', async () => {
+  let registered: string[] = [];
+  (globalThis as any).chrome = {
+    runtime: {
+      onMessage: event(),
+      onConnect: event(),
+      onUserScriptMessage: event(),
+      getManifest: () => ({ permissions: ['userScripts'] }),
+    },
+    userScripts: {
+      getScripts: async () => registered.map((id) => ({ id })),
+      unregister: async () => {
+        registered = [];
+      },
+      register: async (scripts: Array<{ id: string }>) => {
+        registered = scripts.map((s) => s.id);
+      },
+      configureWorld: async () => {},
+    },
+  };
+  const adapter = createExecAdapter({ handleGm: async () => 'ok', loadMods: async () => [], loadGmValues: async () => ({}) });
+  const mods = [mod(), mod({ id: 'mod-b' }), mod({ id: 'mod-off', enabled: false }), mod({ id: 'mod-nowhere', matches: [] })];
+
+  // Saved while the toggle was off: nothing registered, two that should be.
+  assert.equal(await adapter.needsSync(mods), true);
+  await adapter.sync(mods, async () => ({}));
+  assert.deepEqual(registered.sort(), ['mod-a', 'mod-b']);
+  // A healthy worker wake: registrations persisted, so there is nothing to redo.
+  assert.equal(await adapter.needsSync(mods), false);
+  // One was disabled behind its back.
+  assert.equal(await adapter.needsSync([mod(), mod({ id: 'mod-b', enabled: false })]), true);
+  // No mods and nothing registered is not a reason to sync.
+  registered = [];
+  assert.equal(await adapter.needsSync([]), false);
 });

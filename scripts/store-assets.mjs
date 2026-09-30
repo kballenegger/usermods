@@ -115,6 +115,8 @@ function expectSize(file, want) {
 async function startMock() {
   const child = spawn(process.execPath, [path.join(ROOT, 'scripts', 'mock-llm.mjs'), String(PORT)], {
     cwd: ROOT,
+    // The plain hero reply: see HERO_REPLY in mock-llm.mjs for what the specimen put in the picture.
+    env: { ...process.env, MOCK_LLM_PLAIN_HERO: '1' },
     stdio: ['ignore', 'pipe', 'inherit'],
   });
   await new Promise((resolve, reject) => {

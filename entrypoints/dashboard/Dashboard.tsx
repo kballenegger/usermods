@@ -63,8 +63,19 @@ export function Dashboard() {
 
   useEffect(() => {
     void refresh();
-    void rpc({ type: 'userScripts.status' }).then(setUsStatus).catch(() => {});
   }, [refresh]);
+
+  // While user scripts are blocked, keep asking: the instructions are followed in another tab, and
+  // this page should stop saying "blocked" once they have been. Same rule as the side panel.
+  const usBlocked = usStatus ? !usStatus.available : false;
+  useEffect(() => {
+    const check = () => rpc({ type: 'userScripts.status' }).then(setUsStatus).catch(() => {});
+    void check();
+    const poll = usBlocked ? setInterval(() => void check(), 2000) : undefined;
+    return () => {
+      if (poll) clearInterval(poll);
+    };
+  }, [usBlocked]);
 
   /**
    * Open a chat on its page with the side panel pointed at it — the same handoff the Chats list's

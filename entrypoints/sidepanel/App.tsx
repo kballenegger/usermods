@@ -41,18 +41,39 @@ export interface AppProps {
  * there is only ever one useful instance of. The lookup is by URL prefix, not exact match, so a tab
  * sitting on #mods or #settings still counts as "the dashboard tab".
  */
+/**
+ * The tab the dashboard is in, if it is open.
+ *
+ * Asked of the extension's own contexts where the browser can answer that (Chrome 116 and later),
+ * because the Chrome build does not hold the `tabs` permission: host access already shows it the
+ * address of every web page, and the only addresses `tabs` added were ones like this, the
+ * extension's own pages, which a tab query no longer reports. Safari keeps the permission and the
+ * query.
+ */
+async function findDashboardTab(url: string): Promise<{ tabId: number; windowId?: number } | null> {
+  const runtime = chrome.runtime as typeof chrome.runtime & {
+    getContexts?: (filter: { contextTypes: string[] }) => Promise<Array<{ documentUrl?: string; tabId: number; windowId: number }>>;
+  };
+  if (typeof runtime.getContexts === 'function') {
+    const contexts = await runtime.getContexts({ contextTypes: ['TAB'] });
+    const hit = contexts.find((c) => c.documentUrl?.startsWith(url) && c.tabId >= 0);
+    return hit ? { tabId: hit.tabId, windowId: hit.windowId } : null;
+  }
+  const [tab] = await chrome.tabs.query({ url: `${url}*` });
+  return tab?.id != null ? { tabId: tab.id, windowId: tab.windowId } : null;
+}
+
 export async function openDashboard(): Promise<void> {
   const url = chrome.runtime.getURL('dashboard.html');
   try {
-    const open = await chrome.tabs.query({ url: `${url}*` });
-    const existing = open[0];
-    if (existing?.id != null) {
-      await chrome.tabs.update(existing.id, { active: true });
+    const existing = await findDashboardTab(url);
+    if (existing) {
+      await chrome.tabs.update(existing.tabId, { active: true });
       if (existing.windowId != null) await chrome.windows.update(existing.windowId, { focused: true }).catch(() => {});
       return;
     }
   } catch {
-    // The query failed (no tabs permission in some future build, say); opening a new tab still works.
+    // The lookup failed; opening a new tab still works.
   }
   await chrome.tabs.create({ url });
 }
@@ -166,13 +187,21 @@ export function App({ surface = 'panel' }: AppProps = {}) {
     };
   }, [compact, pointer.tablet]);
 
+  const usBlocked = usStatus ? !usStatus.available : false;
   useEffect(() => {
     const check = () => rpc({ type: 'userScripts.status' }).then(setUsStatus).catch(() => {});
     void check();
     const onFocus = () => void check();
     window.addEventListener('focus', onFocus);
-    return () => window.removeEventListener('focus', onFocus);
-  }, []);
+    // While the setup instructions are showing, keep asking. The user follows them in another tab
+    // and comes back by clicking the page, not the panel, so no focus event arrives here and the
+    // instructions would sit there after they had been followed.
+    const poll = usBlocked ? setInterval(() => void check(), 2000) : undefined;
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      if (poll) clearInterval(poll);
+    };
+  }, [usBlocked]);
 
   const host = hostFromUrl(pageUrl);
   const target = targetChip(pageUrl);

@@ -361,7 +361,10 @@ export function problemMessage(problem: SelectionProblem, label = ''): string {
   const named = label ? `“${label}”` : 'that provider';
   switch (problem) {
     case 'no-providers':
-      return 'Connect a provider in Settings to start: an API key, a local server, or a subscription sign-in.';
+      // A store build has no subscription sign-in, so it must not offer one.
+      return SUBSCRIPTIONS_OFF
+        ? 'Connect a provider in Settings to start: an API key or a local server.'
+        : 'Connect a provider in Settings to start: an API key, a local server, or a subscription sign-in.';
     case 'none':
       return 'Pick a model for this chat.';
     case 'removed':

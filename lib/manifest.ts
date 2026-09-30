@@ -68,7 +68,7 @@ export function isSafariOnlyIcon(relativePath: string): boolean {
   return m ? SAFARI_ONLY_ICON_SIZES.includes(Number(m[1])) : false;
 }
 
-/** Permissions every target needs, in the order the Chrome build has always listed them. */
+/** What Safari asks for: everything Chrome does that WebKit has, plus `tabs` (see permissionsFor). */
 const BASE_PERMISSIONS = ['storage', 'scripting', 'tabs', 'declarativeNetRequest'];
 
 export function isSafariTarget(browser: string): boolean {
@@ -80,12 +80,19 @@ export function isSafariTarget(browser: string): boolean {
  *
  * No `activeTab` anywhere: `host_permissions: ['<all_urls>']` already covers everything it would
  * grant (captureVisibleTab, content-script injection), and nothing in the code depends on it.
+ *
+ * No `tabs` on Chrome either, since 0.1.1. The permission does not gate the tabs API; all it grants
+ * is the address and title of tabs the extension has no host access to, and with `<all_urls>` that
+ * leaves only browser pages and the extension's own, neither of which usermods acts on. Chrome's
+ * store review rejects a permission that adds nothing ("excessive permissions"), and a
+ * justification listing tabs.query and captureVisibleTab reads, to a reviewer who knows the API,
+ * as the case against it. The one place that did read an extension page's address, finding the
+ * open dashboard tab, asks runtime.getContexts instead (entrypoints/sidepanel/App.tsx). Safari keeps
+ * it: its host access is granted per site by the user, so there the permission still adds something.
  */
 export function permissionsFor(browser: string): string[] {
   if (isSafariTarget(browser)) return [...BASE_PERMISSIONS];
-  // The order is the order the shipped Chrome manifest has, so moving this list out of
-  // wxt.config.ts leaves that build's manifest.json byte-for-byte what it was.
-  return ['sidePanel', 'storage', 'scripting', 'tabs', 'userScripts', 'declarativeNetRequest'];
+  return ['sidePanel', 'storage', 'scripting', 'userScripts', 'declarativeNetRequest'];
 }
 
 /**

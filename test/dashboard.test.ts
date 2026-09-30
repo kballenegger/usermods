@@ -33,6 +33,7 @@ import {
   transcriptsToSearch,
   type ChatHandoff,
 } from '../lib/dashboard.ts';
+import { buildSource } from '../lib/mods.ts';
 import type { Mod } from '../lib/types.ts';
 
 function chat(over: Partial<Chat> & { id: string }): Chat {
@@ -288,6 +289,11 @@ test("a mod's source is the host it was downloaded from, when it has one", () =>
 
 test('a mod the model wrote is recognised by the header buildSource emits', () => {
   const written = '// ==UserScript==\n// @name        Test\n// @version     1.0\n// @grant       none\n// ==/UserScript==\n';
+  assert.equal(modSource(mod({ id: 'a', source: written })), 'written in chat');
+});
+
+test('…including the header it emits now, which marks the isolated world instead of @grant none', () => {
+  const written = buildSource({ name: 'Test', description: '', matches: ['https://example.com/*'], code: 'x;' });
   assert.equal(modSource(mod({ id: 'a', source: written })), 'written in chat');
 });
 

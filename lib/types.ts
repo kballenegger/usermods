@@ -292,10 +292,16 @@ export interface ModProposal {
   /** Script body without the userscript header. */
   code: string;
   /**
-   * Set when the model proposed without a successful run_script and said why. Shown on the
+   * Set when the model proposed without a successful run_script or test_mod and said why. Shown on the
    * proposal card so the user knows this one was never run on a real page.
    */
   untestedReason?: string;
+  /**
+   * How this exact code was tested (lib/agent/propose.ts testedAs): as the saved mod on a fresh
+   * load, or only on the page as it already was, or it failed when run as the saved mod. Absent
+   * when untested. Shown on the card.
+   */
+  tested?: 'fresh-load' | 'open-page' | 'mod-failed';
 }
 
 // Events streamed from the background agent loop to the side panel over a Port.
@@ -458,8 +464,10 @@ export interface ElementRef extends PickedElement {
 
 // Messages between the side panel / background and the content script.
 export type ContentRequest =
-  | { type: 'snapshot'; selector?: string; maxChars?: number }
-  | { type: 'query'; selector: string; limit?: number }
+  /** `text`: readable text instead of HTML (lib/pagetext.ts), from character `offset`. */
+  | { type: 'snapshot'; selector?: string; maxChars?: number; includeHidden?: boolean; text?: boolean; offset?: number }
+  /** `styles` and `overlays`: see FindOptions in lib/inspect.ts. */
+  | { type: 'query'; selector?: string; limit?: number; text?: string; styles?: string[]; overlays?: boolean }
   | { type: 'styles'; selector: string; properties?: string[] }
   | { type: 'pick' }
   /**

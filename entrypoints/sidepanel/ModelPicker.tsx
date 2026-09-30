@@ -31,6 +31,7 @@ import {
   type ResolvedSelection,
   type SignedIn,
 } from '@/lib/connections';
+import { SUBSCRIPTIONS_OFF } from '@/lib/buildflags';
 import { rpc } from '@/lib/rpc';
 import {
   resolveReasoningField,
@@ -388,8 +389,8 @@ export function ModelPicker({
           <div className="model-list" id={listId} role="listbox" aria-label="Models from connected providers">
             {connected.length === 0 && (
               <div className="model-empty" data-testid="model-empty">
-                No provider is connected yet. Add an API key, a local server or a subscription sign-in in Settings, and its
-                models appear here.
+                No provider is connected yet. Add an API key{SUBSCRIPTIONS_OFF ? ' or a local server' : ', a local server or a subscription sign-in'} in
+                Settings, and its models appear here.
               </div>
             )}
             {groups.map((g) => {

@@ -1,9 +1,9 @@
 # Manual QA checklist
 
 For Kenneth to run in real Chrome. Automation (`npm run smoke`) drives the chat/agent loop
-headless against a mock LLM, but it cannot flip Chrome's own "Allow User Scripts" toggle, sign
-in to a real subscription, or click a real `chrome://extensions` UI — so everything here is the
-part nothing else has run.
+headless against a mock LLM with Chrome's "Allow User Scripts" toggle off, and cannot sign in to a
+real subscription. `npm run reviewer-walkthrough` does turn the toggle on and runs one script for
+real, against the store build. Everything else here is the part nothing else has run.
 
 Target: about an hour, most of it in the GM API and import/export sections. The basic chat/agent
 loop (send a message, watch it inspect the page, get a proposal) already works and gets a

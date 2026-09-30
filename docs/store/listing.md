@@ -26,13 +26,15 @@ cap, which was wrong. The limit is not a constraint here either way: the store a
 names in listing tiles and search results well before 75 characters, so a short name is the right
 call independently of the limit.
 
-## Summary (132 characters max — confirmed against the current docs)
+## Summary
 
 ```
-Customize any website by chatting with the AI of your choice: it reads the page, writes a userscript, runs it on every visit.
+Vibe-code userscripts in place. Customize any website by chatting with any LLM.
 ```
 
-(125 characters.)
+Like the title, the summary is **not a dashboard field**: the dashboard shows it read-only, taken
+from the manifest's `description` (`lib/manifest.ts`). 79 characters, under the 132-character limit.
+Changing it means changing the manifest and uploading a new package.
 
 ## Category
 
@@ -48,73 +50,70 @@ English (United States).
 
 ## Detailed description
 
-3,136 characters. Google publishes no numeric limit for this field — the "Creating a great listing
-page" doc only asks for something "concise, informative, and accurate, using more than just one
-sentence" — and the widely repeated 16,000-character figure appears nowhere in the current docs.
-This description is far short of any limit the field could plausibly have, so it is not a concern.
+About 2,800 characters (`npm run listing-check` prints the exact count); the dashboard's limit is
+16,000. Each paragraph and bullet is one line, so the
+block pastes into the dashboard as it is.
+
+**Rewritten on 2026-09-30 after the first submission was rejected for keyword spam** (violation
+reference *Yellow Argon*, 2026-09-22). The reviewer quoted the two bullets that listed eight provider
+and tool names in a row. Google's [spam FAQ](https://developer.chrome.com/docs/webstore/program-policies/spam-faq)
+gives the rules this text is now held to, and they apply to every later edit:
+
+- **No more than five brand or site names in the whole description.** This one has four: Chrome,
+  Tampermonkey, GitHub and Greasy Fork. No provider is named at all; "presets for the common
+  services" carries that, and the screenshots show them.
+- **Fewer than five uses of any one keyword**, even the extension's main purpose. "userscript"
+  appears twice, "usermods" twice (once in the link).
+- **No non-affiliation paragraph.** The old one named seven companies and projects, which is a list
+  of brands however it is worded.
+
+`node scripts/listing-check.mjs` counts all three and fails if a later edit breaks one.
 
 ```
-Every website has that one thing. The sidebar you never use, the banner that comes back every visit,
-the layout that wastes half your screen, the button that should be three clicks closer.
+Every website has that one thing: the sidebar you never use, the banner that returns on every visit, the layout that wastes half your screen.
 
 usermods lets you fix it by asking.
 
-Open the side panel on any page and describe the change you want. usermods reads the page, works out
-which elements you mean, writes a userscript, tests it live in front of you, and hands it back with
-Try and Save buttons. Save it, and it runs automatically every time you visit that site.
+Open the side panel on any page and describe the change you want. Your AI model reads the page, works out which elements you mean, writes a small script, tests it in front of you, and hands it back to try or save. Once saved, it runs every time you visit that site.
 
 HOW IT WORKS
 
-• Describe the change in plain language: "hide the sidebar", "make this full width", "stop the
-  video autoplaying".
-• The model inspects the real page — its structure, its elements, its computed styles — instead of
-  guessing, and runs its draft once to check the result before showing it to you.
-• You see the finished script, and nothing is saved until you click Save.
-• Point at an element on the page and it drops a reference into your message, so you can say "this"
-  and mean it.
-• Need something once rather than forever? "Open every carousel and list the image URLs" just runs.
+• Describe the change in plain language: "hide the sidebar", "make this full width", "stop the video autoplaying".
+• The model inspects the real structure and styles of what you are looking at instead of guessing, and normally tests its draft there before showing it to you.
+• You see the finished code, and nothing is installed until you save it.
+• Point at an element to drop a reference into your message, so you can say "this" and mean it.
+• Not sure yet? Run a draft once on the page without saving it.
 
-BRING YOUR OWN MODEL
+YOUR OWN AI
 
-usermods has no account and no server of its own. You choose where it sends your requests:
+There is no account and no server behind this extension. Connect the AI service you already use with your own API key, or a model running on your own computer, in which case your pages and messages never leave your machine. Presets for the common services are built in, and any endpoint that speaks a standard chat API works too.
 
-• Anthropic, OpenAI, xAI or OpenRouter with your own API key.
-• A model running on your own machine through Ollama, LM Studio, vLLM or mlx_lm, so nothing leaves
-  your computer.
-• Anything else that speaks the Anthropic Messages or OpenAI chat-completions protocol.
+A FULL USERSCRIPT MANAGER
 
-A REAL USERSCRIPT MANAGER
+What you save is a plain userscript with the standard header: nothing proprietary, and yours to keep.
 
-Mods are plain userscripts with a standard ==UserScript== header — nothing proprietary, and yours to
-keep.
-
-• Install scripts from Greasy Fork, OpenUserJS or a file. Clicking a .user.js link shows a preview
-  of what it matches, what it is granted and what it loads, before anything is saved.
-• Works with scripts written for Tampermonkey: the GM_* and GM.* API, @require libraries, @resource
-  files, @connect host restrictions, @run-at and page-world scripts.
-• Moving over? A Tampermonkey backup file imports your whole library in one step, with each
-  script's on/off state and its stored values.
-• Export any mod back out as a .user.js file whenever you like.
+• Install from a link or a file. A preview shows which sites it runs on, what it is allowed to do and what it loads, before anything is saved. On a page that offers one, a small bar offers to install it.
+• Scripts written for other managers work too, including the GM API and @require libraries.
+• Moving from Tampermonkey? Import its backup file and your whole library comes across, with each item's on/off state and stored values.
+• Updates are offered, never automatic. At most once a day it checks the address each installed item names for a newer version, and you see what changed before you accept one.
+• Export anything as a .user.js file, or share it as a GitHub gist or on Greasy Fork for others to install.
 
 PRIVACY
 
-To change a page, the model has to see it. usermods explains exactly what that means before your
-first message ever goes out, and sends it only to the provider you picked for that chat. Your messages, the
-page's content and screenshots the model asks for go to your model provider; your API keys, tokens
-and mods stay in local extension storage on your device. Nothing is sent to the author of usermods,
-who runs no server. There is no telemetry and no analytics of any kind.
+To change a page, the AI has to see it. Before your first message goes out, a notice lists what is sent: your messages; the address, title and content of the tab you are on; what its test scripts return from that tab; images you attach; and screenshots it asks for. All of it goes only to the provider you chose for that chat. Your keys and saved mods stay in local extension storage on your device. Nothing is sent to the developer, who runs no server. No telemetry, no analytics.
 
-Open source and MIT licensed: https://github.com/kballenegger/usermods
+Open source under the MIT license: https://github.com/kballenegger/usermods
 
-NOTE
+SETUP NOTE
 
-Chrome requires you to turn on "Allow User Scripts" for usermods in chrome://extensions → Details.
-Every user script manager needs this toggle. usermods shows you where it is on first run.
-
-usermods is an independent open-source project and is not affiliated with, endorsed by, or
-sponsored by Google, Anthropic, OpenAI, xAI, or the authors of Tampermonkey, Violentmonkey or
-Greasemonkey.
+Chrome requires every extension of this kind to be allowed to run user scripts, a switch in chrome://extensions → Details. A banner shows you where it is on first run.
 ```
+
+The text also stays inside what the single-purpose statement covers. An earlier draft advertised
+one-off tasks ("open every carousel and list the image URLs"), which reads as scraping, a second
+purpose; the listing now only says a draft can be run once without saving it. And the privacy
+paragraph lists every kind of data the first-run notice does, because the User Data policy wants
+the listing and the in-product notice to agree.
 
 ---
 
@@ -167,20 +166,17 @@ Paste the single-purpose statement from [permissions.md](permissions.md#single-p
 
 Paste the corresponding paragraph from [permissions.md](permissions.md#permission-justifications)
 into each permission's field. The dashboard generates one field per permission declared in the
-manifest — here `sidePanel`, `storage`, `scripting`, `tabs`, `userScripts`,
-`declarativeNetRequest` — plus one for host permissions.
+manifest — here `sidePanel`, `storage`, `scripting`, `userScripts`, `declarativeNetRequest` — plus
+one for host permissions.
 
-The published docs describe this only as a single "Permissions justification" section with "a field
-for you to state the justification for each permission", and do not confirm in text whether host
-permissions get their own separate field or are folded into the same list. `permissions.md` has a
-paragraph written for each of the seven either way, so the answer does not change what gets pasted.
+Host permissions get a field of their own, and every field is limited to 1,000 characters.
 
 ## Remote code
 
-Select **No, I am not using remote code**, and paste the explanation from
-[permissions.md](permissions.md#are-you-using-remote-code) into the field. It matters that a
-reviewer reads the userscript explanation there, since a manager that runs user-supplied scripts
-invites the question.
+Select **Yes** and paste the justification from
+[permissions.md](permissions.md#are-you-using-remote-code), which also gives the reasoning. A
+userscript manager that runs model-written scripts invites the question, and answering it in the
+field is better than having it asked in a rejection.
 
 ## Data usage — what this item collects
 
@@ -231,5 +227,5 @@ Section 7 of [../../PRIVACY.md](../../PRIVACY.md) carries the required sentence:
   justifications in [permissions.md](permissions.md) are written to be pasted verbatim.
 - Before submitting, re-check that the permission list in the dashboard matches the built manifest
   (`.output/store-chrome-mv3/manifest.json`, from `npm run build:store` — the store build's own
-  output folder): `sidePanel`, `storage`, `scripting`, `tabs`, `userScripts`,
-  `declarativeNetRequest`, plus `<all_urls>` host permissions.
+  output folder): `sidePanel`, `storage`, `scripting`, `userScripts`, `declarativeNetRequest`, plus
+  `<all_urls>` host permissions.

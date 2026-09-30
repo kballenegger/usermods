@@ -65,26 +65,31 @@ export const TOOLS: ToolDef[] = [
   {
     name: 'get_page',
     description:
-      'Return a pruned HTML view of the current page (or of one element and its subtree). Scripts, styles and hidden elements are removed; long text is truncated. Start here. Use a selector to zoom in when the page is large.',
+      'Return a pruned HTML view of the current page (or of one element and its subtree). Scripts, styles and hidden elements are removed; long text is truncated. Start here. A page over budget is outlined, its regions collapsed to "…N nodes"; open one with a selector.',
     inputSchema: {
       type: 'object',
       properties: {
         selector: { type: 'string', description: 'Optional CSS selector for the root element to serialize.' },
         max_chars: { type: 'integer', description: 'Character budget for the output. Default 20000, max 60000.' },
+        include_hidden: { type: 'boolean', description: 'Keep hidden elements too.' },
+        text: { type: 'boolean', description: 'Readable text instead of HTML, to answer questions about the page.' },
+        offset: { type: 'integer', description: 'With text: the character offset to continue from, as the previous part says.' },
       },
       additionalProperties: false,
     },
   },
   {
     name: 'find_elements',
-    description: 'List elements matching a CSS selector with their position, size, visibility and text preview. Use it to verify a selector before relying on it.',
+    description: 'List elements by selector and/or text: box, layout, text preview, and ancestors marking the likely unit to hide. Use it to verify a selector.',
     inputSchema: {
       type: 'object',
       properties: {
         selector: { type: 'string' },
+        text: { type: 'string', description: 'Visible text to find (case-insensitive), alone or with selector; lists the deepest elements containing it.' },
         limit: { type: 'integer', description: 'Max elements to list. Default 20.' },
+        styles: { type: 'array', items: { type: 'string' }, description: 'Computed CSS properties to show for each match.' },
+        overlays: { type: 'boolean', description: 'List fixed/sticky layers, dialogs, backdrops and scroll locks; needs no selector.' },
       },
-      required: ['selector'],
       additionalProperties: false,
     },
   },
@@ -104,7 +109,7 @@ export const TOOLS: ToolDef[] = [
   {
     name: 'run_script',
     description:
-      'Run JavaScript once on the current page, right now, in the same isolated world a saved mod would use. Returns the value of the last expression (or of an explicit return, or the resolved value of a promise), a count of what the DOM did while it ran, console output, and any thrown error. Code whose last statement is a bare expression returns that expression; code that only mutates the page reports "Completed. No return value." with the DOM counts, which is a successful run, not a failure. Use it to test a draft mod or to perform a one-off task. Code may use await at top level.',
+      'Run JavaScript once on the current page, right now, in the same isolated world a saved mod would use. Returns the value of the last expression (or of an explicit return, or the resolved value of a promise), a count of what the DOM did while it ran, console output, and any thrown error. Code whose last statement is a bare expression returns that expression; code that only mutates the page reports "Completed. No return value." with the DOM counts, which is a successful run, not a failure. Use it to explore, try an idea, or do a one-off task; test a finished mod with test_mod. Code may use await at top level.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -119,6 +124,20 @@ export const TOOLS: ToolDef[] = [
         },
       },
       required: ['code', 'description'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'test_mod',
+    description:
+      'Run a finished script exactly as the saved mod will: its header\'s world, @grant functions, @require files and @run-at. reload: true reloads the tab and runs it at page load; use that before propose_mod when the change should be there on every visit. Reports errors, console output, what changed, and whether it was still there 2s later.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        code: { type: 'string', description: 'The script body, exactly as you will pass it to propose_mod.' },
+        reload: { type: 'boolean', description: 'Reload the tab and run at page load. Default false.' },
+      },
+      required: ['code'],
       additionalProperties: false,
     },
   },
@@ -161,7 +180,7 @@ export const TOOLS: ToolDef[] = [
   {
     name: 'propose_mod',
     description:
-      'Present a finished userscript to the user, who can try it, save it, and enable it. Call this once the script has been tested with run_script. It is refused if nothing has been run since your last proposal, if the code does not parse, if it uses eval, new Function, document.write or an inline handler attribute, or if a match pattern covers every site the user visits without them having asked for that. Do not include a ==UserScript== header; it is generated from the other fields.',
+      'Present a finished userscript to the user, who can try it, save it, and enable it. Call this after test_mod has run the same code. It is refused if nothing has been run since your last proposal, if the code does not parse, if it uses eval, new Function, document.write or an inline handler attribute, or if a match pattern covers every site the user visits without them having asked for that. Do not include a ==UserScript== header; it is generated from the other fields.',
     inputSchema: {
       type: 'object',
       properties: {

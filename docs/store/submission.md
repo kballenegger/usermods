@@ -1,302 +1,239 @@
 # Chrome Web Store submission checklist
 
-## Live submission status — 2026-09-22
+## Status
 
 - Publisher: `kenneth@ballenegger.com` (publisher id kept out of the repo).
-- Created draft item: `dhmdjekbeinhhnfhcgnkgdpgdafpboic`.
-- [Developer dashboard](https://chrome.google.com/webstore/devconsole).
-- Uploaded the audited ZIP below, with its SHA-256 verified unchanged. Saved the description,
-  category, language, icon, all five screenshots, both promo tiles, homepage and support URLs.
-- Saved privacy disclosures and permission justifications. Distribution is free, Public,
-  and All regions.
-- Reviewer endpoint, dedicated API key, and 468-character setup instructions saved in Google's
-  confidential Test instructions form on 2026-09-22, with explicit owner authorization.
-- Public publisher contact email `kenneth@ballenegger.com` verified on 2026-09-22.
-- **Submitted for review on 2026-09-22.** Google confirmed **Pending Review** and that the item
-  is undergoing compliance review. Broad host permissions may require in-depth review.
-- Automatic publication is **off**: publication is staged after approval. Automatic approval
-  review blocked enabling automatic publication without explicit authorization for that step;
-  the review submission itself completed successfully. Do not resubmit while pending.
+- Item: `dhmdjekbeinhhnfhcgnkgdpgdafpboic`.
+  [Developer dashboard](https://chrome.google.com/webstore/devconsole).
+- **2026-09-22: 0.1.0 submitted, and rejected the same day.** Violation *Yellow Argon*, keyword
+  spam: "excessive and / or irrelevant keywords in the item's description". The text the reviewer
+  quoted was the two bullets that listed eight provider and tool names (Anthropic, OpenAI, xAI,
+  OpenRouter, Ollama, LM Studio, vLLM, mlx_lm). Nothing else was cited. The notice went to the
+  publisher's mailbox and was not seen for a week, so until 2026-09-30 this file said "pending
+  review".
+- **2026-09-30: 0.1.1 prepared for resubmission. Not yet uploaded or submitted.** What changed is
+  under [What the resubmission changes](#what-the-resubmission-changes); what to do in the dashboard
+  is under [Resubmitting](#resubmitting).
+- Automatic publication is **off**: an approved item waits for Publish to be pressed.
 
-Live dashboard corrections to the original handoff:
+Things the dashboard turned out to do differently from Google's docs, learned on the first
+submission:
 
-- Summary is read-only and comes from the manifest, just like the title. The uploaded release
-  uses `Vibe-code userscripts in place. Customize any website by chatting with any LLM.`
-- Description limit is 16,000 characters. Single purpose and each permission justification
-  are limited to 1,000 characters; the host justification was shortened to fit.
-- Choosing no remote code disables its justification field. Explain userscript execution
-  in reviewer test instructions instead.
-- Reviewer access is under **Test instructions**, with Username and Password fields limited
-  to 100 characters each and Additional instructions limited to 500. The planned mapping is
-  endpoint in Username, dedicated reviewer key in Password, and concise setup steps explicitly
-  explaining that mapping. Never put credential values in this document.
+- Title and summary are read-only and come from the manifest (`name`, `description`).
+- Description limit is 16,000 characters. Single purpose and each permission justification are
+  limited to 1,000 characters.
+- Choosing "No" for remote code disables its justification field.
+- Reviewer access is a **Test instructions** form: Username and Password at 100 characters each and
+  Additional instructions at 500. See [reviewer-notes.md](reviewer-notes.md).
 
 ---
 
-Every field the developer dashboard asks for, in the order it asks, with the exact value to paste
-or the file to upload. Written so the submission is a paste job with no decisions left in it.
+## What the resubmission changes
+
+**The description, which is what was rejected.** Rewritten in [listing.md](listing.md#detailed-description)
+to the rules in Google's [spam FAQ](https://developer.chrome.com/docs/webstore/program-policies/spam-faq):
+no more than five brand or site names in the whole text (it has three, and names no model provider
+at all), fewer than five uses of any one keyword, and no non-affiliation paragraph listing other
+companies. `npm run listing-check` enforces all of it.
+
+**The package, because 0.1.0 would have failed the next stage of review.** Checking the reviewer's
+own steps against the store build found that a fresh install did not work:
+
+- With "Allow User Scripts" off, which is how every install starts, Chrome leaves `chrome.userScripts`
+  undefined. The extension read that as "this is Safari", picked the Safari engine, reported itself
+  ready and showed **no setup banner**.
+- After the toggle was turned on, nothing worked until the browser was restarted: every script run
+  ended in "No result after 20s" and saved mods did not run.
+
+A reviewer following the test instructions would have hit the second one on step 5. Both are fixed
+in 0.1.1 (`lib/exec/engine.ts`, `entrypoints/background.ts`), and `npm run reviewer-walkthrough` now
+runs the reviewer's test end to end against the store build, toggle included. It had gone unnoticed
+because every earlier test of the real thing was on a profile where the toggle had been on for
+days, and the automated flows believed the toggle could not be turned on in automation. It can.
+
+**Other things a reviewer could have held against it**, found by reading the package and the
+listing against Google's policies the way a reviewer would:
+
+- **The `tabs` permission was unnecessary** (violation *Purple Potassium*, excessive permissions).
+  It adds nothing over `<all_urls>` for what usermods does, and its justification listed API calls
+  that do not need it. 0.1.1 does not ask for it. See [permissions.md](permissions.md#tabs-no-longer-requested).
+- **"Are you using remote code?" was answered No.** The model's draft is run on the page during the
+  chat, and a userscript is by the dashboard's own definition code that is not in the package. The
+  answer is now **Yes**, with a justification citing the User Scripts API, which the Manifest V3
+  policy names as the permitted way. See [permissions.md](permissions.md#are-you-using-remote-code).
+  It is the accurate answer and the defensible one, and it costs a slower review.
+- **The first-run data notice left out two things that are sent**: what a script returns when the
+  model runs one on the page, and images the user attaches. The listing's privacy paragraph said the
+  notice "explains exactly what is sent" over a shorter list still. Both now name everything the
+  privacy policy does.
+- **The description advertised one-off tasks** ("open every carousel and list the image URLs"),
+  which reads as scraping: a second purpose next to a single-purpose statement about userscripts.
+- **Three places in the store build mentioned a subscription sign-in** that build does not have: the
+  line by the message box, the empty model picker, and the hint under Base URL on the card the
+  reviewer fills in.
+- **The first store screenshot showed test content.** The scripted model's reply ends in three lines
+  that exist to exercise the markdown sanitiser, one reading "do not click me", and that was the
+  part of the transcript in the picture.
+- The `declarativeNetRequest` justification said "exactly one static rule"; 0.1.1 registers two
+  dynamic rules. The host-permission justification was over the 1,000-character limit and had been
+  cut by hand.
+- The privacy policy said every network request follows "an explicit action of yours", two lines
+  above the automatic daily update check; said it transfers data to no third party, which the model
+  provider is; and filed *Fetch models* under installing a script.
+- The test instructions did not say that the Base URL field comes pre-filled and has to be replaced,
+  or that a new extension's icon is inside the puzzle-piece menu.
+- The README said the listing was pending review.
+
+**A privacy bug, found in review of the read tools and present since the first version.** The page
+snapshot printed the `value` of every input, so on a site that writes keystrokes back into the page
+(React does) a typed password, an autofilled card number or a hidden token could be sent to the
+model provider. 0.1.1 never sends form field values. The privacy policy and the first-run notice
+say what is sent.
+
+**Two more fixes to the package:** a mod written in chat no longer moves to the page's own world
+the second time it is saved, and a route change on a single-page app is no longer reported to the
+model as the page navigating away.
+
+0.1.1 also carries everything merged since 0.1.0 (see [CHANGELOG.md](../../CHANGELOG.md)): markdown
+replies, the one-row composer, per-chat thinking levels, reviewed updates, sharing, the install
+banner, the fixes from the first user report, and the agent's reworked tools: `test_mod` (the
+finished script is tested the way the saved mod will run, and the proposal card says how), honest
+`run_script` results, and page reads that keep a long page's shape, search by text, list overlays
+and read a page's text. None of it changes the permissions or what the listing has to say.
+
+---
+
+## Resubmitting
+
+In the dashboard, on the item above. Nothing here needs a decision; it is upload and paste.
+
+1. **Package** → upload `.output/usermods-0.1.1-chrome.zip` (from `npm run zip:store`; checksum in
+   [package-audit.md](package-audit.md)). The permission list is one shorter (`tabs` is gone), so the
+   dashboard should show five permission fields plus host permissions, and no new permission
+   warning.
+2. **Store listing → Description** → replace with the block in
+   [listing.md](listing.md#detailed-description).
+3. **Store listing → Screenshots** → replace all five with the files in `docs/store/assets/`, in
+   order `01` to `05`. They show the 0.1.1 panel.
+4. **Privacy practices → justifications** → replace each of the seven texts (single purpose, five
+   permissions, host permissions) with its block in [permissions.md](permissions.md).
+5. **Privacy practices → remote code** → change the answer to **Yes** and paste the block under
+   [Are you using remote code?](permissions.md#are-you-using-remote-code).
+6. **Test instructions** → leave Username and Password as they are (the reviewer key was extended
+   to 2026-10-17, same key and endpoint) and replace Additional instructions with the block in
+   [reviewer-notes.md](reviewer-notes.md#test-instructions).
+7. Leave everything else as it is: category, language, icon, promo tiles, URLs, data-usage
+   checkboxes, the three certifications, the privacy policy URL, distribution.
+8. **Submit for review.** Do not tick automatic publication.
+
+Before pressing Submit:
+
+- [ ] `npm run listing-check` prints `ok`.
+- [ ] `npm run reviewer-walkthrough` ends with `ok`.
+- [ ] The uploaded zip's SHA-256 matches [package-audit.md](package-audit.md).
+- [ ] The reviewer key still works: `curl -s -H "Authorization: Bearer $KEY" "$BASE_URL/models"`
+      lists the model that step 4 of the test instructions names.
+- [ ] `PRIVACY.md` on `main` is the updated one (its date reads 30 September 2026), since the
+      dashboard links to it there.
+
+After submitting, watch the publisher mailbox: the rejection arrived there within a day and sat
+unread. When the item is approved and published, tag the release (`v0.1.1`).
+
+---
+
+## Field reference
+
+Every field the dashboard asks for, in the order it asks, for a submission from scratch.
 
 Sources: [listing.md](listing.md) for the copy, [permissions.md](permissions.md) for the
-justifications, [reviewer-notes.md](reviewer-notes.md) for the reviewer field,
+justifications, [reviewer-notes.md](reviewer-notes.md) for the test instructions,
 [package-audit.md](package-audit.md) for what is in the zip, [../../PRIVACY.md](../../PRIVACY.md)
-for the policy. Field names and limits checked against `developer.chrome.com` on 2026-09-19
-(`cws-dashboard-listing`, `cws-dashboard-privacy`, `cws-dashboard-distribution`, `best-listing`).
+for the policy.
 
----
-
-## 0. Before you open the dashboard
+### 0. Before you open the dashboard
 
 | | |
 |---|---|
-| Developer account | Register at the [dashboard](https://chrome.google.com/webstore/devconsole) and pay the **one-time $5 USD** registration fee. Verify the account's email address, or publishing is blocked. |
-| Model API key | The reviewer key exists: an OpenAI-compatible endpoint (the reviewer endpoint, base URL kept in 1Password, project vault, item "Ornith API - chrome-app-review - 14 days"), model `ornith`, **expiring 2026-10-03**. It goes in the reviewer-notes field via `scripts/reviewer-notes.mjs`, never into the repo. Revoke it once the review clears. |
-| The package | `npm run zip:store` → upload `.output/usermods-0.1.0-chrome.zip`. Current build: 410,791 bytes, sha256 `8b7c23dd7e5fcd539be151328f13fec6ee33b9c9e6a38f79666ac3db2226c01b` (commit `12fc38a`). |
+| Developer account | Registered, fee paid, contact email verified (2026-09-22). |
+| Reviewer key | An OpenAI-compatible endpoint and a time-limited key for it, kept in 1Password (project vault, item "Ornith API - chrome-app-review - 14 days"), model `ornith`. Never in the repo. Revoke it once the review clears. |
+| The package | `npm run zip:store` → `.output/usermods-0.1.1-chrome.zip`. |
 
-**Upload the zip first.** The dashboard derives the item name and the permission-justification
-fields from the uploaded manifest, so the Privacy tab is incomplete until it has one.
+**Upload the zip first.** The dashboard derives the item name, the summary and the
+permission-justification fields from the uploaded manifest.
 
----
-
-## 1. Store listing tab
-
-### Title
-
-```
-usermods
-```
-
-**Nothing to do.** This is not an editable dashboard field — the store reads it from the uploaded
-manifest's `name`, which already ships as `usermods`. No change to `wxt.config.ts`, no rebuild.
-
-It is the name on the icon, in the README, in the toolbar tooltip and throughout the UI, so the
-listing matches the extension a user installs. The descriptive tagline goes in the **summary**
-field below, not into the name. (The limit, for reference, is 75 characters.)
-
-### Summary
-
-**132 characters max.** This is 125 — verified by counting.
-
-```
-Customize any website by chatting with the AI of your choice: it reads the page, writes a userscript, runs it on every visit.
-```
-
-### Description
-
-3,136 characters. No numeric limit is published for this field; this is far inside any plausible
-one. Paste the fenced block under **Detailed description** in
-[listing.md](listing.md#detailed-description) verbatim.
-
-Do not trim the "How it works" or "Privacy" sections. The Limited Use policy permits handling web
-page content only for a feature described *prominently* on the store page, and those two sections
-are what does the describing.
-
-### Category
-
-```
-Developer Tools
-```
-
-Labelled "primary category" in the docs. Second-best fit if a less technical placement is ever
-wanted: *Workflow & Planning*.
-
-### Language
-
-```
-English (United States)
-```
-
-### Store icon
-
-| | |
-|---|---|
-| Requirement | 128×128 PNG |
-| Upload | `public/icon/128.png` — verified 128×128 |
-
-### Screenshots
-
-At least one, up to five. **1280×800** (or 640×400). All five are 1280×800, verified.
-
-| # | File | What it shows |
-|---|---|---|
-| 1 | `docs/store/assets/01-chat.png` | the chat proposing a mod on Wikipedia |
-| 2 | `docs/store/assets/02-point.png` | the element picker dropping an `@reference` into the composer |
-| 3 | `docs/store/assets/03-mods.png` | the Mods list split by what matches this site |
-| 4 | `docs/store/assets/04-install.png` | the install page for a live Greasy Fork script |
-| 5 | `docs/store/assets/05-migrate.png` | Migrate from Tampermonkey, expanded |
-
-Upload in that order — the store shows them in the order given.
-
-### YouTube video
-
-Optional. **Leave blank.** There is no video.
-
-### Small promo tile
-
-| | |
-|---|---|
-| Requirement | 440×280 PNG or JPEG |
-| Upload | `docs/store/assets/promo-tile.png` — verified 440×280 |
-
-### Marquee promo tile
-
-| | |
-|---|---|
-| Requirement | **1400×560** PNG or JPEG (not 1440×560), optional — used only if the item is featured |
-| Upload | `docs/store/assets/marquee.png` — verified 1400×560 |
-
-### Additional fields
+### 1. Store listing tab
 
 | Field | Value |
 |---|---|
-| **Official URL** | **Leave blank.** This field is for verified publishers and requires domain ownership verification in Search Console. Not applicable. |
-| **Homepage URL** | `https://github.com/kballenegger/usermods` |
-| **Support URL** | `https://github.com/kballenegger/usermods/issues` |
-| **Mature content** | **No** / unchecked. |
+| Title | `usermods`. Read-only, from the manifest. |
+| Summary | `Vibe-code userscripts in place. Customize any website by chatting with any LLM.` Read-only, from the manifest. |
+| Description | The block in [listing.md](listing.md#detailed-description). Do not add provider names, a list of supported sites, or a non-affiliation paragraph: that is what was rejected. Do not trim the "How it works" or "Privacy" sections either; the Limited Use policy permits handling page content only for a feature described prominently on the store page. |
+| Category | Developer Tools |
+| Language | English (United States) |
+| Store icon | `public/icon/128.png` (128×128) |
+| Screenshots | `docs/store/assets/01-chat.png` to `05-migrate.png`, 1280×800, in that order |
+| YouTube video | Blank |
+| Small promo tile | `docs/store/assets/promo-tile.png` (440×280) |
+| Marquee promo tile | `docs/store/assets/marquee.png` (1400×560) |
+| Official URL | Blank (needs a verified domain) |
+| Homepage URL | `https://github.com/kballenegger/usermods` |
+| Support URL | `https://github.com/kballenegger/usermods/issues` |
+| Mature content | No |
 
----
+### 2. Privacy practices tab
 
-## 2. Privacy practices tab
+**Single purpose** and **permission justifications**: one field each, pasted from the matching
+block in [permissions.md](permissions.md).
 
-### Single purpose
-
-One field. Paste the block-quoted paragraph under **Single purpose** in
-[permissions.md](permissions.md#single-purpose) — it starts "usermods is a userscript manager."
-No character limit is published for this field.
-
-### Permission justifications
-
-One field per permission in the uploaded manifest, plus host permissions. Paste the matching
-section of [permissions.md](permissions.md#permission-justifications) into each:
-
-| Dashboard field | Paste from permissions.md |
+| Dashboard field | Block in permissions.md |
 |---|---|
-| `sidePanel` | [§ sidePanel](permissions.md#sidepanel) |
-| `storage` | [§ storage](permissions.md#storage) |
-| `scripting` | [§ scripting](permissions.md#scripting) |
-| `tabs` | [§ tabs](permissions.md#tabs) |
-| `userScripts` | [§ userScripts](permissions.md#userscripts) |
-| `declarativeNetRequest` | [§ declarativeNetRequest](permissions.md#declarativenetrequest) |
-| Host permissions (`<all_urls>`) | [§ Host permissions](permissions.md#host-permissions-all_urls) |
+| Single purpose | [Single purpose](permissions.md#single-purpose) |
+| `sidePanel` | [sidePanel](permissions.md#sidepanel) |
+| `storage` | [storage](permissions.md#storage) |
+| `scripting` | [scripting](permissions.md#scripting) |
+| `userScripts` | [userScripts](permissions.md#userscripts) |
+| `declarativeNetRequest` | [declarativeNetRequest](permissions.md#declarativenetrequest) |
+| Host permissions | [Host permissions](permissions.md#host-permissions-all_urls) |
 
-Cross-check the generated field list against the built manifest before filling them in — if the
-dashboard shows a permission this table does not, the manifest changed and `permissions.md` needs a
-new paragraph. Per [package-audit.md](package-audit.md), the shipped manifest declares exactly
-these six plus `<all_urls>`.
+If the dashboard shows a permission this table does not, the manifest changed and `permissions.md`
+needs a new block.
 
-### Remote code
+**Remote code**: select *Yes* and paste the block under
+[Are you using remote code?](permissions.md#are-you-using-remote-code). (Selecting No disables the
+field, so the explanation is never read.)
 
-Select:
-
-```
-No, I am not using remote code
-```
-
-Paste the explanation from [permissions.md](permissions.md#are-you-using-remote-code). Do include
-the userscript paragraphs — a manager that runs user-supplied scripts invites exactly this question,
-and answering it before it is asked is faster than answering it in a rejection appeal.
-
-### Data usage — what this item collects
-
-Check these three, leave the rest unchecked:
+**Data usage**: check these three and leave the rest unchecked. The reasoning for each is in
+[listing.md](listing.md#data-usage--what-this-item-collects).
 
 | Category | Check |
 |---|---|
-| Personally identifiable information | ☐ No |
-| Health information | ☐ No |
-| Financial and payment information | ☐ No |
-| **Authentication information** | ☑ **Yes** |
-| **Personal communications** | ☑ **Yes** |
-| Location | ☐ No |
-| Web history | ☐ No |
-| User activity | ☐ No |
-| **Website content** | ☑ **Yes** |
+| Personally identifiable information | No |
+| Health information | No |
+| Financial and payment information | No |
+| **Authentication information** | **Yes** |
+| **Personal communications** | **Yes** |
+| Location | No |
+| Web history | No |
+| User activity | No |
+| **Website content** | **Yes** |
 
-The reasoning for each is in the table in [listing.md](listing.md#data-usage--what-this-item-collects).
+**Certifications**: check all three.
 
-> The exact category list and wording appear in the published docs only as a screenshot, never as
-> text, so the labels above are reconstructed rather than quoted. If the live form words one of them
-> differently, match it by meaning: the three that are true are *the user's own API key*, *the
-> user's chat messages*, and *page content sent to the model*.
+**Privacy policy URL**: `https://github.com/kballenegger/usermods/blob/main/PRIVACY.md`
 
-### Data usage — certifications
+**Test instructions**: see [reviewer-notes.md](reviewer-notes.md).
 
-Check **all three**. All three are true; see
-[listing.md](listing.md#data-usage--certifications) for why each one holds.
-
-1. I do not sell or transfer user data to third parties, outside of the approved use cases.
-2. I do not use or transfer user data for purposes that are unrelated to my item's single purpose.
-3. I do not use or transfer user data to determine creditworthiness or for lending purposes.
-
-### Privacy policy URL
-
-```
-https://github.com/kballenegger/usermods/blob/main/PRIVACY.md
-```
-
-Mandatory for any item that handles user data, which this one does. The URL must be publicly
-reachable before submitting — **push the repo and confirm the link renders** first.
-
-### Notes for reviewers
-
-Do not copy this one out of the file by hand — the text in the repo carries placeholders where the
-key and the base URL go. Generate it with both substituted and put it straight on the clipboard:
-
-```sh
-USERMODS_REVIEWER_KEY='<the reviewer key>' USERMODS_REVIEWER_BASE_URL='<the reviewer endpoint>' node scripts/reviewer-notes.mjs | pbcopy
-```
-
-Then paste into the field. The script reads the **short version** from
-[reviewer-notes.md](reviewer-notes.md#short-version--paste-this), replaces
-`[reviewer key: PASTE HERE]` and `[reviewer base URL: PASTE HERE]`, writes the result to stdout and
-the character count to stderr, and exits non-zero if either env var is missing, the base URL does
-not start with `https://`, or either placeholder has gone. Neither the key nor the base URL ever
-touches the repository.
-
-Without a key the reviewer cannot exercise the chat at all, and the likeliest outcome is a
-rejection for a feature that "does not work".
-
-**The reviewer key expires 2026-10-03.** It is for an OpenAI-compatible endpoint (the reviewer
-endpoint, base URL kept in 1Password, project vault, item "Ornith API - chrome-app-review - 14 days";
-model `ornith`), and the pasted notes tell the reviewer to
-request a fresh one via the support URL if it has lapsed. If a review is still open near that date,
-issue a new key and update this field in the dashboard.
-
-> Google documents neither this field nor its character limit anywhere on developer.chrome.com. It
-> exists in the dashboard UI. If it rejects the text as too long, cut from the bottom up — the
-> toggle steps and the key matter most.
-
----
-
-## 3. Distribution tab
+### 3. Distribution tab
 
 | Field | Value |
 |---|---|
-| **Contains in-app purchases** | ☐ Unchecked. Free, MIT, no purchases. |
-| **Visibility** | **Public** — lists the item for all users. (*Unlisted* = installable only via direct URL; *Private* = named testers only. All three get the same review and the same policy requirements, so choosing Unlisted buys no leniency.) |
-| **Geographic distribution** | **All regions.** |
-| **Pricing** | Free. There is no pricing control for a free item; it follows from leaving in-app purchases unchecked. |
+| In-app purchases | Unchecked |
+| Visibility | Public |
+| Geographic distribution | All regions |
 
-There is no "show in search results" toggle — that behaviour is what Public vs Unlisted decides.
+### After it clears
 
----
-
-## 4. Last checks before clicking Submit
-
-- [ ] The uploaded zip is the **store** build (`npm run zip:store`), not `npm run zip`. The store
-      build omits subscription sign-in; the plain build does not, and shipping it would put
-      undocumented vendor endpoints in a listing that declares what it talks to.
-- [ ] `manifest.version` is `0.1.0` and matches `package.json`.
-- [ ] `manifest.name` is `usermods` — the store title, unchanged.
-- [ ] The reviewer-notes field was generated with `scripts/reviewer-notes.mjs` and carries a **real
-      key**, not the placeholder — and the key has not expired (2026-10-03).
-- [ ] `PRIVACY.md` is pushed and its GitHub URL renders.
-- [ ] Permission fields in the dashboard match the built manifest exactly — no extra, none missing.
-- [ ] [CHANGELOG.md](../../CHANGELOG.md) has the v0.1.0 entry.
-
-### After submitting
-
-Expect a **slower than average review**: `<all_urls>`, `userScripts` and a broad content script are
-three of the things that route an item to manual review, and this item has all three. That is
-normal and is what the justifications are written for. Do not resubmit while a review is pending.
-
-Once it clears, tag the release (`v0.1.0`) so the published package and the source history line up.
+Expect a slower than average review: `<all_urls>`, `userScripts` and a broad content script are
+three of the things that route an item to manual review. Do not upload anything while a review is
+pending, because that restarts it. Once it is approved and published, tag the release and revoke
+the reviewer key.

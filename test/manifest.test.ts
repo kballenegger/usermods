@@ -23,11 +23,17 @@ test('safari is not asked for permissions it does not have', () => {
   }
 });
 
-test('chrome keeps every permission it shipped with', () => {
-  const chrome = permissionsFor('chrome');
-  for (const p of ['sidePanel', 'storage', 'scripting', 'tabs', 'declarativeNetRequest', 'userScripts']) {
-    assert.ok(chrome.includes(p), `chrome must keep ${p}`);
-  }
+test('chrome asks for exactly the permissions it uses', () => {
+  // Exact, not "includes": the store listing carries one justification per permission, so an extra
+  // one here is a field nobody wrote and a missing one is a feature that stops working.
+  assert.deepEqual(permissionsFor('chrome'), ['sidePanel', 'storage', 'scripting', 'userScripts', 'declarativeNetRequest']);
+});
+
+test('chrome does not ask for tabs, which adds nothing over its host access', () => {
+  // With <all_urls>, `tabs` only adds the address of browser pages and the extension's own pages.
+  // The store rejects a permission that is not needed, and nothing acts on those addresses.
+  assert.ok(!permissionsFor('chrome').includes('tabs'));
+  assert.deepEqual(buildManifest('chrome').host_permissions, ['<all_urls>']);
 });
 
 test('safari gets a toolbar popup and chrome does not', () => {

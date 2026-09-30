@@ -25,11 +25,11 @@
 
 export type ExecEngine = 'user-scripts' | 'content-script';
 
-/** What the host runtime exposes. Gathered by lib/exec/adapter.ts; plain data so this stays pure. */
+/** What the host runtime exposes. Read by `readProbe` below; plain data so the rest stays pure. */
 export interface RuntimeProbe {
-  /** The `userScripts` namespace exists at all. */
+  /** This build is a `userScripts` build: its manifest asks for the permission. */
   api: boolean;
-  /** It exists AND is permitted. On Chrome that is the "Allow User Scripts" toggle being on. */
+  /** The API can be called now. On Chrome that is the "Allow User Scripts" toggle being on. */
   permitted: boolean;
   /** `sidePanel` exists. False on Safari and Firefox; the popup is the surface there. */
   sidePanel: boolean;
@@ -44,13 +44,57 @@ export interface ExecStatus {
   engine: ExecEngine;
 }
 
+/** The slice of `chrome` the probe reads, so node can stand in for each state a profile can be in. */
+export interface ProbeSource {
+  runtime?: { getManifest?: () => { permissions?: readonly string[] } };
+  userScripts?: { getScripts?: () => unknown };
+  sidePanel?: unknown;
+}
+
+/**
+ * Read the runtime.
+ *
+ * `api` comes from the MANIFEST, not from whether `chrome.userScripts` is there to look at. Chrome
+ * (138 and later) leaves the namespace undefined while the "Allow User Scripts" toggle is off, which
+ * is the state of every fresh install, and adds it to the live worker and pages when the toggle is
+ * turned on. Reading the namespace therefore made a fresh Chrome install look exactly like Safari:
+ * the content-script engine was picked, the panel reported "ready" with no setup instructions, and
+ * every run went to a runner file the Chrome package does not contain and timed out. The manifest is
+ * the fact that does not move: a build that asks for `userScripts` is a userScripts build whether
+ * or not the user has allowed it yet.
+ */
+export function readProbe(c: ProbeSource | undefined, userAgent: string): RuntimeProbe {
+  let api = false;
+  try {
+    api = !!c?.runtime?.getManifest?.().permissions?.includes('userScripts');
+  } catch {
+    // WXT imports the background at build time against a fake browser whose getManifest throws.
+    // Nothing runs there, so which engine that import picks does not matter; it must not crash.
+    api = false;
+  }
+  let permitted = false;
+  if (api) {
+    try {
+      // Throws when the toggle is off: a TypeError on the missing namespace, or Chrome's own error.
+      const asked = c!.userScripts!.getScripts!();
+      // The answer itself is not wanted; a rejection of it must not surface as unhandled.
+      (asked as Promise<unknown> | undefined)?.catch?.(() => {});
+      permitted = true;
+    } catch {
+      permitted = false;
+    }
+  }
+  return { api, permitted, sidePanel: typeof c?.sidePanel !== 'undefined', userAgent };
+}
+
 /**
  * The engine for a runtime.
  *
- * Keyed on the namespace EXISTING rather than on it being permitted: a Chrome profile with the
- * toggle off must keep getting Chrome's "turn the toggle on" instructions, not silently fall back
- * to a weaker execution model whose CSP behaviour differs. Falling back there would be the worst
- * kind of helpful. Mods would start working slightly differently and nothing would say why.
+ * Keyed on the build ASKING for userScripts rather than on it being permitted: a Chrome profile
+ * with the toggle off must keep getting Chrome's "turn the toggle on" instructions, not silently
+ * fall back to a weaker execution model whose CSP behaviour differs. Falling back there would be
+ * the worst kind of helpful. Mods would start working slightly differently and nothing would say
+ * why.
  */
 export function pickEngine(probe: Pick<RuntimeProbe, 'api'>): ExecEngine {
   return probe.api ? 'user-scripts' : 'content-script';

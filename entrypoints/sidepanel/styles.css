@@ -1470,6 +1470,24 @@ details > summary::-webkit-details-marker {
   color: var(--warn-text);
 }
 
+/* Its sibling, "tested as the saved mod on a fresh page load" / "on the open page only": the same
+   sentence-case form, in the muted text colour, because it qualifies the proposal rather than
+   warning about it. */
+.label.tested {
+  font-family: var(--font-ui);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--fs-meta);
+  font-weight: 400;
+  color: var(--text-2);
+}
+
+/* "failed when tested as the saved mod" is a warning, so it takes .untested's colour, but not its
+   class: .label.untested is the untested_reason line, which scripts and screenshots select by. */
+.label.tested.failed {
+  color: var(--warn-text);
+}
+
 .list {
   display: flex;
   flex-direction: column;

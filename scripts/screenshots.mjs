@@ -252,6 +252,9 @@ const log = (...a) => console.log('[screenshots]', ...a);
 async function startMock() {
   const child = spawn(process.execPath, [path.join(ROOT, 'scripts', 'mock-llm.mjs'), String(PORT)], {
     cwd: ROOT,
+    // A capture gets the plain hero reply, so the README's first picture does not end on the
+    // sanitiser's test lines. The asserting flows keep the specimen. See HERO_REPLY in mock-llm.mjs.
+    env: CAPTURING ? { ...process.env, MOCK_LLM_PLAIN_HERO: '1' } : process.env,
     stdio: ['ignore', 'pipe', 'inherit'],
   });
   await new Promise((resolve, reject) => {
@@ -2045,12 +2048,12 @@ async function guardrails() {
     if (!/You have made 4 page reads without running or proposing anything/.test(sent)) {
       fail('the read-budget nudge never reached the mock');
     }
-    if (!/Act now: test with run_script or ask the user one question/.test(sent)) {
+    if (!/Stop reading: answer the user if you already can, try the change with run_script or test_mod if one is wanted, or ask the user one question/.test(sent)) {
       fail('the read-budget nudge reached the mock without its instruction');
     }
 
-    // FIX 6: the first propose_mod had no run_script behind it, so the loop refused it and said so.
-    if (!/Test the script with run_script before proposing it/.test(sent)) {
+    // FIX 6: the first propose_mod had no test behind it, so the loop refused it and said so.
+    if (!/Test the script with test_mod before proposing it/.test(sent)) {
       fail('propose_mod without a test was not refused, or the refusal never reached the mock');
     }
 

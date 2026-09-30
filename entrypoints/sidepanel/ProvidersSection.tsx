@@ -281,8 +281,8 @@ function ConnectionCard({
                   spellCheck={false}
                 />
                 <span>
-                  Any endpoint that speaks the {conn.kind === 'anthropic' ? 'Anthropic Messages' : 'OpenAI chat completions'} API works here,
-                  including a local proxy in front of a subscription.
+                  Any endpoint that speaks the {conn.kind === 'anthropic' ? 'Anthropic Messages' : 'OpenAI chat completions'} API works here
+                  {SUBSCRIPTIONS_OFF ? '.' : ', including a local proxy in front of a subscription.'}
                 </span>
                 {/*
                   On iPhone and iPad, "localhost" is the phone. Typing the address off a desktop

@@ -30,4 +30,6 @@ Scripts and their `@require` libraries are evaluated in their own function scope
 
 `@grant none` and `unsafeWindow` scripts run in the page's **MAIN** world, where they share globals with the page — which is what those scripts want. The trade-off is that extension messaging is unavailable there, so `GM_setValue` writes from a MAIN-world script update the in-page copy but **cannot be persisted**. Mod cards and the install preview mark those scripts with a *page world* badge. Everything else runs in Chrome's isolated `USER_SCRIPT` world.
 
+A mod written in chat carries no `@grant` line. Its generated header marks the isolated world with `@inject-into content` (Violentmonkey) and `@sandbox DOM` (Tampermonkey), and usermods honours either marker on any script, ahead of `@grant none` and `unsafeWindow`. The markers only ever move a script to the isolated world: `@inject-into page` or `auto` and `@sandbox raw` or `JavaScript` leave the `@grant` rule in charge.
+
 Regex-style `@include` lines (`/^https?:\/\/…$/`) are not supported; Chrome matches on patterns and globs only. The install preview warns when it drops one.

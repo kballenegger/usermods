@@ -6,6 +6,188 @@ All notable changes to usermods are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.1.1] — 2026-09-30
+
+The version resubmitted to the Chrome Web Store. 0.1.0 was submitted on 2026-09-22 and rejected the
+same day for its listing text (keyword spam in the description), not for the package; everything
+merged since then ships here.
+
+### The agent tests a mod the way the saved mod will run
+
+An audit of the agent's tools, and then the owner's own chat histories (14 chats, 184 tool calls),
+showed where runs went wrong: "tested" meant only that some script had run without throwing.
+
+- **`test_mod`** runs the finished script as the saved mod will run it: with its header's world, its
+  `@grant` functions, its `@require` files and its `@run-at`. With `reload: true` the tab reloads and
+  the script runs at load on a clean page; on Chrome that is a temporary, reserved
+  `chrome.userScripts` registration that is always removed afterwards and swept at worker start.
+  Without reload it runs on the open page and says so. It reports an error at the model's own line,
+  the console output, what changed, and whether the change was still there two seconds later.
+- **The proposal card says how the proposed code was tested**: "tested as the saved mod on a fresh
+  page load", "tested on the open page only, not on a fresh load", "failed when tested as the saved
+  mod", or the existing "not tested on this page · reason". Nothing is refused that was allowed
+  before; the card tells the truth instead.
+- **Fixed: Try on a page-world mod** (`@grant none` / `unsafeWindow`) ran and then waited out its
+  timeout, because the result had no way back to the extension. It now reports normally.
+
+### Fixed: page reads could send what you had typed into a form
+
+Found in review of the read tools, and present since the first version.
+
+- **Form field values are never sent to the model.** `get_page` printed the `value` attribute of
+  every input. For a plain form that is only its default, but a site that writes each keystroke back
+  into the attribute, as React does for a controlled input, put whatever you had typed there into
+  the snapshot: a password, an autofilled card number, a hidden anti-forgery token when hidden
+  elements were asked for, the text of a text area. The `value` of text, password, card and hidden
+  inputs and the contents of text areas are now left out; a button's or a checkbox's value, which is
+  its label or identity, is kept. Text typed into an editable region of a page (a message draft in a
+  webmail editor) is still visible page text and is still read, which the privacy policy now says.
+
+### The page reads answer in one call what scripts were being written for
+
+In the owner's exported chats, 55 of 119 `run_script` calls changed nothing: scripts of about 1,200
+characters walking up from a label to the card worth hiding, listing overlays and scroll locks,
+measuring a few elements, or reading a terms page in 4,000-character bites. `find_elements`, which
+already had each element's box, was called 4 times.
+
+- **`find_elements` says which container.** The first three matches carry one line of ancestors,
+  nearest first, with wrappers of the same size counted instead of printed, and `[unit? …]` marking
+  the likely thing to hide: a dialog, a fixed or sticky layer, or a card repeated among its
+  siblings. It is labelled a guess from layout.
+- **Layout for every match**: display always; visibility, opacity, position and z-index when set.
+  `styles` asks for any computed properties, for every match at once. `get_styles` says when it read
+  only the first of several matches.
+- **The page's furniture in one call.** `find_elements` with `overlays: true` lists fixed and sticky
+  layers, dialogs and backdrops (inside open shadow roots too) with their size, z-index and how much
+  of the screen they cover, and says what is locking the page's scrolling.
+- **Reading a page to answer a question about it.** `get_page` with `text: true` returns the
+  readable text: headings, lists and table rows kept, the main content first, long navigation and
+  footers shortened to one line with the selector that reads them. Long pages come in parts, each
+  saying where it is and how to continue. Nothing is cut silently.
+- **The agent no longer assumes you want a mod.** The system prompt names the three things you may
+  want: a change that sticks, a one-off task you explicitly ask for, or an answer about the page.
+  After four page reads the nudge says to answer if it can, try the change if one is wanted, or ask
+  one question; before, it said to run a script. Operating the page stays an explicit one-off, and
+  the prompt now says never to submit, buy, send or delete anything you did not ask for.
+- **Fixed: everything inside a `display: contents` wrapper was invisible to the page reads.**
+  Substack wraps its article and its subscribe dialog in one.
+
+### run_script tells the model what it actually got
+
+In the owner's chats, 8 of 119 script results had been cut at 4,000 characters with nothing to say
+so.
+
+- **Returned values are readable.** An element comes back as `<div#app.shell> "its first text…"`
+  instead of `{}`, a NodeList one node per line with the total, a Map or Set as an array, an Error as
+  its name and message. Cycles and huge values no longer throw or hang. Plain JSON results are
+  exactly what they were.
+- **Nothing is cut silently.** A long result or stack ends in "[truncated: 4,000 of 18,230 chars;
+  return less, or slice]". Console lines are capped at 500 characters with a marker, and dropped
+  console lines are counted.
+- **"What changed" names the nodes:** "2 removed (div.modal-backdrop, div#newsletter), 1 added
+  (div.modal), 2 attributes changed (body[class,style])". This is how the model sees a site put back
+  what its script removed.
+- **Errors thrown later by a script's own observers, timers and listeners are no longer lost.** They
+  arrive with the model's next tool result, mapped to the line it wrote, and are still followed
+  across a single-page app's route changes. No new tool and no schema change. On Safari this
+  degrades to the previous behaviour if the engine cannot attribute them.
+
+### Cheaper, sharper page reads
+
+Half of the page snapshots in those chats had been truncated, and the cheap read tools were barely
+used: the models wrote scripts to look at the page instead.
+
+- **A page over budget keeps its shape.** `get_page` used to cut a long page at 20,000 characters in
+  document order, so the header and menus came through and the main content was what got lost.
+  Every region now appears: a region that does not fit collapses to one line saying how many
+  elements it holds and how it starts, a long run of similar items shows whole examples and a
+  count, and a very long list of unlike children shows its first ones and says how many were cut.
+  `get_page` with a selector opens any of them. A page that fits prints exactly as before.
+- **`find_elements` can search by visible text**, alone or with a selector, and answers with the
+  innermost matching elements.
+- **Open shadow roots are reachable.** A selector that matches nothing in the document is retried
+  inside open shadow roots by `find_elements`, `get_styles`, `get_page` and `wait_for`, and the
+  answer gives the `.shadowRoot.querySelector` chain a script needs. usermods' own banner is never
+  searched.
+- **The snapshot shows `data-*` attributes and ARIA state**, the durable hooks a mod should select
+  on, within limits: at most four per element, short readable values only, no hashed, tracking or
+  plumbing names, and never names or values that look like credentials or contact details. About 1%
+  more text on most pages, 9% on a GitHub repository page.
+- **`get_page` takes `include_hidden`.**
+- **Page reads are charged by size.** The read budget counted a one-line `find_elements` the same as
+  a full `get_page`, so a model that checked three selectors was told to stop looking. A read now
+  costs its length over 6,000 characters, between a quarter and one whole read; four full page reads
+  are still nudged, as before.
+
+### Fixed: a mod written in chat moved to the page's world on its second save
+
+- The header generated for a mod the model wrote said `@grant none`, which every userscript manager
+  (and usermods) reads as "run in the page". Only the first save kept the mod in the isolated world
+  it had been tested in; "Save & update mod", a dashboard edit or a re-imported export moved it to
+  the page. The generated header now has no `@grant` and marks the isolated world with
+  Violentmonkey's `@inject-into content` and Tampermonkey's `@sandbox DOM`, which usermods also
+  honours on import (in that direction only). An imported `@grant none` script still runs in the
+  page.
+- A mod saved once by an earlier build (isolated, with the old generated header byte for byte) shows
+  the new header when loaded, and so does a chat draft holding that header when it is saved into an
+  isolated mod. Nothing either mod does changes. A mod that a second save already moved to the page
+  is left as it is; saving it again from its chat moves it back.
+
+### Fixed: a route change on a single-page app read as "the page navigated, the result was lost"
+
+- Chrome reports a `history.pushState`, `replaceState` or hash change as the tab loading, and
+  `run_script` and the panel's Run once ended the run there. A run now ends on navigation only when
+  its document is really gone (`lib/navwatch.ts`). Real navigations, reloads included, are still
+  reported as soon as the new page commits.
+
+### Fixed: a fresh install on Chrome did not work until the browser was restarted
+
+Found while checking the store reviewer's own steps against the store build. It had been there since
+Safari support was merged, and was in the 0.1.0 package that was submitted.
+
+- **No setup banner.** Chrome leaves `chrome.userScripts` undefined while "Allow User Scripts" is
+  off, which is how every install starts. The engine choice read the missing namespace as "this
+  browser has no userScripts", which is Safari, so a fresh Chrome install picked the Safari engine,
+  called itself ready and never showed the three steps for turning the toggle on. The choice is now
+  made from the manifest: a build that asks for `userScripts` is a userScripts build whether or not
+  the user has allowed it yet (`readProbe` in `lib/exec/engine.ts`).
+- **Nothing ran after the toggle was turned on.** Chrome adds the API to the worker that is already
+  running and fires neither `onInstalled` nor `onStartup`, and those were the only two moments the
+  extension configured the user-script world and registered saved mods. Every run finished on the
+  page and then waited out "No result after 20s", and saved mods did not run, until the browser was
+  restarted. The engine is now prepared whenever the panel asks for its status and before any run
+  (`prepareEngine` in `entrypoints/background.ts`).
+- **The banner clears itself.** The side panel keeps asking while the banner is showing, so it goes
+  away within a couple of seconds of the toggle being turned on, without a click in the panel.
+- **The store build no longer offers a subscription sign-in it does not have**, in the line by the
+  message box, in the empty model picker and under Base URL on a provider card.
+- **Registering mods is one at a time, and only when needed.** Two syncs interleaved could leave a
+  mod the user had just disabled still registered; they now queue. And a worker that wakes to find
+  the right mods already registered leaves them alone, instead of unregistering and re-registering
+  everything.
+- **`npm run reviewer-walkthrough`** does the reviewer's test against the store build from a fresh
+  profile: banner, toggle turned on through `chrome://extensions`, provider added by the words on
+  screen, a script really run on the page, the mod saved, applied again after a reload, deleted. The
+  toggle is an ordinary control and can be clicked from an automated profile; the belief that it
+  could not is why none of the other flows had ever run a script.
+- **`npm run listing-check`** holds the store description to Google's keyword rules (five brand
+  names at most, fewer than five uses of a keyword) and the dashboard's field limits.
+
+### Chrome no longer asks for the `tabs` permission
+
+With `<all_urls>`, `tabs` added only the address and title of browser pages and of the extension's
+own pages, and nothing acts on either. Chrome's store review rejects a permission that adds nothing,
+so it is gone from the Chrome manifest; Safari, where host access is granted site by site, keeps it.
+The one place that read an extension page's address, finding the dashboard tab that is already open,
+asks `runtime.getContexts` instead. Nothing a user sees changes, and the install warning is the same.
+
+### The first-run data notice lists everything that is sent
+
+It named messages, the page's address, title and HTML, element details and screenshots. It now also
+names what a script returns when the model runs one on the page to test its work, and images you
+attach. Both were already in the privacy policy; the notice and the store listing had a shorter
+list.
+
 ### Updates are offered, reviewed, and never automatic
 
 - **Installed scripts are checked for newer versions** when the panel or dashboard opens and at
@@ -489,4 +671,5 @@ First public release, and the first submission to the Chrome Web Store.
 - Every screenshot in the README, [docs/screenshots.md](docs/screenshots.md) and the store listing is regenerated by script from the real
   extension, not mocked up by hand.
 
+[0.1.1]: https://github.com/kballenegger/usermods/releases/tag/v0.1.1
 [0.1.0]: https://github.com/kballenegger/usermods/releases/tag/v0.1.0

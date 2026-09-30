@@ -32,7 +32,7 @@ import {
   type WaitCondition,
   type WaitSpec,
 } from '../lib/agent/wait.ts';
-import { ACT_TOOLS, NEUTRAL_TOOLS, READ_TOOLS, countReads, readBudgetNudge } from '../lib/agent/budget.ts';
+import { ACT_TOOLS, NEUTRAL_TOOLS, NO_READS, READ_TOOLS, countReads, readBudgetNudge } from '../lib/agent/budget.ts';
 import { toolDotClass, toolDotState, toolRowTitle } from '../lib/transcript.ts';
 import { TOOLS } from '../lib/agent/tools.ts';
 
@@ -338,14 +338,14 @@ test('wait_for is in neither budget set, so it cannot trip or reset the read bud
 });
 
 test('waiting between reads neither advances nor resets the read count', () => {
-  let reads = 0;
+  let reads = NO_READS;
   reads = countReads(reads, ['get_page']);
   reads = countReads(reads, ['wait_for']);
-  assert.equal(reads, 1, 'the wait itself must not count as a read');
+  assert.equal(reads.calls, 1, 'the wait itself must not count as a read');
   reads = countReads(reads, ['find_elements']);
   reads = countReads(reads, ['wait_for']);
   reads = countReads(reads, ['get_styles']);
-  assert.equal(reads, 3, 'and it must not have laundered the streak either');
+  assert.equal(reads.calls, 3, 'and it must not have laundered the streak either');
   // Which means the read nudge still fires on the read that crosses the budget.
   const before = reads;
   reads = countReads(reads, ['get_page']);
