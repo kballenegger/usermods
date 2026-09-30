@@ -59,3 +59,8 @@ test('the main content goes first only when there is exactly one', () => {
   const only = load('<html><body><div role="main"><p>All of it</p></div></body></html>');
   assert.equal(pageText(only.body, { wholePage: true }, shown), 'All of it', 'no marker when nothing is outside');
 });
+
+test('page text leaves form field values out: a textarea\'s text is what the user typed', () => {
+  const d = load('<html><body><form><label>Password <input type="password" value="Secret1"></label><textarea>Typed secret</textarea><p>After</p></form></body></html>');
+  assert.equal(pageText(d.body, {}, shown), 'Password\n\nAfter');
+});

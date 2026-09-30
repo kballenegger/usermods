@@ -20,7 +20,9 @@
 // The .ts extension: see lib/agent/tools.ts. node's test runner loads this file directly.
 import { isVisible, selectorFor, trunc } from './snapshot.ts';
 
-const SKIP = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE', 'SVG', 'svg', 'CANVAS', 'IFRAME', 'HEAD', 'LINK', 'META']);
+// TEXTAREA: its text is its value, what the user typed once a framework syncs it back; form field
+// values are never read (an <input> has no text to read in the first place).
+const SKIP = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE', 'SVG', 'svg', 'CANVAS', 'IFRAME', 'HEAD', 'LINK', 'META', 'TEXTAREA']);
 /** Elements that end a line. Tag-based rather than computed display: cheap, and the same in a test. */
 const BLOCK = new Set([
   'ADDRESS', 'ARTICLE', 'ASIDE', 'BLOCKQUOTE', 'DD', 'DETAILS', 'DIALOG', 'DIV', 'DL', 'DT', 'FIELDSET', 'FIGCAPTION', 'FIGURE',

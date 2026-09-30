@@ -57,6 +57,28 @@ const SKIPPED_NAME = /^(ga|gtm|octo|hydro|analytics|track|tracking|event|log|bea
  */
 const SENSITIVE_NAME = /(^|[-_])(csrf|xsrf|token|nonce|secret|password|passwd|session|sid|auth|signature|sig|apikey|api-key|email|e-mail|mail|phone|tel|ssn)([-_]|$)/;
 
+/**
+ * Input types whose `value` attribute is a label or an option's identity (a submit button's text,
+ * which radio this is), never something the user typed.
+ */
+const LABEL_VALUE_TYPES = new Set(['submit', 'button', 'reset', 'image', 'checkbox', 'radio']);
+
+/**
+ * Whether an element's `value` attribute may be sent. A read tool's output goes to a third-party
+ * model, and the attribute is not only the server's default: React writes every keystroke of a
+ * controlled input back into it, password fields included, and autofill goes through the same
+ * path. So a text, password, card or hidden field's value is never printed, and neither is a
+ * button's or checkbox's when its name says it is a token. <option>, <button>, <li> and <meter>
+ * values are the page's own and are kept.
+ */
+export function valueIsSafe(el: Element): boolean {
+  if (el.tagName.toUpperCase() !== 'INPUT') return true;
+  const type = (el.getAttribute('type') ?? '').trim().toLowerCase();
+  if (!LABEL_VALUE_TYPES.has(type)) return false;
+  const name = `${el.getAttribute('name') ?? ''} ${el.getAttribute('id') ?? ''}`.toLowerCase();
+  return !name.split(/\s+/).some((n) => SENSITIVE_NAME.test(n) || /(^|[-_])cc([-_]|$)|card/.test(n));
+}
+
 /** Rendered and not display:none or visibility:hidden. Shared with lib/inspect.ts. */
 export function isVisible(el: Element): boolean {
   if (!(el instanceof HTMLElement)) return true;
@@ -191,6 +213,7 @@ export function buildTree(root: Element, opts: { maxDepth?: number; includeHidde
     const tag = el.tagName.toLowerCase();
     const attrs: string[] = [];
     for (const a of KEEP_ATTRS) {
+      if (a === 'value' && !valueIsSafe(el)) continue;
       const v = el.getAttribute(a);
       if (v != null && v !== '') attrs.push(`${a}="${trunc(v, MAX_ATTR).replace(/"/g, '&quot;')}"`);
     }
@@ -199,6 +222,8 @@ export function buildTree(root: Element, opts: { maxDepth?: number; includeHidde
     const cls = (el.getAttribute('class') ?? '').trim().split(/\s+/)[0];
     const sig = cls ? `${tag}.${cls}` : tag;
     if (tag === 'svg') return makeNode(`<svg${a}/>`, '', [], sig);
+    // A textarea's text is its value: what the user typed, once a framework syncs it back.
+    if (tag === 'textarea') return makeNode(`<textarea${a}>`, '</textarea>', [], sig);
     const kids: (string | SNode)[] = [];
     if (el.shadowRoot) kids.push(makeNode('<#shadow-root>', '</#shadow-root>', walkKids(el.shadowRoot.childNodes, depth + 1), '#shadow-root'));
     kids.push(...walkKids(el.childNodes, depth + 1));
@@ -488,6 +513,8 @@ export function durabilityLabel(selector: string): string {
 
 /** A stable-ish CSS selector for an element. */
 export function selectorFor(el: Element): string {
+  // The loop below stops at body, so body itself used to come back as an empty selector.
+  if (el === document.body) return 'body';
   if (el.id && !/\d{4,}/.test(el.id)) return `#${CSS.escape(el.id)}`;
   const parts: string[] = [];
   let cur: Element | null = el;

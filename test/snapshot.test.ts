@@ -353,3 +353,36 @@ test('display:contents counts as visible, so the subtree under it is still read'
     Object.assign(globalThis, { HTMLElement: class {} });
   }
 });
+
+// ---------- form field values ----------
+
+// React writes every keystroke of a controlled input into its value attribute, password fields and
+// autofilled card numbers included, and a controlled textarea's into its text. A read tool's output
+// goes to a third-party model, so neither may ever be printed, with or without include_hidden.
+const FORM = `<html><body><form>
+  <input id="user" name="username" type="text" value="kenneth-typed">
+  <input id="pw" type="password" value="ReactSyncedSecret1">
+  <input id="cc" autocomplete="cc-number" value="4111111111111111">
+  <input type="email" value="me@example.com"><input type="search" value="my query">
+  <input type="hidden" name="authenticity_token" value="HIDDENTOKEN123">
+  <input type="checkbox" name="remember_token" value="TOKENVALUE">
+  <input type="submit" value="Log in"><input type="radio" name="plan" value="pro">
+  <textarea id="ta">ReactTextareaTypedSecret</textarea>
+  <select><option value="fr" selected>France</option></select><button value="go">Go</button>
+</form></body></html>`;
+
+test('get_page never prints what a user typed: no text, password, card or hidden input value, no textarea text', () => {
+  for (const includeHidden of [false, true]) {
+    const out = renderTree(tree(FORM, { includeHidden }), 20_000);
+    for (const secret of ['kenneth-typed', 'ReactSyncedSecret1', '4111111111111111', 'me@example.com', 'my query', 'HIDDENTOKEN123', 'TOKENVALUE', 'ReactTextareaTypedSecret']) {
+      assert.ok(!out.includes(secret), `${secret} leaked (include_hidden: ${includeHidden})`);
+    }
+    // What a mod selects on is still there: the fields themselves, and the page's own labels.
+    assert.match(out, /<input id="pw" type="password"><\/input>/);
+    assert.match(out, /<textarea id="ta"><\/textarea>/);
+    assert.match(out, /<input type="submit" value="Log in">/);
+    assert.match(out, /<input name="plan" type="radio" value="pro">/);
+    assert.match(out, /<option value="fr">France<\/option>/);
+    assert.match(out, /<button value="go">Go<\/button>/);
+  }
+});
