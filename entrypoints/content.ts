@@ -1,5 +1,6 @@
 import { createHolder } from '@/lib/keepalive-holder';
-import { computedStyles, describeElements, reachFor, selectorFor, snapshot } from '@/lib/snapshot';
+import { computedStyles, describeElements } from '@/lib/inspect';
+import { reachFor, selectorFor, snapshot } from '@/lib/snapshot';
 import { queryAllDeep, waitForDom } from '@/lib/waitdom';
 import { initBanner } from '@/lib/bannerclient';
 import { handleShareMessage } from '@/lib/shareclient';

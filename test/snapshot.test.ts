@@ -10,7 +10,8 @@ import test from 'node:test';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { parseHTML } from 'linkedom';
-import { buildTree, dataAttrs, describeElements, noisyDataValue, reachFor, renderTree, type SNode } from '../lib/snapshot.ts';
+import { buildTree, dataAttrs, noisyDataValue, reachFor, renderTree, type SNode } from '../lib/snapshot.ts';
+import { describeElements } from '../lib/inspect.ts';
 import { deepestOnly, elementsWithText, hasText, normalizeText, queryAllDeep } from '../lib/waitdom.ts';
 
 // selectorFor uses CSS.escape, which a page has and node does not.
