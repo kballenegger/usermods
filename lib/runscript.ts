@@ -110,6 +110,25 @@ export interface DomEffect {
   added: number;
   removed: number;
   attributes: number;
+  /**
+   * Which nodes, by name (lib/exec/wrap.ts `__name`: tag, then #id or up to two classes), with how
+   * many of each. Attribute entries also carry the attribute names. At most 20 names per kind are
+   * tallied in the page; nodes past that are still in the counts above.
+   */
+  targets?: {
+    added: Array<[string, number]>;
+    removed: Array<[string, number]>;
+    attributes: Array<[string, string[], number]>;
+  };
+}
+
+/**
+ * An uncaught error or rejection from one of the script's own callbacks (a timer, an observer, a
+ * listener), already described for the model: `TypeError: x is null (line 12)`.
+ */
+export interface CallbackError {
+  text: string;
+  count: number;
 }
 
 /**
@@ -127,14 +146,54 @@ export type RunOutcome =
 
 export interface RunResult {
   outcome: RunOutcome;
+  /** The last LOG_KEEP console lines. */
   logs: string[];
+  /** How many console lines there were in all, when the wrapper said; more than logs.length means some were dropped. */
+  logCount?: number;
+  /** Uncaught errors from the script's callbacks while the run was being measured. */
+  callbackErrors?: CallbackError[];
 }
 
-/** `14 removed, 0 added, 2 attributes changed`, or null when nothing moved. */
+/** Names shown per kind in the DOM summary. Five, collapsed by name, is about 40 tokens at most. */
+const DOM_NAMES_SHOWN = 5;
+
+/**
+ * ` (div.modal-backdrop, li ×12, +3 more)`, or '' when there is nothing to name. Most frequent
+ * first; "+N more" counts the changes not covered by the names shown, so it stays true even when
+ * the page tallied only the first 20 names.
+ */
+function namedTargets(entries: Array<[string, number]> | undefined, total: number, label: (e: [string, number], i: number) => string): string {
+  if (!entries?.length || !total) return '';
+  const sorted = entries.map((e, i) => ({ e, i })).sort((a, b) => b.e[1] - a.e[1] || a.i - b.i);
+  const shown = sorted.slice(0, DOM_NAMES_SHOWN);
+  const covered = shown.reduce((n, { e }) => n + e[1], 0);
+  const parts = shown.map(({ e, i }) => label(e, i));
+  if (total > covered) parts.push(`+${total - covered} more`);
+  return ` (${parts.join(', ')})`;
+}
+
+/**
+ * `2 removed (div.modal-backdrop, div#newsletter), 1 added (div.modal), 2 attributes changed
+ * (body[class,style])`, or null when nothing moved.
+ *
+ * The names are what let the model see a site put back what its script removed: the same name under
+ * "removed" and "added" in one run. Repeated names collapse into `name ×N`; attribute entries list
+ * the attributes instead, since an element restyled sixty times is one fact, not sixty.
+ */
 export function formatDomEffect(dom: DomEffect | undefined): string | null {
   if (!dom) return null;
   if (!dom.added && !dom.removed && !dom.attributes) return null;
-  return `${dom.removed} removed, ${dom.added} added, ${dom.attributes} attribute${dom.attributes === 1 ? '' : 's'} changed`;
+  const t = dom.targets;
+  const nodes = (e: [string, number]) => (e[1] > 1 ? `${e[0]} ×${e[1]}` : e[0]);
+  const attrs = t?.attributes ?? [];
+  const removed = namedTargets(t?.removed, dom.removed, nodes);
+  const added = namedTargets(t?.added, dom.added, nodes);
+  const changed = namedTargets(
+    attrs.map(([name, , n]) => [name, n]),
+    dom.attributes,
+    ([name], i) => (attrs[i]![1].length ? `${name}[${attrs[i]![1].join(',')}]` : name),
+  );
+  return `${dom.removed} removed${removed}, ${dom.added} added${added}, ${dom.attributes} attribute${dom.attributes === 1 ? '' : 's'} changed${changed}`;
 }
 
 /**
@@ -168,6 +227,92 @@ export function mapStack(stack: string, codeLineOffset: number, codeLines: numbe
   // Drop a trailing run of nothing so the output does not end in blank lines.
   while (out.length && !out[out.length - 1]!.trim()) out.pop();
   return out.join('\n');
+}
+
+/** Where a run's code sits in what was injected, so its frames can be mapped back. */
+export interface RunSource {
+  /** The run's `//# sourceURL` (lib/exec/wrap.ts). */
+  sourceName: string;
+  lineOffset: number;
+  codeLines: number;
+}
+
+/** A callback error as the wrapper reports it, before it is described. */
+export interface RawCallbackError {
+  message?: unknown;
+  stack?: unknown;
+  count?: unknown;
+}
+
+/**
+ * `TypeError: x is null (line 12)`: the message, and the first frame in the model's own code mapped
+ * back to the line it wrote. Chrome writes frames as `at f (file:12:3)`, Safari as `f@file:12:3`;
+ * both are matched by the file name. A frame outside the model's lines is the wrapper's, and is
+ * skipped, as mapStack does.
+ */
+export function describeCallbackError(e: RawCallbackError, src: RunSource): CallbackError {
+  const message = typeof e.message === 'string' && e.message ? e.message : 'Uncaught error';
+  const stack = typeof e.stack === 'string' ? e.stack : '';
+  const count = typeof e.count === 'number' && e.count > 0 ? e.count : 1;
+  const escaped = src.sourceName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  let line: number | null = null;
+  for (const m of stack.matchAll(new RegExp(`${escaped}:(\\d+):\\d+`, 'g'))) {
+    const mapped = Number(m[1]) - src.lineOffset;
+    if (mapped >= 1 && mapped <= src.codeLines) {
+      line = mapped;
+      break;
+    }
+  }
+  return { text: line == null ? message : `${message} (line ${line})`, count };
+}
+
+/** Callback errors shown in one line; the rest are counted. */
+const CALLBACK_ERRORS_SHOWN = 3;
+
+/** `TypeError: x is null (line 12) ×40; Error: y (line 3); +2 more`. */
+export function formatCallbackErrors(errors: CallbackError[]): string {
+  const shown = errors.slice(0, CALLBACK_ERRORS_SHOWN).map((e) => (e.count > 1 ? `${e.text} ×${e.count}` : e.text));
+  if (errors.length > CALLBACK_ERRORS_SHOWN) shown.push(`+${errors.length - CALLBACK_ERRORS_SHOWN} more`);
+  return shown.join('; ');
+}
+
+// ---------------------------------------------------------------------------
+// Late errors: thrown by a run's callbacks after the run reported
+// ---------------------------------------------------------------------------
+
+/** One buffered late error, with the run it came from. */
+export interface LateError extends CallbackError {
+  runId: string;
+}
+
+/** Distinct late errors kept per tab between tool results. */
+export const LATE_KEEP = 5;
+
+/**
+ * Fold a late report into a tab's buffer. The page sends a running count per error since the run
+ * reported, so a repeat replaces the count rather than adding to it. New errors past LATE_KEEP are
+ * dropped: five distinct failures are already more than the model will fix in one step.
+ */
+export function mergeLateErrors(buffer: LateError[], runId: string, errors: CallbackError[]): LateError[] {
+  const out = buffer.map((e) => ({ ...e }));
+  for (const e of errors) {
+    const same = out.find((b) => b.runId === runId && b.text === e.text);
+    if (same) same.count = Math.max(same.count, e.count);
+    else if (out.length < LATE_KEEP) out.push({ runId, text: e.text, count: e.count });
+  }
+  return out;
+}
+
+/**
+ * The line prepended to the next tool result for the tab, or null when there is nothing to say.
+ * Line numbers are in the code of the run that threw; an error from a run before the latest one says
+ * so, because "line 12" would otherwise be read against the script the model just wrote.
+ */
+export function renderLateErrors(buffer: LateError[], latestRunId: string | null): string | null {
+  const errors = buffer.filter((e) => e.count > 0);
+  if (!errors.length) return null;
+  const described = errors.map((e) => ({ text: e.runId === latestRunId ? e.text : `${e.text} [earlier run]`, count: e.count }));
+  return `[Uncaught in your run_script callbacks since the last result: ${formatCallbackErrors(described)}]`;
 }
 
 /** Render a finished run as the text the model sees. Pure, so the loop's wording is testable. */
@@ -204,6 +349,11 @@ export function renderRunResult(r: RunResult): { text: string; isError: boolean 
       isError = true;
       break;
   }
-  if (r.logs.length) lines.push('Console:', ...r.logs.slice(-50));
+  if (r.callbackErrors?.length) lines.push(`Uncaught in its callbacks: ${formatCallbackErrors(r.callbackErrors)}`);
+  if (r.logs.length) {
+    const kept = r.logs.slice(-50);
+    const total = Math.max(r.logCount ?? 0, r.logs.length);
+    lines.push(total > kept.length ? `Console (last ${kept.length} of ${total} lines):` : 'Console:', ...kept);
+  }
   return { text: lines.join('\n'), isError };
 }
