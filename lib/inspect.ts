@@ -131,20 +131,24 @@ function sig(el: Element): string {
  * Why an ancestor looks like the natural unit to hide, or null. Checked nearest first, so the answer
  * is the SMALLEST such ancestor:
  *   - a dialog, or a fixed or sticky layer: the popup's shell, whatever its inner structure;
- *   - one of at least UNIT_MIN_ALIKE similar siblings (same tag and first class) and at least
- *     UNIT_MIN_GROWTH times the match's area: a card in a feed, a row in a list, a section in a sidebar. "Much larger"
- *     keeps a label's own inline siblings (three spans in a byline) from winning.
+ *   - a box (not display:inline), one of at least UNIT_MIN_ALIKE similar siblings (same tag and
+ *     first class), and at least UNIT_MIN_GROWTH times the match's area: a card in a feed, a row in
+ *     a list, a section in a sidebar. The display test keeps a label's inline siblings (the spans of
+ *     a byline) from winning; a pure size ratio could not, because a card holding little more than
+ *     its heading (a 1264x59 card around a 1264x22 h3) is only 2.7 times its area.
  * A guess from layout, and the output says so; it is right for the shapes the real scripts were
  * hunting (an ad card, a subscribe popup, a sidebar section) and cheap: no text is read.
  */
 export const UNIT_MIN_ALIKE = 3;
-/** A card is far bigger than the label in it (10x or more on the real pages); a byline's span is not. */
-export const UNIT_MIN_GROWTH = 4;
-function unitReason(el: Element, box: Box, pos: string, matchBox: Box): string | null {
+export const UNIT_MIN_GROWTH = 2;
+function unitReason(el: Element, box: Box, style: (p: string) => string, matchBox: Box): string | null {
+  const pos = style('position');
   if (isDialog(el)) return 'dialog';
   if (pos === 'fixed' || pos === 'sticky') return `${pos} layer`;
   const parent = el.parentElement;
   if (!parent) return null;
+  const display = style('display');
+  if (display.startsWith('inline') || display === 'contents') return null;
   const big = area(matchBox) > 0 ? area(box) >= UNIT_MIN_GROWTH * area(matchBox) : area(box) > 0;
   if (!big) return null;
   const mine = sig(el);
@@ -188,7 +192,7 @@ export function ancestorChain(el: Element, matchBox: Box, probe: Probe, seen: Ma
     const s = probe.style(a);
     const pos = s('position');
     const box = probe.box(a);
-    const unit = unitFound ? null : unitReason(a, box, pos, matchBox);
+    const unit = unitFound ? null : unitReason(a, box, s, matchBox);
     const layered = pos === 'fixed' || pos === 'sticky';
     const sameBox = Math.round(box.w) === Math.round(last.w) && Math.round(box.h) === Math.round(last.h);
     if (sameBox && !unit && !layered) {

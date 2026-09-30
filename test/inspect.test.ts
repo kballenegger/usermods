@@ -112,10 +112,13 @@ test('a popup: the dialog is the unit even when it does not repeat, and a fixed 
   );
 });
 
-test('a small label among inline siblings is not a unit: the ancestor must be much larger than the match', () => {
-  load('<html><body><p data-box="0,0,600,200"><span class="m" data-box="0,0,80,16"><b data-box="0,0,40,16">x</b></span><span class="m" data-box="80,0,80,16"></span><span class="m" data-box="160,0,80,16"></span></p></body></html>');
+test('a label among inline siblings is not a unit; a card little bigger than its heading is', () => {
+  load('<html><body><p data-box="0,0,600,200"><span class="m" style="display:inline" data-box="0,0,80,16"><b data-box="0,0,40,16">x</b></span><span class="m" style="display:inline" data-box="80,0,80,16"></span><span class="m" style="display:inline" data-box="160,0,80,16"></span></p></body></html>');
   const b = document.querySelector('b')!;
   assert.doesNotMatch(ancestorChain(b, probe.box(b), probe, new Map(), 1).split(' › ')[0]!, /unit/);
+  load(`<html><body><section data-box="0,0,1264,5900">${'<div class="card" data-box="0,0,1264,59"><h3 data-box="0,0,1264,22">Card</h3><span>t</span></div>'.repeat(3)}</section></body></html>`);
+  const h3 = document.querySelector('h3')!;
+  assert.match(ancestorChain(h3, probe.box(h3), probe, new Map(), 1), /^div\.card 1264x59 \[unit\? 1 of 3 like it\]/);
 });
 
 test('a deep chain stops at CHAIN_STEPS and says it was cut', () => {
