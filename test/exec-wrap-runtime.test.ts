@@ -70,6 +70,8 @@ test('an element reads as a selector-ish tag with its first text, not {}', () =>
   const link = el('a', { cls: 'dl', text: 'Photo 1', attrs: { href: '/photo/1.jpg' } });
   assert.equal(h.__ser(link), '<a.dl href="/photo/1.jpg"> "Photo 1"');
   assert.equal(h.__ser(el('input', { value: 'typed' })), '<input value="typed">');
+  // Indentation ahead of the first words is skipped, and a megabyte of text is only skimmed.
+  assert.equal(h.__ser(el('main', { text: '\n' + ' '.repeat(600) + 'Welcome back' + ' z'.repeat(500_000) })), `<main> "Welcome back${' z'.repeat(24)}…"`);
   assert.equal(h.__ser(textNode(' hi ')), '#text "hi"');
 });
 
@@ -166,6 +168,8 @@ interface Harness {
   /** Run every pending timer (the throttle), once. */
   tick(): void;
   done: Promise<Record<string, any>>;
+  /** Window listeners the wrapper still has registered. */
+  listening(): number;
 }
 
 /**
@@ -176,10 +180,14 @@ function run(code: string, runId = 'run-1234abcd', transport: 'chrome' | 'bridge
   const { wrapped, sourceName, lineOffset } = wrapForExecution(code, runId, transport);
   const sent: Record<string, any>[] = [];
   const listeners: Record<string, ((ev: any) => void)[]> = {};
+  const listening = () => Object.values(listeners).reduce((n, l) => n + l.length, 0);
   let observerCb: ((records: unknown[]) => void) | null = null;
   const pending: Array<() => void> = [];
   const fakeGlobal = {
     addEventListener: (type: string, fn: (ev: any) => void) => (listeners[type] ??= []).push(fn),
+    removeEventListener: (type: string, fn: (ev: any) => void) => {
+      listeners[type] = (listeners[type] ?? []).filter((f) => f !== fn);
+    },
     console: { log() {}, info() {}, warn() {}, error() {} },
   };
   class FakeObserver {
@@ -214,6 +222,7 @@ function run(code: string, runId = 'run-1234abcd', transport: 'chrome' | 'bridge
     fireRejection: (reason) => listeners.unhandledrejection?.forEach((f) => f({ reason })),
     mutate: (records) => observerCb?.(records),
     tick: () => pending.splice(0).forEach((f) => f()),
+    listening,
   };
 }
 
@@ -299,13 +308,14 @@ test('after the result, a new callback error is sent at once, a repeat only upda
   h.fireError(mine, h.sourceName);
   assert.equal(h.sent.length, 2);
   assert.deepEqual(h.sent[1], { type: 'usermods:run-result', runId: 'run-1234abcd', late: true, errors: [{ message: 'Error: late boom', stack: mine.stack, count: 1 }] });
-  // The same error again is throttled: nothing is sent until the timer runs, then the running count.
+  // The same error again is throttled: nothing is sent until the timer runs, then the repeats
+  // since the last report (the background adds them up).
   h.fireError(mine, h.sourceName);
   h.fireError(mine, h.sourceName);
   assert.equal(h.sent.length, 2);
   h.tick();
   assert.equal(h.sent.length, 3);
-  assert.equal(h.sent[2]!.errors[0].count, 3);
+  assert.equal(h.sent[2]!.errors[0].count, 2);
   // A registered mod sharing the world throws: its file is not this run's, so it is not reported.
   const other = new Error('someone else');
   other.stack = 'Error: someone else\n    at <anonymous>:1:26';
@@ -331,11 +341,14 @@ test('late reports are capped: five distinct errors, twenty sends', async () => 
   assert.equal(h.sent.length - 1, 5);
   const e0 = new Error('e0');
   e0.stack = `Error: e0\n    at ${h.sourceName}:${h.lineOffset + 1}:1`;
+  assert.equal(h.listening(), 2);
   for (let i = 0; i < 40; i++) {
     h.fireError(e0, h.sourceName);
     h.tick();
   }
   assert.equal(h.sent.length - 1, 20);
+  // At the cap it stops listening, so a run whose observer throws forever leaves nothing behind.
+  assert.equal(h.listening(), 0);
 });
 
 test('the sourceURL names this run and cannot be broken out of', () => {

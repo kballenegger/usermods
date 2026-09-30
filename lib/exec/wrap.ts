@@ -96,7 +96,9 @@ function __name(n, long) {
 function __describe(n) {
   try {
     const t = n.nodeType;
-    const text = (x, max) => __clip(String(x || '').replace(/\\s+/g, ' ').trim(), max);
+    // Sliced before the whitespace pass: the textContent of <body> on a big page is megabytes, and
+    // a list of fifty containers would otherwise run the regex over all of it fifty times.
+    const text = (x, max) => __clip(String(x || '').slice(0, 4000).replace(/\\s+/g, ' ').trim(), max);
     if (t === 1) {
       let s = '<' + __name(n, true);
       for (const a of ['href', 'src']) {
@@ -236,14 +238,18 @@ function __catchLate(src, send) {
   // A rejection with a non-Error reason carries no stack, so it cannot be attributed and is skipped.
   const seen = new Map();
   let settled = false, timer = 0, flushes = 0;
+  // Each report carries only what happened since the one before, and the background adds them up:
+  // a running total would still count errors the model was already told about once the background
+  // has handed its buffer to a tool result.
   const flush = () => {
     timer = 0;
-    if (flushes >= 20) return;
     const errors = [];
-    for (const e of seen.values()) if (e.dirty) { e.dirty = false; errors.push({ message: e.message, stack: e.stack, count: e.count }); }
+    for (const e of seen.values()) if (e.dirty) { e.dirty = false; errors.push({ message: e.message, stack: e.stack, count: e.count }); e.count = 0; }
     if (!errors.length) return;
-    flushes++;
     send({ late: true, errors });
+    // Twenty reports is the most one run gets. Past that, stop listening altogether rather than
+    // keep counting (and re-arming the throttle) for reports that will never be sent.
+    if (++flushes >= 20) off();
   };
   const note = (err, filename, fallback) => {
     try {
@@ -266,9 +272,17 @@ function __catchLate(src, send) {
       else if (!timer) timer = setTimeout(flush, 1000);
     } catch (x) {}
   };
+  const onError = (ev) => note(ev.error, ev.filename, ev.message);
+  const onRejection = (ev) => note(ev.reason, '', '');
+  const off = () => {
+    try {
+      globalThis.removeEventListener('error', onError);
+      globalThis.removeEventListener('unhandledrejection', onRejection);
+    } catch (x) {}
+  };
   try {
-    globalThis.addEventListener('error', (ev) => note(ev.error, ev.filename, ev.message));
-    globalThis.addEventListener('unhandledrejection', (ev) => note(ev.reason, '', ''));
+    globalThis.addEventListener('error', onError);
+    globalThis.addEventListener('unhandledrejection', onRejection);
   } catch (x) {}
   return {
     // The errors thrown while the run was still being measured belong in its own result; after

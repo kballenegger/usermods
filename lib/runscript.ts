@@ -289,15 +289,16 @@ export interface LateError extends CallbackError {
 export const LATE_KEEP = 5;
 
 /**
- * Fold a late report into a tab's buffer. The page sends a running count per error since the run
- * reported, so a repeat replaces the count rather than adding to it. New errors past LATE_KEEP are
- * dropped: five distinct failures are already more than the model will fix in one step.
+ * Fold a late report into a tab's buffer. Each report counts only what happened since the page's
+ * previous report, so a repeat adds to the count, and the count shown is what happened since the
+ * model's last tool result. New errors past LATE_KEEP are dropped: five distinct failures are
+ * already more than the model will fix in one step.
  */
 export function mergeLateErrors(buffer: LateError[], runId: string, errors: CallbackError[]): LateError[] {
   const out = buffer.map((e) => ({ ...e }));
   for (const e of errors) {
     const same = out.find((b) => b.runId === runId && b.text === e.text);
-    if (same) same.count = Math.max(same.count, e.count);
+    if (same) same.count += e.count;
     else if (out.length < LATE_KEEP) out.push({ runId, text: e.text, count: e.count });
   }
   return out;

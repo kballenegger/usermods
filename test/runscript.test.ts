@@ -288,9 +288,9 @@ test('dropped console lines are counted', () => {
 
 // ---------- late errors ----------
 
-test('late errors merge by run and message, the running count replacing the old one, capped at five', () => {
+test('late errors merge by run and message, each report adding to the count, capped at five', () => {
   let buf = mergeLateErrors([], 'r1', [{ text: 'TypeError: x (line 2)', count: 1 }]);
-  buf = mergeLateErrors(buf, 'r1', [{ text: 'TypeError: x (line 2)', count: 7 }]);
+  buf = mergeLateErrors(buf, 'r1', [{ text: 'TypeError: x (line 2)', count: 6 }]);
   assert.deepEqual(buf, [{ runId: 'r1', text: 'TypeError: x (line 2)', count: 7 }]);
   // The same text from another run is another error: its line is in other code.
   buf = mergeLateErrors(buf, 'r2', [{ text: 'TypeError: x (line 2)', count: 1 }]);
@@ -315,4 +315,14 @@ test('the late line names the latest run\'s errors plainly and an earlier run\'s
     ),
     '[Uncaught in your run_script callbacks since the last result: TypeError: x is null (line 12) ×3; Error: old (line 4) [earlier run]]',
   );
+});
+
+test('a repeat after the buffer was handed to a tool result counts only what happened since', () => {
+  // The page reports deltas, so once takeLateErrors has emptied the buffer the next line says how
+  // many times it threw since the model last heard, not since the run.
+  let buf = mergeLateErrors([], 'r1', [{ text: 'TypeError: x (line 2)', count: 40 }]);
+  assert.match(renderLateErrors(buf, 'r1')!, /×40\]$/);
+  buf = [];
+  buf = mergeLateErrors(buf, 'r1', [{ text: 'TypeError: x (line 2)', count: 3 }]);
+  assert.match(renderLateErrors(buf, 'r1')!, /line 2\) ×3\]$/);
 });
