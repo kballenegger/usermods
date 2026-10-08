@@ -721,7 +721,342 @@ and confirmed when on.
 
 ## 6. The interface
 
+Consistent with `[bu §5]`: one panel, no mode, questions as rows of the chat column, permissions
+only in an extension page, the components and tokens of `docs/design.md` in the BBS Underground
+identity `[doc: AGENTS.md, docs/branding.md]`. Nothing here adds a colour, a shadow or a tab.
+
+### 6.1 Words
+
+| Thing | Word | Note |
+|---|---|---|
+| The saved object | **skill** | "a skill runs steps on a site when you ask"; a mod "changes a page on every visit" |
+| Starting one | **run** | `Run File an expense`. Never "execute", never "play" |
+| The file | `.skill.md` | Shown in the Export menu and the preview |
+| The activity | **running <name>** | Beside **driving**, which stays for a model-led run |
+| The card at the end | **On the page** | Unchanged; it gains outputs and SAVE AS SKILL |
+| The proposal | **Proposed skill** | The hero card, as a mod's |
+| First run of an installed skill | **walking through** | `walking through File an expense · step 3 of 7` |
+
+### 6.2 Where a run starts
+
+Four places, all of them existing surfaces:
+
+1. **The Mods tab.** Its list gains a second heading. Today it is split into the mods matching
+   this site and the rest `[code: ModsView.tsx]`; it becomes `MODS ON THIS SITE · OTHER MODS ·
+   SKILLS ON THIS SITE · OTHER SKILLS`, each skill row with **Run** as the primary action where a
+   mod has its on/off switch, then **Edit in chat**, **Export ▾** (Download, Copy, Share as Gist,
+   Update gist), **Delete**. The tab keeps its name: the top bar `CHAT  MODS  ● host  ⚙ ▣ ◐` is
+   load-bearing at 360px `[doc: docs/design.md]` and a fourth tab does not fit; the owner may
+   prefer a rename (open question 6). *Install from URL* and *Import file* accept both kinds.
+2. **The chat's empty state.** Under the three example lines of `[bu §5.3]`, when a skill matches
+   the site, a block in the shape of the existing "or keep building on a mod that runs here":
+
+   ```
+   │  OR RUN A SKILL ON THIS SITE                   │
+   │  [ RUN FILE AN EXPENSE ]  [ RUN EXPORT INVOICES ]
+   ```
+
+   Each is a `linklike` that opens the run card. Nothing is sent to the model.
+3. **The composer's + menu** gains **Run a skill…**, which opens a picker of every skill, page
+   matches first, in the shape of **Edit a mod…** `[doc: docs/guide.md]`. This is the one
+   departure from `[bu §5.1]` ("nothing is added to the + menu"), and it is the smallest one:
+   one item, present only in a build with `act`, and disabled with its reason when no skill is
+   installed, which the menu pattern already allows `[doc: docs/design.md, Menus]`. The phone's
+   Add sheet gets the same row.
+4. **The model**, through `run_skill`, which lands on the same card.
+
+### 6.3 The run card
+
+A row of the chat column, on `--surface-2` with the primary rail, the shape of "Let usermods
+operate this site?" `[bu §5.5]`:
+
+```
+▌RUN FILE AN EXPENSE?
+▌9 steps on expenses.example.com · fills 3 fields · stops before Submit so you press it.
+▌Merchant   [ Blue Bottle            ]
+▌Amount     [ 42.00                  ]
+▌Note       [                        ]  optional
+▌usermods asks before anything it can tell sends, buys, deletes or unsubscribes.
+▌[ RUN ]   Not now
+```
+
+The summary line is computed from the steps, as the preview's **WHAT IT DOES** is. When the
+model started it, a line is added: `the model wants to run this with the values above`, and the
+values are editable before RUN. When the site has no standing allowance and this is the chat's
+first `act`, the card gains the "Let usermods operate…" paragraph and its tick box, one card
+asking both, as `[bu §5.5]` does for a consequential first step. On the first run of an installed
+skill the card ends `This is its first run here: each step is shown before it happens.`
+
+### 6.4 The transcript
+
+Rows are the browser-use rows. What a run adds:
+
+```
+│    you ran File an expense v1.0.0 · merchant, amount, note        │
+│ ▌➤ 1/9 · went to /expenses/new                                     │
+│ ▌➤ 2/9 · filled "Merchant"                                         │
+│ ▌➤ 3/9 · filled "Amount"                                           │
+│ ▌➤ 4/9 · filled "Note"                                             │
+│ ▌●  5/9 · waited · button "Submit" visible                         │
+│ ▌YOUR TURN                                                         │
+│ ▌Check the form and press Submit.                                  │
+│ ▌It continues by itself when the page shows "Expense filed".       │
+│ ▌[ I HAVE DONE IT ]   Stop                                         │
+│    you did this step: press Submit                                 │
+│ ┌────────────────────────────────────────────────────────────────┐ │
+│ │ ON THE PAGE · FILE AN EXPENSE · 6 STEPS                        │ │
+│ │ expenses.example.com · 1 page · 31s                            │ │
+│ │ 3 fields · 1 navigation · you did 1 yourself                   │ │
+│ │ OUTPUTS  confirmation: EXP-20261008-0142         [COPY]        │ │
+│ │ ▼ actions                                                      │ │
+│ └────────────────────────────────────────────────────────────────┘ │
+```
+
+The opening note row is the one place inputs are shown in the transcript, by name only; the
+values are on the card the user filled in, and are stored with the transcript as the user's
+message is. A run that was not a skill ends in the same card with **SAVE AS SKILL** beside the
+action count, in the GitHub build, when the run had at least one `act` step and no script. A
+broken step is an error row, `could not find button "Export" · stopped at 4/9`, followed by the
+card with CONTINUE FROM 5 / TRY AGAIN. A repair is a sub-section of rows under a note
+`repairing step 4 with claude-opus-5`, its own looked and touched rows, each touched one having
+asked.
+
+On a phone, three or more consecutive rows fold as today, and the fold counts steps: `9 steps ·
+9 on the page` `[code: lib/compactshell.ts stepsSummary]`.
+
+### 6.5 The draft panel and proposal card
+
+A draft skill is the chat's artifact, one per chat, with the same bar, version strip, diff, roll
+back and inline rename `[code: ArtifactPanel.tsx]`. The collapsed line reads `DRAFT SKILL · File
+an expense · v2 · 9 steps` and its buttons are **RUN AGAIN** and **SAVE** (later **UPDATE SKILL**,
+and **Save as a new skill instead** when editing an installed one). The proposal card is the
+hero card: `PROPOSED SKILL · V1`, name, `recorded from 9 steps · tested in this chat`, RUN AGAIN,
+SAVE. Expanded, the draft shows the file with the steps block rendered as the preview's list and
+the source under it.
+
+### 6.6 The dashboard, Settings, titles
+
+- **Dashboard › Mods** gains a kind filter beside the site filter: `All · Mods · Skills`. A skill
+  row shows version, site, step count, inputs by label, where it came from (a download host,
+  *recorded in chat*, *imported*), and `walked` or `first run pending` for an installed one. The
+  source editor edits the file with the parser's warnings. Bulk export zips both kinds. The
+  overview strip counts skills beside mods.
+- **Dashboard › Chats**: the badge `ran File an expense · 9 actions` beside `on the page ·
+  14 actions` `[bu §5.7]`; the filter gains `Ran a skill`.
+- **Settings › Operating pages** `[bu §5.7]` gains: *Repair broken steps with the model*
+  (`never` · `skills made here` · `every skill`, default the middle), with the help text `When a
+  skill cannot find a step's target, the model you connected is shown that step's notes and
+  asked to do it; every action it takes is confirmed. For a skill you installed, its notes were
+  written by someone else.`; and the list *Steps you allowed without asking* under the sites
+  list, each `File an expense · click "Submit expense"` with Remove.
+- **Titles**: a chat in which a skill ran is titled as any chat is `[code: lib/title.ts]`; the
+  skill's name is in the first user turn's note, so the titler sees it.
+
+### 6.7 The iPhone and iPad popup
+
+The compact shell `[doc: docs/design.md]` and the rules of `[bu §5.8]`:
+
+- Skills are in the Mods tab under the same headings; **Run** is on the row and in the row's
+  "more" sheet.
+- The run card is in the popup: inputs are typed there, RUN pressed there. Then, as for driving:
+  `Close this sheet to watch. Stop is on the bar at the top of the page.` The run holds the page's
+  keepalive port `[code: lib/keepalive.ts]`.
+- Every question is answered in the popup; the bar says `usermods needs an answer · open
+  usermods`. `ask` steps are the exception already made for "your turn": the bar carries the words
+  and **I HAVE DONE IT** at 44px.
+- The walked first run on a phone is slow by design (open the popup for every step). The card
+  says so and offers RUN THE REST WITHOUT ASKING from the first step; the recommendation stands
+  because a phone is where a mis-click costs most.
+- Outputs are read in the popup when it is reopened; Copy is there.
+
+### 6.8 The store build
+
+Absent entirely, with `act` ([§8.3](#83-the-store-question)): no headings in the Mods tab, no
+menu item, no run card, no redirect rule for `.skill.md`, no install mode, no `propose_skill`.
+A `.skill.md` link in the store build renders as the text it is. Nothing in that build names
+what it lacks, as `[bu §5.9]` requires.
+
 ## 7. Three skills, end to end
+
+Three fictional sites, so the fixtures of [§9](#9-evaluation) can be the same three pages. Each:
+what the user types, the file as saved, what the preview shows to someone installing it, a run,
+and where it asks.
+
+### 7.1 A form with inputs: file an expense
+
+**What the user types**, on `https://expenses.example.com/expenses/new`:
+
+> fill this in for lunch at Blue Bottle, 42 dollars, and let me press submit. then save that as
+> a skill
+
+**What happens.** The model calls `find_elements` on the form, then one `act` with three `fill`
+steps, then `wait_for { selector: 'button[type=submit]', ask_user: 'Check the form and press
+Submit.' }`. The panel asks "Let usermods operate expenses.example.com?" (first `act` in the
+chat), fills, shows Your turn; the user presses Submit; the page shows "Expense filed"; the
+model calls `propose_skill` naming the three typed values as inputs, `note` optional. The
+proposal card appears.
+
+**The file**, as the draft panel shows it and SAVE writes it (the front matter of
+[§1.2](#12-the-file) is this example; the steps):
+
+```steps
+- go: /expenses/new
+  why: open the new-expense form
+- fill: $merchant
+  into: textbox "Merchant"
+  at: { css: "input#merchant", in: 'form "New expense"' }
+  why: enter the merchant name
+- fill: $amount
+  into: textbox "Amount"
+  at: { css: "input[name=amount]", in: 'form "New expense"' }
+  why: enter the amount
+- fill: $note
+  into: textbox "Note"
+  at: { css: "textarea#note", in: 'form "New expense"' }
+  why: enter the note, if any
+  when: $note
+- wait: { selector: "button[type=submit]", state: visible }
+- ask: Check the form and press Submit.
+  until: { text: "Expense filed" }
+```
+
+`go` is first because the model recorded from `/expenses/new` and `start` says so; the compiler
+writes it so a run from `/expenses` still lands on the form.
+
+**The preview** for someone installing it from the gist link: `RUNS ON expenses.example.com ·
+starts at /expenses/new`; `WHAT IT DOES 6 steps · 3 fields · 1 navigation · 1 wait · 1 your
+turn`; `ASKS YOU nothing it can tell; step 6 is yours: "Check the form and press Submit."`;
+`TYPES merchant, amount, note (your inputs)`; `READS nothing`; `INPUTS Merchant · Amount ·
+Note (optional)`.
+
+**A later run**, from the Mods tab on the same site: the run card asks the three inputs; row 1
+`went to /expenses/new`; rows 2 to 4 filled; row 5 waited; Your turn; the user presses Submit;
+the card `ON THE PAGE · FILE AN EXPENSE · 5 STEPS · you did 1 yourself`. Nothing was asked
+beyond the inputs, because nothing in the skill submits.
+
+**The variant that submits.** Had the user said "and submit it", the last steps would be
+`click: button "Submit expense"` with `at: { css: "button[type=submit]", in: 'form "New
+expense"' }` and `wait: { text: "Expense filed" }`. The preview would carry `▲ ASKS YOU 1 step
+submits a form: click "Submit expense". usermods asks before it, every run.`, and every run
+would show the Allow card at step 6, headline from the live button. For the user's own skill,
+that card offers **Do not ask again for this step**; for the installed copy it does not.
+
+### 7.2 A process across pages of one site: export this month's invoices
+
+**What the user types**, on `https://billing.example.com/`:
+
+> write me a skill that exports this month's invoices as a CSV and lists the invoice numbers
+
+**What happens.** The model: `act { go: '/invoices' }` (on the site, not consequential),
+`find_elements` for the period control, `act { select: 'This month', target: listbox "Period" }`
+with `then_wait { selector: 'table tbody tr' }`, `find_elements 'table tbody tr td.number'` (the
+list it reports from), `act { click: button "Download CSV" }` and `wait_for { ms: 1500 }` for the
+download. "Download CSV" is not on the consequential list and is a button, not a submit, so
+nothing asks beyond the first-`act` card. Whether a synthetic click on an `<a download>` starts
+a download without user activation is `[untested]` (a `window.open` would be blocked `[bu §3.2]`);
+the fixture decides, and if it fails the model's run ends in `ask: Press Download CSV.` and so
+does the skill. The model calls `propose_skill` with no inputs and one output,
+`invoices` from the `find_elements` call, `take: text`, `list: true`.
+
+**The file:**
+
+```markdown
+---
+usermods-skill: 1
+name: Export this month's invoices
+description: Filters the invoices page to this month, lists the invoice numbers and downloads the CSV.
+namespace: kenneth
+version: 1.0.0
+match: ["*://billing.example.com/*"]
+start: https://billing.example.com/invoices
+inputs: {}
+outputs:
+  invoices: { label: Invoice numbers, list: true }
+---
+
+# Export this month's invoices
+
+Opens the invoices page, picks "This month", reads the invoice numbers and downloads the CSV.
+Made with usermods 0.2 on 2026-10-08 from a run on billing.example.com.
+
+```steps
+- go: /invoices
+  why: open the invoices page
+- select: This month
+  into: listbox "Period"
+  at: { css: "select#period", in: 'form "Filters"' }
+  why: show only this month's invoices
+- wait: { selector: "table tbody tr", state: visible }
+- read: invoices
+  from: "table tbody tr td.number"
+  take: text
+  each: true
+  why: collect the invoice numbers shown
+- click: button "Download CSV"
+  at: { css: "a#download-csv", in: 'region "Invoices"' }
+  why: download the filtered list
+- wait: { ms: 1500 }
+```
+```
+
+**The preview:** `RUNS ON billing.example.com · starts at /invoices`; `WHAT IT DOES 6 steps ·
+1 click · 1 navigation · 1 choice · 2 waits · 1 reads`; `ASKS YOU nothing it can tell`; `TYPES
+nothing`; `READS the text of table tbody tr td.number into "Invoice numbers"`; a warning,
+`step 6 waits a fixed 1.5 s; a wait on a condition is more reliable`.
+
+**A run two months later**, after the site renamed its filter: step 2's `select#period` is gone
+and no listbox is named "Period". With repair at its default (`skills made here`), and this
+being the user's own skill, the run pauses: `repairing step 2 with claude-opus-5`, the model
+reads the inventory, finds `combobox "Billing period"`, calls `act { select }`; the Allow card
+asks (every repaired action asks): `ALLOW THIS? · choose "This month" in combobox "Billing
+period" · the model says: show only this month's invoices`. Allowed; the run resumes at step 3;
+the card at the end offers **UPDATE SKILL WITH THE REPAIR** and the diff shows step 2's new
+target. On the installed copy of the same skill, with repair at its default, the run stops at
+step 2 with `could not find listbox "Period" (0 matches; closest: combobox "Billing period")`,
+and the user can pick the period by hand and press CONTINUE FROM 3.
+
+### 7.3 An extraction: download links for every photo in an album
+
+**What the user types**, on `https://photos.example.com/albums/2026-kyoto`:
+
+> load the whole album and give me the download links for all the photos
+
+**What happens.** The model: `act { click: button "Load more", repeat: 50 }` (one card, because
+`repeat` asks once with its count only when the click is consequential, and "Load more" is not;
+so nothing asks beyond the site card), `find_elements 'a.photo-download'` which lists each link
+with its URL `[bu §4.3]`, and answers with the list. The user says "save that as a skill"; the
+card's SAVE AS SKILL compiles it, and asks nothing, since nothing was typed. The output is the
+`find_elements` call, `take: href`.
+
+**The file's steps:**
+
+```steps
+- click: button "Load more"
+  at: { css: "button.load-more", in: 'main "Album"' }
+  repeat: 50
+  why: load every photo in the album
+- wait: { idle: true, quiet_ms: 800 }
+- read: links
+  from: "a.photo-download"
+  take: href
+  each: true
+  why: collect each photo's download link
+```
+
+with `match: ["*://photos.example.com/*"]`, `start: https://photos.example.com/albums/` and
+`outputs: { links: { label: Download links, list: true } }`. `start` is a prefix the user edits
+to the album; a run offered on any album page uses the page it is on, since `start` matches it.
+
+**The preview:** `WHAT IT DOES 3 steps · 1 click (up to 50 times) · 1 wait · 1 reads`;
+a warning, `step 1 repeats up to 50 times`; `READS the href of a.photo-download into "Download
+links"`.
+
+**A run:** the row `1/3 · clicked "Load more" ×14 → none left`, `2/3 · waited · quiet`, `3/3 ·
+read 212 download links`; the card shows `OUTPUTS Download links · 212 [COPY] [COPY AS CSV]`.
+No question was asked after the site card. When the album has a "Delete album" button beside
+"Load more" and a renamed site swaps their classes, the name check stops the run at step 1
+rather than click it: `could not click button "Load more" · the element at button.load-more is
+now button "Delete album"`.
 
 ## 8. The build
 
