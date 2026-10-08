@@ -450,7 +450,274 @@ named the skill.
 
 ## 4. Sharing, installing, updating
 
+"The same way it shares reusable scripts": Export, a gist, a raw link that installs, a preview,
+updates on review. One of the two sites is out.
+
+### 4.1 Greasy Fork is out, the gist and the raw link are in
+
+Greasy Fork's rules, read today: "Scripts must have a reason to be a script" and "Scripts must
+include a description of what they do and may not do things unreasonably outside of this
+description" `[src: code rules]`; external code is allowed from listed CDNs, from `@require` URLs
+carrying a Tampermonkey-format integrity hash, and from its own libraries, which "can additionally
+be set to sync from an external URL" `[src: external scripts]`. A library there "should not be
+installed directly" `[src: a library's own page]`. Nothing on either page says a non-userscript
+file may be posted, and a `.skill.md` is not a script: in Tampermonkey it would be a wall of text,
+and dressed as a `.user.js` with a data body it would be a script with no reason to be one.
+**Recommended: no Greasy Fork for skills in 0.2**, and no `.user.js` disguise to get there. The
+Export menu's Greasy Fork item is absent on a skill row. Whether the maintainer would accept a
+file type for one extension is open question 5, and the answer changes nothing in the format.
+
+What stays:
+
+| Way out | Mod today `[code: lib/share.ts, lib/sharecontroller.ts]` | Skill |
+|---|---|---|
+| Download | `<slug>.user.js` from `shareFileName` | `<slug>.skill.md`, the same slug rule |
+| Copy | The whole source | The whole file |
+| Share as Gist | Opens `gist.github.com`, fills name, description and file, points at the site's button; the user presses it; the gist is remembered and `@updateURL`/`@downloadURL` point at the sha-less raw URL | The same controller, the same fill, the same hint words with "script" read as "skill"; `updateURL`/`downloadURL` written into the front matter by `reheaderFields`' YAML sibling. A gist renders the Markdown, so the gist page is the human preview |
+| Update gist | Bumps the patch version, fills the edit page | Same, `bumpPatch` on `version` |
+| The install link | `https://gist.githubusercontent.com/<you>/<id>/raw/<slug>.user.js` | `…/raw/<slug>.skill.md`. GitHub serves it as `text/plain` `[inferred]`, which is what the raw detection reads |
+
+The leak check runs first, as it does today, extended in [§4.4](#44-the-leak-check).
+
+### 4.2 Installing from a raw link
+
+The mod path is a `declarativeNetRequest` redirect of `.user.js` navigations to
+`install.html#<url>`, an allow rule for code hosts' HTML views, and a Safari watcher that asks
+the same question in code `[code: lib/installurl.ts, entrypoints/background.ts, docs/safari.md]`.
+Skills add one pattern beside `USER_JS_PATTERN`:
+
+```
+SKILL_MD_PATTERN = ^https?://[^?#]+\.skill\.md([?#].*)?$
+```
+
+with the same `USER_JS_VIEW_PATTERN` exemption for blob pages, and `isSkillUrl` beside
+`isUserScriptUrl`. The install page reads the URL from its fragment as now, fetches it with
+`fetchBinary` (15 s, 5 MB, no credentials `[code: lib/install.ts]`), and decides by content: a
+`==UserScript==` header is a script, a front matter with `usermods-skill: 1` is a skill, anything
+else is refused with the existing message. `previewFromUrl` gains that branch; `mods.preview`
+returns a tagged union `{ kind: 'mod' | 'skill', … }`.
+
+The install banner `[code: lib/banner.ts]` learns the second file: on a gist page, a file whose
+Raw link ends in `.skill.md`; on a raw text document, a first line of `---` followed within the
+first 2 KB by `usermods-skill:`; on a GitHub blob page, the same. Greasy Fork and OpenUserJS
+detection are unchanged, since no skill is there. The banner says `usermods can install the skill
+"File an expense"` and **Install** opens the install page in skill mode.
+
+**Identity** for "already installed": the download URL when both sides have one, else
+`namespace` + `name`, the `scriptIdentity` rule `[code: lib/installurl.ts]`. A skill and a mod
+with the same namespace and name are different things and never match each other.
+
+### 4.3 The install preview
+
+What a reviewer must be able to see before installing a stranger's skill, every line computed
+from the parsed steps and front matter, never from the prose:
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│ usermods · Install skill                                          │
+│ Fetching from https://gist.githubusercontent.com/…/unsub.skill.md │
+├──────────────────────────────────────────────────────────────────┤
+│ Unsubscribe from the weekly digest                v1.0.2 · ns ada │
+│ Turns off the weekly digest in your email preferences and saves. │
+├──────────────────────────────────────────────────────────────────┤
+│ RUNS ON        news.example.com (and subdomains)                  │
+│                starts at /account/settings                        │
+│ WHAT IT DOES   7 steps · 2 clicks · 1 navigation · 1 untick ·     │
+│                2 waits · 1 reads                                  │
+│ ▲ ASKS YOU     1 step submits a form: click "Save preferences".   │
+│                usermods asks before it, every run.                │
+│ TYPES          nothing                                            │
+│ READS          the text of div.flash into "confirmation"          │
+│ SENDS          nothing. A skill has no network and runs no code.  │
+│                What it types and clicks goes where the site sends │
+│                it. If a step breaks and repair is on, this file's │
+│                words are shown to the model you connected.        │
+│ INPUTS         none                                               │
+│ YOUR FIRST RUN each step is shown before it happens               │
+├──────────────────────────────────────────────────────────────────┤
+│ ▼ steps (7)                                                       │
+│   1  go /account/settings                                         │
+│   2  click link "Email preferences"  in nav "Account"             │
+│   3  wait  checkbox "Weekly digest" visible                       │
+│   4  untick checkbox "Weekly digest"  in form "Email preferences" │
+│   5  click button "Save preferences" ▲ submits a form             │
+│   6  wait  text "Preferences saved"                               │
+│   7  read  div.flash → confirmation                               │
+│ ▼ the author's notes                                              │
+│ ▼ source                                                          │
+│                                        [ INSTALL ]   Cancel       │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+Rules the preview enforces, each a refusal with the line named, in `lib/skills.ts previewSkill`:
+
+- The front matter parses; `usermods-skill` is 1; `name`, `description`, `version`, at least one
+  valid `match`, `start` present.
+- One site: every `match` host shares its last two labels with the first; `start` and every `go`
+  match.
+- Every step has one verb, a value of the right shape, and for element steps an `at` with at
+  least `css`; a `fill` into a target whose role or name reads as password, one-time code or card
+  (the never list's words `[bu §4.5]`) is refused outright, not warned.
+- Inputs referenced exist; declared inputs are referenced.
+- No step is a script, a `fetch`, a request or a file (there are no such verbs; the parser refuses
+  unknown ones).
+- Limits of [§1.2](#12-the-file).
+
+Warnings, shown and not blocking: a `wait` with only `ms`; a `go` with a query string; a `click`
+with `repeat` over 20; prose longer than 4 KB (it is what a model would read).
+
+The counts under **WHAT IT DOES** and the **ASKS YOU** line use the consequential rule of
+`[bu §4.5]` on the recorded names and form facts, and say so: `anything it can tell`. The
+**SENDS** paragraph is fixed text, because it is true of every skill.
+
+### 4.4 The leak check
+
+`scanForLeaks` `[code: lib/leakscan.ts]` runs over the whole file as it does over a script: keys,
+tokens, private hosts and addresses. Three rules are added for skills, in the same shape
+(`kind`, `label`, line, masked preview):
+
+| Kind | Finds | Why |
+|---|---|---|
+| `typed-value` | A `fill` or `select` with a literal value, not `$input` | "values captured from forms are the obvious leak": a name, an address, an account number typed during the recording. The default makes every typed value an input, so a literal is a choice the user made; the check asks once more before it is published |
+| `url-query` | A `go` or `start` whose query string has a value of 12 characters or more that is not a plain word | Session tokens, signed links and ids travel in query strings |
+| `prose-secret` | The existing rules, applied to the body | A pasted confirmation number or an email address in the notes |
+
+The panel lists them with **Share anyway** and **Cancel** as today `[doc: docs/guide.md]`; a
+`typed-value` offers **Make it an input** inline, which rewrites the step and adds the declaration.
+
+### 4.5 Updates
+
+`checkUrls`, `dueForCheck`, the daily cap, the byte budget, "never applied by a check" and
+install-by-hash all carry over `[code: lib/updates.ts, lib/updatecontroller.ts]`; the check
+recognises a skill by its front matter as it recognises a script by its header, and a `.meta`
+shortcut is not needed because the file is small. The review screen (`install.html?update=<id>`)
+gains a skill mode whose **What changed in its powers** is `skillPowersDiff(old, new)`:
+
+- sites added or removed; `start` changed;
+- steps added, removed or changed, listed as the preview lists them, with consequential ones
+  first: `New step 8: click button "Delete account" ▲ (delete)`;
+- inputs added or removed; outputs added or removed; constants changed;
+- `ask` steps removed (a skill that used to hand you a step now does it);
+- prose changed (shown as a diff; it matters only to repair, and the note says so).
+
+**Check with the agent first** reuses `buildReviewPrompt` with a skill-specific system prompt
+that asks about the same things in step terms (new consequential steps, inputs that look like
+credentials, prose that addresses the model); the fences and the verdict parsing are unchanged
+`[code: lib/updates.ts parseReview]`.
+
+An update to an installed skill clears its walked-first-run flag and any standing allowance
+([§5.3](#53-what-asks-every-time)): new steps have not been seen.
+
 ## 5. Trust and safety of shared skills
+
+A skill written by a stranger operates pages in the user's signed-in browser. The format was
+chosen so that most of what it can do is visible before it runs; this section is what holds, what
+is asked, and what does not hold.
+
+### 5.1 The three ways a stranger's file can hurt, and what the format does to each
+
+| Way | In a recipe | In a script | In this format |
+|---|---|---|---|
+| **Instructions to the model** (prompt injection) | The whole file is instructions, and the model has `act` | The code is the attack; no model needed | The prose and every `why` are shown to the model **only during a repair**, fenced as untrusted with a nonce, for one step, with no `go`, no scripts, 8 tool calls, and every action confirmed. With repair off (the default for installed skills, [§5.3](#53-what-asks-every-time)), the model never reads the file |
+| **Doing the wrong thing** (click Delete, submit, send) | Whatever the model does | Whatever the code does, which the guard can only observe `[bu §4.6]` | Every step is a named action gated from the live element. Consequential ones ask every run. The never list denies. The first run walks every step |
+| **Taking data out** | The model can be told to | `fetch`, an image URL, a form `[bu §4.6]` | There is no network verb and no code. The only exits: what a `fill` types into the site's own form (the site then sends it where it sends it), and the outputs, which stay on the device unless a model in the same chat is given them through `note` |
+
+The honest comparison with the browser-use spec's table in `[bu §4.6]`: a replayed skill is
+*safer* than an ordinary chat on the same site, because the ordinary chat has `run_script` and
+the skill has nothing that is not a gated action. Its risk is concentrated in two places: the
+repair, and the resolution of a target.
+
+### 5.2 What the install preview declares and verifies
+
+Everything in [§4.3](#43-the-install-preview) is computed from the steps. The author's prose is
+labelled as the author's and shown under its own heading; nothing in the preview's summary lines
+comes from it. The guarantees a reader can take from the preview:
+
+- **Sites**: the skill cannot take a tab off the site named, because `go` off `match` is refused
+  at install and paused at run time.
+- **Actions**: the verbs and their counts are the whole program. There is no hidden step.
+- **Consequential**: the ▲ lines are the gate's own rule applied to the recorded names; at run
+  time the same rule is applied to the live name, so an element renamed since the recording is
+  caught either way (recorded "Save" now "Delete" stops the run by the name check; recorded
+  "Delete" asks because it is on the list).
+- **Reads**: the `read` steps and their outputs are listed; nothing else is read into anything.
+- **Sends**: nothing, by construction, and the paragraph says the two real exits.
+- **Inputs**: what the user will be asked to type, by label.
+
+What the preview cannot say: whether "Save preferences" on this site does what the author says
+it does, and whether the site has changed since the recording. The first is true of every
+installed thing; the second is the first run's job.
+
+### 5.3 What asks every time
+
+Regardless of the file's own claims, in every build:
+
+| | Rule | Standing allowance possible? |
+|---|---|---|
+| Password, one-time-code, card fields | Never typed into; a skill that tries is refused at install and denied at run time `[bu §4.5]` | No |
+| Logins, 2FA, captchas, purchases | `ask` steps, done by the user `[bu "Do not do"]` | No |
+| A consequential step (submit, send, delete, unsubscribe, pay, …, from the live element) | Asked by name, each run. "Allow every one of these in this run" for a `repeat` | Only for a skill with `origin: local` (made on this device from its own journal, never edited by hand, never updated from a URL): a per-skill **Do not ask again for this step** on the Allow card, listed under Settings › Operating pages with Remove. Cleared by any update or hand edit |
+| A repaired step (any `act` the model makes during a repair) | Asked, always, consequential or not. The headline is the extension's read of the element; the model's reason is labelled as the model's `[bu §5.5]` | No |
+| The first run of a skill that was installed, imported or hand-edited | Walks: every step is shown on an Allow-style card (`STEP 3 OF 7 · untick checkbox "Weekly digest" · the skill says: turn off the digest`) with **NEXT**, **RUN THE REST WITHOUT ASKING** (from step 3 on; consequential steps still ask) and **Stop**. iOS warns that a shared shortcut "hasn't been reviewed by Apple" and lets the user inspect it `[src: Apple platform security]`; this is the inspection, on the live page | After one complete walk, the skill is `walked` and later runs ask only what the rows above ask |
+| A run started by the model (`run_skill`) | The run card is shown and must be confirmed; the model cannot confirm it | No |
+| Leaving the site, leaving the tab, the ceiling | As `[bu §4.5]` | As there |
+| "Ask before every step" on `[bu §4.5]` | Every step of every skill waits | — |
+
+**Repair is off by default for installed skills** and on by default for local ones: the setting
+*Repair broken steps with the model* in Settings › Operating pages has three values, `never`,
+`skills made here`, `every skill`. The reasoning: the prose of a local skill is the user's own
+model's words from the user's own run; the prose of an installed skill is a stranger's, and the
+cheapest way to keep a stranger's words away from the model is not to show them. A user who
+turns it on for every skill is told, on the setting, what that means.
+
+**Shared recipes with "ask before every step" on by default**, the question the brief asked: there
+are no pure recipes in 0.2 ([§1.1](#11-recipe-replay-or-script)), repaired steps always ask, and
+the walked first run is "ask before every step" for exactly one run. That is the recommended
+answer; making every run of an installed skill ask every step would make installed skills
+useless for the forty-click cases they exist for, and the user can turn the global switch on.
+
+### 5.4 Leak check on sharing
+
+[§4.4](#44-the-leak-check). The rule the brief asked for: values captured from forms are refused
+by default by construction (every typed value becomes an input), and the ones the user chose to
+keep are listed, masked, before anything opens.
+
+### 5.5 The residual risk
+
+Said plainly, in the order I think it matters:
+
+1. **A decoy with the recorded name.** Resolution is by role, name, stable selector, landmark and
+   ordinal, and a page's content can be written by strangers `[bu §3.1]`. A reviewer who can put
+   `<button>Unsubscribe</button>` inside the same landmark, with the same stable attribute, can
+   make a recorded click land on their element. The drift guard, the "exactly one match" rule
+   and the stable-selector check shrink this; they do not close it. A skill that clicks a link
+   whose target the attacker controls is the realistic case, and the site boundary then pauses
+   the run before the next step, which is after the click.
+2. **The wrong ordinary thing.** A click nothing flags, on a site whose "Delete" is in another
+   language, is not confirmed. The word list is English `[bu §4.5]`; the form rule covers
+   submits in any language; the walked first run is the only control for the rest.
+3. **Repair.** With repair on for installed skills, a stranger's prose reaches the model with
+   the page in front of it. Every action is confirmed, the sub-run is bounded, there is no `go`
+   and no script, and the model is the user's. That is a smaller injection surface than any
+   ordinary chat on the same page has today, and it is not zero: a confirmed action the user
+   does not read before allowing is still taken.
+4. **What the site does with what it is sent.** A skill that fills a form fills it with the
+   user's inputs; the site is where they go. usermods cannot know that the "Save preferences"
+   form posts the user's email to a third party.
+5. **Fingerprints decay.** A skill that resolves on the wrong element without a name mismatch
+   is the failure the name check cannot see: two buttons called "Next" in two landmarks, and the
+   landmark renamed. The evaluation measures this ([§9](#9-evaluation)) and the number is
+   published rather than assumed.
+6. **The outputs.** A `read` step reads what its selector matches. A stranger can write a skill
+   whose `read` collects every message subject on the page into an output. The preview lists
+   it, the output stays on the device, and a model in the same chat can be given it. Nothing is
+   sent anywhere by the skill; the user decides what to do with the output.
+
+No vendor claims to have solved any of this for agents that act on pages `[bu §2, sources]`, and
+usermods has less than they do: no trained model, no classifier, no trusted input. The design's
+claim is narrower: a replayed skill is bounded to steps a reader can see, each gated as the
+extension's own `act` is, and the one place a stranger's words meet the model is off by default
+and confirmed when on.
 
 ## 6. The interface
 
