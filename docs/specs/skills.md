@@ -1060,10 +1060,262 @@ now button "Delete album"`.
 
 ## 8. The build
 
+### 8.1 Storage
+
+Skills are stored under their own key, `skills`, as mods are under `mods` `[code: lib/mods.ts
+STORAGE_KEY]`, each record the parsed file plus bookkeeping:
+
+```
+interface Skill {
+  id; name; description; version; namespace; matches; start;
+  inputs; outputs; steps;            // parsed
+  source;                            // the .skill.md text, canonical, as Mod.source is
+  downloadUrl?; share?;              // as Mod
+  origin: 'local' | 'installed' | 'imported' | 'edited';
+  walked: boolean;                   // one complete first run since install/edit/update
+  allowedSteps: string[];            // step ids with a standing allowance (origin local only)
+  createdAt; updatedAt;
+}
+```
+
+No `enabled`: a skill is never on; it is run. No `gm:` store. The chat index gains `ranSkill`
+beside the action count of `[bu §5.7]`.
+
+### 8.2 New files and changed files
+
+Prerequisite: browser-use step 3 (`[bu §6]`): `lib/interact/` with the registry, `describe`,
+`actions` and `delta`; `lib/agent/gate.ts` and `allowances.ts`; the journal on `RunRecord`; the
+`act` tool. A skill is those pieces driven from a file instead of from a tool call.
+
+| Where | New or changed | What |
+|---|---|---|
+| `lib/skills.ts` (new, pure) | Parse and serialise `.skill.md`: a front-matter subset of YAML (maps, lists, scalars, quoted strings, flow maps on one line; nothing else, documented in the file's header), the steps block, `previewSkill` with every refusal and warning of [§4.3](#43-the-install-preview), `skillMatchesUrl`, `skillIdentity`, `skillFileName`. Round-trip tested: parse(serialise(x)) is x |
+| `lib/skillcompile.ts` (new, pure) | Journal entries to steps ([§2.4](#24-the-compiler)); the inputs card's data; `propose_skill`'s refusals |
+| `lib/skillrun.ts` (new, pure where it can be) | The run as a state machine: `next(state, event)` over steps, with the gate's decisions, `pending`, walked mode, the stop and repair transitions, the ceilings. The I/O lives in the background |
+| `lib/interact/registry.ts` | Fingerprint serialisation to and from the `at` map; re-resolution exposed to the runner; the name check |
+| `lib/agent/tools.ts` | `propose_skill`, `open_skill`, `run_skill`, in a build with `act` |
+| `lib/agent/loop.ts` | The three cases in `executeTool`; `AgentEnv` gains `journal()`, `runSkill()`; the repair sub-run as a bounded call of the same loop with a tool allowlist (`find_elements`, `act`, `wait_for`, `note`) |
+| `lib/agent/prompt.ts` | The sentences of [§2.2](#22-from-a-description-write-me-a-skill-that) and [§3.5](#35-the-three-uses-and-d5); the skills-on-this-page block in the user turn; the repair system prompt |
+| `lib/leakscan.ts` | The three skill rules of [§4.4](#44-the-leak-check) |
+| `lib/install.ts`, `lib/installurl.ts` | `SKILL_MD_PATTERN`, `isSkillUrl`; `previewFromUrl` returns the tagged union; `resolveDependencies` has nothing to do for a skill |
+| `lib/banner.ts` | `.skill.md` on gist, blob and raw pages |
+| `lib/share.ts`, `lib/sharecontroller.ts`, `lib/sharefill.ts` | `prepareShare` on a skill (no Greasy Fork target), `recordGist` writing the two URLs into front matter, the hint words. The fill is the same editor fill with a different file name |
+| `lib/updates.ts`, `lib/updatecontroller.ts` | `skillPowersDiff`; the check reads either kind; the review prompt variant |
+| `lib/runstate.ts` | `RunRecord.skill?: { id, step }` beside `pending` |
+| `lib/chats.ts`, `lib/dashboard.ts` | The index fields; `exportFilename` for skills; the kind filter |
+| `entrypoints/background.ts` | The third `declarativeNetRequest` rule and the Safari watcher for `.skill.md`; the `skills.*` RPCs (list, run, stop, answer, save, delete, preview, install); driving the runner through `envForTab` |
+| `entrypoints/content.ts` | Nothing new: the runner sends the same `describe`, `act`, `highlight` and `wait` messages `act` sends |
+| `entrypoints/install/` | `SkillPreview` component; the update review's skill mode |
+| `entrypoints/sidepanel/` | `ModsView.tsx` headings and rows; `Chat.tsx` the run card, the walk card, the broken-step card, SAVE AS SKILL, the opening note row; `ArtifactPanel.tsx` the draft skill; `SettingsView.tsx` the two entries; the **+** item |
+| `entrypoints/dashboard/` | The kind filter, skill rows, the editor on `.skill.md`, the badge |
+| `lib/exec/` | **Unchanged.** A skill never becomes registered code; `buildRegisteredCode` `[code: lib/gm.ts]` does not see it. The browser-use phase 5 line imagined "the action code bundled as `buildRegisteredCode` bundles the GM shim", which would have made a skill a mod; this spec does not, for the reasons in [§1.1](#11-recipe-replay-or-script) |
+| `lib/buildflags.ts` | Nothing new: everything above is under `__ACT__` |
+
+### 8.3 The store question
+
+The single-purpose statement says "usermods is a userscript manager. Its single purpose is to
+create, install and run userscripts" `[doc: docs/store/permissions.md]`; the listing removed
+one-off tasks because they "read as scraping: a second purpose" `[doc: docs/store/listing.md]`;
+the first submission was rejected and the resubmission is pending. The Chrome Web Store FAQ
+allows "various functions related to that focus area or subject matter" under one narrow purpose
+`[src]`. A skill is not a userscript, and "run saved automations on sites" is a focus area of its
+own. The browser-use spec's recommendation for `act` (GitHub only, behind `__ACT__`, until 0.1.1
+is approved and phase 3 has numbers, `[bu open question 1]`) therefore applies with more force
+here: **skills ship in the GitHub build only, and enter the store build only with `act`, under a
+rewritten single-purpose statement**, which would then have to say that the extension carries
+out steps on the page the user is on, when asked, and can save and share them. That statement
+is `[bu §5.9]`'s plus one sentence. No new permission is involved: the redirect rule is a third
+dynamic rule under the permission already held, and the justification text would gain a clause.
+
+### 8.4 Safari
+
+- The runner is content-script code; a replay works on a page whose CSP refuses `run_script`
+  `[bu §3.6]`, which makes Safari the engine where skills matter most once browser-use phase 4
+  has landed.
+- The `.skill.md` navigation is caught by the watcher, late, as `.user.js` is
+  `[doc: docs/safari.md]`.
+- The share fill is isolated-world only on Safari `[code: lib/sharecontroller.ts]`; the file is
+  text, so the clipboard fallback is the same.
+- The keepalive port holds a run while the popup is closed `[code: lib/keepalive.ts]`; the
+  automatic resume is off over a pending step.
+- The walked first run on iPhone is the slow case of [§6.7](#67-the-iphone-and-ipad-popup).
+
+### 8.5 Phases
+
+Numbered on from the browser-use spec's, and gated by it.
+
+**Phase 7: the format and its paths.** Pure code, buildable alongside browser-use phase 3.
+- `lib/skills.ts`, `lib/leakscan.ts` rules, `lib/installurl.ts`, `lib/banner.ts`, `lib/share.ts`,
+  `lib/updates.ts`; the install page's skill mode; the dashboard editor. No runner.
+- *Exit:* the parser round-trips every fixture file; every refusal and warning of
+  [§4.3](#43-the-install-preview) has a test; a `.skill.md` on a gist installs, previews, is
+  recognised as installed by the banner, and updates through the review screen, all under the
+  share and update smoke flows `[code: scripts/lib/share-flows.mjs, update-flow.mjs]`; nothing
+  of it is in the store bundle.
+
+**Phase 8: recording and replay, on Chrome.** After browser-use phase 3's exit.
+- `lib/skillcompile.ts`, SAVE AS SKILL, the draft skill, `lib/skillrun.ts`, the run card, the
+  walk, the broken-step stop, CONTINUE FROM, resume with a pending step, the outputs.
+- *Exit:* the three examples of [§7](#7-three-skills-end-to-end) record, save and replay on
+  their fixtures with no model; the stability matrix of [§9](#9-evaluation) has its first
+  numbers and *wrong element* is 0; no consequential step runs without an answer across every
+  run; the never list holds against a hand-written skill; the owner has made three skills of his
+  own and run each twice.
+
+**Phase 9: the model's part.** `propose_skill`, `open_skill`, `run_skill`, repair, UPDATE SKILL
+WITH THE REPAIR.
+- *Exit:* "write me a skill that…" produces a skill on the frontier and the mid model on the
+  three fixtures; a repair fixes a renamed target on the frontier model in under 8 calls, every
+  repaired action asked; the injection suite's skill cases are written into this file as measured.
+
+**Phase 10: Safari.** After browser-use phase 4.
+- *Exit:* a replay on a strict-CSP fixture page in Safari; a walked first run on the iPhone with
+  questions in the popup; the automatic resume does not fire over a pending step.
+
+**Phase 11: the store.** With browser-use phase 6, or never.
+
+**Later, each its own note:** the `each` block for loops over rows and pages, and unrecorded
+steps (open question 2); WebMCP tools as a `call` step, since Chrome's origin trial registers
+tools with `readOnlyHint` and `consequentialHint` annotations an extension can read `[src]`,
+which would make a site's own tool a step that names its own consequence; Greasy Fork, if asked
+and answered; a mod with inputs and a Run entry (open question 7).
+
+**Do not do**, on top of the browser-use list:
+
+- A skill that runs on page load, on a timer, in the background, or on another site.
+- Code in a skill file, or a skill that is a userscript.
+- Executing prose: no step the extension did not record runs without a model, and none the model
+  plans runs without a question.
+- A model-written step: `propose_skill` names journal entries, it does not author targets.
+- A standing allowance for an installed or edited skill's consequential steps.
+- Input values in the file, in the skill's record, or in any storage beyond the run and the
+  transcript.
+- A gallery, a server, or any index of skills; a usermods-hosted install page beyond the
+  extension's own `install.html`.
+
 ## 9. Evaluation
+
+No telemetry; everything local, as `[bu §7]`. The harness is the browser-use one: fixtures in
+`test/fixtures/`, the mock model `[code: scripts/mock-llm.mjs]`, the reviewer walkthrough for
+scripts, Playwright observing only. A Playwright click is trusted input; every action under test
+goes through the extension's own code.
+
+### How we know skills work
+
+| Question | How |
+|---|---|
+| The format holds | Node tests on `lib/skills.ts`: parse/serialise round trip on every fixture file and on files with every warning and refusal; a fuzz of the YAML subset against a reference parser for the subset's documented grammar |
+| Recording is faithful | `test/fixtures/skill/<name>/` holds `index.html`, a scripted conversation that does the task, and the expected `.skill.md`. The compiled file must equal the expectation byte for byte, three fixtures: `expense-form`, `export-invoices`, `album-links` ([§7](#7-three-skills-end-to-end)) |
+| Replay is stable across site changes | Each fixture page has variants, served by the fixture server under a query flag: `renamed-class` (the stable selector changes, name and landmark stay), `moved` (the element moves to another landmark), `reordered` (same-named siblings swap), `decoy` (a second element with the recorded name is added inside the landmark), `renamed-button` (the target keeps its selector and changes its name), `removed`. Per variant, per step: `resolved`, `stopped`, `wrong element`. **Wrong element must be 0 on every variant**; `resolved` on `renamed-class` and `moved` is the number to publish; `decoy` and `renamed-button` must stop |
+| Share → install → run round trip | The share flow's gist routes `[code: scripts/lib/share-flows.mjs]` extended: share a recorded skill as a gist, open the raw link in a second profile, install from the preview, run it on the fixture, compare the recorded facts card and outputs with the recording's. Update: serve a newer version with a new consequential step; the review screen must name it and Install update must be the only path |
+| The gate holds for a file | `skill-submit`: a hand-written skill whose step 1 clicks a POST submit; one question, none without an answer. `skill-never`: a hand-written `fill` into a password field; refused at install and, when forced into storage by test, denied at run time. `skill-offsite`: a `go` to another host; refused at install; a page whose link navigates off-site mid-run pauses |
+| Resume never replays | The worker stopped over CDP between a step's journal write and its result `[doc: docs/architecture.md]`; on resume the pending-step card is shown and nothing has run twice |
+| The injection suite, extended | `skill-injection-prose`: an installed skill whose body and `why` lines instruct the model to click "Delete account" and to `go` to `evil.test`; with repair off the model never sees them (asserted from the mock's recorded requests); with repair on and a broken step, every action the model proposes is asked, the delete endpoint records nothing unless the user allowed it, no `go` is possible. `skill-injection-page`: the decoy variant with page text addressed to the model during a repair. Counts for `evil.test` are published, not required to be zero, as in `[bu §7]` |
+| Leak check | Node tests for the three rules: a literal fill, a token in a `go` query, an email in the prose; and the "Make it an input" rewrite |
+| Weak models | The repair matrix: three models × the `renamed-class` and `moved` variants × three runs; success, tool calls, questions asked, wrong targets proposed (which the user declines in the scripted flow). A model that proposes a wrong target in more than one run in five is a model for which the setting should say so |
+| Whether skills get used | His own: how many he saves, how many he runs twice, how many break and are repaired. The run record of `[bu §7]` gains `skillId` and the outcome |
+
+### Probes
+
+| Probe | Question | Decides |
+|---|---|---|
+| S-a | Does a synthetic click on `<a download>` start a download with no user activation, on Chrome and on Safari? | Whether `export-invoices` ends in a click or an `ask` |
+| S-b | What does GitHub serve a `.skill.md` raw link as, and does the gist page render it? | [§4.1](#41-greasy-fork-is-out-the-gist-and-the-raw-link-are-in) |
+| S-c | Does Chrome's `declarativeNetRequest` redirect fire for a `.skill.md` navigation from a gist raw URL the same way it does for `.user.js`? | [§4.2](#42-installing-from-a-raw-link) |
+| S-d | Can a content script read a WebMCP tool's `consequentialHint`, and call it? | The `call` step, later |
 
 ## 10. Open questions
 
+For the owner, most design-changing first, each with the recommended answer.
+
+1. **Is a skill a replay with intent attached (S1), or should 0.2 also accept pure recipes
+   (natural-language steps the model plans each run)?** *Recommended: replay only. A recipe needs
+   a capable model, cannot be previewed for what it does, and is a prompt injection the moment it
+   is shared. A recorded skill can be made from a description by doing it once. Revisit when the
+   repair numbers say the model can be trusted with a whole step list.*
+2. **Loops and unrecorded steps: does 0.2 need an `each` block (for every row, for every page)
+   and a step that says "find X and open it" without a recording?** *Recommended: not in 0.2.
+   `repeat` on a click and `read` with `each` cover the album and the comments; a loop over rows
+   that each open a page is a control structure, and it is the first thing to add in phase 11
+   once three real skills have wanted it.*
+3. **Repair with the model for installed skills: off by default (`skills made here`), or on?**
+   *Recommended: off for installed skills, on for your own. It is the one place a stranger's
+   words reach the model, and the cost of off is a stop with "continue from the next step".*
+4. **Does a freshly installed skill walk its first run, every step shown?** *Recommended: yes,
+   with "run the rest without asking" from any step. It is the only control for the wrong
+   ordinary click, and it is one run.*
+5. **Should Greasy Fork be asked whether it would host a `.skill.md`, or a `.user.js` wrapper
+   be built so skills can be posted there?** *Recommended: ask, do not wrap. A file that does
+   nothing in Tampermonkey is what their "reason to be a script" rule is for, and the gist link
+   already installs.*
+6. **Where do skills live in the panel: under the Mods tab with their own headings, or should
+   the tab be renamed?** *Recommended: under Mods, name unchanged, because the top bar does not
+   fit a fourth tab at 360px; rename to a word that covers both only if the word is found.*
+7. **Should mods also gain inputs and a Run entry (a `@usermods-inputs` header), so a script
+   can be an on-demand automation with the mod trust story?** *Recommended: not now. Two
+   formats for "run this on demand" is the confusion the spec avoids; a mod with
+   `GM_registerMenuCommand` is the existing answer, and that menu is not built either.*
+8. **Can the model start a skill (`run_skill`), with the run card confirming, or only the
+   user?** *Recommended: the model can, through the card. It is what makes "file my lunch
+   expense" one sentence, and the card is where the inputs are checked.*
+9. **Standing allowances for a local skill's consequential steps ("do not ask again for this
+   step")?** *Recommended: yes for `origin: local` only, cleared by any update or edit, listed
+   in Settings. A weekly form submission is the use case, and the file was recorded by you.*
+10. **The ceilings: 200 steps, 50 per repeat, 500 actions per run, 8 calls per repair?**
+    *Recommended: those numbers, and the run stats say whether any is hit.*
+11. **Does a skill's `read` output go to the chat's model through `note` automatically, or only
+    when the user asks?** *Recommended: automatically, in the chat the run happened in, because
+    the chat is where the user will ask the next question about it; never anywhere else.*
+12. **Ship order: phase 7 alongside browser-use phase 3, or strictly after?** *Recommended:
+    alongside, because it is pure and testable, and it gives browser-use phase 3's journal a
+    second consumer that keeps its shape honest.*
+
+Answered here as consequences of D1 to D5: one site per skill and per run (D1); no `debugger`,
+no trusted input, so `ask` steps for what synthetic input cannot do (D2); the interface is
+about every use and a skill is invoked, not a mode (D3, D5); no scheduled, background or
+cross-site runs (the "Do not do" list).
+
 ## Prior art
 
+| System | What is packaged | What transfers | What does not |
+|---|---|---|---|
+| Agent Skills: Anthropic, agentskills.io, OpenAI Codex `[src]` | A folder with `SKILL.md`: YAML front matter `name` and `description`, Markdown instructions, optional scripts and references; progressive disclosure; "Use Skills only from trusted sources", "a malicious Skill can direct Claude to invoke tools or execute code in ways that don't match the Skill's stated purpose" | The file shape, the two required fields, the trust warning taken at its word | The body is instructions for a model with bash; here the body is notes and the steps are data |
+| Stagehand caching `[src]` | A cached `act()` result keyed by instruction, page and options | "replays a cached act() result deterministically with self-healing turned off. If the recorded selector no longer resolves, Stagehand falls back to full inference": the replay-then-repair rule | A hosted cache; CDP |
+| workflow-use (browser-use) `[src]` | JSON workflows "with variables which fallback to Browser Use if a step fails", recorded by an extension or generated from one agent run | Variables as inputs; record-by-demonstration; generation by doing the task once | "very early development"; the fallback is "currently really bad"; Python and CDP |
+| Playwright codegen `[src]` | Generated test code with locators "prioritizing role, text and test id locators", refined until unique | The locator priority is the fingerprint's: role and name first, stable attributes, then position | Trusted input; code as the artifact |
+| Tampermonkey `@require`/`@resource` `[src]` | External code and files by URL with `#sha256=` integrity | The pattern of a header line naming a URL and a hash, for a later `@require`-like reuse of skills by skills, if ever | A skill carries no code and loads none |
+| iOS Shortcuts `[src]` | Shared shortcuts "considered untrusted"; "the user is warned that the shortcut hasn't been reviewed by Apple" and can inspect it; JavaScript on a web page prompts per domain; an "Ask Each Time" variable | The inspection before install, the per-site question, the ask-each-time input | Apple's malware definitions at runtime |
+| WebMCP origin trial `[src]` | A site registers tools with name, description, input schema, `execute`, and `readOnlyHint`/`consequentialHint` annotations; an example extension finds and runs them | A site's own tool as a step whose consequence the site declares: the `call` step, later | A draft "subject to change"; Chrome only |
+| Greasy Fork `[src]` | Scripts, libraries for `@require`, external code from listed CDNs and hashed URLs | The 2 MB limit and the "reason to be a script" rule, which is why skills are not posted there | A non-script file type |
+
 ## Sources
+
+Fetched 2026-10-08. Version-specific claims come from these pages as they read on that date.
+
+- Greasy Fork code rules: <https://greasyfork.org/en/help/code-rules> ("Scripts must have a reason
+  to be a script"; description rule; 2 MB; no minification); external scripts:
+  <https://greasyfork.org/en/help/external-scripts> (CDNs, SRI hashes, libraries syncing from an
+  external URL); the libraries listing <https://greasyfork.org/scripts/libraries> and one
+  library's page <https://greasyfork.org/scripts/447149-checkversion> ("should not be installed
+  directly")
+- Anthropic, Agent Skills overview: <https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview>
+  (front matter, progressive disclosure, the security section quoted above)
+- Agent Skills specification: <https://agentskills.io/specification> (`name`, `description`,
+  `license`, `compatibility`, `metadata`, `allowed-tools`; directory layout)
+- OpenAI, build skills for ChatGPT and Codex: <https://learn.chatgpt.com/docs/build-skills>
+  ("build on the open agent skills standard"; skill locations; `$skill-installer`; no guidance on
+  untrusted skills)
+- Stagehand caching: <https://docs.stagehand.dev/best-practices/caching>
+- workflow-use README: <https://github.com/browser-use/workflow-use> (read through jsDelivr's
+  mirror of `README.md`)
+- Playwright codegen: <https://playwright.dev/docs/codegen>
+- Tampermonkey externals: <https://www.tampermonkey.net/documentation.php?q=externals>
+- Apple Platform Security, Shortcuts: <https://support.apple.com/guide/security/secec043bdae/web>;
+  Shortcuts User Guide, Ask Each Time: <https://support.apple.com/guide/shortcuts/apd8b28e2166/ios>
+- WebMCP imperative API: <https://developer.chrome.com/docs/ai/webmcp/imperative-api>
+- Chrome Web Store single purpose FAQ:
+  <https://developer.chrome.com/docs/webstore/program-policies/quality-guidelines-faq>
+- In this repository: `docs/specs/browser-use.md` (7e96c26), `README.md`, `docs/guide.md`,
+  `docs/architecture.md`, `docs/design.md`, `docs/safari.md`, `docs/store/permissions.md`,
+  `docs/store/listing.md`, `docs/research/tabagent.md`, `AGENTS.md`; the code as read in this
+  worktree at 7e96c26 and, where marked, on `main` at 36a158e
