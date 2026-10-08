@@ -1152,7 +1152,7 @@ guard's.
 | 2 | **Measurement.** Per-run stats with token usage; the harness, fixture server and scripted baselines; the probes | Stats only | Stats only | Probes by hand |
 | 3 | **Operating the page, on Chrome.** In order: `lib/interact` under node tests; refs and the inventory in `find_elements`; the guard, observing only; the `describe` and `act` content messages under the harness, before any model sees them; the gate, allowances, journal, boundary and pause; then the `act` tool, the prompt section, the guard's holds, and the interface of 5.5 and 5.6 | No (flag), unless open question 1 says yes | Yes | No |
 | 4 | **Operating the page, on Safari.** The Mac popup first, which needs only checking; then the phone: the bar, and questions in the popup | No | No | Local builds |
-| 5 | **Depth**, each its own small spec: cross-origin frames, closed shadow roots, `webRequest` diagnostics, saving steps as a mod, WebMCP | Per item | Per item | Per item |
+| 5 | **Depth**, each its own small spec: cross-origin frames, closed shadow roots, `webRequest` diagnostics, saving steps as a skill (now [skills.md](skills.md)), WebMCP | Per item | Per item | Per item |
 
 Nothing is uploaded to the store while a review is pending `[doc: docs/store/submission.md]`.
 
@@ -1337,9 +1337,12 @@ the next upload after 0.1.1 is approved.
   done it" on the page; the automatic resume does not fire over a pending action.
 
 **Phase 5: depth.** Only what phases 3 and 4 ask for, in the order they ask, each its own spec.
-- Cross-origin frames; closed shadow roots; `webRequest` diagnostics; saving steps as a mod, the
-  action log replayed with the action code bundled as `buildRegisteredCode` bundles the GM shim;
-  WebMCP tools as actions, if P-f says they are reachable.
+- Cross-origin frames; closed shadow roots; `webRequest` diagnostics; WebMCP tools as actions, if
+  P-f says they are reachable.
+- Saving steps as something replayable is no longer a one-line item here: it is
+  [skills.md](skills.md), which makes the journal a `.skill.md` file replayed through the same
+  gate, with no model and no registered code (it is not a mod, and `buildRegisteredCode` is not
+  involved). Its phases 7 to 11 follow phase 3 of this spec.
 
 **Phase 6: the store question for acting.** After 0.1.1 is approved and phase 3 has numbers: it
 stays in the GitHub build, or enters the store build with the rewritten single-purpose statement
@@ -1376,7 +1379,9 @@ answer.
    first of each named action asks and offers "allow every one of these in this chat"; anything
    touching a payment, password or one-time-code field is never performed and is handed to you;
    scripts are never confirmed, and a consequential click made by a script is held and sent
-   through `act`.*
+   through `act`.* Skills bear on this: a replayed skill's consequential steps ask every run from
+   the live element, a standing "do not ask again" exists only for a skill recorded on this
+   device, and every step a model takes while repairing a skill asks ([skills.md §5.3](skills.md#53-what-asks-every-time)).
 3. When does usermods ask before it operates a site at all: never (the first-run notice is
    enough), the first time in each chat, or once per site? *Recommended: the first `act` in a chat
    asks once, with "Do not ask again on this site" on the card and the list in Settings. Building
