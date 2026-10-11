@@ -1,6 +1,6 @@
 # usermods Privacy Policy
 
-**Last updated: 30 September 2026**
+**Last updated: 11 October 2026**
 
 usermods is an open-source browser extension that lets you customize websites by chatting with a
 large language model of your choosing. It is published by Kenneth Ballenegger as a personal,
@@ -15,11 +15,12 @@ The canonical address of this policy — the one given to the Chrome Web Store �
 <https://github.com/kballenegger/usermods/blob/main/PRIVACY.md>. The source code for every claim on
 this page is public at <https://github.com/kballenegger/usermods>.
 
-**Two builds.** The build published on the Chrome Web Store omits ChatGPT and SuperGrok subscription
-sign-in; it contacts no vendor authentication endpoint at all. The sections below marked
-*(GitHub build only)* therefore do not apply to the Web Store version — in that build no
-subscription token is ever created, stored or sent. They are documented here because the same
-policy covers the GitHub build, which keeps the feature.
+**Which build has the subscription sign-in.** The build published on the Chrome Web Store omits
+ChatGPT and SuperGrok subscription sign-in; it contacts no vendor authentication endpoint at all.
+The sections below marked *(GitHub and App Store builds)* therefore do not apply to the Web Store
+version — in that build no subscription token is ever created, stored or sent. They do apply to the
+build on GitHub and to the Safari app for iPhone and iPad on the App Store, both of which keep the
+feature; the same policy covers all three.
 
 ---
 
@@ -33,7 +34,7 @@ never uploads it anywhere.
 |---|---|---|
 | **Provider settings** — each provider you connected: its name, base URL, the list of model names it offered, and which model each chat uses | `chrome.storage.local` | So usermods knows which endpoints exist and which one a chat talks to. |
 | **Your API keys**, if you use any | `chrome.storage.local` | Each is sent only to the provider it belongs to, as the authentication header for your own requests. Removing a provider deletes its key. |
-| **Subscription tokens** *(GitHub build only)* — OAuth access and refresh tokens for ChatGPT or xAI sign-in, and the account identifier and label (typically your email address and plan name) read out of those tokens | `chrome.storage.local` | Sent only to that vendor, to authenticate your own requests, and refreshed automatically. Removed when you sign out. |
+| **Subscription tokens** *(GitHub and App Store builds)* — OAuth access and refresh tokens for ChatGPT or xAI sign-in, and the account identifier and label (typically your email address and plan name) read out of those tokens | `chrome.storage.local` | Sent only to that vendor, to authenticate your own requests, and refreshed automatically. Removed when you sign out. |
 | **Saved mods** — the full userscript text, its header metadata, its enabled state, and any `@require` libraries and `@resource` files downloaded at install time | `chrome.storage.local` | So your mods can run on matching pages. |
 | **Mod values** — data your scripts save with `GM_setValue`, including values imported from a Tampermonkey backup | `chrome.storage.local` | The storage that userscripts expect. It belongs to the script, not to usermods. |
 | **Chat history** — your messages, the model's replies, the tool calls made and their results, and the page address and title of the tab a chat belongs to | `chrome.storage.local` | So a conversation survives closing the panel. Capped at 200 chats, oldest dropped. Screenshots are stripped from stored history. |
@@ -112,7 +113,7 @@ an explicit action of yours, except the update check, which runs by itself and c
   exists. The request carries no cookies and nothing about you or your browsing; the host sees that
   a copy of its script asked for an update, as it would from any userscript manager. Nothing is
   installed by a check.
-- **Signing in to a subscription** *(GitHub build only)*. The ChatGPT and xAI device-code sign-in flows contact those
+- **Signing in to a subscription** *(GitHub and App Store builds)*. The ChatGPT and xAI device-code sign-in flows contact those
   vendors' own authentication servers.
 - **`GM_xmlhttpRequest` from a userscript.** Scripts you installed can make cross-origin requests,
   restricted to the hosts their `@connect` header declares. These are requests made by *that script*

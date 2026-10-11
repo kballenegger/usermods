@@ -133,7 +133,7 @@ Before pressing Submit:
 - [ ] The uploaded zip's SHA-256 matches [package-audit.md](package-audit.md).
 - [ ] The reviewer key still works: `curl -s -H "Authorization: Bearer $KEY" "$BASE_URL/models"`
       lists the model that step 4 of the test instructions names.
-- [ ] `PRIVACY.md` on `main` is the updated one (its date reads 30 September 2026), since the
+- [ ] `PRIVACY.md` on `main` is the updated one (its date reads 11 October 2026), since the
       dashboard links to it there.
 
 After submitting, watch the publisher mailbox: the rejection arrived there within a day and sat
