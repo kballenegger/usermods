@@ -1069,11 +1069,50 @@ allowed.
 
 ## Distribution
 
-Nothing here is an App Store submission and nothing here is signed for release. On macOS that is the
-difference between an extension Safari lists and one it hides: a Developer ID signature is what makes
-the two developer settings in [Install](#then-turn-it-on-on-macos) unnecessary. Apple's App Review
-guideline 2.5.2 covers executing code that changes an app's features, which is a fair description of
-what usermods does with model-written scripts, so App Store distribution is an open question that
-this port does not answer. See the Safari section of [docs/browsers.md](browsers.md). The device path in
-[Install](#install) is written down but has not been run: nothing here is signed, and no physical
-iPhone or iPad has run this build.
+### iOS: the App Store archive
+
+`node scripts/safari-xcode.mjs archive --team <id>` is the release path for iPhone and iPad. It
+stages the ordinary Safari build (the one with subscription sign-in; add `--store` for the variant
+without it), archives the `usermods` scheme in Release for `generic/platform=iOS`, and exports an
+App Store `.ipa` with `method = app-store-connect` and automatic signing. Nothing distribution-grade
+is checked in: with `-allowProvisioningUpdates`, xcodebuild asks the Apple account signed in to
+Xcode on that machine for the Apple Distribution certificate and the two App Store profiles (app and
+extension), and keeps them in Xcode's own keychain. The archive's app still shows an *Apple
+Development* signature; the export is what re-signs it.
+
+Then it looks inside, because the copy phase that puts the web extension into the `.appex` has
+shipped the previous web build before without a word in any log ([see the macOS section](#one-pair-of-targets-two-platforms)):
+
+- the `.appex` is embedded and has `manifest.json` at its root, and every staged file is in it at
+  the same size;
+- app, extension and manifest carry the same version, and `ITSAppUsesNonExemptEncryption` is
+  `false` in the app's Info.plist (both app plists declare it; the app only makes ordinary HTTPS
+  requests, and without the key App Store Connect holds every build on the export-compliance
+  question);
+- the `.ipa` holds `embedded.mobileprovision` for both bundles.
+
+Run on 2026-10-11 for 0.1.1 (1): 39 staged files matched; the exported app and extension were both
+signed `Apple Distribution: Kenneth Ballenegger (2TK86C98Z5)`, with *iOS Team Store Provisioning
+Profile* profiles (no device list, `get-task-allow` false, `beta-reports-active` true, valid to
+August 2027), `MinimumOSVersion` 16.4, device family iPhone and iPad.
+
+Nothing leaves the machine until `--upload` is added, which exports the same archive again with
+`destination = upload` through the Xcode account, and App Store Connect then processes it into
+TestFlight. `--build N` overrides `USERMODS_BUILD_NUMBER` for a re-upload of the same version;
+`manageAppVersionAndBuildNumber` is off in the export options so Apple does not renumber it.
+
+### What the App Store asks that this port does not answer
+
+Apple's App Review guideline 2.5.2 covers executing code that changes an app's features, which is a
+fair description of what usermods does with model-written scripts; the argument that it is within the
+rules (userscripts are user data run inside Safari's own web-extension sandbox, as existing App Store
+userscript managers do) is made in `docs/store/appstore/reviewer-notes.md`, and only a review
+answers it. See also the Safari section of [docs/browsers.md](browsers.md).
+
+### macOS
+
+The Mac build is not signed for release. That is the difference between an extension Safari lists
+and one it hides: a Developer ID signature (or the App Store) is what makes the two developer
+settings in [Install](#then-turn-it-on-on-macos) unnecessary. The macOS version on the App Store
+Connect record is left in *Prepare for Submission*; it needs its own screenshots and either an App
+Store export for macOS or a notarised Developer ID build, neither of which `archive` does yet.

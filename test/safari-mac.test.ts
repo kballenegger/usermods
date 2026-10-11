@@ -129,6 +129,32 @@ test('the extension is embedded where Safari looks for it', () => {
 
 // ---------- the build script ----------
 
+test('the build script has an App Store archive command that checks the .ipa before anything is uploaded', () => {
+  const script = read('scripts/safari-xcode.mjs');
+  assert.match(script, /'archive'/);
+  // Distribution signing and profiles come from the Apple account in Xcode, not from the repo.
+  assert.match(script, /-allowProvisioningUpdates/);
+  assert.match(script, /app-store-connect/);
+  // The export to disk is inspected, and only --upload sends anything.
+  assert.match(script, /embedded\.mobileprovision/);
+  assert.match(script, /has\('upload'\)/);
+  // Our build number is the build number; App Store Connect must not renumber it.
+  assert.match(script, /manageAppVersionAndBuildNumber<\/key>\s*<false\/>/);
+});
+
+test('both app Info.plists declare exempt encryption, so uploads are not held on the compliance question', () => {
+  for (const file of ['safari/App/Info.plist', 'safari/App/Info-macOS.plist']) {
+    assert.match(read(file), /<key>ITSAppUsesNonExemptEncryption<\/key>\s*<false\/>/, file);
+  }
+});
+
+test('the app, the extension and the web manifest agree on the version', () => {
+  const xcconfig = read('safari/Config/Shared.xcconfig');
+  const version = xcconfig.match(/^USERMODS_MARKETING_VERSION = (\S+)$/m)?.[1];
+  const pkg = JSON.parse(read('package.json')) as { version: string };
+  assert.equal(version, pkg.version, 'Shared.xcconfig USERMODS_MARKETING_VERSION must match package.json');
+});
+
 test('the build script has a Mac command and says what Safari still needs', () => {
   const script = read('scripts/safari-xcode.mjs');
   assert.match(script, /'mac'/);

@@ -11,6 +11,13 @@
 //   node scripts/safari-xcode.mjs simulator           build, boot a simulator, install, launch
 //   node scripts/safari-xcode.mjs mac                 build the Mac app, check it, say what is next
 //   node scripts/safari-xcode.mjs mac --launch        the same, then open it
+//   node scripts/safari-xcode.mjs archive --team ABCDE12345
+//                                                     stage, archive for iOS devices, export an
+//                                                     App Store .ipa, check what is inside it
+//   node scripts/safari-xcode.mjs archive --team ABCDE12345 --upload
+//                                                     the same, then upload it to App Store
+//                                                     Connect through the Xcode account on
+//                                                     this Mac (TestFlight)
 //
 // ---------------------------------------------------------------------------
 // Why this script exists rather than "open Xcode and press play"
@@ -541,6 +548,165 @@ function mac({ configuration, bundleId, team, launch }) {
 }
 
 // ---------------------------------------------------------------------------
+// App Store: archive, export, upload
+// ---------------------------------------------------------------------------
+
+/**
+ * The App Store path, which is a different shape from every other command here: an .xcarchive
+ * built for real devices, exported into an .ipa with a distribution signature, then handed to
+ * App Store Connect. Automatic signing with -allowProvisioningUpdates lets xcodebuild mint the
+ * Apple Distribution certificate and the App Store profiles itself, through the Apple account
+ * signed in to Xcode on this machine; nothing is stored in the repository.
+ *
+ * Two exports rather than one: `export` writes the .ipa to disk so it can be inspected before
+ * anything leaves the machine, and `upload` (only with --upload) sends the same archive. The
+ * inspection matters for the same reason `mac` has it: the copy phase that puts the web extension
+ * into the .appex can silently ship the previous web build, and nothing in an upload receipt
+ * would say so.
+ */
+const archiveDir = path.join(root, '.output', 'safari-archive');
+
+function exportOptions({ team, destination }) {
+  const plist = path.join(archiveDir, `ExportOptions-${destination}.plist`);
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>method</key>
+	<string>app-store-connect</string>
+	<key>destination</key>
+	<string>${destination}</string>
+	<key>teamID</key>
+	<string>${team}</string>
+	<key>signingStyle</key>
+	<string>automatic</string>
+	<key>uploadSymbols</key>
+	<true/>
+	<key>manageAppVersionAndBuildNumber</key>
+	<false/>
+</dict>
+</plist>
+`;
+  fs.writeFileSync(plist, xml);
+  return plist;
+}
+
+/** Read one string value out of a binary or XML Info.plist without a dependency. */
+function plistValue(file, key) {
+  return capture('/usr/libexec/PlistBuddy', ['-c', `Print :${key}`, file]);
+}
+
+function archive({ bundleId, team, upload, buildNumber }) {
+  if (!team) fail('archive needs --team <id>', 'An App Store archive has to be signed by a team.');
+  if (storeVariant) {
+    console.log('note: --store given, so the archive carries the variant WITHOUT subscription sign-in');
+  }
+  const developerDir = requireXcode();
+  const xcodebuildBin = path.join(developerDir, 'usr', 'bin', 'xcodebuild');
+  const env = xcodeEnv(developerDir);
+  fs.mkdirSync(archiveDir, { recursive: true });
+
+  const overrides = [`DEVELOPMENT_TEAM=${team}`, 'CODE_SIGN_STYLE=Automatic'];
+  if (bundleId) overrides.push(`USERMODS_BUNDLE_ID=${bundleId}`);
+  if (buildNumber) overrides.push(`USERMODS_BUILD_NUMBER=${buildNumber}`);
+
+  const archivePath = path.join(archiveDir, 'usermods-ios.xcarchive');
+  fs.rmSync(archivePath, { recursive: true, force: true });
+  console.log(`archiving for iOS devices with DEVELOPER_DIR=${developerDir}`);
+  run(xcodebuildBin, [
+    '-project', project,
+    '-scheme', 'usermods',
+    '-configuration', 'Release',
+    '-sdk', 'iphoneos',
+    '-destination', 'generic/platform=iOS',
+    '-archivePath', archivePath,
+    '-derivedDataPath', path.join(root, '.output', 'safari-xcode'),
+    '-allowProvisioningUpdates',
+    'archive',
+    ...overrides,
+  ], { env });
+
+  // Check the archive before signing anything for distribution: the app, the extension inside it,
+  // the manifest at the extension's root, and the staged files byte for byte by size.
+  const app = path.join(archivePath, 'Products', 'Applications', 'usermods.app');
+  if (!fs.existsSync(app)) fail(`the archive has no app at ${path.relative(root, app)}`);
+  const appex = path.join(app, 'PlugIns', 'usermods-extension.appex');
+  if (!fs.existsSync(appex)) fail(`no extension inside ${path.relative(root, app)}`, 'The app archived but the .appex was not embedded.');
+  if (!fs.existsSync(path.join(appex, 'manifest.json'))) {
+    fail(`no manifest.json inside ${path.relative(root, appex)}`, 'Run `node scripts/safari-xcode.mjs stage`, then archive again.');
+  }
+  assertBundleMatchesStage(appex);
+
+  const info = path.join(app, 'Info.plist');
+  const version = plistValue(info, 'CFBundleShortVersionString');
+  const build = plistValue(info, 'CFBundleVersion');
+  const exempt = plistValue(info, 'ITSAppUsesNonExemptEncryption');
+  const minOS = plistValue(info, 'MinimumOSVersion');
+  const extVersion = plistValue(path.join(appex, 'Info.plist'), 'CFBundleShortVersionString');
+  if (version !== extVersion) fail(`app is ${version} but the extension is ${extVersion}`);
+  if (exempt !== 'false') {
+    fail('ITSAppUsesNonExemptEncryption is not false in the archived Info.plist', 'App Store Connect would hold the build on the export-compliance question.');
+  }
+  // What the manifest says it is, so a wrong variant is visible here rather than in a review.
+  const manifest = JSON.parse(fs.readFileSync(path.join(appex, 'manifest.json'), 'utf8'));
+  console.log(`archived  ${path.relative(root, archivePath)}`);
+  console.log(`          app ${version} (${build}), extension ${extVersion}, manifest ${manifest.version}, iOS ${minOS}+`);
+  console.log(`          variant: ${storeVariant ? 'App Store (no subscription sign-in)' : 'ordinary (subscription sign-in included)'}`);
+
+  // Export to disk, then look inside the .ipa rather than trusting the export log.
+  const exportPath = path.join(archiveDir, 'export');
+  fs.rmSync(exportPath, { recursive: true, force: true });
+  console.log('exporting an App Store .ipa (distribution signature, automatic)');
+  run(xcodebuildBin, [
+    '-exportArchive',
+    '-archivePath', archivePath,
+    '-exportOptionsPlist', exportOptions({ team, destination: 'export' }),
+    '-exportPath', exportPath,
+    '-allowProvisioningUpdates',
+  ], { env });
+  const ipa = fs.readdirSync(exportPath).map((f) => path.join(exportPath, f)).find((f) => f.endsWith('.ipa'));
+  if (!ipa) fail(`the export produced no .ipa in ${path.relative(root, exportPath)}`);
+  const listing = execFileSync('/usr/bin/unzip', ['-l', ipa], { encoding: 'utf8' });
+  const must = [
+    'Payload/usermods.app/Info.plist',
+    'Payload/usermods.app/PlugIns/usermods-extension.appex/manifest.json',
+    'Payload/usermods.app/embedded.mobileprovision',
+    'Payload/usermods.app/PlugIns/usermods-extension.appex/embedded.mobileprovision',
+  ];
+  const missing = must.filter((m) => !listing.includes(m));
+  if (missing.length) fail(`the .ipa is missing ${missing.join(', ')}`);
+  console.log(`exported  ${path.relative(root, ipa)}  ${(fs.statSync(ipa).size / 1048576).toFixed(1)} MB`);
+  // Who signed the exported app: unzip the one Info.plist's neighbour, the code signature, is not
+  // worth it; codesign on the archive's copy says which identity the export was asked for, and
+  // the .ipa listing above proves the distribution profiles went in.
+  const authority = describeSignature(app).split('\n').find((l) => l.startsWith('Authority=Apple'));
+  if (authority) console.log(`          ${authority}`);
+
+  if (!upload) {
+    console.log('');
+    console.log('Nothing has left this machine. To upload the same archive to App Store Connect:');
+    console.log(`  node scripts/safari-xcode.mjs archive --no-build --no-stage --team ${team} --upload`);
+    console.log('(or drop the .ipa on Transporter.app)');
+    return;
+  }
+
+  console.log('');
+  console.log('uploading to App Store Connect through the Xcode account on this Mac');
+  const uploadPath = path.join(archiveDir, 'upload');
+  fs.rmSync(uploadPath, { recursive: true, force: true });
+  run(xcodebuildBin, [
+    '-exportArchive',
+    '-archivePath', archivePath,
+    '-exportOptionsPlist', exportOptions({ team, destination: 'upload' }),
+    '-exportPath', uploadPath,
+    '-allowProvisioningUpdates',
+  ], { env });
+  console.log('');
+  console.log(`uploaded  usermods ${version} (${build}) for iOS`);
+  console.log('          App Store Connect processes it for a few minutes, then it appears under TestFlight > iOS builds.');
+}
+
+// ---------------------------------------------------------------------------
 // Arguments
 // ---------------------------------------------------------------------------
 
@@ -579,6 +745,10 @@ switch (command) {
     if (!has('no-stage')) stage({ build: !has('no-build') });
     mac({ configuration, bundleId, team, launch: has('launch') });
     break;
+  case 'archive':
+    if (!has('no-stage')) stage({ build: !has('no-build') });
+    archive({ bundleId, team, upload: has('upload'), buildNumber: flag('build') });
+    break;
   default:
-    fail(`unknown command "${command}"`, 'Try: doctor, stage, build, simulator, mac');
+    fail(`unknown command "${command}"`, 'Try: doctor, stage, build, simulator, mac, archive');
 }
