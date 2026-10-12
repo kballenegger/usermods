@@ -59,27 +59,37 @@ Distribution* with App Store profiles for both bundles.
    that a run survives the popup being dismissed; the simulator cannot prove either (see
    [docs/safari.md](../../safari.md#what-only-a-device-can-prove)). Take the device screenshots
    while you are there if the simulator ones in `screenshots/` are not wanted.
-3. **App Store → iOS App → 0.1.1.** The record was created with version **1.0**; change the
-   version string to **0.1.1** so it matches the build. Then:
-   - **Build** → select 0.1.1 (1).
-   - **Screenshots** → iPhone 6.9" and iPad 13" sets from `screenshots/`, in the order the
-     README there gives. Apple derives the smaller sizes from these.
-   - **Promotional text, Description, Keywords, What's New** → paste the blocks from
-     [listing.md](listing.md).
-   - **Support URL, Marketing URL, Copyright** → already set; confirm.
-4. **App Review Information.** *Sign-in required* stays unticked (the app has no account).
-   Contact: name, phone, email. **Notes** → paste the block from
-   [reviewer-notes.md](reviewer-notes.md). It needs the reviewer endpoint and key: the existing
-   reviewer key was extended on 2026-10-13 to a month past 2026-10-17, so it outlives a review; put
-   its base URL and key in the two placeholders. Never commit them.
-5. **Version release** → *Manually release this version*, so approval does not publish before the
-   announcement post is ready.
-6. **Add for Review → Submit.** iOS only; leave the macOS version alone.
+3. **Fill the record through the API.** Steps 3 to 6 of the web form are one command, so what
+   goes to Apple is the reviewed text and images in this folder and not a paste:
+
+   ```
+   node scripts/appstore-connect.mjs status     what the record holds
+   node scripts/appstore-connect.mjs prepare    version string, build, copy, screenshots, review notes, manual release
+   node scripts/appstore-connect.mjs submit     add the version to a review submission and submit it
+   ```
+
+   `prepare` renames the version from 1.0 to the checkout's version, selects the processed build
+   with the checkout's build number, pastes the blocks from [listing.md](listing.md), uploads the
+   two screenshot sets from `screenshots/`, writes the review information from
+   [reviewer-notes.md](reviewer-notes.md) with its placeholders filled, and sets manual release.
+   It changes nothing twice, so it can be run again after a correction. The script's header says
+   what goes in `~/.config/usermods/appstore.env`: the API key, and the reviewer endpoint, key and
+   contact that fill the notes. Nothing of that is in the repository.
+4. **App Review Information**, done by `prepare` from the env file: *Sign-in required* unticked (the
+   app has no account), the contact, and the notes with the reviewer endpoint and key. The
+   reviewer key was extended on 2026-10-13 to a month past 2026-10-17, so it outlives a review.
+   Never commit it.
+5. **Version release**: *Manually release this version*, set by `prepare`, so approval does not
+   publish before the announcement post is ready.
+6. **Submit.** `node scripts/appstore-connect.mjs submit`, iOS only; the macOS version is left
+   alone. Or **Add for Review → Submit** on the record's page.
 
 Before pressing Submit:
 
-- [ ] The uploaded build is 0.1.1 (1) and its status is *Ready to Submit* (not *Missing
-      Compliance*).
+- [x] The uploaded build is 0.1.1 (1) and its status is *Ready to Submit* (not *Missing
+      Compliance*). Uploaded 2026-10-13 after a first attempt was refused for an alpha channel in
+      the 1024 icon ([docs/safari.md](../../safari.md#the-host-app)); the second was accepted and
+      processed within minutes.
 - [ ] The version string on the record reads 0.1.1.
 - [ ] The reviewer key works: `curl -s -H "Authorization: Bearer $KEY" "$BASE_URL/models"` lists
       the model the notes name, and the notes carry the real URL and key, not the placeholders.
