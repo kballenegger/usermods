@@ -69,8 +69,14 @@
 // system mask that bevel is actively harmful: those corner blocks are transparent, so they punch
 // four notches out of the navy right where the system's squircle needs opaque colour, and the Dock
 // shows grey through them. macOS gets MAC_BG painted edge to edge underneath instead. The corner is
-// the system's job now. iOS keeps the artwork as-is, because its corners land outside the
-// superellipse and are never seen.
+// the system's job now.
+//
+// iOS USED TO KEEP THE ARTWORK AS-IS, on the reasoning that its corners land outside the
+// superellipse and are never seen. App Store Connect disagreed on 2026-10-13: the first upload was
+// refused at validation with "Invalid large app icon. The large app icon in the asset catalog can't
+// be transparent or contain an alpha channel". So iOS gets the same field underneath, and the
+// rasters for both platforms are written without an alpha channel at all, which is what that rule
+// literally asks for; a fully opaque RGBA image still "contains an alpha channel".
 //
 // THE BREATHING ROOM MOVED FROM THE TILE TO THE MARK, and that turns out to need no scaling at
 // all. The old margin was around the whole tile, which is what read as "a small mark floating in a
@@ -100,6 +106,7 @@
 import { chromium } from 'playwright';
 import { colourKey, decodePNG, pretty } from './lib/png.mjs';
 import fs from 'node:fs';
+import zlib from 'node:zlib';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -144,32 +151,68 @@ const IOS_SIZE = 1024;
 /**
  * Lay the SVG out alone on a page at exactly `size`, and screenshot it.
  *
- * `platform` picks the treatment:
+ * Both platforms get the same treatment: the artwork at the full size, over MAC_BG painted across
+ * the whole square. The background is what fills the bevel's four transparent corner blocks, so
+ * the system's rounded-square mask has opaque colour everywhere it clips, and so App Store Connect
+ * has no alpha to object to. See the note at the top.
  *
- *   'ios' — the artwork alone, full bleed on a transparent page, exactly as it is drawn. Its bevel
- *           corners stay transparent because the superellipse mask cuts further in than they do.
- *
- *   'mac' — the same artwork at the same full size, over MAC_BG painted across the whole square.
- *           The background is what fills the bevel's four transparent corner blocks, so the
- *           system's rounded-square mask has opaque colour everywhere it clips. See the note at
- *           the top.
+ * The screenshot is then rewritten as an 8-bit RGB PNG: Chromium emits RGBA whether or not
+ * anything is transparent, and Apple's rule is about the channel, not about its values.
  */
-async function render(browser, svg, size, file, { platform }) {
+async function render(browser, svg, size, file) {
   const page = await browser.newPage({ viewport: { width: size, height: size }, deviceScaleFactor: 1 });
-  const mac = platform === 'mac';
   // No border-radius on either platform: the system does the rounding now. See the note at the top.
   await page.setContent(
     `<!doctype html><html><head><style>
-       html,body{margin:0;padding:0;background:${mac ? MAC_BG : 'transparent'};width:${size}px;height:${size}px}
+       html,body{margin:0;padding:0;background:${MAC_BG};width:${size}px;height:${size}px}
        /* crispEdges in the SVG keeps the blocks hard; this stops any browser-side smoothing of
           the element box on top of it. */
        svg{display:block;width:${size}px;height:${size}px;image-rendering:pixelated}
      </style></head><body>${svg}</body></html>`,
   );
-  // omitBackground would punch the mac field back out to transparent, which is the exact thing
-  // macOS 26 wraps in a grey frame — so it is only for iOS, whose bevel corners must stay clear.
-  await page.screenshot({ path: file, omitBackground: !mac });
+  await page.screenshot({ path: file, omitBackground: false });
   await page.close();
+  fs.writeFileSync(file, encodeRGB(decodePNG(file)));
+}
+
+/**
+ * An 8-bit RGB PNG (colour type 2, no alpha channel) from decoded RGBA pixels. The pixels are
+ * copied, not resampled, so the no-new-colours check below still holds over the output.
+ */
+function encodeRGB({ width, height, px }) {
+  const raw = Buffer.alloc((width * 3 + 1) * height);
+  for (let y = 0; y < height; y++) {
+    raw[y * (width * 3 + 1)] = 0; // filter: none
+    for (let x = 0; x < width; x++) {
+      const s = (y * width + x) * 4;
+      const d = y * (width * 3 + 1) + 1 + x * 3;
+      raw[d] = px[s];
+      raw[d + 1] = px[s + 1];
+      raw[d + 2] = px[s + 2];
+    }
+  }
+  const chunk = (type, data) => {
+    const len = Buffer.alloc(4);
+    len.writeUInt32BE(data.length);
+    const body = Buffer.concat([Buffer.from(type, 'ascii'), data]);
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(zlib.crc32(body) >>> 0);
+    return Buffer.concat([len, body, crc]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8; // bit depth
+  ihdr[9] = 2; // colour type: RGB
+  ihdr[10] = 0;
+  ihdr[11] = 0;
+  ihdr[12] = 0;
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', ihdr),
+    chunk('IDAT', zlib.deflateSync(raw, { level: 9 })),
+    chunk('IEND', Buffer.alloc(0)),
+  ]);
 }
 
 // ---------------------------------------------------------------------------
@@ -190,16 +233,19 @@ function sourcePalette() {
  *
  * No exemptions and no slack band: nothing here is antialiased, because nothing here is rounded.
  *
- * `platform` sets the opacity floor. A macOS raster must now be COMPLETELY opaque — that is the
- * whole point of the change, since any transparent pixel is a hole the system's squircle shows the
- * Dock through — so its floor is 1. iOS keeps a floor just under 1 because its bevel legitimately
- * leaves four transparent corner blocks.
+ * Every raster must be COMPLETELY opaque, and carry no alpha channel at all: on macOS a transparent
+ * pixel is a hole the system's squircle shows the Dock through, and on iOS App Store Connect refuses
+ * the build at upload if the 1024 has an alpha channel, opaque or not.
  */
-function verify(file, size, palette, { platform = 'ios' } = {}) {
+function verify(file, size, palette) {
   const im = decodePNG(file);
   const rel = path.relative(ROOT, file);
   if (im.width !== size || im.height !== size) {
     throw new Error(`${rel} is ${im.width}x${im.height}, expected exactly ${size}x${size}`);
+  }
+  const colourType = fs.readFileSync(file)[25];
+  if (colourType !== 2) {
+    throw new Error(`${rel} has PNG colour type ${colourType}, not 2 (RGB): an alpha channel fails App Store upload`);
   }
 
   const bad = new Map();
@@ -225,19 +271,12 @@ function verify(file, size, palette, { platform = 'ios' } = {}) {
     );
   }
 
-  // A blank or near-blank icon would pass every colour check above, since transparent is in the
-  // palette. Beyond that, a macOS raster with ANY transparent pixel is the bug this change fixes:
-  // the system clips its squircle out of whatever is supplied, and a hole in the artwork is a hole
-  // the Dock's grey shows through. So macOS demands 100% and says which pixel failed.
+  // A raster with ANY transparent pixel is a bug on both platforms now: the system clips its
+  // squircle out of whatever is supplied, a hole in the artwork is a hole the Dock's grey shows
+  // through, and App Store Connect refuses the upload outright.
   const filled = 1 - transparent / (im.width * im.height);
-  if (platform === 'mac' && transparent > 0) {
-    throw new Error(
-      `${rel} has ${transparent} transparent pixel(s); a macOS icon must be opaque edge to edge or ` +
-        "macOS 26 shows its own grey frame through the gaps",
-    );
-  }
-  if (filled < 0.95) {
-    throw new Error(`${rel} is only ${(filled * 100).toFixed(1)}% opaque; the artwork did not render`);
+  if (transparent > 0) {
+    throw new Error(`${rel} has ${transparent} transparent pixel(s); an app icon must be opaque edge to edge`);
   }
 
   // How wide the mark actually came out, as a fraction of the canvas: the leftmost and rightmost
@@ -307,14 +346,14 @@ for (const f of fs.readdirSync(ICONSET)) {
 const browser = await chromium.launch({ channel: 'chromium' });
 try {
   const ios = path.join(ICONSET, `ios-${IOS_SIZE}.png`);
-  await render(browser, svg, IOS_SIZE, ios, { platform: 'ios' });
-  verify(ios, IOS_SIZE, palette, { platform: 'ios' });
+  await render(browser, svg, IOS_SIZE, ios);
+  verify(ios, IOS_SIZE, palette);
   console.log(`[appicon] ios-${IOS_SIZE}.png`.padEnd(28) + `${IOS_SIZE}x${IOS_SIZE}  full bleed, verified`);
 
   for (const size of MAC_SIZES) {
     const file = path.join(ICONSET, `mac-${size}.png`);
-    await render(browser, svg, size, file, { platform: 'mac' });
-    const { markSpan } = verify(file, size, palette, { platform: 'mac' });
+    await render(browser, svg, size, file);
+    const { markSpan } = verify(file, size, palette);
     // The mark has to actually land where the artwork says it does. One block of tolerance, which
     // is all a 16px raster can express; anything further off means the SVG was redrawn and the
     // icon's proportions moved without anyone deciding to move them.
@@ -342,7 +381,7 @@ try {
     // is applied on top of this at display time.
     const out = path.resolve(ROOT, preview);
     fs.mkdirSync(path.dirname(out), { recursive: true });
-    await render(browser, svg, 256, out, { platform: 'mac' });
+    await render(browser, svg, 256, out);
     console.log(`[appicon] preview -> ${path.relative(ROOT, out)}`);
   }
 } finally {

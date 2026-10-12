@@ -129,6 +129,32 @@ test('the extension is embedded where Safari looks for it', () => {
 
 // ---------- the build script ----------
 
+test('the build script has an App Store archive command that checks the .ipa before anything is uploaded', () => {
+  const script = read('scripts/safari-xcode.mjs');
+  assert.match(script, /'archive'/);
+  // Distribution signing and profiles come from the Apple account in Xcode, not from the repo.
+  assert.match(script, /-allowProvisioningUpdates/);
+  assert.match(script, /app-store-connect/);
+  // The export to disk is inspected, and only --upload sends anything.
+  assert.match(script, /embedded\.mobileprovision/);
+  assert.match(script, /has\('upload'\)/);
+  // Our build number is the build number; App Store Connect must not renumber it.
+  assert.match(script, /manageAppVersionAndBuildNumber<\/key>\s*<false\/>/);
+});
+
+test('both app Info.plists declare exempt encryption, so uploads are not held on the compliance question', () => {
+  for (const file of ['safari/App/Info.plist', 'safari/App/Info-macOS.plist']) {
+    assert.match(read(file), /<key>ITSAppUsesNonExemptEncryption<\/key>\s*<false\/>/, file);
+  }
+});
+
+test('the app, the extension and the web manifest agree on the version', () => {
+  const xcconfig = read('safari/Config/Shared.xcconfig');
+  const version = xcconfig.match(/^USERMODS_MARKETING_VERSION = (\S+)$/m)?.[1];
+  const pkg = JSON.parse(read('package.json')) as { version: string };
+  assert.equal(version, pkg.version, 'Shared.xcconfig USERMODS_MARKETING_VERSION must match package.json');
+});
+
 test('the build script has a Mac command and says what Safari still needs', () => {
   const script = read('scripts/safari-xcode.mjs');
   assert.match(script, /'mac'/);
@@ -338,18 +364,18 @@ test('every macOS raster is opaque edge to edge', () => {
   }
 });
 
-test('the iOS raster stays full bleed with its bevel corners clear', () => {
-  // iOS is NOT given the macOS treatment: its superellipse mask cuts further in than the artwork's
-  // pixel-art bevel, so those four corner blocks are never seen and painting them would be filling
-  // in pixels nobody looks at. The corners staying transparent is what says the two platforms are
-  // still rendered differently on purpose.
+test('the iOS raster is opaque and carries no alpha channel, which App Store Connect refuses', () => {
+  // The first upload (2026-10-13) was refused at validation: "Invalid large app icon. The large app
+  // icon in the asset catalog can't be transparent or contain an alpha channel". The bevel corners
+  // used to be transparent on iOS on the reasoning that the superellipse hides them; Apple checks
+  // the file, not the mask. So: no transparent pixel, and PNG colour type 2 (RGB), since a fully
+  // opaque RGBA file still contains the channel the rule names.
   const im = pixels('ios-1024.png');
-  assert.ok(transparentCount(im) > 0, 'the iOS icon lost its bevel corners');
-  assert.equal(colourKey(im.px, 0), 'transparent', 'the top-left bevel block should be transparent');
-  // But the edges between the bevels must be opaque tile, or it is not full bleed at all.
-  assert.notEqual(
-    colourKey(im.px, (im.width / 2) * 4),
-    'transparent',
-    'the iOS icon is not full bleed along its top edge',
-  );
+  assert.equal(transparentCount(im), 0, 'the iOS icon has transparent pixels; the upload would be refused');
+  for (const file of readdirSync(root + 'safari/App/Assets.xcassets/AppIcon.appiconset/').filter((f) => f.endsWith('.png'))) {
+    const colourType = readFileSync(root + 'safari/App/Assets.xcassets/AppIcon.appiconset/' + file)[25];
+    assert.equal(colourType, 2, `${file} is PNG colour type ${colourType}, not RGB`);
+  }
+  // And still full bleed: the edge is opaque tile, not a margin.
+  assert.notEqual(colourKey(im.px, (im.width / 2) * 4), 'transparent', 'the iOS icon is not full bleed along its top edge');
 });

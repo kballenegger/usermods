@@ -20,6 +20,11 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<!-- The app and its extension make only standard HTTPS requests, to the model provider the
+	     person configures. Declaring that here answers App Store Connect's export-compliance
+	     question at upload time instead of blocking every build on it. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<!-- An empty UILaunchScreen is the modern replacement for a launch storyboard. The app draws its

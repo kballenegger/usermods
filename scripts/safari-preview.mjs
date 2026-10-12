@@ -21,6 +21,8 @@
 //                                                   gets, save a PNG of each, and (unless the label
 //                                                   is `before`) run the compact shell's
 //                                                   accessibility assertions
+//   ?fixture=appstore                               the Wikipedia session the App Store screenshots
+//                                                   show (scripts/appstore-screenshots.mjs renders it)
 //   node scripts/safari-preview.mjs --probe         serve, open the popup in the default browser,
 //                                                   print what that browser laid out, and exit
 //                                                   (--probe simulator for the booted iPhone,
@@ -250,6 +252,80 @@ const LONG = {
 };
 
 /**
+ * The App Store fixture (?fixture=appstore), for scripts/appstore-screenshots.mjs.
+ *
+ * A first session on a Wikipedia article: one request, the page reads a model would make, a
+ * one-off test run, and a proposal that has not been saved yet, so the card offers Run once and
+ * Save & enable. The proposal is the same userscript the simulator captures install and run for
+ * real (APPSTORE_MOD_CSS below mirrors the fixture userscript in that script), so the chat, the
+ * Mods list and the page running the mod all tell one story. Invented, like every fixture here:
+ * no model wrote this transcript.
+ */
+const APPSTORE_TAB = { id: 7, windowId: 1, url: 'https://en.wikipedia.org/wiki/Bulletin_board_system', title: 'Bulletin board system - Wikipedia' };
+const APPSTORE_CHAT_ID = 'chat-appstore';
+const APPSTORE_MOD_CODE = `GM_addStyle(\`
+  html, body, #content { background: #f4ecd8 !important; }
+  .mw-parser-output p, .mw-parser-output li {
+    font-family: 'New York', Georgia, serif !important;
+    font-size: 19px !important;
+    line-height: 1.65 !important;
+  }
+  .mw-parser-output a { color: #8a3b12 !important; }
+  .mw-editsection, .hatnote, .ambox { display: none !important; }
+\`);`;
+const APPSTORE_ITEMS = [
+  { kind: 'model', connectionId: 'conn-1', label: 'Anthropic', model: 'claude-opus-5' },
+  { kind: 'user', id: 'u1', text: 'Make articles easier to read: warm paper, bigger serif text, no edit clutter.' },
+  { kind: 'tool', id: 't1', name: 'get_page', input: { max_chars: 12000 }, summary: 'Bulletin board system, 9,840 chars, Minerva skin' },
+  { kind: 'tool', id: 't2', name: 'get_styles', input: { selector: '.mw-parser-output p', properties: ['font-family', 'font-size', 'line-height'] }, summary: 'sans-serif, 16px, 1.6' },
+  { kind: 'tool', id: 't3', name: 'run_script', input: { description: 'try the reading styles on this page', code: APPSTORE_MOD_CODE }, summary: 'ran without errors' },
+  { kind: 'assistant', text: "This is Wikipedia's mobile skin. I set a warm paper background, switched the body to a serif at 19px with a 1.65 line height, warmed the link colour to match, and hid the edit pencils, hatnotes and message boxes. I tried it on this page first and it applied cleanly." },
+  { kind: 'proposal', version: 1, proposal: { name: 'Wikipedia: reading mode', description: 'Warm paper background, a serif body at a comfortable size, and no edit clutter on Wikipedia articles.', matches: ['*://*.wikipedia.org/wiki/*'], code: APPSTORE_MOD_CODE } },
+];
+const APPSTORE_ARTIFACT = {
+  id: 'artifact-appstore', chatId: APPSTORE_CHAT_ID, name: 'Wikipedia: reading mode',
+  description: 'Warm paper background, a serif body at a comfortable size, and no edit clutter on Wikipedia articles.',
+  matches: ['*://*.wikipedia.org/wiki/*'],
+  versions: [version(1, APPSTORE_MOD_CODE, 'Warm paper background, a serif body at a comfortable size, and no edit clutter on Wikipedia articles.', 6e4)],
+  current: 1,
+};
+APPSTORE_ARTIFACT.versions[0].name = 'Wikipedia: reading mode';
+APPSTORE_ARTIFACT.versions[0].matches = ['*://*.wikipedia.org/wiki/*'];
+const APPSTORE_CHATS = [
+  { id: APPSTORE_CHAT_ID, host: 'en.wikipedia.org', title: 'Reading mode for articles', createdAt: Date.now() - 3e5, updatedAt: Date.now() - 6e4, turns: 1, url: APPSTORE_TAB.url },
+  { id: 'chat-appstore-2', host: 'en.wikipedia.org', title: 'Hide the donation banner', createdAt: Date.now() - 6048e5, updatedAt: Date.now() - 2592e5, turns: 2 },
+];
+const appstoreMod = (id, name, description, matches, over = {}) => ({
+  id, name, description, version: '1.0.0', matches, excludeMatches: [], includeGlobs: [], excludeGlobs: [],
+  runAt: 'document_end', world: 'USER_SCRIPT', allFrames: false, grants: ['GM_addStyle'], connect: [],
+  requires: [], resources: [], source: '// ==UserScript==\n', enabled: true, createdAt: Date.now() - 864e5, updatedAt: Date.now() - 36e5, ...over,
+});
+const APPSTORE_MODS = [
+  appstoreMod('mod-a1', 'Wikipedia: reading mode', 'Warm paper background, a serif body at a comfortable size, and no edit clutter on Wikipedia articles.', ['*://*.wikipedia.org/wiki/*'], { version: '1.2.0' }),
+  appstoreMod('mod-a2', 'Wikipedia: no donation banner', 'Hides the fundraising banner and the site notice above articles.', ['*://*.wikipedia.org/*'], { enabled: false, grants: [] }),
+  appstoreMod('mod-a3', 'Hacker News: wider comments', 'Full-width comment column with a smaller reply indent.', ['https://news.ycombinator.com/item*']),
+  appstoreMod('mod-a4', 'YouTube: no Shorts', 'Removes the Shorts shelf and the Shorts tab from the home feed.', ['*://www.youtube.com/*'], { runAt: 'document_idle' }),
+  appstoreMod('mod-a5', 'GitHub: wider diffs', 'Lets pull-request diffs use the full width of the window.', ['*://github.com/*'], { enabled: false }),
+];
+const APPSTORE = {
+  tab: APPSTORE_TAB,
+  storage: {
+    'chats': APPSTORE_CHATS,
+    [`chat:${APPSTORE_CHAT_ID}:items`]: APPSTORE_ITEMS,
+    connections: {
+      v: 1,
+      list: [
+        { id: 'conn-1', kind: 'anthropic', label: 'Anthropic', baseUrl: '', apiKey: 'sk-ant-preview-not-a-real-key', models: { ids: ['claude-opus-5', 'claude-sonnet-5', 'claude-haiku-4-5-20251001'], fetchedAt: Date.now() } },
+        { id: 'conn-4', kind: 'chatgpt', label: 'ChatGPT subscription', baseUrl: '', apiKey: '' },
+        { id: 'conn-3', kind: 'xai', label: 'SuperGrok subscription', baseUrl: '', apiKey: '' },
+        { id: 'conn-2', kind: 'openai-compatible', label: 'LM Studio', baseUrl: 'http://localhost:1234/v1', apiKey: '', models: { ids: ['qwen3-coder-30b', 'gemma-3-12b-it'], fetchedAt: Date.now() } },
+      ],
+    },
+  },
+  rpc: { 'mods.list': APPSTORE_MODS, 'chats.list': APPSTORE_CHATS, 'chats.listAll': APPSTORE_CHATS, 'artifact.get': APPSTORE_ARTIFACT },
+};
+
+/**
  * A device-code sign-in, invented end to end.
  *
  * NOTHING here touches a vendor. `auth.x.ai` and `auth.openai.com` are never contacted, no real
@@ -292,8 +368,15 @@ function stubSource() {
   return `(() => {
   const store = ${JSON.stringify(STORAGE)};
   const rpc = ${JSON.stringify(RPC)};
-  const tab = ${JSON.stringify(TAB)};
+  let tab = ${JSON.stringify(TAB)};
   const query = new URLSearchParams(location.search);
+  // ?fixture=appstore: the Wikipedia session scripts/appstore-screenshots.mjs captures.
+  if (query.get('fixture') === 'appstore') {
+    const appstore = ${JSON.stringify(APPSTORE)};
+    Object.assign(store, appstore.storage);
+    Object.assign(rpc, appstore.rpc);
+    tab = appstore.tab;
+  }
   // ?fixture=long swaps in the worked-in chat. ?theme=light|dark picks the palette, in storage
   // (what the app reads) and in the localStorage mirror (what theme-boot.js reads before paint).
   if (query.get('fixture') === 'long') {

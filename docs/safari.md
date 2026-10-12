@@ -412,13 +412,13 @@ Three things about that grid and the platforms are worth recording:
   one layer in — and would reintroduce the split-block problem. Because nothing is scaled, **there
   is no small-size exception any more**: every macOS raster from 16 to 1024 is whole blocks, so the
   no-new-colours check applies unweakened at every slot.
-- **The macOS rasters drop the artwork's bevel; the iOS one keeps it.** `assets/icon.svg` takes one
+- **Every raster drops the artwork's bevel, and none carries an alpha channel.** `assets/icon.svg` takes one
   grid block out of each corner — a pixel-art bevel, the BBS-era way of saying "rounded" at this
   size. Under a system mask that bevel is harmful: those corner blocks are transparent, so they
   punch four notches out of the navy right where the squircle needs opaque colour. macOS therefore
   gets the tile colour painted edge to edge underneath, and the generator fails the build on a
   single transparent pixel in a macOS raster. iOS keeps the artwork as-is, because its superellipse
-  cuts further in than the bevel does and those corners are never seen. No CSS rounding is applied
+  cuts further in than the bevel does and those corners are never seen. That reasoning held until the first App Store upload on 2026-10-13, which App Store Connect refused at validation for an alpha channel in the 1024 icon ("can't be transparent or contain an alpha channel"). So the iOS raster is opaque too, and every raster is written as 8-bit RGB with no alpha channel at all, since a fully opaque RGBA file still contains the channel the rule names. No CSS rounding is applied
   on either platform: the system does the rounding, and a `border-radius` would only antialias an
   arc that gets clipped away, breaking the no-new-colours rule for nothing.
 
@@ -1069,11 +1069,50 @@ allowed.
 
 ## Distribution
 
-Nothing here is an App Store submission and nothing here is signed for release. On macOS that is the
-difference between an extension Safari lists and one it hides: a Developer ID signature is what makes
-the two developer settings in [Install](#then-turn-it-on-on-macos) unnecessary. Apple's App Review
-guideline 2.5.2 covers executing code that changes an app's features, which is a fair description of
-what usermods does with model-written scripts, so App Store distribution is an open question that
-this port does not answer. See the Safari section of [docs/browsers.md](browsers.md). The device path in
-[Install](#install) is written down but has not been run: nothing here is signed, and no physical
-iPhone or iPad has run this build.
+### iOS: the App Store archive
+
+`node scripts/safari-xcode.mjs archive --team <id>` is the release path for iPhone and iPad. It
+stages the ordinary Safari build (the one with subscription sign-in; add `--store` for the variant
+without it), archives the `usermods` scheme in Release for `generic/platform=iOS`, and exports an
+App Store `.ipa` with `method = app-store-connect` and automatic signing. Nothing distribution-grade
+is checked in: with `-allowProvisioningUpdates`, xcodebuild asks the Apple account signed in to
+Xcode on that machine for the Apple Distribution certificate and the two App Store profiles (app and
+extension), and keeps them in Xcode's own keychain. The archive's app still shows an *Apple
+Development* signature; the export is what re-signs it.
+
+Then it looks inside, because the copy phase that puts the web extension into the `.appex` has
+shipped the previous web build before without a word in any log ([see the macOS section](#one-pair-of-targets-two-platforms)):
+
+- the `.appex` is embedded and has `manifest.json` at its root, and every staged file is in it at
+  the same size;
+- app, extension and manifest carry the same version, and `ITSAppUsesNonExemptEncryption` is
+  `false` in the app's Info.plist (both app plists declare it; the app only makes ordinary HTTPS
+  requests, and without the key App Store Connect holds every build on the export-compliance
+  question);
+- the `.ipa` holds `embedded.mobileprovision` for both bundles.
+
+Run on 2026-10-11 for 0.1.1 (1): 39 staged files matched; the exported app and extension were both
+signed `Apple Distribution: Kenneth Ballenegger (2TK86C98Z5)`, with *iOS Team Store Provisioning
+Profile* profiles (no device list, `get-task-allow` false, `beta-reports-active` true, valid to
+August 2027), `MinimumOSVersion` 16.4, device family iPhone and iPad.
+
+Nothing leaves the machine until `--upload` is added, which exports the same archive again with
+`destination = upload` through the Xcode account, and App Store Connect then processes it into
+TestFlight. `--build N` overrides `USERMODS_BUILD_NUMBER` for a re-upload of the same version;
+`manageAppVersionAndBuildNumber` is off in the export options so Apple does not renumber it.
+
+### What the App Store asks that this port does not answer
+
+Apple's App Review guideline 2.5.2 covers executing code that changes an app's features, which is a
+fair description of what usermods does with model-written scripts; the argument that it is within the
+rules (userscripts are user data run inside Safari's own web-extension sandbox, as existing App Store
+userscript managers do) is made in `docs/store/appstore/reviewer-notes.md`, and only a review
+answers it. See also the Safari section of [docs/browsers.md](browsers.md).
+
+### macOS
+
+The Mac build is not signed for release. That is the difference between an extension Safari lists
+and one it hides: a Developer ID signature (or the App Store) is what makes the two developer
+settings in [Install](#then-turn-it-on-on-macos) unnecessary. The macOS version on the App Store
+Connect record is left in *Prepare for Submission*; it needs its own screenshots and either an App
+Store export for macOS or a notarised Developer ID build, neither of which `archive` does yet.

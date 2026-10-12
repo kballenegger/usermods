@@ -22,6 +22,7 @@
     "postinstall": "wxt prepare",
     "popover-size": "npm run build:safari && node scripts/safari-preview.mjs --popover-size",
     "safari-providers": "npm run build:safari && node scripts/safari-preview.mjs --providers",
+    "appstore-screenshots": "node scripts/appstore-screenshots.mjs",
     "screenshots": "USERMODS_TEST_BUILD=1 wxt build && USERMODS_TEST_BUILD=1 node scripts/screenshots.mjs",
     "smoke": "USERMODS_TEST_BUILD=1 wxt build && USERMODS_TEST_BUILD=1 node scripts/screenshots.mjs --smoke",
     "smoke:chats": "USERMODS_TEST_BUILD=1 wxt build && USERMODS_TEST_BUILD=1 node scripts/screenshots.mjs --chats",
