@@ -782,8 +782,13 @@ Installing the app is not enough. On the simulator or the device:
 
 ### Then turn it on, on macOS
 
-Safari finds the extension through the app, so the app has to live somewhere permanent. A build
-directory is not that.
+**From a release**, the window in `usermods.dmg` says it all: drag usermods to Applications, open
+it once, turn it on in Safari > Settings > Extensions, give it Every Website. That build is
+Developer ID signed and notarized ([Distribution](#macos-the-disk-image)), so none of the developer
+settings below apply to it.
+
+**From a local build**, Safari still finds the extension through the app, so the app has to live
+somewhere permanent. A build directory is not that.
 
 1. `cp -R .output/safari-xcode/Build/Products/Debug/usermods.app /Applications/`
 2. Open it once. The window says where the switch is and can open Safari's extension settings for
@@ -1109,10 +1114,64 @@ rules (userscripts are user data run inside Safari's own web-extension sandbox, 
 userscript managers do) is made in `docs/store/appstore/reviewer-notes.md`, and only a review
 answers it. See also the Safari section of [docs/browsers.md](browsers.md).
 
-### macOS
+### macOS: the disk image
 
-The Mac build is not signed for release. That is the difference between an extension Safari lists
-and one it hides: a Developer ID signature (or the App Store) is what makes the two developer
-settings in [Install](#then-turn-it-on-on-macos) unnecessary. The macOS version on the App Store
-Connect record is left in *Prepare for Submission*; it needs its own screenshots and either an App
-Store export for macOS or a notarised Developer ID build, neither of which `archive` does yet.
+`node scripts/safari-xcode.mjs dmg --team <id>` is the release path for the Mac, outside the App
+Store, and it has the shape Caret and Feke use for their Mac apps: a Release archive for
+`generic/platform=macOS`, a Developer ID export, a disk image with a laid-out Finder window,
+notarization with the ticket stapled to the image and to the app, and a mount-and-look before the
+command calls anything finished. Developer ID is what makes Safari list the extension on another
+Mac without the two developer settings `mac` prints; the notarization ticket is what lets
+Gatekeeper open a fresh download at all. The image lands at `dist/usermods.dmg` (git-ignored).
+
+What it needs on the machine: a full Xcode, `uv` (`brew install uv`; dmgbuild runs through `uvx`,
+pinned, so nothing is installed globally), a *Developer ID Application* certificate for the team in
+the keychain (Xcode > Settings > Accounts > the team > Manage Certificates > +, account holder
+only), and App Store Connect API credentials for `notarytool`. The credentials come from a
+keychain profile named `usermods` (`--notary-profile` picks another), created once with
+
+```sh
+xcrun notarytool store-credentials usermods --key AuthKey_XXXXXXXXXX.p8 --key-id XXXXXXXXXX --issuer <issuer id>
+```
+
+or from `USERMODS_ASC_KEY_PATH`, `USERMODS_ASC_KEY_ID` and `USERMODS_ASC_ISSUER_ID` in the
+environment. Nothing of that is in the repository.
+
+The window is laid out by [dmgbuild](https://github.com/dmgbuild/dmgbuild) from
+`safari/dmg/settings.py` against `safari/dmg/background.png`, the owner's artwork (see
+[branding.md](branding.md)): the app on the left, an alias to `/Applications` on the right, the
+arrow between them, and "Drag usermods to Applications" above. dmgbuild writes the window's `.DS_Store` itself, so there is no Finder scripting and no
+Automation permission, and the same image comes out over ssh. The artwork ships as a two-
+representation TIFF, so Retina displays get the full 1536 × 1024 while the window stays 768 × 512
+points.
+
+Three things it does that the build log would not show:
+
+- The whole thing builds under `~/Library/Caches/usermods-mac-dmg`, not `.output/`, and the
+  exported app has its extended attributes cleared before it goes on the image. This checkout
+  lives in a synced folder on the release Mac, and the sync client tags every file it sees with
+  an attribute of its own, which would otherwise ride inside the app. The seal is verified again
+  after the clearing.
+- The archived app is compared file by file against what was staged, as `mac` and `archive` do,
+  because the copy phase has shipped the previous web build before without a word in any log.
+- The finished image is mounted (`-nobrowse`, so it never appears in Finder) and read back: the
+  app and the `Applications` alias are there, `.DS_Store` and the HiDPI background are at the
+  volume root, app and extension carry the same version, the signature verifies with the
+  extension inside, both bundles are Developer ID signed with the hardened runtime, the ticket is
+  stapled, and `spctl --assess` answers *Notarized Developer ID*. `dmg --check` runs those checks
+  alone on the image in `dist/`. `--skip-notarize` makes the image without the trip to Apple and
+  says, in the checks and in the summary, that it is not one to hand out.
+
+Nothing leaves the machine until `--publish`, which copies the checked image to the GitHub
+release `v<version>` as `usermods-<version>.dmg` and `usermods.dmg` (the name
+`releases/latest/download/usermods.dmg` resolves). The release is created as a draft when it does
+not exist, so the notes get read before anything is public, and it refuses a dirty tree or a
+commit the remote has not seen.
+
+Run on 2026-10-13 for 0.1.1 (1): 39 staged files matched; app and extension exported as
+`Developer ID Application: Kenneth Ballenegger (2TK86C98Z5)` with the hardened runtime,
+`LSMinimumSystemVersion` 13.0; the image is 0.8 MB.
+
+The macOS version on the App Store Connect record stays in *Prepare for Submission*: the store
+would need its own screenshots and an App Store export for macOS, which is a different export
+method from this one and not something anyone has asked for yet.
