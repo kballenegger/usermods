@@ -10,28 +10,66 @@ import { DEFAULT_SETTINGS, THEME_CYCLE, nextTheme, resolveTheme } from '../lib/t
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-test('the pre-paint script and lib/theme.ts agree on the mirror key', () => {
-  // public/theme-boot.js runs before the stylesheet, as a classic script, and imports nothing — it
-  // cannot share a constant with lib/theme.ts without pulling in the module graph it exists to
-  // avoid. So the key is written in both places. If they ever drift, the pre-paint script reads a
-  // key nothing writes, and the dark flash comes back silently on a path nothing else covers.
-  const theme = fs.readFileSync(path.join(ROOT, 'lib', 'theme.ts'), 'utf8');
+// A minimal <html> element: the attribute and style the theme code writes, nothing else.
+function fakeDocument() {
+  const attrs = new Map<string, string>();
+  const documentElement = {
+    style: { colorScheme: '' },
+    setAttribute: (name: string, value: string) => void attrs.set(name, value),
+    removeAttribute: (name: string) => void attrs.delete(name),
+    getAttribute: (name: string) => attrs.get(name) ?? null,
+  };
+  return { documentElement } as unknown as Document;
+}
+
+function fakeLocalStorage() {
+  const data = new Map<string, string>();
+  return {
+    getItem: (k: string) => data.get(k) ?? null,
+    setItem: (k: string, v: string) => void data.set(k, v),
+  };
+}
+
+// Runs public/theme-boot.js the way a page does: as a classic script with only the page globals.
+// A module-only construct (an `import` statement) is a SyntaxError here, and a `require` would
+// throw inside the script's try and leave the document untouched, so both fail the checks below.
+function runBootScript(localStorage: ReturnType<typeof fakeLocalStorage>, document: Document): void {
   const boot = fs.readFileSync(path.join(ROOT, 'public', 'theme-boot.js'), 'utf8');
+  new Function('localStorage', 'document', boot)(localStorage, document);
+}
 
-  const inTheme = /MIRROR_KEY\s*=\s*'([^']+)'/.exec(theme)?.[1];
-  const inBoot = /localStorage\.getItem\('([^']+)'\)/.exec(boot)?.[1];
-
-  assert.ok(inTheme, 'no MIRROR_KEY found in lib/theme.ts');
-  assert.ok(inBoot, 'no localStorage.getItem key found in public/theme-boot.js');
-  assert.equal(inBoot, inTheme);
+test('the pre-paint script restores whatever applyTheme last applied', async () => {
+  // public/theme-boot.js runs before the stylesheet, as a classic script, and imports nothing, so it
+  // cannot share the mirror key with lib/theme.ts. If the two drift, the pre-paint script reads a key
+  // nothing writes and the dark flash comes back on a path nothing else covers. This runs both
+  // halves: applyTheme writes the mirror, and the boot script on a fresh page must reproduce the
+  // same <html> state before any CSS applies.
+  const { applyTheme } = await import('../lib/theme.ts');
+  const storage = fakeLocalStorage();
+  (globalThis as { localStorage?: unknown }).localStorage = storage;
+  try {
+    for (const choice of ['light', 'dark', 'system'] as const) {
+      const live = fakeDocument();
+      // Start the fresh page from the opposite state, so a boot script that does nothing fails.
+      const fresh = fakeDocument();
+      fresh.documentElement.setAttribute('data-theme', choice === 'light' ? 'dark' : 'light');
+      applyTheme(choice, live);
+      runBootScript(storage, fresh);
+      assert.equal(fresh.documentElement.getAttribute('data-theme'), live.documentElement.getAttribute('data-theme'), choice);
+      assert.equal(fresh.documentElement.style.colorScheme, live.documentElement.style.colorScheme, choice);
+    }
+  } finally {
+    delete (globalThis as { localStorage?: unknown }).localStorage;
+  }
 });
 
-test('the pre-paint script stays dependency-free', () => {
-  // The moment this file imports anything it stops being able to run before the first paint, which
-  // is its entire reason for existing.
-  const boot = fs.readFileSync(path.join(ROOT, 'public', 'theme-boot.js'), 'utf8');
-  assert.ok(!/^\s*import\s/m.test(boot), 'public/theme-boot.js must not import anything');
-  assert.ok(!/\brequire\s*\(/.test(boot), 'public/theme-boot.js must not require anything');
+test('the pre-paint script leaves a fresh profile on the CSS default', () => {
+  // An empty mirror means no saved choice. The CSS default (System) is the right answer, so the
+  // script must not write anything.
+  const doc = fakeDocument();
+  runBootScript(fakeLocalStorage(), doc);
+  assert.equal(doc.documentElement.getAttribute('data-theme'), null);
+  assert.equal(doc.documentElement.style.colorScheme, '');
 });
 
 test('every page loads the pre-paint script before its stylesheet', () => {

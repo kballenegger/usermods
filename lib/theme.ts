@@ -5,12 +5,12 @@
 // off is what "System" means — the prefers-color-scheme rule then decides, and its selector is
 // scoped to :root:not([data-theme]) so an explicit choice always wins.
 
-import type { ThemeChoice } from './types';
-import { DEFAULT_SETTINGS, resolveTheme } from './types';
+import type { ThemeChoice } from './types.ts';
+import { DEFAULT_SETTINGS, resolveTheme } from './types.ts';
 
 // The choice itself (the cycle order, the labels, how a stored value resolves) lives in types.ts
 // beside the setting it belongs to. This module is only the part that touches a document.
-export { THEME_CYCLE, THEME_LABEL, nextTheme } from './types';
+export { THEME_CYCLE, THEME_LABEL, nextTheme } from './types.ts';
 
 /**
  * A synchronous mirror of the saved choice, so the first paint can be right.

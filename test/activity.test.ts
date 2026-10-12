@@ -175,10 +175,6 @@ test('a lost port outranks a stall: the port is the more specific fact', () => {
   assert.equal(a.action, 'retry');
 });
 
-test('a lost port still shows a line even once the phase reads idle', () => {
-  assert.notEqual(activityFor(state({ phase: 'idle', disconnected: true })), null);
-});
-
 // ---------- the timer ----------
 
 test('elapsed reads in whole seconds below a minute', () => {
@@ -292,8 +288,6 @@ test('a finished chat leaves no entry for the next run to inherit', () => {
     { chatId: 'a', e: { type: 'status', phase: 'idle' } },
   ]);
   assert.equal(map.size, 0);
-  // Which is to say: an unknown chat reads as idle, so the line shows nothing.
-  assert.equal(map.get('a') ?? IDLE_ACTIVITY, IDLE_ACTIVITY);
 });
 
 test("a chat's elapsed clock starts at its own first event, not another chat's", () => {

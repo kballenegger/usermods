@@ -62,20 +62,12 @@ test('a fractional budget is rounded rather than stored as a fraction', () => {
 // The report itself: every prefix of a number you are typing
 // ---------------------------------------------------------------------------
 
-test('typing 50000 one key at a time never rewrites the field under the cursor', () => {
+test('typing 50000 one key at a time commits what was typed', () => {
   // THE BUG, as a test. The old field clamped inside onChange, so to reach 50000 the user typed
-  // "5" — which became 10000 — and from there every further keystroke appended to the wrong
-  // number. The prefixes are exactly what must NOT be clamped; only the final value is.
-  const typed = '50000';
-  const prefixes = Array.from({ length: typed.length }, (_, i) => typed.slice(0, i + 1));
-  assert.deepEqual(prefixes, ['5', '50', '500', '5000', '50000']);
-
-  // What the OLD code did to each prefix, for the record: four of the five were rewritten.
-  const oldBehaviour = prefixes.map((p) => Math.max(10_000, Number(p) || DEFAULT_CONTEXT_BUDGET));
-  assert.deepEqual(oldBehaviour, [10_000, 10_000, 10_000, 10_000, 50_000]);
-
-  // The new field commits once, at the end, and gets what the user typed.
-  assert.equal(commitContextBudget(typed), 50_000);
+  // "5", which became 10000, and every further keystroke appended to the wrong number. Only the
+  // final value may be committed, and it must come back as typed. Whether the screen waits for the
+  // final value is the source check further down.
+  assert.equal(commitContextBudget('50000'), 50_000);
 });
 
 test('the same holds for a budget the user means to be below the floor', () => {
@@ -91,8 +83,12 @@ test('the same holds for a budget the user means to be below the floor', () => {
 // The rule being correct is not the fix; the fix is that the screen stopped applying it on every
 // keystroke. A unit test of the pure function cannot see that, and the regression would be one
 // careless edit away — so the shape of the field is pinned here too.
+//
+// These two are source lint, not behaviour: they read SettingsView.tsx as text. The test suite has
+// no DOM renderer to fire input and blur events, so this is the cheapest guard for the regression
+// the user reported. If a renderer is ever added, replace them with a typed-then-blurred field.
 
-test('the Settings field commits the budget on blur, not on change', () => {
+test('source lint: the Settings field commits the budget on blur, not on change', () => {
   const src = fs.readFileSync(path.join(ROOT, 'entrypoints', 'sidepanel', 'SettingsView.tsx'), 'utf8');
   const field = src.slice(src.indexOf('Context budget (tokens)'), src.indexOf('Side panel opens'));
   assert.ok(field.includes('onBlur={commitBudget}'), 'the context budget must be committed on blur');
@@ -109,7 +105,7 @@ test('the Settings field commits the budget on blur, not on change', () => {
   );
 });
 
-test('the floor the screen shows is the floor the rule applies', () => {
+test('source lint: the floor the screen shows comes from the constant the rule applies', () => {
   // The help text names a number. If the two ever drift, the screen is lying about what it will do.
   const src = fs.readFileSync(path.join(ROOT, 'entrypoints', 'sidepanel', 'SettingsView.tsx'), 'utf8');
   assert.ok(src.includes('MIN_CONTEXT_BUDGET'), 'the field should state the floor from the constant, not a literal');

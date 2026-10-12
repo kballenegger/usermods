@@ -22,7 +22,7 @@ import {
   type Artifact,
   type NewVersion,
 } from '../lib/artifact.ts';
-import { capChats, itemsKey, messagesKey, type Chat } from '../lib/chats.ts';
+import { capChats, chatKeys, type Chat } from '../lib/chats.ts';
 import { parseHeader, stripHeader } from '../lib/mods.ts';
 import type { Mod } from '../lib/types';
 
@@ -378,9 +378,9 @@ test('an artifact is keyed by its chat, so nothing else can read or overwrite it
 });
 
 test('the chat cap evicts artifacts along with the transcripts it drops', () => {
-  // capChats names the ids that go; the background removes all three keys for each. This asserts
-  // the artifact key is derivable for exactly those ids, which is what keeps a dropped chat from
-  // leaving its draft behind in storage forever.
+  // capChats names the ids that go; the background removes chatKeys(id) for each. This asserts
+  // that list includes the artifact key, which is what keeps a dropped chat from leaving its
+  // draft behind in storage forever.
   const chats: Chat[] = Array.from({ length: 5 }, (_, i) => ({
     id: `c${i}`,
     host: 'example.com',
@@ -391,8 +391,8 @@ test('the chat cap evicts artifacts along with the transcripts it drops', () => 
   const { kept, dropped } = capChats(chats, 3);
   assert.deepEqual(dropped.sort(), ['c0', 'c1']);
   assert.equal(kept.length, 3);
-  const removed = dropped.flatMap((id) => [messagesKey(id), itemsKey(id), artifactKey(id)]);
-  assert.deepEqual(removed, ['chat:c0:messages', 'chat:c0:items', 'chat:c0:artifact', 'chat:c1:messages', 'chat:c1:items', 'chat:c1:artifact']);
+  const removed = dropped.flatMap((id) => chatKeys(id));
+  for (const id of dropped) assert.ok(removed.includes(artifactKey(id)), `${id} artifact is removed`);
 });
 
 /** A Mod with the fields fromMod reads; the rest are defaults nothing here looks at. */

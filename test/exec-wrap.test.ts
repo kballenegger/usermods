@@ -6,23 +6,41 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { wrapForExecution } from '../lib/exec/wrap.ts';
 
-test('the chrome transport reports through chrome.runtime, the bridge through the runner', () => {
-  const viaChrome = wrapForExecution('return 1', 'run-1');
-  const viaBridge = wrapForExecution('return 1', 'run-1', 'bridge');
-  assert.match(viaChrome.wrapped, /chrome\.runtime\.sendMessage/);
-  assert.doesNotMatch(viaChrome.wrapped, /__usermodsReport/);
-  // Safari evaluates the code with chrome shadowed, so the result has to come back through the
-  // function the runner passes in. See lib/exec/evaluate.ts.
-  assert.match(viaBridge.wrapped, /__usermodsReport/);
-  assert.doesNotMatch(viaBridge.wrapped, /chrome\.runtime\.sendMessage/);
+/**
+ * Run the wrapped code for real, with a fake chrome.runtime and a fake __usermodsReport, and return
+ * every message each transport received. Node has no document, MutationObserver or
+ * requestAnimationFrame; the wrapper already guards each of those, so the run completes here too.
+ */
+async function run(code: string, runId: string, transport?: 'chrome' | 'bridge') {
+  const viaChrome: unknown[] = [];
+  const viaBridge: unknown[] = [];
+  const chrome = { runtime: { sendMessage: (m: unknown) => void viaChrome.push(m) } };
+  const report = (m: unknown) => void viaBridge.push(m);
+  const { wrapped } = wrapForExecution(code, runId, transport);
+  await new Function('chrome', '__usermodsReport', `return ${wrapped}`)(chrome, report);
+  return { viaChrome, viaBridge };
+}
+
+/** What a script that returns 1 and touches nothing reports. */
+const resultOf = (runId: string) => ({
+  type: 'usermods:run-result',
+  runId,
+  ok: true,
+  returnedValue: true,
+  result: '1',
+  dom: { added: 0, removed: 0, attributes: 0 },
+  logs: [],
 });
 
-test('both transports report the same runId and message type', () => {
-  for (const t of ['chrome', 'bridge'] as const) {
-    const { wrapped } = wrapForExecution('return 1', 'run-xyz', t);
-    assert.match(wrapped, /'usermods:run-result'/);
-    assert.match(wrapped, /"run-xyz"/);
-  }
+test('the chrome transport reports through chrome.runtime, the bridge through the runner', async () => {
+  const chrome = await run('return 1', 'run-1');
+  assert.deepEqual(chrome.viaChrome, [resultOf('run-1')]);
+  assert.deepEqual(chrome.viaBridge, [], 'the chrome transport must not call the bridge');
+  // Safari evaluates the code with chrome shadowed, so the result has to come back through the
+  // function the runner passes in. See lib/exec/evaluate.ts.
+  const bridge = await run('return 1', 'run-1', 'bridge');
+  assert.deepEqual(bridge.viaBridge, [resultOf('run-1')]);
+  assert.deepEqual(bridge.viaChrome, [], 'the bridge transport must not call chrome.runtime');
 });
 
 test('the line offset is the same on both, so a stack maps the same way', () => {
@@ -34,8 +52,11 @@ test('the line offset is the same on both, so a stack maps the same way', () => 
   assert.ok(a.lineOffset > 0);
 });
 
-test('a runId with a quote in it cannot break out of the generated string', () => {
-  const { wrapped } = wrapForExecution('return 1', `r'"\n`, 'bridge');
+test('a hostile runId arrives intact on both transports instead of breaking the generated code', async () => {
   // JSON.stringify is what keeps this honest; the test is here so it stays that way.
-  assert.match(wrapped, /runId: "r'\\"\\n"/);
+  const hostile = 'r\'"\n`${globalThis}\\';
+  const chrome = await run('return 1', hostile, 'chrome');
+  assert.deepEqual(chrome.viaChrome, [resultOf(hostile)]);
+  const bridge = await run('return 1', hostile, 'bridge');
+  assert.deepEqual(bridge.viaBridge, [resultOf(hostile)]);
 });
