@@ -53,7 +53,7 @@ Distribution* with App Store profiles for both bundles.
    This goes through the Apple account signed in to Xcode on this Mac. Processing takes a few
    minutes; the build then appears under **TestFlight → iOS builds**. If it asks for export
    compliance anyway, answer *No* to non-exempt encryption (standard HTTPS only).
-2. **TestFlight on a real device.** Install the build from TestFlight on an iPhone, enable the
+2. **TestFlight on a real device.** Done on Kenneth's iPhone on 2026-10-13 (sign-in, a mod, a run surviving the popup's dismissal). For a later build: install it from TestFlight on an iPhone, enable the
    extension (Settings → Apps → Safari → Extensions → usermods, allow on all websites), connect a
    provider, write one mod and reload the page. Check that a subscription sign-in completes and
    that a run survives the popup being dismissed; the simulator cannot prove either (see
@@ -70,8 +70,8 @@ Distribution* with App Store profiles for both bundles.
 4. **App Review Information.** *Sign-in required* stays unticked (the app has no account).
    Contact: name, phone, email. **Notes** → paste the block from
    [reviewer-notes.md](reviewer-notes.md). It needs the reviewer endpoint and key: the existing
-   Chrome reviewer key expires **2026-10-17**, so issue or extend one that outlives a review
-   (two to four weeks) and put its base URL and key in the two placeholders. Never commit them.
+   reviewer key was extended on 2026-10-13 to a month past 2026-10-17, so it outlives a review; put
+   its base URL and key in the two placeholders. Never commit them.
 5. **Version release** → *Manually release this version*, so approval does not publish before the
    announcement post is ready.
 6. **Add for Review → Submit.** iOS only; leave the macOS version alone.

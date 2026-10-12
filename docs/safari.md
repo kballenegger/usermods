@@ -412,13 +412,13 @@ Three things about that grid and the platforms are worth recording:
   one layer in — and would reintroduce the split-block problem. Because nothing is scaled, **there
   is no small-size exception any more**: every macOS raster from 16 to 1024 is whole blocks, so the
   no-new-colours check applies unweakened at every slot.
-- **The macOS rasters drop the artwork's bevel; the iOS one keeps it.** `assets/icon.svg` takes one
+- **Every raster drops the artwork's bevel, and none carries an alpha channel.** `assets/icon.svg` takes one
   grid block out of each corner — a pixel-art bevel, the BBS-era way of saying "rounded" at this
   size. Under a system mask that bevel is harmful: those corner blocks are transparent, so they
   punch four notches out of the navy right where the squircle needs opaque colour. macOS therefore
   gets the tile colour painted edge to edge underneath, and the generator fails the build on a
   single transparent pixel in a macOS raster. iOS keeps the artwork as-is, because its superellipse
-  cuts further in than the bevel does and those corners are never seen. No CSS rounding is applied
+  cuts further in than the bevel does and those corners are never seen. That reasoning held until the first App Store upload on 2026-10-13, which App Store Connect refused at validation for an alpha channel in the 1024 icon ("can't be transparent or contain an alpha channel"). So the iOS raster is opaque too, and every raster is written as 8-bit RGB with no alpha channel at all, since a fully opaque RGBA file still contains the channel the rule names. No CSS rounding is applied
   on either platform: the system does the rounding, and a `border-radius` would only antialias an
   arc that gets clipped away, breaking the no-new-colours rule for nothing.
 

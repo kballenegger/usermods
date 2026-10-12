@@ -364,18 +364,18 @@ test('every macOS raster is opaque edge to edge', () => {
   }
 });
 
-test('the iOS raster stays full bleed with its bevel corners clear', () => {
-  // iOS is NOT given the macOS treatment: its superellipse mask cuts further in than the artwork's
-  // pixel-art bevel, so those four corner blocks are never seen and painting them would be filling
-  // in pixels nobody looks at. The corners staying transparent is what says the two platforms are
-  // still rendered differently on purpose.
+test('the iOS raster is opaque and carries no alpha channel, which App Store Connect refuses', () => {
+  // The first upload (2026-10-13) was refused at validation: "Invalid large app icon. The large app
+  // icon in the asset catalog can't be transparent or contain an alpha channel". The bevel corners
+  // used to be transparent on iOS on the reasoning that the superellipse hides them; Apple checks
+  // the file, not the mask. So: no transparent pixel, and PNG colour type 2 (RGB), since a fully
+  // opaque RGBA file still contains the channel the rule names.
   const im = pixels('ios-1024.png');
-  assert.ok(transparentCount(im) > 0, 'the iOS icon lost its bevel corners');
-  assert.equal(colourKey(im.px, 0), 'transparent', 'the top-left bevel block should be transparent');
-  // But the edges between the bevels must be opaque tile, or it is not full bleed at all.
-  assert.notEqual(
-    colourKey(im.px, (im.width / 2) * 4),
-    'transparent',
-    'the iOS icon is not full bleed along its top edge',
-  );
+  assert.equal(transparentCount(im), 0, 'the iOS icon has transparent pixels; the upload would be refused');
+  for (const file of readdirSync(root + 'safari/App/Assets.xcassets/AppIcon.appiconset/').filter((f) => f.endsWith('.png'))) {
+    const colourType = readFileSync(root + 'safari/App/Assets.xcassets/AppIcon.appiconset/' + file)[25];
+    assert.equal(colourType, 2, `${file} is PNG colour type ${colourType}, not RGB`);
+  }
+  // And still full bleed: the edge is opaque tile, not a margin.
+  assert.notEqual(colourKey(im.px, (im.width / 2) * 4), 'transparent', 'the iOS icon is not full bleed along its top edge');
 });
