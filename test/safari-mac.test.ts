@@ -379,3 +379,49 @@ test('the iOS raster is opaque and carries no alpha channel, which App Store Con
   // And still full bleed: the edge is opaque tile, not a margin.
   assert.notEqual(colourKey(im.px, (im.width / 2) * 4), 'transparent', 'the iOS icon is not full bleed along its top edge');
 });
+
+// ---------- the Mac disk image ----------
+//
+// The release path for the Mac app is a Developer ID export on a laid-out, notarized disk image,
+// the shape Caret and Feke ship. Every step of it fails quietly in its own way: an un-notarized
+// image mounts and installs on the Mac that built it and is refused on every other one; a missing
+// background still produces an image, just an ugly one. These pin the parts a build log would not.
+
+test('the build script has a Mac disk image command that notarizes and then mounts the image to check it', () => {
+  const script = read('scripts/safari-xcode.mjs');
+  assert.match(script, /'dmg'/);
+  // Developer ID, not App Store: what makes Safari list the extension on another Mac.
+  assert.match(script, /<string>developer-id<\/string>/);
+  // The layout tool is pinned, so every machine produces the same image.
+  assert.match(script, /dmgbuild==\$\{DMGBUILD_VERSION\}/);
+  assert.match(script, /^const DMGBUILD_VERSION = '\d+\.\d+\.\d+';$/m);
+  // Notarize, staple, and then ask Gatekeeper rather than trusting the ticket.
+  assert.match(script, /'notarytool', 'submit'/);
+  assert.match(script, /'stapler', 'staple'/);
+  assert.match(script, /source=Notarized Developer ID/);
+  assert.match(script, /hdiutil', \['attach', '-nobrowse'/);
+  // Nothing leaves the machine without --publish, and the release starts as a draft.
+  assert.match(script, /has\('publish'\)/);
+  assert.match(script, /'--draft'/);
+  // Credentials come from the keychain or the environment, never from here.
+  assert.match(script, /--keychain-profile/);
+  assert.doesNotMatch(script, /AuthKey_[A-Z0-9]/);
+  assert.doesNotMatch(script, /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/);
+});
+
+test('the installer window layout agrees with its artwork', () => {
+  const settings = read('safari/dmg/settings.py');
+  assert.match(settings, /^WINDOW_WIDTH = 768$/m);
+  assert.match(settings, /^WINDOW_HEIGHT = 512$/m);
+  assert.match(settings, /symlinks = \{"Applications": "\/Applications"\}/);
+  // hide_extensions writes FinderInfo onto the signed bundle, which strict verification rejects.
+  assert.doesNotMatch(settings, /^hide_extensions/m);
+  // The artwork is exactly twice the window, so both HiDPI representations are derived from it.
+  const art = decodePNG(root + 'safari/dmg/background.png');
+  assert.equal(art.width, 1536, 'background.png width');
+  assert.equal(art.height, 1024, 'background.png height');
+});
+
+test('the disk image is build output, not source', () => {
+  assert.match(read('.gitignore'), /^dist\/$/m);
+});

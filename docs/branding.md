@@ -48,6 +48,12 @@ The generated banner has texture and color variation; these are consistent imple
   also drops the artwork's corner bevel and carries no alpha channel: the transparent blocks would
   show the Dock through the system's squircle on macOS, and App Store Connect refuses an iOS icon
   with an alpha channel at upload (2026-10-13). See [safari.md](safari.md#the-host-app) for the full reasoning and sources.
+- `safari/dmg/background.png` — the macOS disk image's installer-window background, the owner's
+  artwork chosen on 2026-10-13 and kept byte for byte: 1536 × 1024, shown at half size (768 × 512
+  pt). The wordmark, "Drag usermods to Applications" and the arrow are in the picture; the goblin
+  sits bottom-left under where the app icon lands, a coast and skyline along the bottom.
+  `safari/dmg/settings.py` places the app and Applications icons either side of the arrow. There
+  is no generator; replace the file to change the window.
 
 Regenerate the extension PNGs (and `icon-1024.png`) after changing the SVG:
 

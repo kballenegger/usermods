@@ -87,7 +87,7 @@ Then in Chrome:
 2. Click **Details** on usermods and turn on **Allow User Scripts**. Chrome requires this toggle for any extension that runs user scripts, including Tampermonkey.
 3. Click the usermods icon to open the side panel **on that tab**. Go to **Settings**, click a preset under **Add provider**, and paste a key (or a local server URL). It saves as you type. Back in **Chat**, the model is the chip in the chat bar.
 
-For Safari, `node scripts/safari-xcode.mjs doctor` says what your Xcode allows, and `simulator` / `mac` build it. One app, one extension, both platforms, subscription sign-in included — **[docs/safari.md](docs/safari.md)** has the build, the install steps, the limitations and what has actually been seen running.
+For Safari on a Mac, the signed and notarized disk image on the [releases page](https://github.com/kballenegger/usermods/releases) is the install: drag usermods to Applications, open it once, turn it on in Safari > Settings > Extensions. To build it yourself, `node scripts/safari-xcode.mjs doctor` says what your Xcode allows, and `simulator` / `mac` build it. One app, one extension, both platforms, subscription sign-in included — **[docs/safari.md](docs/safari.md)** has the build, the install steps, the limitations and what has actually been seen running.
 
 ## Learn more
 
