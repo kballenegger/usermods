@@ -1170,7 +1170,7 @@ commit the remote has not seen.
 
 Run on 2026-10-13 for 0.1.1 (1): 39 staged files matched; app and extension exported as
 `Developer ID Application: Kenneth Ballenegger (2TK86C98Z5)` with the hardened runtime,
-`LSMinimumSystemVersion` 13.0; the image is 0.8 MB.
+`LSMinimumSystemVersion` 13.0; the notarization was accepted and the image is 2.3 MB.
 
 The macOS version on the App Store Connect record stays in *Prepare for Submission*: the store
 would need its own screenshots and an App Store export for macOS, which is a different export
