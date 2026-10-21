@@ -30,7 +30,7 @@ sees an authentication error inside the chat, which looks exactly like a broken 
 rejection under guideline 2.1.
 
 The block below holds the placeholders `<BASE_URL>` and `<API_KEY>` in place of those values.
-Replace both, and nothing else, when pasting. The model id `ornith` is not a secret and is filled in.
+Replace both, and nothing else, when pasting. The model id `ornith-1.5-35b` is not a secret and is filled in.
 
 ---
 
@@ -41,7 +41,7 @@ usermods is a Safari web extension for iPhone and iPad: a userscript manager whe
 No account or sign-in is needed. To test the AI feature, use this test endpoint (OpenAI-compatible):
 Base URL: <BASE_URL>
 API key: <API_KEY>
-Model: ornith
+Model: ornith-1.5-35b
 
 ENABLE THE EXTENSION
 1. Open the usermods app once. It shows these steps.
@@ -51,7 +51,7 @@ TEST (about 3 minutes)
 3. In Safari, open en.wikipedia.org/wiki/Common_kingfisher
 4. Tap the page menu button in Safari's address bar, then usermods. A sheet opens over the page. Tap "I understand" on the data notice.
 5. Tap Menu (top right) > Settings. Under "Add provider", tap "Custom OpenAI API". In the card that opens, replace ALL of Base URL (it starts as http://localhost:) with the Base URL above, and paste the API key into "API key". Settings save as you type.
-6. Tap "‹ Chat". Tap the model chip in the top bar (it reads "No model"), type ornith, and tap Use "ornith" on Custom OpenAI API.
+6. Tap "‹ Chat". Tap the model chip in the top bar (it reads "No model"), type ornith-1.5-35b, and tap Use "ornith-1.5-35b" on Custom OpenAI API.
 7. Type: hide the table of contents, and tap Send. The model reads the page and tests a script on it (the contents box disappears), then shows a proposed mod with its code.
 8. Tap "Save & enable". Close the sheet and reload the page: the saved script hides the contents box again.
 
@@ -77,7 +77,7 @@ App Store Connect refuses a Notes field over 4,000 rather than truncating it.
 
 The `‹` in step 6 is the character the button really shows, so the reviewer can match it by eye.
 Every quoted label in the steps (`I understand`, `Add provider`, `Custom OpenAI API`, `No model`,
-`Use "ornith" on Custom OpenAI API`, `Save & enable`) was checked against the source: `Consent.tsx`,
+`Use "ornith-1.5-35b" on Custom OpenAI API`, `Save & enable`) was checked against the source: `Consent.tsx`,
 `ProvidersSection.tsx`, `lib/connections.ts`, `Chat.tsx`, `ModelPicker.tsx` and `lib/artifact.ts`.
 If any of those strings changes, change the step.
 
@@ -125,7 +125,7 @@ Its card's first fields are **Name**, **Base URL** and **API key**. Base URL is 
 `http://localhost:`, which must be replaced entirely; this is the one place a reviewer can get stuck,
 which is why the Notes put "ALL" in capitals. Settings autosaves. There is no Model field in
 Settings: the model is picked from the chip in the chat's top bar, which reads **No model** until
-one is chosen. Its sheet has a filter field; typing a model id offers *Use "ornith" on Custom OpenAI
+one is chosen. Its sheet has a filter field; typing a model id offers *Use "ornith-1.5-35b" on Custom OpenAI
 API* whether or not the endpoint lists its models.
 
 `localhost` on a phone is the phone. The Ollama and LM Studio presets point there and are unusable
