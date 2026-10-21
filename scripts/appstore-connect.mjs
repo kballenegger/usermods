@@ -457,7 +457,12 @@ async function submit() {
   const ver = await iosVersion(a.id);
   const attached = await api('GET', `/v1/appStoreVersions/${ver.id}/build`);
   if (!attached.json.data) fail('no build is selected for the version', 'Run prepare first.');
-  if (!(await reviewDetail(ver.id))) fail('no review information on the version', 'Run prepare first.');
+  // App Store Connect creates an empty review detail with the version, so the resource existing
+  // proves nothing; the contact and the notes have to be in it or Apple answers 409 at Submit.
+  const rd = await reviewDetail(ver.id);
+  if (!rd?.attributes?.contactEmail || !rd?.attributes?.notes) {
+    fail('the review information is empty (no contact or no notes)', 'Run prepare with REVIEW_* and CONTACT_* set; see the header of this script.');
+  }
 
   const open = await api('GET', `/v1/reviewSubmissions?filter[app]=${a.id}&filter[platform]=IOS&filter[state]=READY_FOR_REVIEW,WAITING_FOR_REVIEW,IN_REVIEW,UNRESOLVED_ISSUES&limit=5`);
   let submission = (open.json.data ?? []).find((s) => s.attributes.state === 'READY_FOR_REVIEW');
