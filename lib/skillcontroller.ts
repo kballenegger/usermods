@@ -189,12 +189,13 @@ export async function saveDraft(chatId: string): Promise<{ artifact: Artifact; s
   return { artifact: next, skill };
 }
 
-/** A draft as a record to run, which goes nowhere: it holds no allowance and has nothing to walk. */
+/** A draft as a record to run, which goes nowhere: it holds no allowance, and if it is the user's own has nothing to walk. */
 export async function draftAsSkill(chatId: string): Promise<Skill> {
   const artifact = await loadArtifact(chatId);
   const v = artifact && isSkillDraft(artifact) ? currentVersion(artifact) : undefined;
   if (!v) throw new Error('This chat has no draft skill.');
-  return { ...skillFromSource(v.code, { origin: 'edited', id: `draft:${chatId}` }), walked: true };
+  // Someone else's file still walks its first run, in a chat or out of one.
+  return { ...skillFromSource(v.code, { origin: 'edited', id: `draft:${chatId}` }), walked: !artifact!.foreign };
 }
 
 /** One complete first run: only for the same steps it was walked on. */

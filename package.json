@@ -36,6 +36,7 @@
     "smoke:interact": "USERMODS_TEST_BUILD=1 wxt build && USERMODS_TEST_BUILD=1 node scripts/screenshots.mjs --interact",
     "smoke:act": "USERMODS_TEST_BUILD=1 wxt build && USERMODS_TEST_BUILD=1 node scripts/screenshots.mjs --act",
     "smoke:skills": "USERMODS_TEST_BUILD=1 wxt build && USERMODS_TEST_BUILD=1 node scripts/screenshots.mjs --skills",
+    "smoke:skills-model": "USERMODS_TEST_BUILD=1 wxt build && USERMODS_TEST_BUILD=1 node scripts/screenshots.mjs --skills-model",
     "check:act-bundle": "npm run build:store && npm run build:safari && npm run build:safari:store && USERMODS_TEST_BUILD=1 wxt build && node scripts/check-act-bundle.mjs",
     "smoke:images": "USERMODS_TEST_BUILD=1 wxt build && USERMODS_TEST_BUILD=1 node scripts/screenshots.mjs --images",
     "smoke:vision": "USERMODS_TEST_BUILD=1 wxt build && USERMODS_TEST_BUILD=1 node scripts/screenshots.mjs --vision",

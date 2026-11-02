@@ -95,6 +95,7 @@ import { extDir } from './build-dir.mjs';
 import { interactFlow } from './lib/interact-flow.mjs';
 import { actFlow } from './lib/act-flow.mjs';
 import { skillsFlow } from './lib/skills-flow.mjs';
+import { skillsModelFlow } from './lib/skills-model-flow.mjs';
 import { bannerFlow, shareFlow } from './lib/share-flows.mjs';
 import { updatesFlow } from './lib/update-flow.mjs';
 import fs from 'node:fs';
@@ -117,6 +118,7 @@ const SMOKE = process.argv.includes('--smoke');
 const INTERACT = process.argv.includes('--interact');
 const ACT_FLOW = process.argv.includes('--act');
 const SKILLS_FLOW = process.argv.includes('--skills');
+const SKILLS_MODEL_FLOW = process.argv.includes('--skills-model');
 const CHATS = process.argv.includes('--chats');
 const ISOLATION = process.argv.includes('--isolation');
 const COMPACTION = process.argv.includes('--compaction');
@@ -5766,6 +5768,10 @@ async function main() {
       await skillsFlow({ launch, openPanel, openSite, waitForComposer, sendPrompt, startNewChat, stopServiceWorker, fetchRequests, clearViolations, fetchViolations, log });
       return;
     }
+    if (SKILLS_MODEL_FLOW) {
+      await skillsModelFlow({ launch, openPanel, openSite, waitForComposer, sendPrompt, startNewChat, fetchRequests, clearViolations, fetchViolations, log });
+      return;
+    }
     if (IMAGES) {
       await imagesFlow();
       return;
@@ -5905,6 +5911,7 @@ async function main() {
       await interactFlow({ launch, log });
       await actFlow({ launch, openPanel, openSite, waitForComposer, sendPrompt, startNewChat, stopServiceWorker, requestsFor, clearViolations, fetchViolations, log });
       await skillsFlow({ launch, openPanel, openSite, waitForComposer, sendPrompt, startNewChat, stopServiceWorker, fetchRequests, clearViolations, fetchViolations, log });
+      await skillsModelFlow({ launch, openPanel, openSite, waitForComposer, sendPrompt, startNewChat, fetchRequests, clearViolations, fetchViolations, log });
       return;
     }
     // The dark set: the design system's own palette, and what the README leads with.

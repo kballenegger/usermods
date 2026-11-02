@@ -1480,9 +1480,9 @@ export function Chat({ tabId, pageUrl, host: liveHost, onOpenSettings, runReques
     if (!artifact) return;
     const v = artifact.versions.find((x) => x.n === artifact.current);
     if (!ACT_OFF && artifact.kind === 'skill') {
-      // RUN AGAIN: the same card, on the draft as it stands. A draft is the user's own, so it does not walk.
+      // RUN AGAIN: the same card, on the draft as it stands. A draft of the user's own does not walk, and someone else's does.
       try {
-        if (v) await openRunCard({ ...skillFromSource(v.code, { origin: 'local' }), walked: true }, true);
+        if (v) await openRunCard(skillFromSource(v.code, { origin: artifact.foreign ? 'edited' : 'local' }), true);
       } catch (e) {
         setArtifactNote(e instanceof Error ? e.message : String(e));
       }

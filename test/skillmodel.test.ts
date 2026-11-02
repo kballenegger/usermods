@@ -16,7 +16,7 @@ import { draftStanding } from '../lib/modmatch.ts';
 import type { Provider } from '../lib/providers/types.ts';
 import { compileProposal, parseProposeSkill, repairedSkill, type JournalEntry, type ProposalBase, type SkillProposal } from '../lib/skillcompile.ts';
 import { MAX_REPAIR_CALLS, REPAIR_SYSTEM_PROMPT, buildRepairPrompt, repairAllowed, repairValue, runRepair } from '../lib/skillrepair.ts';
-import { initialRun, next, runReport } from '../lib/skillrun.ts';
+import { initialRun, next, runReport, stepsKey } from '../lib/skillrun.ts';
 import { parseSkill, previewSkill, serialiseSkill, skillForModel, skillFromSource, skillsBlock, type ParsedSkill, type SkillStep } from '../lib/skills.ts';
 import type { AgentEventBody, Msg, Part, Settings, ToolDef } from '../lib/types.ts';
 
@@ -432,7 +432,7 @@ function repairWith(replies: Part[][], answers: Array<Answer | null>, step: Skil
   const { log, driver } = pageFor(answers);
   const events: AgentEventBody[] = [];
   const result = runRepair(
-    { settings: SETTINGS, provider, driver, env: envFor(log.ran), emit: (e) => void events.push(e), changeNote: async () => ({ ok: true, text: 'noted' }), newId: () => `nonce${Math.random().toString(36).slice(2)}` },
+    { settings: SETTINGS, provider, driver, env: envFor(log.ran), emit: (e) => void events.push(e), newId: () => `nonce${Math.random().toString(36).slice(2)}` },
     { skill: { name: 'Save the form', description: 'STRANGER-DESCRIPTION' }, index: 4, total: 5, step, message: 'could not find button "Save"', inventory: 'button "Store" ref=k1', inputs },
     signal,
   );
@@ -527,6 +527,12 @@ test('a repair: Stop ends it, as a stop', async () => {
   assert.equal((await result).kind, 'stopped');
 });
 
+test('a repair’s note stays with the repair, so nothing it wrote rides on the chat’s later turns', async () => {
+  const { result, requests } = repairWith([[tool('n', 'note', { set: 'KEEP-THIS' })], [tool('n2', 'note', { append: 'AND-THIS' })], [said('CANNOT')]], []);
+  await result;
+  assert.match(JSON.stringify(requests.at(-1)!.messages), /Note saved|note/i);
+});
+
 test('a repair’s transcript has its rows and not the model’s words', async () => {
   const { result, events } = repairWith([[said('Let me '), actCall('a', [{ do: 'click', target: '#x' }])], [said('REPAIRED')]], [allow]);
   await result;
@@ -559,6 +565,13 @@ test('a typed step keeps the file’s own form, and an input nothing types any m
   assert.ok(dropped.ok);
   assert.deepEqual(Object.keys(dropped.skill.inputs), []);
   assert.ok(previewSkill(dropped.source).ok);
+});
+
+test('stepsKey reads the same steps as the same whichever order storage left their keys in', () => {
+  const steps = parsed().steps;
+  const sortedKeys = (o: unknown): unknown => (Array.isArray(o) ? o.map(sortedKeys) : o && typeof o === 'object' ? Object.fromEntries(Object.entries(o).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => [k, sortedKeys(v)])) : o);
+  assert.equal(stepsKey(sortedKeys(steps) as SkillStep[]), stepsKey(steps));
+  assert.notEqual(stepsKey(steps.slice(1)), stepsKey(steps));
 });
 
 test('a repair with nothing recorded, a go, or a value of its own does not become a file', () => {

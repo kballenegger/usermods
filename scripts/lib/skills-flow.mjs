@@ -112,6 +112,9 @@ export async function skillsFlow({ launch, openPanel, openSite, waitForComposer,
   try {
     await clearViolations();
     panel = await openPanel(b.ctx, b.extId);
+    // This flow is about runs with no model behind them: a repair (a skill made here repairs by default,
+    // and the mock counts as connected) has its own flow, scripts/lib/skills-model-flow.mjs.
+    await panel.evaluate(async () => chrome.storage.local.set({ settings: { ...(await chrome.storage.local.get('settings')).settings, repairSkills: 'never' } }));
     const page = await openSite(b.ctx, 'https://expenses.example.com/expenses/new');
     await waitForComposer(panel);
 

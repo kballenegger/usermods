@@ -1160,7 +1160,26 @@ async function carrySkill(chatId: string, tabId: number, driver: Driver, skill: 
   await updateRuns((runs) => withRunSkill(runs, chatId, { id: skill.id, name: skill.name, step: opts.from ?? 0, total: skill.steps.length, key, ...(opts.draft ? { draft: true } : {}) }));
   await saveCarry(chatId, carry).catch(() => {});
   post({ type: 'status', phase: 'tool', tool: 'act', detail: `running ${skill.name}` });
-  const row = (index: number, step: StepRow) => post({ type: 'act_step', id: toolId, index, step });
+  // A repair puts its own rows in the transcript, so the steps after it open a new group below them, and
+  // the transcript reads in the order things happened. A step's row stays in the group it started in.
+  let split = false;
+  let group = { id: toolId, next: 0 };
+  const groups: string[] = [];
+  const placed = new Map<number, { id: string; index: number }>();
+  const row = (key: number, step: StepRow) => {
+    let at = placed.get(key);
+    if (!at) {
+      if (split) {
+        split = false;
+        group = { id: crypto.randomUUID(), next: 0 };
+        groups.push(group.id);
+        post({ type: 'tool_call', id: group.id, name: 'run_skill', input: { skill: skill.name } });
+      }
+      at = { id: group.id, index: group.next++ };
+      placed.set(key, at);
+    }
+    post({ type: 'act_step', id: at.id, index: at.index, step });
+  };
   // What the row and the card show. Numbers, and what the extension read: no input's value.
   let rowsUsed = 0;
   if (opts.from === undefined) {
@@ -1184,7 +1203,7 @@ async function carrySkill(chatId: string, tabId: number, driver: Driver, skill: 
     await driver.startDriving(await tabUrl(tabId));
     if (opts.from === undefined && !signal.aborted) rowsUsed = await goToStart(driver, skill, here, onSite, row, signal);
     const cooked = rowsUsed;
-    const repair = await repairFor(chatId, skill, opts.draft === true, tabId, driver, post, hasNote);
+    const repair = await repairFor(chatId, skill, opts.draft === true, tabId, driver, post, () => (split = true));
     result = await runSkill(
       skill,
       {
@@ -1206,7 +1225,9 @@ async function carrySkill(chatId: string, tabId: number, driver: Driver, skill: 
   } catch (e) {
     failure = e instanceof Error ? e.message : String(e);
   }
-  if (!opts.byModel) post({ type: 'tool_result', id: toolId, summary: result ? `${result.ran} of ${skill.steps.length} steps` : (failure ?? 'stopped'), isError: !!failure || result?.outcome.kind === 'refused' });
+  const summary = result ? `${result.ran} of ${skill.steps.length} steps` : (failure ?? 'stopped');
+  const isError = !!failure || result?.outcome.kind === 'refused';
+  for (const id of [...(opts.byModel ? [] : [toolId]), ...groups]) post({ type: 'tool_result', id, summary, isError });
   if (result?.outcome.kind === 'refused') post({ type: 'error', message: result.outcome.message });
   else if (failure) post({ type: 'error', message: failure });
   const card = await driver.finishSkill(signal.aborted ? 'stopped' : (result?.ending ?? 'model'), { name: skill.name, label: result?.label ?? `stopped · ${skill.name}` }).catch(() => null);
@@ -1227,7 +1248,7 @@ async function carrySkill(chatId: string, tabId: number, driver: Driver, skill: 
  * Whether this skill's broken steps go to the model, and if so how. No model connected, or a setting or
  * an origin that says no, and the run simply stops at them as it always could.
  */
-async function repairFor(chatId: string, skill: Skill, draft: boolean, tabId: number, driver: Driver, post: (e: AgentEventBody) => void, notes: ReturnType<NonNullable<typeof drive>['note']>): Promise<((skill: Skill, req: { index: number; step: SkillStep; message: string; inputs: Readonly<Record<string, string>> }, signal: AbortSignal) => Promise<RepairResult>) | null> {
+async function repairFor(chatId: string, skill: Skill, draft: boolean, tabId: number, driver: Driver, post: (e: AgentEventBody) => void, onRepaired: () => void): Promise<((skill: Skill, req: { index: number; step: SkillStep; message: string; inputs: Readonly<Record<string, string>> }, signal: AbortSignal) => Promise<RepairResult>) | null> {
   const trusted = draft ? !(await loadArtifact(chatId))?.foreign : skill.origin === 'local';
   if (!repairAllowed((await loadSettings()).repairSkills, trusted)) return null;
   const resolved = await resolveChatModel(chatId).catch(() => null);
@@ -1237,19 +1258,20 @@ async function repairFor(chatId: string, skill: Skill, draft: boolean, tabId: nu
     const page = await envForTab(tabId)
       .sendToContent<{ text?: string }>({ type: 'inventory', maxChars: 8000 })
       .catch(() => ({ text: '' }));
-    return runRepair(
+    const outcome = await runRepair(
       {
         settings: resolved.settings,
         provider: createProvider(resolved.settings, { memory: visionMemory, thinkingMemory }),
         driver: { act: (call, ctx, sig, rules) => driver.act(call, ctx, sig, rules), guard: (sig, iteration) => driver.guard(sig, iteration), recordWait: (spec) => driver.recordWait(spec), recordLook: (s, m, l) => driver.recordLook(s, m, l), setRepairing: (i) => driver.setRepairing(i) },
         env: envForTab(tabId),
         emit: post,
-        changeNote: (input) => notes.change(input),
         newId: () => crypto.randomUUID(),
       },
       { skill: { name: file.name, description: file.description }, index: req.index, total: file.steps.length, step: req.step, message: req.message, inventory: page.text ?? '', inputs: req.inputs },
       signal,
     );
+    onRepaired();
+    return outcome;
   };
 }
 

@@ -177,6 +177,17 @@ export function ArtifactPanel({
           above it means — Save writes over a mod that is running on people's pages right now — and
           a panel that only admits that when you expand it is a panel that lets you do it by
           accident. One line, collapsed or not. */}
+      {ACT_OFF ? null : isSkill && artifact.linkedSkillId ? (
+        <div className="artifact-editing" data-testid="artifact-editing-skill">
+          <span className="artifact-editing-label">Editing</span>
+          <span className="artifact-editing-name" title={artifact.name}>
+            {artifact.name}
+          </span>
+          <button className="linklike" onClick={() => void onDetach()} title="The next Save makes a separate skill and leaves this one alone." data-testid="artifact-detach-skill">
+            Save as a new skill instead
+          </button>
+        </div>
+      ) : null}
       {editingModName && (
         <div className="artifact-editing" data-testid="artifact-editing">
           <span className="artifact-editing-label">Editing</span>

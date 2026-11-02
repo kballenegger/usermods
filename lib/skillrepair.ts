@@ -12,13 +12,15 @@
 // never goes.
 //
 // The bounded call is the same loop as a chat's, over an empty conversation: nothing here is saved to the
-// chat, and the chat's own conversation is not sent.
+// chat, and the chat's own conversation is not sent. Its note is its own and goes with it, because the
+// chat's note rides on every later turn, and that would carry a stranger's words past the end of the repair.
 //
 // No chrome.* and no DOM (test/skillrepair.test.ts runs it against a fake provider).
 
 // The .ts extensions: see lib/agent/tools.ts. node's test runner loads this file directly.
 import { VALUE_TOKEN, type ActCall, type ActContext, type RepairRules } from './agent/driver.ts';
 import { runAgent, type AgentEnv, type OperateEnv } from './agent/loop.ts';
+import { changeNote } from './agent/note.ts';
 import { repairTools } from './agent/tools.ts';
 import type { WaitOutcome, WaitSpec } from './agent/wait';
 import type { Provider } from './providers/types';
@@ -115,7 +117,6 @@ export interface RepairDeps {
   env: Pick<AgentEnv, 'sendToContent' | 'runScript' | 'screenshot' | 'pageInfo' | 'wait'>;
   /** The transcript's rows of the sub-run: its looked and touched ones. */
   emit: (e: AgentEventBody) => void;
-  changeNote: OperateEnv['changeNote'];
   newId(): string;
 }
 
@@ -136,6 +137,7 @@ export async function runRepair(deps: RepairDeps, req: Omit<RepairRequest, 'nonc
   let done = 0;
   let declined = false;
   let lastFailed = false;
+  let scratch = '';
   const operate: OperateEnv = {
     guard: (sig, iteration) => driver.guard(sig, iteration),
     act: async (call, ctx, sig) => {
@@ -154,7 +156,11 @@ export async function runRepair(deps: RepairDeps, req: Omit<RepairRequest, 'nonc
     recordWait: (spec) => driver.recordWait(spec),
     recordAsk: async () => {},
     recordLook: (selector, matched, links) => driver.recordLook(selector, matched, links),
-    changeNote: deps.changeNote,
+    changeNote: async (input) => {
+      const r = changeNote(scratch, input);
+      if (r.ok) scratch = r.note;
+      return r;
+    },
   };
   driver.setRepairing(req.index);
   try {

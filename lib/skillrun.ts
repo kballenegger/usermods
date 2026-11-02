@@ -148,10 +148,15 @@ export function next(s: RunState, e: RunEvent): { state: RunState; effect: RunEf
 /** The Allow card's standing offer: for a skill made here, never edited and never updated. */
 export const STANDING_LABEL = 'Do not ask again for this step';
 
-/** The steps' identity for "is this still the file the run was started on?": a resume must not land on another. */
+/**
+ * The steps' identity for "is this still the file the run was started on?": a resume must not land on
+ * another. Keys in a sorted order, because a record back from chrome.storage has them sorted and one just
+ * parsed does not, and they are the same steps.
+ */
 export function stepsKey(steps: readonly SkillStep[]): string {
+  const sorted = (_k: string, v: unknown) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => a.localeCompare(b))) : v);
   let h = 0x811c9dc5;
-  for (const c of JSON.stringify(steps)) {
+  for (const c of JSON.stringify(steps, sorted)) {
     h ^= c.charCodeAt(0);
     h = Math.imul(h, 0x01000193) >>> 0;
   }
