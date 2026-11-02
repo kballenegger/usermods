@@ -620,7 +620,7 @@ is asked, and what does not hold.
 
 | Way | In a recipe | In a script | In this format |
 |---|---|---|---|
-| **Instructions to the model** (prompt injection) | The whole file is instructions, and the model has `act` | The code is the attack; no model needed | The prose and every `why` are shown to the model **only during a repair**, fenced as untrusted with a nonce, for one step, with no `go`, no scripts, 8 tool calls, and every action confirmed. With repair off (the default for installed skills, [§5.3](#53-what-asks-every-time)), the model never reads the file |
+| **Instructions to the model** (prompt injection) | The whole file is instructions, and the model has `act` | The code is the attack; no model needed | The prose and every `why` are shown to the model **only during a repair**, fenced as untrusted with a nonce, for one step, with no `go`, no scripts, 8 tool calls, and every action confirmed. With repair off (the default for installed skills, [§5.3](#53-what-asks-every-time)), the model never reads the file's prose: it is told what the file does, by the extension, with names quoted and clipped |
 | **Doing the wrong thing** (click Delete, submit, send) | Whatever the model does | Whatever the code does, which the guard can only observe `[bu §4.6]` | Every step is a named action gated from the live element. Consequential ones ask every run. The never list denies. The first run walks every step |
 | **Taking data out** | The model can be told to | `fetch`, an image URL, a form `[bu §4.6]` | There is no network verb and no code. The only exits: what a `fill` types into the site's own form (the site then sends it where it sends it), and the outputs, which stay on the device unless a model in the same chat is given them through `note` |
 
@@ -1383,7 +1383,7 @@ differs from the text above, by stage. The browser-use subset this stands on has
 |---|---|---|
 | Browser-use phase 3 (the subset skills need) | `smoke:interact`, `smoke:act` | Met under the mock |
 | 7 | Round trip, every refusal and warning tested, gist → install → banner → update | Met |
-| 7 | Nothing of it in the store bundle | Met by `check:act-bundle` (named strings, read from the packages) and a scan. **No byte-for-byte comparison with a build of `main` was done at the end** |
+| 7 | Nothing of it in the store bundle | Met by `check:act-bundle` (named strings, read from the packages) and a scan of the three flag-off builds. **Compared with a store build of the merge base it is not byte-identical**: the manifest is, and what differs is unreachable scaffolding (see Decided differently) |
 | 8 | Three examples record, save and replay with no model | Met under the mock |
 | 8 | Stability matrix has numbers, wrong element 0 | Met on the fixtures, published above |
 | 8 | No consequential step without an answer; the never list against a hand-written skill | Met |
@@ -1396,6 +1396,16 @@ differs from the text above, by stage. The browser-use subset this stands on has
 | 10, 11 | Safari, the store | **Not built**, and flagged out of both builds |
 
 ### Decided differently
+
+**What review found, and how it came out**
+
+- A file's words outside a repair: `version` must read as a version, every other one-line field refuses a line break, a name is at most 64 characters. In someone else's file `skillForModel` prints no place, selector or key that is not a key, and a name is quoted and clipped. An output goes into the chat's note by its key, with what was read quoted and labelled as page content.
+- A run's site: Run off the site pins to the landing page only if its match covers it, and to `start` otherwise, so a `start` that redirects away pauses on the first step (the left-site question, whose Go back may redirect again: Stop ends it). A host its match covers *and* the file names is on the site, which `go` to `start` on a sibling needs; any other host its match covers still asks.
+- The go to `start` is run by `runSkill` and stops the run if it is declined, refused or fails. It and a repair's actions are journalled as `skill-start` and `skill-repair`, and "It did" on either settles no step of the file: "It did" on a repair's action opens the broken-step question.
+- Resume after the browser closed: what was typed is gone (`RunCarry.lost`), so a step's `when` asks, with **Leave it empty** on the card, where an empty one used to mean skip. Outputs read before it are gone from the final card, and a note says so.
+- A step skipped by `when` costs the walk. `check` refuses what is not a checkbox, radio or switch, at install and in the page, and is on the never list for a form holding a password. What `select` chose is on no row, card or result. A run claims its chat before any await and will not start on a tab another chat's run holds; a chat's **model** run on that tab is not held back by a skill's, as it never was by another chat's.
+- `propose_mod` over an unsaved draft skill is refused until it passes `replace: true`, and the flag-off tool list has no such parameter.
+- Flag-off bundle: against a store build of the merge base the manifest is identical and the skill strings are gone. What still differs is scaffolding that does nothing with the flag off: panel state and handlers that hold no skill logic, the prop names `onRunSkill` and `onEditSkill`, empty stubs from `lib/skills-off.ts`, the unused `refOf` of `find_elements`, and small shared refactors in the content script. `record.pending` stays read in Safari's auto-resume path on purpose: "reading it as none" is the unsafe direction.
 
 **Foundation (`lib/interact`, the gate, the journal, the bar)**
 

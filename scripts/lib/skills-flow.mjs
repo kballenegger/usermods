@@ -69,6 +69,7 @@ async function routeSites(ctx, state) {
       state.posts.push({ url: u.pathname, body: req.postData() ?? '' });
       return route.fulfill(html('<!doctype html><title>Thanks</title><h1>Thanks</h1>'));
     }
+    if (u.pathname === '/redirect') return route.fulfill({ status: 302, headers: { location: 'https://elsewhere.example.org/landing' } });
     return route.fulfill(
       html(`<!doctype html><meta charset="utf-8"><title>Forms</title><main>
 <form id="pay" aria-label="Pay" method="post" action="/pay"><button id="send" type="submit">Submit payment</button></form>
@@ -517,6 +518,30 @@ export async function skillsFlow({ launch, openPanel, openSite, waitForComposer,
     await panel.locator('[data-testid="page-card"]', { hasText: 'Wander' }).last().waitFor({ timeout: 30_000 });
     check(page.url() === forms, 'it went to start first', page.url());
     check(/went to \//.test((await panel.locator('[data-testid="touched"] summary').allTextContents()).join(' | ')), 'and said so');
+
+    // A sibling host its match covers and it names: not refused as leaving the site, and step 1 runs there.
+    await force({ ...imported, id: 'sibling', name: 'Sibling', origin: 'local', walked: true, matches: ['*://*.example.com/*'], start: forms, steps: [{ verb: 'wait', condition: { ms: 50 } }] });
+    await page.goto('https://billing.example.com/invoices');
+    await page.bringToFront();
+    await fresh();
+    await runForms('sibling');
+    await panel.locator('[data-testid="page-card"]', { hasText: 'Sibling' }).last().waitFor({ timeout: 30_000 });
+    check(page.url() === forms, 'it went to a start on a sibling host', page.url());
+
+    // A start that redirects off its match: the run is pinned to `start`, so it pauses before any step.
+    await force({ ...imported, id: 'redirected', name: 'Redirected', origin: 'local', walked: true, start: `${forms}redirect`, steps: [{ verb: 'wait', condition: { ms: 50 } }] });
+    await page.goto('https://expenses.example.com/expenses');
+    await page.bringToFront();
+    await panel.locator('[data-view="mods"]').first().click();
+    await rowFor('Redirected').locator('[data-testid="skill-run-row"]').click();
+    await panel.locator('[data-testid="skill-run-opens"]').waitFor({ timeout: 60_000 });
+    await panel.locator('[data-testid="skill-run"]').click();
+    await question('left-site').waitFor({ timeout: 30_000 });
+    check(page.url().startsWith('https://elsewhere.example.org/'), 'the redirect took it off the site', page.url());
+    check(!(await action('question-continue').count()), 'and another site is not one button away');
+    await action('question-stop').click();
+    await panel.locator('[data-testid="page-card"]', { hasText: 'Redirected' }).last().waitFor({ timeout: 30_000 });
+    log('skills: d4 OK (a start on a sibling is on the site, and one that redirects away pauses before any step)');
 
     // Same-named siblings told apart only by position: a stop, on every run, so never the wrong one.
     await force({ ...imported, id: 'nth', name: 'Nth', origin: 'local', walked: true, steps: [{ verb: 'click', target: 'button "Edit"', at: { css: 'p > button.r:nth-of-type(2)', nth: 1 } }] });
