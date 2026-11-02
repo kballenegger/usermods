@@ -577,6 +577,8 @@ export class Driver {
     if (await this.deps.askEveryStep().catch(() => false)) {
       const answer = await this.askUser({ kind: 'script', id: this.deps.newId(), description: description.slice(0, 300), code }, signal, iteration);
       if (!answer || answer.kind !== 'allow') return false;
+      // The line said it was waiting; the script is what is going on now.
+      this.deps.emit({ type: 'status', phase: 'tool', tool: 'run_script', detail: description.slice(0, 120), ...(iteration ? { iteration } : {}), ...(this.driving ? { driving: true } : {}) });
     }
     await this.deps.journalWrite({ kind: 'script', label: `run a script: ${description.slice(0, 120) || 'no description'}` }).catch(() => {});
     return true;

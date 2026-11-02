@@ -120,7 +120,7 @@ export function stepLabel(step: Pick<ActStep, 'do' | 'text'>, d: Described): str
 /** Where the element sits, as the extension read it. */
 export function whereWords(d: Described): string | undefined {
   if (d.form?.name) return `in form "${clip(d.form.name, 60)}"`;
-  if (d.landmark) return `in ${clip(d.landmark, 60)}`;
+  if (d.landmark) return d.landmark.includes('"') ? `in ${clip(d.landmark, 60)}` : `in the ${d.landmark}`;
   return undefined;
 }
 

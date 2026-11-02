@@ -250,11 +250,15 @@ export function OperatingPages({ askEveryStep, onAskEveryStep }: { askEveryStep:
   }, []);
   const remove = (host: string) => void rpc({ type: 'act.allowance-remove', host }).then((r) => setSites(r.sites), () => {});
   return (
-    <div className="field operating-pages" data-testid="settings-operating">
-      <div className="settings-subhead">Operating pages</div>
-      <div>Sites usermods may operate without asking first</div>
+    <div className="operating-pages" data-testid="settings-operating">
+      <div className="operating-heading">
+        Operating pages
+        <span>Sites usermods may operate without asking first</span>
+      </div>
       {sites && !sites.length && (
-        <span data-testid="operating-none">none · usermods asks the first time in each chat</span>
+        <p className="operating-empty" data-testid="operating-none">
+          none · usermods asks the first time in each chat
+        </p>
       )}
       {sites && sites.length > 0 && (
         <ul className="operating-list" data-testid="operating-sites">
@@ -268,8 +272,8 @@ export function OperatingPages({ askEveryStep, onAskEveryStep }: { askEveryStep:
           ))}
         </ul>
       )}
-      <label className="operating-switch">
-        <span className="check-row">
+      <label className="field">
+        <span className="toggle" style={{ marginBottom: 'var(--sp-1)' }}>
           <input type="checkbox" checked={askEveryStep} data-testid="setting-ask-every-step" onChange={(e) => onAskEveryStep(e.target.checked)} />
           Ask before every step
         </span>

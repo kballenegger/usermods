@@ -785,10 +785,15 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
   session.running = true;
   session.controller = new AbortController();
   const signal = session.controller.signal;
+  const driver = drive ? drive.driverFor(chatId, session.tabId) : null;
   // How the run ended, for the card: the step cap is the one ending the loop only says as an event.
   let ending: RunEnding = 'model';
   const post = (e: AgentEventBody) => {
-    if (!ACT_OFF && e.type === 'stopped') ending = 'ceiling';
+    if (!ACT_OFF) {
+      if (e.type === 'stopped') ending = 'ceiling';
+      // Every status of a driving run says so, so a panel that opens mid-run reads it off the last one.
+      if (e.type === 'status' && e.phase !== 'idle' && driver?.isDriving) return postAgentEvent(chatId, { ...e, driving: true });
+    }
     postAgentEvent(chatId, e);
   };
   const release = holdWorker();
@@ -802,7 +807,6 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
   // A step the last run may or may not have got through. It goes to the model as a warning, and the
   // record keeps it until that warning is safely in the saved conversation.
   const cutOff = ACT_OFF ? undefined : (await loadRuns().catch(() => ({}) as RunMap))[chatId]?.pending;
-  const driver = drive ? drive.driverFor(chatId, session.tabId) : null;
   // Written before anything else happens, so there is no moment at which a run exists and storage
   // does not know. It also replaces a 'failed' or 'interrupted' record: whether this is a resume or
   // a new message, that run is no longer the thing to resume.

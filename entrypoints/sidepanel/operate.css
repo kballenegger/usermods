@@ -132,14 +132,29 @@
 .operating-host {
   font-family: var(--font-mono);
 }
-.operating-switch {
+/* The section's head reads like every other field label; `label.field` is for the labels that wrap a control. */
+.operating-heading {
   display: block;
-  margin-top: var(--sp-3);
-}
-.settings-subhead {
-  font: 400 var(--fs-meta) / 1.35 var(--font-mono);
+  font-family: var(--font-ui);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-label);
+  letter-spacing: var(--lbl-tracking);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  color: var(--text-2);
+  margin-bottom: var(--sp-1);
+}
+.operating-heading > span {
+  display: block;
+  margin-top: var(--sp-1);
+  font-size: var(--fs-meta);
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.operating-empty {
+  margin: 0 0 var(--sp-3);
+  font-size: var(--fs-meta);
+  color: var(--text-2);
 }
 
 @media (prefers-reduced-motion: reduce) {
