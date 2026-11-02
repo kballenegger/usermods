@@ -153,6 +153,9 @@ export function actionKey(d: Described, verb: Verb): string {
   return `${verb} ${d.role} "${name}"`;
 }
 
+/** www. is the same site, to `go` as to the boundary (lib/agent/boundary.ts). */
+const bareHost = (host: string) => host.toLowerCase().replace(/^www\./, '');
+
 /**
  * The decision. Order is the whole rule: the never list beats everything; then a question that is
  * forced cannot be answered away by an allowance; then the site's first question and the step's own
@@ -162,8 +165,8 @@ export function decide(d: Described, allowances: GateAllowances, ctx: GateContex
   const never = neverReason(d, ctx.verb, ctx.key);
   if (never) return { kind: 'deny', reason: never };
   if (ctx.verb === 'go' && d.go?.kind === 'url') {
-    const hosts = ctx.siteHosts;
-    if (hosts && !hosts.includes(d.go.host.toLowerCase())) return { kind: 'deny', reason: 'it leaves this site' };
+    const hosts = ctx.siteHosts?.map(bareHost);
+    if (hosts && !hosts.includes(bareHost(d.go.host))) return { kind: 'deny', reason: 'it leaves this site' };
   }
   const key = actionKey(d, ctx.verb);
   const reasons = consequentialReasons(d, ctx);

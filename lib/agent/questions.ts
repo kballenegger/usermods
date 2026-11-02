@@ -1,0 +1,329 @@
+// What a run asks the user, what the user can answer, and how a step reads in the transcript. See
+// docs/specs/browser-use.md, sections 5.4 and 5.5.
+//
+// Every question is answered in an extension page. A page, a script or a skill file cannot answer
+// one: the answer travels over a message the background takes only from an extension page
+// (lib/agent/senders.ts), and `answerFits` holds it to what this question offered.
+//
+// The headline of a question and the sentence of a step are built from what the extension read from
+// the live element (lib/interact/describe.ts). What the model said is a separate field, shown labelled
+// as the model's, and nothing decides anything from it.
+//
+// Pure, tested under node (test/questions.test.ts).
+
+// The .ts extension: see lib/agent/tools.ts. node's test runner loads this file directly.
+import { formatDomEffect } from '../domeffect.ts';
+import type { ActResult, ActStep } from '../interact/actions';
+import type { Delta } from '../interact/delta';
+import type { Described } from '../interact/describe';
+import { formatRoleName } from '../interact/name.ts';
+
+export type Question =
+  /** Let usermods operate this site? The first `act` in a chat, unless the site has a standing allowance. */
+  | { kind: 'operate'; id: string; host: string }
+  /** Allow this? A consequential step, or every step with "Ask before every step" on. */
+  | {
+      kind: 'allow';
+      id: string;
+      host: string;
+      /** From the extension's read: `click button "Unsubscribe" · up to 12 times`. */
+      headline: string;
+      /** `in table "Your subscriptions"`, from the same read. */
+      where?: string;
+      /** The model's reason, labelled as the model's on the card. */
+      modelSays?: string;
+      /** The first act on this site is also part of this card. */
+      firstOnSite: boolean;
+      /** "Allow every one of these in this chat", when that is on offer. */
+      every?: { label: string };
+    }
+  /** With "Ask before every step" on, a script asks too, shown as code. */
+  | { kind: 'script'; id: string; description: string; code: string }
+  /** Your turn: wait_for with ask_user. `text` is the model's words, the rest is the extension's. */
+  | { kind: 'handoff'; id: string; text: string; until?: string }
+  /** The page left the site. `canContinue` only when the two hosts are siblings (lib/agent/boundary.ts). */
+  | { kind: 'left-site'; id: string; from: string; to: string; canContinue: boolean }
+  /** The page removed usermods' bar and it would not come back. */
+  | { kind: 'bar-removed'; id: string };
+
+export type Answer =
+  | { kind: 'allow'; every?: boolean; standing?: boolean }
+  | { kind: 'decline' }
+  | { kind: 'done' }
+  | { kind: 'back' }
+  | { kind: 'continue' };
+
+/** Whether this answer is one this question offered. Anything else is not an answer. */
+export function answerFits(q: Question, a: Answer): boolean {
+  switch (q.kind) {
+    case 'operate':
+      return (a.kind === 'allow' && !a.every) || a.kind === 'decline';
+    case 'allow':
+      return (a.kind === 'allow' && (!a.every || !!q.every) && (!a.standing || q.firstOnSite)) || a.kind === 'decline';
+    case 'script':
+      return (a.kind === 'allow' && !a.every && !a.standing) || a.kind === 'decline';
+    case 'handoff':
+      return a.kind === 'done';
+    case 'left-site':
+      return a.kind === 'back' || (a.kind === 'continue' && q.canContinue);
+    case 'bar-removed':
+      return a.kind === 'allow' && !a.every && !a.standing;
+  }
+}
+
+/** The activity line while this question is up. */
+export function questionActivity(q: Question): string {
+  switch (q.kind) {
+    case 'operate':
+      return `waiting for you · let usermods operate ${q.host}?`;
+    case 'allow':
+      return `waiting for you · allow ${q.headline}?`;
+    case 'script':
+      return `waiting for you · run this script?`;
+    case 'handoff':
+      return `your turn · ${q.text}`;
+    case 'left-site':
+      return `waiting for you · the page left ${q.from}`;
+    case 'bar-removed':
+      return 'waiting for you · the page removed usermods’ bar';
+  }
+}
+
+// ---------------------------------------------------------------------------
+// A step in words
+// ---------------------------------------------------------------------------
+
+const clip = (s: string, max = 200) => (s.length > max ? `${s.slice(0, max - 1).trimEnd()}…` : s);
+
+/** What a verb is called in a question and in the journal. */
+const VERB_LABEL: Record<ActStep['do'], string> = { click: 'click', fill: 'fill', select: 'choose in', check: 'tick', press: 'press', hover: 'hover', scroll_to: 'scroll to', go: 'go to' };
+
+function goWords(d: Described): string {
+  const go = d.go;
+  if (go?.kind === 'url') return `go to ${go.href}`;
+  if (go?.kind === 'reload') return 'reload the page';
+  if (go?.kind === 'back') return 'go back';
+  return 'go forward';
+}
+
+/**
+ * The step as read from the element: `click button "Place order"`. It is what the journal stores and
+ * what a question leads with, so it never holds what a field would be filled with.
+ */
+export function stepLabel(step: Pick<ActStep, 'do' | 'text'>, d: Described): string {
+  if (step.do === 'go') return goWords(d);
+  const target = formatRoleName(d.role, d.name);
+  if (step.do === 'press') return `press ${clip((step.text ?? '').trim() || 'a key', 20)} in ${target}`;
+  return `${VERB_LABEL[step.do]} ${target}`;
+}
+
+/** Where the element sits, as the extension read it. */
+export function whereWords(d: Described): string | undefined {
+  if (d.form?.name) return `in form "${clip(d.form.name, 60)}"`;
+  if (d.landmark) return `in ${clip(d.landmark, 60)}`;
+  return undefined;
+}
+
+/** A name in quotes, or a role for an element that has none. */
+const named = (d: Described) => (d.name ? `"${clip(d.name, 80)}"` : d.role);
+
+/** What the arrow says: what the extension observed. Empty when it observed nothing. */
+export function deltaWords(delta: Delta | undefined): string {
+  if (!delta) return '';
+  const parts: string[] = [];
+  if (delta.dom.removed) parts.push(`${delta.dom.removed} removed`);
+  if (delta.dom.added) parts.push(`${delta.dom.added} added`);
+  if (delta.urlAfter !== delta.urlBefore) parts.push('the page moved on');
+  return parts.join(', ');
+}
+
+/** A step in flight: `clicking "Unsubscribe"`, for the activity line and the row. */
+export function stepInFlight(step: Pick<ActStep, 'do'>, d: Described): string {
+  switch (step.do) {
+    case 'click':
+      return `clicking ${named(d)}`;
+    case 'fill':
+      return `filling ${named(d)}`;
+    case 'select':
+      return `choosing in ${named(d)}`;
+    case 'check':
+      return `ticking ${named(d)}`;
+    case 'press':
+      return `pressing a key in ${named(d)}`;
+    case 'hover':
+      return `hovering ${named(d)}`;
+    case 'scroll_to':
+      return `scrolling to ${named(d)}`;
+    case 'go':
+      return d.go?.kind === 'url' ? `going to ${d.go.path || d.go.href}` : 'moving the page';
+  }
+}
+
+/** A step that happened, in the past tense: the click was dispatched, and that is all this claims. */
+export function stepDone(step: Pick<ActStep, 'do' | 'text'>, d: Described, result: Extract<ActResult, { ok: true }>): string {
+  const after = deltaWords(result.delta);
+  const arrow = after ? ` → ${after}` : '';
+  switch (step.do) {
+    case 'click':
+      return `clicked ${named(d)}${(result.clicks ?? 1) > 1 ? ` ×${result.clicks}` : ''}${arrow}`;
+    case 'fill':
+      return `filled ${named(d)}`;
+    case 'select':
+      return `chose "${clip((step.text ?? '').trim(), 60)}" in ${named(d)}${arrow}`;
+    case 'check':
+      return `${/^(false|off|no|uncheck|unticked?|0)$/i.test(step.text ?? '') ? 'unticked' : 'ticked'} ${named(d)}${arrow}`;
+    case 'press':
+      return `pressed ${clip((step.text ?? '').trim(), 20)} in ${named(d)}${arrow}`;
+    case 'hover':
+      return `hovered ${named(d)}${arrow}`;
+    case 'scroll_to':
+      return `scrolled to ${named(d)}`;
+    case 'go': {
+      const go = d.go;
+      if (go?.kind === 'url') return `went to ${go.path || go.href}`;
+      if (go?.kind === 'reload') return 'reloaded the page';
+      return go?.kind === 'back' ? 'went back' : 'went forward';
+    }
+  }
+}
+
+/** How one step of an `act` call stands. `failed` also covers what was refused. */
+export interface StepRow {
+  state: 'running' | 'done' | 'declined' | 'failed' | 'stopped';
+  /** The sentence on the row. */
+  text: string;
+  /** What it opens to. */
+  detail?: {
+    /** The model's description of the call, labelled as the model's. */
+    modelSays?: string;
+    /** The element as read: `button "Delete" · in form "Account" · submits a form`. */
+    read?: string;
+    /** The result in full: the same lines the model was told. */
+    result?: string;
+  };
+}
+
+/** The element as read, for a row's details. */
+export function readWords(d: Described): string {
+  const parts = [d.go ? goWords(d) : formatRoleName(d.role, d.name)];
+  const where = whereWords(d);
+  if (where) parts.push(where);
+  if (d.submits) parts.push(d.form?.method && d.form.method !== 'get' ? `submits a ${d.form.method.toUpperCase()} form` : 'submits a form');
+  if (d.link?.path) parts.push(`goes to ${d.link.path}`);
+  return parts.join(' · ');
+}
+
+// ---------------------------------------------------------------------------
+// A script, as a row
+// ---------------------------------------------------------------------------
+
+/** What the extension observed a script or a test do to the page. `text` is the row's sentence. */
+export interface ToolEffect {
+  text: string;
+}
+
+/** The DOM half of a script's row, as `2 removed (div.modal-backdrop, div#login)`. */
+function domWords(dom: Parameters<typeof formatDomEffect>[0]): string | null {
+  const full = formatDomEffect(dom);
+  if (!full || (!dom?.added && !dom?.removed)) return null;
+  // formatDomEffect always spells out all three; a row names only the ones that happened.
+  return full
+    .split(/, (?=\d+ (?:added|attribute))/)
+    .filter((part) => !/^0 /.test(part) && !/^\d+ attribute/.test(part))
+    .join(', ');
+}
+
+/**
+ * Whether a script touched the page, and how that reads. Decided from what it did, not from which
+ * tool ran it: a script that changed nothing is a look, and keeps its ordinary row.
+ */
+export function scriptEffect(lead: string, dom: Parameters<typeof formatDomEffect>[0], navigatedTo?: string): ToolEffect | null {
+  const said = domWords(dom);
+  const parts = [...(said ? [said] : []), ...(navigatedTo ? ['the page moved on'] : [])];
+  return parts.length ? { text: `${clip(lead, 120)} → ${parts.join(', ')}` } : null;
+}
+
+// ---------------------------------------------------------------------------
+// The card: what the extension recorded of a run
+// ---------------------------------------------------------------------------
+
+/** One line of the card's list, in the words of the transcript's rows. */
+export interface PageCard {
+  /** `on the page · 14 actions`, `stopped by you · 9 actions`, `paused at 30 steps · 12 actions`. */
+  label: string;
+  /** `shop.example.com · 1 page · 48s`. */
+  where: string;
+  /** `12 clicks · 2 fields · you allowed 2 · you did 1 yourself · 1 script ran`. */
+  counts: string;
+  actions: string[];
+  /** A script ran, so the card adds that it cannot see into one. */
+  scripted: boolean;
+  /** How many things were done on the page, for the chat index. */
+  total: number;
+}
+
+export type RunEnding = 'model' | 'stopped' | 'ceiling';
+
+/** The facts a driving run gathers. Nothing in here comes from the model. */
+export interface PageRecord {
+  startedAt: number;
+  hosts: string[];
+  pages: string[];
+  clicks: number;
+  fields: number;
+  others: number;
+  allowed: number;
+  yourself: number;
+  scripts: number;
+  actions: string[];
+}
+
+export const emptyRecord = (now: number): PageRecord => ({ startedAt: now, hosts: [], pages: [], clicks: 0, fields: 0, others: 0, allowed: 0, yourself: 0, scripts: 0, actions: [] });
+
+/** The most lines the card's list keeps; a long repeat is one line, a very long run keeps its last. */
+const CARD_LIST_MAX = 100;
+
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+/** One finished step, into the record. */
+export function recordStep(rec: PageRecord, step: Pick<ActStep, 'do'>, words: string, clicks: number | undefined): PageRecord {
+  const counts = { clicks: rec.clicks, fields: rec.fields, others: rec.others };
+  if (step.do === 'click') counts.clicks += clicks ?? 1;
+  else if (step.do === 'fill' || step.do === 'select' || step.do === 'check') counts.fields += 1;
+  else counts.others += 1;
+  return { ...rec, ...counts, actions: [...rec.actions, words].slice(-CARD_LIST_MAX) };
+}
+
+/** A page visited, by address and host, once each. */
+export function recordPage(rec: PageRecord, url: string, host: string): PageRecord {
+  const next = { ...rec };
+  if (url && !rec.pages.includes(url)) next.pages = [...rec.pages, url];
+  if (host && !rec.hosts.includes(host)) next.hosts = [...rec.hosts, host];
+  return next;
+}
+
+/** The card, or null when the run did nothing on the page. */
+export function pageCard(rec: PageRecord, ending: RunEnding, now: number): PageCard | null {
+  const total = rec.clicks + rec.fields + rec.others;
+  if (!total) return null;
+  const seconds = Math.max(1, Math.round((now - rec.startedAt) / 1000));
+  const took = seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, '0')}s`;
+  const count = plural(total, 'action');
+  const label = ending === 'stopped' ? `stopped by you · ${count}` : ending === 'ceiling' ? `paused at 30 steps · ${count}` : `on the page · ${count}`;
+  const parts = [
+    ...(rec.clicks ? [plural(rec.clicks, 'click')] : []),
+    ...(rec.fields ? [plural(rec.fields, 'field')] : []),
+    ...(rec.others ? [plural(rec.others, 'other step')] : []),
+    ...(rec.allowed ? [`you allowed ${rec.allowed}`] : []),
+    ...(rec.yourself ? [`you did ${rec.yourself} yourself`] : []),
+    ...(rec.scripts ? [`${plural(rec.scripts, 'script')} ran`] : []),
+  ];
+  return {
+    label,
+    where: [rec.hosts.join(', ') || 'this page', plural(Math.max(1, rec.pages.length), 'page'), took].join(' · '),
+    counts: parts.join(' · '),
+    actions: rec.actions,
+    scripted: rec.scripts > 0,
+    total,
+  };
+}
