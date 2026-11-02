@@ -200,6 +200,13 @@ export function scanSkillForLeaks(source: string): Leak[] {
     if ((s.verb === 'fill' || s.verb === 'select') && !isInputRef(s.value)) {
       out.push({ kind: 'typed-value', label: `a typed value in ${s.target}`, line, preview: mask(s.value), step: i });
     }
+    if (s.verb === 'read') {
+      for (const rule of PROSE_RULES) {
+        rule.re.lastIndex = 0;
+        const m = rule.re.exec(s.from);
+        if (m) out.push({ kind: 'prose-secret', label: `in a read's selector, ${rule.label}`, line, preview: mask(m[0]) });
+      }
+    }
     if (s.verb === 'go') {
       const token = tokenInQuery(s.to);
       if (token) out.push({ kind: 'url-query', label: 'a token in an address', line, preview: mask(token) });

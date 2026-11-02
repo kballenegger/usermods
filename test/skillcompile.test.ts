@@ -222,3 +222,13 @@ test('a start that is no address, or on another site than the recording, is an e
   assert.ok(!with_('https://evil.test/').ok);
   assert.ok(with_('https://x.example.com/').ok);
 });
+
+test('a selector a run looked with is held to what was typed, as a wait is', () => {
+  const entries: JournalEntry[] = [
+    { n: 1, kind: 'act', run: 'r', url: 'https://a.test/', verb: 'fill', role: 'textbox', name: 'Search', at: { css: '#q' }, why: 'search', toolId: 't', stepIndex: 0 },
+    { n: 2, kind: 'look', run: 'r', url: 'https://a.test/', selector: 'a[title="ada@example.com"]', matched: 1, links: true },
+  ];
+  const r = compileRecording(entries, { name: 'S', description: 'D', fields: { 1: { as: 'input', name: 'q', label: 'Q' } }, outputs: { 2: { name: 'hit', label: 'Hit', take: 'text', list: false } } }, { today: '2026-11-02', valueOf: () => 'ada@example.com' });
+  assert.equal(r.ok, false);
+  assert.match(!r.ok ? r.errors.join() : '', /selector of hit holds what was typed/);
+});

@@ -315,6 +315,10 @@ export function compileRecording(recording: readonly JournalEntry[], d: SaveDeci
     if (e.kind === 'look') {
       const out = d.outputs[e.n];
       if (!out) continue;
+      if (holdsTyped(e.selector)) {
+        errors.push(`the selector of ${out.name} holds what was typed for an input (entry ${e.n})`);
+        continue;
+      }
       outputs[out.name] = { label: out.label, ...(out.list ? { list: true } : {}) };
       steps.push({ verb: 'read', output: out.name, from: e.selector, take: out.take, ...(out.list ? { each: true } : {}) });
       continue;

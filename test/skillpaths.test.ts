@@ -451,3 +451,25 @@ test('origin and walked: only a skill recorded here starts walked and can keep a
   const bumped = skillFromSource(BOOKKEEPING, { origin: 'local', existing: stored, keepTrust: true });
   assert.deepEqual(bumped.allowedSteps, ['click button "pay"'], 'a version bump keeps what it had');
 });
+
+test('the leak check reads the selector a read step uses', () => {
+  const source = `---
+usermods-skill: 1
+name: Look
+description: Looks.
+version: 1.0.0
+match:
+  - "*://a.example.com/*"
+start: https://a.example.com/
+inputs: {}
+outputs: { hit: { label: Hit } }
+---
+
+\`\`\`steps
+- read: hit
+  from: 'a[title="ada@example.com"]'
+\`\`\`
+`;
+  const leaks = scanSkillForLeaks(source);
+  assert.ok(leaks.some((l) => /selector/.test(l.label) && /email/.test(l.label)), JSON.stringify(leaks));
+});
