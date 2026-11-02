@@ -1,6 +1,6 @@
 {
   "name": "usermods",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "Vibe-code userscripts in place. Customize any website by chatting with any LLM.",
   "license": "MIT",

@@ -31,7 +31,7 @@ You do not need a real model at all for the tests or the smoke run — both use 
 |---|---|
 | `npm run dev` | WXT dev server with hot reload, Chrome. `dev:firefox` for the Firefox target. |
 | `npm run build` | Production build to `.output/chrome-mv3`. `build:firefox` for Firefox. |
-| `npm run build:store` | The Chrome Web Store variant: sets `USERMODS_STORE=1`, which drops subscription sign-in and tree-shakes `lib/oauth.ts` out of the bundle, and builds to `.output/store-chrome-mv3`. `zip` and `zip:store` package the two builds. |
+| `npm run build:store` | The Chrome Web Store variant: sets `USERMODS_STORE=1`, which leaves out what a storefront build must not carry, and builds to `.output/store-chrome-mv3`. `zip` and `zip:store` package the two builds. |
 | `npm run typecheck` | `tsc --noEmit`. |
 | `npm test` | Node's built-in runner over `test/*.test.ts`, via `--experimental-strip-types`. No bundler, no browser, fast. |
 | `npm run smoke` | Builds to `.output/test-chrome-mv3`, then drives the real side panel headless in Playwright against `scripts/mock-llm.mjs`, asserting the whole chat loop end to end. |
@@ -124,7 +124,7 @@ For a real adapter:
    input — factor them so a node test can exercise them without the network.
 
 If it needs OAuth rather than an API key, look at `lib/oauth.ts` and `lib/buildflags.ts` first:
-subscription providers are excluded from the Web Store build, and the dynamic import in
+subscription providers are excluded from the App Store variant of Safari, and the dynamic import in
 `providers/index.ts` that keeps the auth module out of that bundle is load-bearing, not incidental.
 
 ## Every fix lands with a regression test

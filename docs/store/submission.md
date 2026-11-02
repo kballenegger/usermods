@@ -16,6 +16,9 @@
   [Resubmitting](#resubmitting).
 - **0.1.1 is live: [the listing](https://chromewebstore.google.com/detail/usermods/dhmdjekbeinhhnfhcgnkgdpgdafpboic), dated 2026-10-02.** It was found live on 2026-11-02. The
   publisher mailbox holds no approval notice, so check the listing rather than waiting for mail.
+- **2026-11-02: 0.1.2 prepared with subscription sign-in in the store build**, to see whether it is
+  approved. If it is rejected for that, `SUBSCRIPTIONS_OFF = STORE_BUILD` in `lib/buildflags.ts`
+  restores the old build. Steps are under [Submitting 0.1.2](#submitting-012).
 - Automatic publication is **off**: an approved item waits for Publish to be pressed.
 
 Things the dashboard turned out to do differently from Google's docs, learned on the first
@@ -102,6 +105,25 @@ banner, the fixes from the first user report, and the agent's reworked tools: `t
 finished script is tested the way the saved mod will run, and the proposal card says how), honest
 `run_script` results, and page reads that keep a long page's shape, search by text, list overlays
 and read a page's text. None of it changes the permissions or what the listing has to say.
+
+---
+
+## Submitting 0.1.2
+
+`PRIVACY.md` on `main` must already carry the sign-in wording, because the dashboard links to it.
+
+1. **Package** → upload `.output/usermods-0.1.2-chrome.zip` (from `npm run zip:store`; checksum in
+   [package-audit.md](package-audit.md)). Permissions are unchanged.
+2. **Store listing → Description** → replace with the block in
+   [listing.md](listing.md#detailed-description).
+3. **Privacy practices → Host permissions** → replace with the block in
+   [permissions.md](permissions.md).
+4. **Test instructions → Additional instructions** → replace with the block in
+   [reviewer-notes.md](reviewer-notes.md#test-instructions). It now names the model id the reviewer
+   key allows.
+5. **Submit for review.** Leave automatic publication off.
+
+Do not upload again while it is in review. Check the listing as well as the mailbox.
 
 ---
 

@@ -300,7 +300,7 @@ They are two independent axes, and they are now written as two:
 | Build | Command | Output | Subscription sign-in |
 |---|---|---|---|
 | Chrome, GitHub | `npm run build` | `.output/chrome-mv3` | yes |
-| Chrome, Web Store | `npm run build:store` | `.output/store-chrome-mv3` | no |
+| Chrome, Web Store | `npm run build:store` | `.output/store-chrome-mv3` | yes, since 0.1.2 |
 | Safari, own devices | `npm run build:safari` | `.output/safari-mv3` | **yes** |
 | Safari, App Store | `npm run build:safari:store` | `.output/store-safari-mv3` | no |
 

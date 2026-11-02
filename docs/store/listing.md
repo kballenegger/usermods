@@ -86,7 +86,7 @@ HOW IT WORKS
 
 YOUR OWN AI
 
-There is no account and no server behind this extension. Connect the AI service you already use with your own API key, or a model running on your own computer, in which case your pages and messages never leave your machine. Presets for the common services are built in, and any endpoint that speaks a standard chat API works too.
+There is no account and no server behind this extension. Connect the AI service you already use with your own API key, sign in with a subscription you already pay for, or use a model running on your own computer, in which case your pages and messages never leave your machine. Presets for the common services are built in, and any endpoint that speaks a standard chat API works too.
 
 A FULL USERSCRIPT MANAGER
 
@@ -185,7 +185,7 @@ the user's device. Answer:
 
 | Category | Check? | Why |
 |---|---|---|
-| **Personally identifiable information** (name, address, email address, age, identification number) | **No** | usermods asks for none of it. The store build has no sign-in of any kind and collects no identifier. |
+| **Personally identifiable information** (name, address, email address, age, identification number) | **No** | usermods asks for none of it and collects no identifier. If the user signs in with a subscription, the account label the provider returns (typically an email address and plan name) is shown in Settings and stays on the device. |
 | **Health information** | No | Not collected. |
 | **Financial and payment information** | No | Not collected. |
 | **Authentication information** (passwords, credentials, security questions, PINs) | **Yes** | The user's own API key is stored locally and transmitted to the model endpoint they configured, to authenticate their own requests. They are disclosed here because they are transmitted off the device, even though the destination is the user's own provider. |

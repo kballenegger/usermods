@@ -93,7 +93,12 @@ async function main() {
     headless: true,
     channel: 'chromium',
     viewport: { width: 420, height: 820 },
-    args: [`--disable-extensions-except=${EXT_DIR}`, `--load-extension=${EXT_DIR}`],
+    args: [
+      `--disable-extensions-except=${EXT_DIR}`,
+      `--load-extension=${EXT_DIR}`,
+      // Chromium ignores these variables, and the walkthrough opens real pages. The mock on loopback bypasses it.
+      ...(process.env.HTTPS_PROXY ? [`--proxy-server=${process.env.HTTPS_PROXY}`] : []),
+    ],
   });
   try {
     let [sw] = ctx.serviceWorkers();
@@ -150,7 +155,9 @@ async function main() {
     await panel.getByRole('button', { name: 'Settings', exact: true }).click();
     await panel.getByText('Add provider', { exact: true }).waitFor({ timeout: 10_000 });
     const presets = await panel.locator('[data-testid="add-provider"]').allTextContents();
-    if (presets.some((p) => /chatgpt|supergrok|subscription/i.test(p))) fail(`the store build offers a subscription preset: ${JSON.stringify(presets)}`);
+    for (const name of ['ChatGPT subscription', 'SuperGrok subscription']) {
+      if (!presets.some((p) => p.includes(name))) fail(`the store build does not offer ${name}: ${JSON.stringify(presets)}`);
+    }
     await panel.getByRole('button', { name: 'Custom OpenAI API', exact: true }).click();
     const baseUrl = panel.getByLabel('Base URL');
     await baseUrl.waitFor({ timeout: 10_000 });

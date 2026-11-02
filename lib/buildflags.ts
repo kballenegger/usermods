@@ -1,9 +1,8 @@
 // Compile-time build variants.
 //
-// The GitHub build is the full extension. The Chrome Web Store build ("npm run build:store")
-// omits the two subscription providers — signing in with a ChatGPT or SuperGrok account uses
-// endpoints the vendors do not document or licence for third parties, which is a poor fit for a
-// listing that has to state exactly what it talks to. Everything else is identical.
+// The GitHub build is the full extension. The Chrome Web Store build ("npm run build:store") is the
+// same extension since 0.1.2, subscription sign-in included. The one build without subscriptions is
+// the App Store variant of Safari ("npm run build:safari:store"), which nothing ships today.
 //
 // The flag is a Vite `define`, so `__STORE_BUILD__` is substituted literally and the dead branch
 // (including the dynamic import of lib/oauth) is dropped by the bundler. Nothing reads an env var
@@ -28,23 +27,19 @@ export const SAFARI_BUILD: boolean = typeof __SAFARI_BUILD__ === 'undefined' ? f
 /**
  * Whether subscription sign-in is off in this build.
  *
- * Exactly one thing turns it off: the store switch (`USERMODS_STORE=1`), which is set for a build
- * destined for a vendor's storefront — the Chrome Web Store today, the App Store if usermods is
- * ever submitted there. The reason is the listing, not the engine: signing in with a ChatGPT or
- * SuperGrok account uses endpoints the vendors do not document or licence for third parties, which
- * is a poor fit for a listing that has to state exactly what it talks to.
+ * Only the App Store variant of Safari turns it off. The Chrome Web Store build had it off until
+ * 0.1.2, because signing in with a ChatGPT or SuperGrok account uses endpoints the vendors do not
+ * document or licence for third parties. The owner chose to submit it with the sign-in and see
+ * whether it is approved. If it is not, `STORE_BUILD` alone here puts the old rule back.
  *
  * It was briefly `STORE_BUILD || SAFARI_BUILD`, which conflated "this is a storefront build" with
  * "this is Safari" and left the owner's own Safari build — the equivalent of the GitHub build, the
- * one he installs on his own devices — without the subscription he actually uses. A Safari build
- * and a store build are two independent axes, so `USERMODS_STORE=1 wxt build -b safari` is the
- * combination that means "Safari, for the App Store", and it is the only Safari build without
- * subscriptions.
+ * one he installs on his own devices — without the subscription he actually uses.
  *
  * Everything that means "this build has no subscriptions" reads this rather than STORE_BUILD, so a
  * further variant would not need every call site found again.
  */
-export const SUBSCRIPTIONS_OFF: boolean = STORE_BUILD;
+export const SUBSCRIPTIONS_OFF: boolean = STORE_BUILD && SAFARI_BUILD;
 
 // ---------- pure logic (tested in test/buildflags.test.ts) ----------
 

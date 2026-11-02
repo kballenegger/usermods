@@ -2,14 +2,12 @@ import { defineConfig } from 'wxt';
 import { buildManifest, isSafariOnlyIcon } from './lib/manifest';
 
 /**
- * A storefront build drops subscription sign-in; see lib/buildflags.ts. Set by
- * `npm run build:store` / `npm run zip:store` (Chrome Web Store) and `npm run build:safari:store`
- * (an App Store submission). A literal define, so the bundler folds the flag and tree-shakes
- * lib/oauth out of the store build entirely.
+ * A storefront build. Set by `npm run build:store` / `npm run zip:store` (Chrome Web Store) and
+ * `npm run build:safari:store` (an App Store submission). A literal define, so the bundler folds the
+ * flag. Only the App Store variant of Safari drops subscription sign-in; see lib/buildflags.ts.
  *
- * It is independent of the target: `USERMODS_STORE=1 wxt build -b safari` is a Safari build for a
- * storefront, and a plain `wxt build -b safari` — the one the owner installs on his own devices —
- * has subscription sign-in exactly like the plain Chrome build.
+ * It is independent of the target, so a plain `wxt build -b safari`, the one the owner installs on
+ * his own devices, keeps subscription sign-in and writes to its own output folder.
  */
 const storeBuild = process.env.USERMODS_STORE === '1';
 

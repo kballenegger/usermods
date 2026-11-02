@@ -17,7 +17,7 @@ https://github.com/user-attachments/assets/b2102d80-e0ff-447f-a1c9-9c62583c4786
 ## Why
 
 - **Any backend.** Anthropic's API, OpenAI, OpenRouter, or anything OpenAI-compatible: Ollama, LM Studio, vLLM, mlx_lm. Your key, your machine, no account, no hosted service.
-- **Use the subscription you already pay for.** Sign in with ChatGPT (Plus, Pro, Team) or SuperGrok / X Premium+ straight from Settings. No API key, no local proxy, no per-token bill. (In the build from this repository; the [Chrome Web Store version](https://chromewebstore.google.com/detail/usermods/dhmdjekbeinhhnfhcgnkgdpgdafpboic) leaves sign-in out.)
+- **Use the subscription you already pay for.** Sign in with ChatGPT (Plus, Pro, Team) or SuperGrok / X Premium+ straight from Settings. No API key, no local proxy, no per-token bill. (From version 0.1.2 in the Chrome Web Store; 0.1.1 leaves it out.)
 - **The model actually sees the page.** It reads a pruned DOM, lists elements, reads computed styles, takes screenshots, and runs scripts to test its work before proposing anything.
 - **One-off tasks too.** "Scroll to the bottom, open every carousel, and give me download links for all the photos" runs as a script, no mod required.
 - **Portable.** Mods are plain userscripts with a `==UserScript==` header. Nothing proprietary. **MIT.**
@@ -82,7 +82,7 @@ Requires Chrome 135+.
 2. Open `chrome://extensions`, click **Details** on usermods, and turn on **Allow User Scripts**. Chrome requires this toggle for any extension that runs user scripts, including Tampermonkey.
 3. Click the usermods icon to open the side panel **on that tab**. Go to **Settings**, click a preset under **Add provider**, and paste a key (or a local server URL). It saves as you type. Back in **Chat**, the model is the chip in the chat bar.
 
-The store version has no subscription sign-in. To sign in with ChatGPT or SuperGrok instead of using a key, install from source.
+Signing in with ChatGPT or SuperGrok instead of using a key arrives in the store with version 0.1.2. Until then, install from source for it.
 
 ## Install (from source)
 

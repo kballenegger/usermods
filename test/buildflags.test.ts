@@ -63,14 +63,14 @@ test('SAFARI_BUILD and STORE_BUILD both default off outside a bundler', () => {
   assert.equal(SUBSCRIPTIONS_OFF, false);
 });
 
-test('the build matrix: only the store switch turns subscriptions off', () => {
+test('the build matrix: only the App Store variant of Safari turns subscriptions off', () => {
   // `SUBSCRIPTIONS_OFF` is a compile-time constant, so what is asserted here is the rule it is
   // derived from, spelled out for all four combinations the build scripts can produce.
-  const subscriptionsOff = (store: boolean, _safari: boolean) => store;
+  const subscriptionsOff = (store: boolean, safari: boolean) => store && safari;
 
   const matrix: { name: string; store: boolean; safari: boolean; off: boolean }[] = [
     { name: 'npm run build            (chrome)', store: false, safari: false, off: false },
-    { name: 'npm run build:store      (chrome + store)', store: true, safari: false, off: true },
+    { name: 'npm run build:store      (chrome + store)', store: true, safari: false, off: false },
     { name: 'npm run build:safari     (safari)', store: false, safari: true, off: false },
     { name: 'npm run build:safari:store (safari + store)', store: true, safari: true, off: true },
   ];
