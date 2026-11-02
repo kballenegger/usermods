@@ -15,7 +15,7 @@ how they were made. How the build itself is produced and checked is in
 | Bundle IDs | `com.kballenegger.usermods`, `com.kballenegger.usermods.extension`, both registered as explicit App IDs |
 | Platforms on the record | iOS (iPhone and iPad) and macOS, one record. **Only iOS is being submitted.** The macOS version stays in *Prepare for Submission*. |
 | SKU, language | `usermods`, English (U.S.) |
-| Price, availability | Free, all 175 territories |
+| Price, availability | Free, 174 of 175 territories. China mainland dropped on 2026-11-02: App Review objected to the ChatGPT references under Guideline 5, and the sign-in stays. |
 | Categories | Developer Tools, then Utilities |
 | Subtitle | `Vibe-code userscripts` (Apple's limit is 30 characters) |
 | Age rating | 4+ |
