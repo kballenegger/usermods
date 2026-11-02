@@ -65,6 +65,7 @@ export async function loadSettings(): Promise<Settings> {
     sidePanelScope: stored?.sidePanelScope ?? DEFAULT_SETTINGS.sidePanelScope,
     checkUpdates: stored?.checkUpdates !== false,
     ...(!ACT_OFF && stored?.askEveryStep === true ? { askEveryStep: true } : {}),
+    ...(!ACT_OFF && (stored?.repairSkills === 'never' || stored?.repairSkills === 'every') ? { repairSkills: stored.repairSkills } : {}),
   };
   return { ...DEFAULT_SETTINGS, ...prefs };
 }

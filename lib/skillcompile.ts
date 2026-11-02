@@ -17,8 +17,9 @@
 // The .ts extensions: see lib/agent/tools.ts. node's test runner loads this file directly.
 import type { Verb } from './agent/gate';
 import { formatRoleName } from './interact/name.ts';
+import { bumpPatch } from './share.ts';
 import type { AtMap } from './interact/target';
-import { atStart, serialiseSkill, skillMatchesUrl, type ParsedSkill, type SkillInput, type SkillOutput, type SkillStep, type SkillWait } from './skills.ts';
+import { atStart, isInputRef, serialiseSkill, skillMatchesUrl, type ParsedSkill, type SkillInput, type SkillOutput, type SkillStep, type SkillWait } from './skills.ts';
 import type { Msg } from './types';
 
 /** How many entries one chat keeps. A run this long has outgrown a skill anyway. */
@@ -31,6 +32,8 @@ interface EntryBase {
   run: string;
   /** The page it happened on. */
   url: string;
+  /** A repair did this, instead of the skill's step at this index. */
+  repairOf?: number;
 }
 
 export type JournalEntry =
@@ -52,6 +55,8 @@ export type JournalEntry =
       /** Where the value is in the conversation, for a fill or a select. */
       toolId?: string;
       stepIndex?: number;
+      /** A repair typed the broken step's own value, so this is how the file already writes it. */
+      typedAs?: string;
     })
   | (EntryBase & { kind: 'wait'; condition: SkillWait; timeoutMs?: number })
   | (EntryBase & { kind: 'ask'; text: string; until?: SkillWait })
@@ -212,6 +217,8 @@ export interface CompileOptions {
   valueOf: (toolId: string, stepIndex: number) => string | null;
   /** YYYY-MM-DD, for the body's line about where it came from. */
   today: string;
+  /** These steps go into an existing file, which has its own start. */
+  noStart?: boolean;
 }
 
 export type CompileResult = { ok: true; source: string; skill: ParsedSkill; steps: number } | { ok: false; errors: string[] };
@@ -222,6 +229,23 @@ const sameWait = (a: SkillWait, b: SkillWait) => JSON.stringify(a) === JSON.stri
 function onSitePath(url: string): string {
   const u = new URL(url);
   return `${u.pathname}${u.search}`;
+}
+
+/** A step that types nothing, as its file writes it. */
+function plainStep(e: Extract<JournalEntry, { kind: 'act' }>, why: { why?: string }): SkillStep {
+  const target = formatRoleName(e.role, e.name);
+  const at = e.at;
+  switch (e.verb) {
+    case 'check':
+      return { verb: 'check', target, at, ...(e.unchecked ? { checked: false } : {}), ...why };
+    case 'press':
+      return { verb: 'press', key: e.key ?? '', ...(e.role ? { target, at } : {}), ...why };
+    case 'hover':
+    case 'scroll_to':
+      return { verb: e.verb, target, at, ...why };
+    default:
+      return { verb: 'click', target, at, ...(e.repeat && e.repeat > 1 ? { repeat: e.repeat } : {}), ...why };
+  }
 }
 
 /** Journal entries to a file. Errors are the things a card should have prevented. */
@@ -263,7 +287,7 @@ export function compileRecording(recording: readonly JournalEntry[], d: SaveDeci
   // A `start` the user widened to a prefix of the page means "wherever under here you are", so there
   // is no first navigation to write. Otherwise a run lands on the page the recording started on.
   const widened = firstPage !== start && atStart(start, firstPage);
-  if (!startsWithGo && !widened) steps.push({ verb: 'go', to: onSitePath(start), why: 'start where the recording started' });
+  if (!startsWithGo && !widened && !opts.noStart) steps.push({ verb: 'go', to: onSitePath(start), why: 'start where the recording started' });
 
   for (const e of recording) {
     if (e.kind === 'dropped') {
@@ -316,9 +340,6 @@ export function compileRecording(recording: readonly JournalEntry[], d: SaveDeci
         steps.push({ verb: 'go', to: onSitePath(to), ...why });
         break;
       }
-      case 'click':
-        steps.push({ verb: 'click', target, at, ...(e.repeat && e.repeat > 1 ? { repeat: e.repeat } : {}), ...why });
-        break;
       case 'fill':
       case 'select': {
         const decided = d.fields[e.n];
@@ -339,16 +360,8 @@ export function compileRecording(recording: readonly JournalEntry[], d: SaveDeci
         steps.push({ verb: e.verb, value, target, at, ...why });
         break;
       }
-      case 'check':
-        steps.push({ verb: 'check', target, at, ...(e.unchecked ? { checked: false } : {}), ...why });
-        break;
-      case 'press':
-        steps.push({ verb: 'press', key: e.key ?? '', ...(e.role ? { target, at } : {}), ...why });
-        break;
-      case 'hover':
-      case 'scroll_to':
-        steps.push({ verb: e.verb, target, at, ...why });
-        break;
+      default:
+        steps.push(plainStep(e, why));
     }
   }
   if (errors.length) return { ok: false, errors };
@@ -378,4 +391,270 @@ export function defaultDecisions(card: SaveCard): SaveDecisions {
   const outputs: SaveDecisions['outputs'] = {};
   for (const l of card.looks) if (l.suggest) outputs[l.n] = { name: l.name, label: l.name.replace(/_/g, ' '), take: l.take, list: l.matched !== 1 };
   return { name: card.name, description: card.description, start: card.start, fields, outputs };
+}
+
+// ---------------------------------------------------------------------------
+// propose_skill: the model names what to keep
+// ---------------------------------------------------------------------------
+
+/** What propose_skill says. It names journal entries: it has no way to write a step. */
+export interface SkillProposal {
+  name: string;
+  description: string;
+  fromStep?: number;
+  toStep?: number;
+  /** Where in the draft these steps go. 0 is before its first step. */
+  afterStep?: number;
+  inputs: { journalStep: number; name: string; label: string; optional?: boolean }[];
+  outputs: { name: string; label: string; fromStep: number; take: string; list?: boolean }[];
+  constants: number[];
+  /** Rename an input the draft already has. */
+  renames: { from: string; to: string; label?: string }[];
+}
+
+const asStep = (v: unknown): number | undefined => (typeof v === 'number' && Number.isInteger(v) ? v : undefined);
+const asText = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
+const asList = (v: unknown): Record<string, unknown>[] => (Array.isArray(v) ? v.filter((x): x is Record<string, unknown> => !!x && typeof x === 'object') : []);
+
+/** The tool's input, checked before anything is read. */
+export function parseProposeSkill(raw: Record<string, unknown>): { ok: true; proposal: SkillProposal } | { ok: false; error: string } {
+  const name = asText(raw.name);
+  const description = asText(raw.description);
+  if (!name || !description) return { ok: false, error: 'propose_skill needs a name and a description.' };
+  const inputs: SkillProposal['inputs'] = [];
+  for (const i of asList(raw.inputs)) {
+    const journalStep = asStep(i.journal_step);
+    if (journalStep === undefined || !asText(i.name) || !asText(i.label)) return { ok: false, error: 'Each input needs journal_step, name and label.' };
+    inputs.push({ journalStep, name: asText(i.name), label: asText(i.label), ...(i.optional === true ? { optional: true } : {}) });
+  }
+  const outputs: SkillProposal['outputs'] = [];
+  for (const o of asList(raw.outputs)) {
+    const fromStep = asStep(o.from_step);
+    if (fromStep === undefined || !asText(o.name) || !asText(o.label) || !asText(o.take)) return { ok: false, error: 'Each output needs name, label, from_step and take.' };
+    outputs.push({ name: asText(o.name), label: asText(o.label), fromStep, take: asText(o.take), ...(o.list === true ? { list: true } : {}) });
+  }
+  const renames: SkillProposal['renames'] = [];
+  for (const r of asList(raw.rename_inputs)) {
+    if (!asText(r.from) || !asText(r.to)) return { ok: false, error: 'Each rename needs from and to.' };
+    renames.push({ from: asText(r.from), to: asText(r.to), ...(asText(r.label) ? { label: asText(r.label) } : {}) });
+  }
+  const fromStep = asStep(raw.from_step);
+  const toStep = asStep(raw.to_step);
+  const afterStep = asStep(raw.after_step);
+  const constants = Array.isArray(raw.constants) ? raw.constants.flatMap((c) => asStep(c) ?? []) : [];
+  return { ok: true, proposal: { name, description, ...(fromStep !== undefined ? { fromStep } : {}), ...(toStep !== undefined ? { toStep } : {}), ...(afterStep !== undefined ? { afterStep } : {}), inputs, outputs, constants, renames } };
+}
+
+/** The draft a proposal revises. `floor` is the last journal entry a proposal has used. */
+export interface ProposalBase {
+  skill: ParsedSkill;
+  floor: number;
+  /** The entries it was compiled from, when it was one recording. */
+  recording?: { from: number; to: number };
+  /** It is a saved skill being edited, whose steps a recording does not replace by default. */
+  linked: boolean;
+}
+
+export type ProposalResult =
+  | { ok: true; source: string; skill: ParsedSkill; recording?: { from: number; to: number }; floor: number; wordsOnly: boolean; note?: string }
+  | { ok: false; error: string };
+
+const refuse = (error: string): ProposalResult => ({ ok: false, error });
+
+/** The latest run with a step in it, from its first act to its last call. */
+function latestRecording(entries: readonly JournalEntry[]): JournalEntry[] {
+  const last = [...entries].reverse().find((e) => e.kind === 'act');
+  return last ? recordingOf(entries, last.run) : [];
+}
+
+const typesValue = (e: JournalEntry): e is Extract<JournalEntry, { kind: 'act' }> => e.kind === 'act' && (e.verb === 'fill' || e.verb === 'select');
+
+/** What the proposal says about each typed value and each look in a recording, with its refusals. */
+function decisionsOf(recording: readonly JournalEntry[], all: readonly JournalEntry[], p: SkillProposal): { ok: true; decisions: SaveDecisions } | { ok: false; error: string } {
+  const entry = (n: number) => all.find((e) => e.n === n);
+  const inRecording = (n: number) => recording.some((e) => e.n === n);
+  const fields: SaveDecisions['fields'] = {};
+  const outputs: SaveDecisions['outputs'] = {};
+  const typedStep = (n: number): string | null => {
+    const e = entry(n);
+    if (!e) return `Journal step ${n} does not exist.`;
+    if (!typesValue(e)) return `Journal step ${n} did not type anything.`;
+    return inRecording(n) ? null : `Journal step ${n} is outside the steps this proposal covers.`;
+  };
+  for (const i of p.inputs) {
+    const problem = typedStep(i.journalStep);
+    if (problem) return { ok: false, error: problem };
+    fields[i.journalStep] = { as: 'input', name: i.name, label: i.label, ...(i.optional ? { optional: true } : {}) };
+  }
+  for (const n of p.constants) {
+    const problem = typedStep(n);
+    if (problem) return { ok: false, error: problem };
+    if (fields[n]) return { ok: false, error: `Journal step ${n} cannot be both an input and a constant.` };
+    fields[n] = { as: 'constant' };
+  }
+  for (const e of recording) {
+    if (!typesValue(e) || fields[e.n]) continue;
+    // A choice from the page's own list can stay as it was. Something typed has to be accounted for.
+    if (e.verb === 'select') fields[e.n] = { as: 'constant' };
+    else return { ok: false, error: `Journal step ${e.n} typed into ${formatRoleName(e.role, e.name)}, and you named it neither as an input nor as a constant. Name it in inputs, or in constants if the user asked to keep that value.` };
+  }
+  for (const o of p.outputs) {
+    const e = entry(o.fromStep);
+    if (!e) return { ok: false, error: `Journal step ${o.fromStep} does not exist.` };
+    if (e.kind !== 'look') return { ok: false, error: `Journal step ${o.fromStep} is not a find_elements call, so an output cannot be read from it.` };
+    if (e.matched < 1) return { ok: false, error: `Journal step ${o.fromStep} matched nothing, so there is nothing to read.` };
+    if (!inRecording(o.fromStep)) return { ok: false, error: `Journal step ${o.fromStep} is outside the steps this proposal covers.` };
+    outputs[o.fromStep] = { name: o.name, label: o.label, take: o.take, list: o.list === true };
+  }
+  return { ok: true, decisions: { name: p.name, description: p.description, fields, outputs } };
+}
+
+/** A word the model wrote that holds a value typed for an input. The one way a value could reach the file. */
+function quotesInput(recording: readonly JournalEntry[], d: SaveDecisions, valueOf: CompileOptions['valueOf'], p: SkillProposal): string | null {
+  const typed = recording.flatMap((e) => {
+    if (e.kind !== 'act' || e.toolId === undefined || e.stepIndex === undefined || d.fields[e.n]?.as !== 'input') return [];
+    const v = valueOf(e.toolId, e.stepIndex)?.trim().toLowerCase();
+    return v && v.length >= MIN_QUOTED ? [v] : [];
+  });
+  const words = [p.name, p.description, ...p.inputs.flatMap((i) => [i.name, i.label]), ...p.outputs.flatMap((o) => [o.name, o.label]), ...p.renames.flatMap((r) => [r.to, r.label ?? ''])];
+  const bad = words.find((w) => typed.some((v) => w.toLowerCase().includes(v)));
+  return bad ? `"${bad}" holds what was typed for an input, and a value never goes in a skill. Word it without the value.` : null;
+}
+
+/** New words on a file, in its front matter and in the heading a recording wrote. */
+function withWords(skill: ParsedSkill, name: string, description: string): ParsedSkill {
+  const before = skill.before.replace(`# ${skill.name}`, `# ${name}`).replace(skill.description, description);
+  return { ...skill, name, description, before };
+}
+
+function withRenames(skill: ParsedSkill, renames: SkillProposal['renames']): { ok: true; skill: ParsedSkill } | { ok: false; error: string } {
+  let out = skill;
+  for (const r of renames) {
+    if (!out.inputs[r.from]) return { ok: false, error: `This draft has no input called ${r.from}.` };
+    if (r.to !== r.from && out.inputs[r.to]) return { ok: false, error: `This draft already has an input called ${r.to}.` };
+    const inputs = Object.fromEntries(Object.entries(out.inputs).map(([k, v]) => (k === r.from ? [r.to, { ...v, ...(r.label ? { label: r.label } : {}) }] : [k, v])));
+    const steps = out.steps.map((s) => {
+      const value = (s.verb === 'fill' || s.verb === 'select') && s.value === `$${r.from}` ? { value: `$${r.to}` } : {};
+      const when = s.when === `$${r.from}` ? { when: `$${r.to}` } : {};
+      return { ...s, ...value, ...when } as SkillStep;
+    });
+    out = { ...out, inputs, steps };
+  }
+  return { ok: true, skill: out };
+}
+
+/**
+ * propose_skill's refusals and what comes of it. Every step in the result is one the extension recorded
+ * (or was already in the file): this function has nowhere to take a target from but the journal.
+ *
+ * With no new step since the last proposal, there must be a draft, and only its words, inputs and outputs
+ * change. With new ones, they become the file, or with `after_step` go into it at that point.
+ */
+export function compileProposal(entries: readonly JournalEntry[], p: SkillProposal, base: ProposalBase | null, opts: CompileOptions): ProposalResult {
+  const floor = base?.floor ?? 0;
+  const since = entries.filter((e) => e.n > floor);
+  const highest = entries.at(-1)?.n ?? floor;
+  const stepsNamed = p.fromStep !== undefined || p.toStep !== undefined || p.afterStep !== undefined;
+
+  if (!since.some((e) => e.kind === 'act') && !stepsNamed) {
+    if (!base) return refuse('Nothing has been done on the page since the last proposal. Do it once with act, then propose it: usermods records the steps, and you cannot write one.');
+    const named = p.inputs.length || p.outputs.length || p.constants.length;
+    let next: ParsedSkill = base.skill;
+    let recording = base.recording;
+    if (named) {
+      if (!recording) return refuse('This draft did not come from one recording in this chat, so its typed values have no journal steps to name. Use rename_inputs to rename an input, or change it on the page and propose with after_step.');
+      const rec = entries.filter((e) => e.n >= recording!.from && e.n <= recording!.to);
+      const d = decisionsOf(rec, entries, p);
+      if (!d.ok) return refuse(d.error);
+      const quoted = quotesInput(rec, d.decisions, opts.valueOf, p);
+      if (quoted) return refuse(quoted);
+      const compiled = compileRecording(rec, { ...d.decisions, start: base.skill.start }, opts);
+      if (!compiled.ok) return refuse(compiled.errors.join('. '));
+      next = { ...compiled.skill };
+    } else {
+      const quoted = quotesInput(entries, { name: '', description: '', fields: {}, outputs: {} }, opts.valueOf, p);
+      if (quoted) return refuse(quoted);
+    }
+    const renamed = withRenames(withWords(next, p.name, p.description), p.renames);
+    if (!renamed.ok) return refuse(renamed.error);
+    const skill = { ...renamed.skill, version: bumpPatch(base.skill.version) };
+    return { ok: true, source: serialiseSkill(skill), skill, ...(recording ? { recording } : {}), floor: Math.max(floor, highest), wordsOnly: true };
+  }
+
+  if (p.afterStep !== undefined && !base) return refuse('after_step says where new steps go in a draft, and this chat has no draft skill.');
+  if (base?.linked && p.afterStep === undefined) return refuse('This draft is a saved skill. Say where the new steps go with after_step: the number of the step they follow, or 0 for the start.');
+  if (p.afterStep !== undefined && (p.afterStep < 0 || p.afterStep > base!.skill.steps.length)) return refuse(`after_step must be from 0 to ${base!.skill.steps.length}: this draft has ${base!.skill.steps.length} steps.`);
+  for (const n of [p.fromStep, p.toStep]) if (n !== undefined && !entries.some((e) => e.n === n)) return refuse(`Journal step ${n} does not exist.`);
+
+  const from = p.fromStep ?? null;
+  const to = p.toStep ?? highest;
+  const recording = from !== null || p.toStep !== undefined ? entries.filter((e) => e.n >= (from ?? floor + 1) && e.n <= to) : latestRecording(since);
+  if (!recording.some((e) => e.kind === 'act')) return refuse('Nothing was done with act in those steps. Do it once with act, then propose it: usermods records the steps, and you cannot write one.');
+
+  const d = decisionsOf(recording, entries, p);
+  if (!d.ok) return refuse(d.error);
+  const quoted = quotesInput(recording, d.decisions, opts.valueOf, p);
+  if (quoted) return refuse(quoted);
+  const scripts = recording.filter((e) => e.kind === 'script').length;
+  const acts = recording.filter((e) => e.kind === 'act').length;
+  const note = scripts ? `this run used scripts; only its ${acts} act step${acts === 1 ? '' : 's'} can be saved` : undefined;
+  const range = { from: recording[0]!.n, to: recording.at(-1)!.n };
+
+  if (p.afterStep === undefined) {
+    const compiled = compileRecording(recording, d.decisions, opts);
+    if (!compiled.ok) return refuse(compiled.errors.join('. '));
+    return { ok: true, source: compiled.source, skill: compiled.skill, recording: range, floor: Math.max(floor, range.to), wordsOnly: false, ...(note ? { note } : {}) };
+  }
+
+  const b = base!.skill;
+  const stray = recording.find((e) => e.kind === 'act' && !skillMatchesUrl(b, e.url));
+  if (stray) return refuse(`Journal step ${stray.n} happened on ${stray.url}, which is off this skill's site.`);
+  const compiled = compileRecording(recording, { ...d.decisions, name: b.name, description: b.description, start: b.start }, { ...opts, noStart: true });
+  if (!compiled.ok) return refuse(compiled.errors.join('. '));
+  const spliced: ParsedSkill = {
+    ...b,
+    inputs: { ...b.inputs, ...compiled.skill.inputs },
+    outputs: { ...b.outputs, ...compiled.skill.outputs },
+    steps: [...b.steps.slice(0, p.afterStep), ...compiled.skill.steps, ...b.steps.slice(p.afterStep)],
+  };
+  const renamed = withRenames(withWords(spliced, p.name, p.description), p.renames);
+  if (!renamed.ok) return refuse(renamed.error);
+  const skill = { ...renamed.skill, version: bumpPatch(b.version) };
+  // Spliced into a file, it is no longer one recording.
+  return { ok: true, source: serialiseSkill(skill), skill, floor: Math.max(floor, range.to), wordsOnly: false, ...(note ? { note } : {}) };
+}
+
+// ---------------------------------------------------------------------------
+// UPDATE SKILL WITH THE REPAIR
+// ---------------------------------------------------------------------------
+
+/**
+ * The file with each repaired step replaced by what the repair did, and its patch version bumped. What
+ * replaces a step is what the extension read when the step ran. A typed value is the step's own, as the
+ * file already wrote it, so nothing typed can come in through here.
+ */
+export function repairedSkill(base: ParsedSkill, entries: readonly JournalEntry[], run: string, repaired: readonly number[]): { ok: true; source: string; skill: ParsedSkill } | { ok: false; error: string } {
+  let steps = base.steps;
+  for (const index of [...repaired].sort((a, b) => b - a)) {
+    if (index < 0 || index >= steps.length) return { ok: false, error: `This file has no step ${index + 1}.` };
+    const did = entries.filter((e) => e.run === run && e.repairOf === index);
+    const fresh: SkillStep[] = [];
+    for (const e of did) {
+      if (e.kind === 'wait') fresh.push({ verb: 'wait', condition: e.condition, ...(e.timeoutMs ? { timeoutMs: e.timeoutMs } : {}) });
+      if (e.kind !== 'act') continue;
+      const why = e.why ? { why: e.why } : {};
+      if (e.verb === 'go') return { ok: false, error: 'A repair cannot go anywhere.' };
+      if (e.verb === 'fill' || e.verb === 'select') {
+        if (e.typedAs === undefined) return { ok: false, error: 'This repair typed something that is not the step’s own value.' };
+        fresh.push({ verb: e.verb, value: e.typedAs, target: formatRoleName(e.role, e.name), at: e.at, ...why });
+      } else fresh.push(plainStep(e, why));
+    }
+    if (!fresh.some((s) => s.verb !== 'wait')) return { ok: false, error: `The journal holds nothing the repair of step ${index + 1} did.` };
+    steps = [...steps.slice(0, index), ...fresh, ...steps.slice(index + 1)];
+  }
+  // A repair can leave an input with nothing typing it, and a file may not declare one it does not use.
+  const used = new Set(steps.flatMap((s) => [(s.verb === 'fill' || s.verb === 'select') && isInputRef(s.value) ? s.value.slice(1) : '', s.when && isInputRef(s.when) ? s.when.slice(1) : '']));
+  const inputs = Object.fromEntries(Object.entries(base.inputs).filter(([k]) => used.has(k)));
+  const skill: ParsedSkill = { ...base, steps, inputs, version: bumpPatch(base.version) };
+  return { ok: true, source: serialiseSkill(skill), skill };
 }

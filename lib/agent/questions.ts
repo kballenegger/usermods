@@ -17,6 +17,7 @@ import type { ActResult, ActStep } from '../interact/actions';
 import type { Delta } from '../interact/delta';
 import type { Described } from '../interact/describe';
 import { formatRoleName } from '../interact/name.ts';
+import type { Skill } from '../skills';
 
 export type Question =
   /** Let usermods operate this site? The first `act` in a chat, unless the site has a standing allowance. */
@@ -60,7 +61,12 @@ export type Question =
   /** The run has done its 500 actions. */
   | { kind: 'skill-ceiling'; id: string; skill: string; actions: number }
   /** A step wants an input the run card left empty. */
-  | { kind: 'skill-input'; id: string; skill: string; n: number; label: string };
+  | { kind: 'skill-input'; id: string; skill: string; n: number; label: string }
+  /**
+   * The model called run_skill. This is the run card, and nothing starts until it is answered here:
+   * no tool can answer a question. `values` are what the model suggested, for the user to change.
+   */
+  | { kind: 'run-skill'; id: string; skill: Skill; values: Record<string, string>; siteAllowed: boolean; host: string };
 
 export type Answer =
   | { kind: 'allow'; every?: boolean; standing?: boolean }
@@ -79,7 +85,9 @@ export type Answer =
   | { kind: 'do-again' }
   /** Past a skill's ceiling. */
   | { kind: 'carry-on' }
-  | { kind: 'input'; value: string };
+  | { kind: 'input'; value: string }
+  /** RUN on a run card the model asked for, with what the user left in its fields. */
+  | { kind: 'run'; inputs: Record<string, string>; standing?: boolean };
 
 /** Whether this answer is one this question offered. Anything else is not an answer. */
 export function answerFits(q: Question, a: Answer): boolean {
@@ -106,6 +114,8 @@ export function answerFits(q: Question, a: Answer): boolean {
       return a.kind === 'carry-on';
     case 'skill-input':
       return a.kind === 'input' && typeof a.value === 'string';
+    case 'run-skill':
+      return a.kind === 'decline' || (a.kind === 'run' && !!a.inputs && typeof a.inputs === 'object' && Object.values(a.inputs).every((v) => typeof v === 'string') && (!a.standing || !q.siteAllowed));
   }
 }
 
@@ -134,6 +144,8 @@ export function questionActivity(q: Question): string {
       return `waiting for you · ${q.skill} has done ${q.actions} actions`;
     case 'skill-input':
       return `waiting for you · ${q.label}`;
+    case 'run-skill':
+      return `waiting for you · run ${q.skill.name}?`;
   }
 }
 
@@ -318,6 +330,36 @@ export interface PageCard {
   outputs?: CardOutput[];
   /** The skill this card is the record of. */
   skill?: string;
+  /** A model repaired steps of this run: UPDATE SKILL WITH THE REPAIR. */
+  repair?: RepairOffer;
+}
+
+/** Which steps of which skill a repair replaced, and the run whose journal holds what it did instead. */
+export interface RepairOffer {
+  run: string;
+  /** From 0, in the file the run ran. */
+  steps: number[];
+  skillId: string;
+  /** The file's steps when the run started: an update does not land on a file that has changed since. */
+  key: string;
+  /** The run was of the chat's draft, which gets a new version. */
+  draft?: boolean;
+}
+
+/** PROPOSED SKILL: the hero card. Every fact on it is the extension's, from what it recorded. */
+export interface SkillProposalCard {
+  name: string;
+  description: string;
+  version: number;
+  /** How many steps the file has. */
+  steps: number;
+  host: string;
+  /** The inputs' labels, in the order the steps use them. */
+  inputs: string[];
+  /** What a re-proposal changed nothing of: no step ran, so `tested` does not apply. */
+  wordsOnly: boolean;
+  /** The steps a run saved cannot include, when it used scripts. */
+  note?: string;
 }
 
 export interface CardOutput {

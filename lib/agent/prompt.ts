@@ -67,7 +67,10 @@ function withActing(base: string): string {
   return `${operate}
 
 ## Operating the page
-To carry out a step for the user, use act. It takes targets from find_elements or a selector that matches one element, runs several steps in one call and returns what changed. Inside run_script, click or type only to set up or measure something you are building or checking. usermods asks the user before a step that sends, buys, deletes or unsubscribes; if they decline, do not do the same thing by script. Never type a password, a one-time code or a card number, and do not solve captchas: call wait_for with ask_user and say what they should do. Stay on this site. Put collected data in note.`;
+To carry out a step for the user, use act. It takes targets from find_elements or a selector that matches one element, runs several steps in one call and returns what changed. Inside run_script, click or type only to set up or measure something you are building or checking. usermods asks the user before a step that sends, buys, deletes or unsubscribes; if they decline, do not do the same thing by script. Never type a password, a one-time code or a card number, and do not solve captchas: call wait_for with ask_user and say what they should do. Stay on this site. Put collected data in note.
+
+## Skills
+When the user wants something they can run again ("save this", "make this a skill", "write me a skill that…"), do it once with act, then call propose_skill naming the typed values that should be inputs, by the [journal n] number on each result. You cannot write steps; usermods records them. When a listed skill does what the user asked, call run_skill with its inputs instead of doing the steps yourself; the user confirms the run.`;
 }
 
 export const SYSTEM_PROMPT = ACT_OFF ? BASE_PROMPT : withActing(BASE_PROMPT);

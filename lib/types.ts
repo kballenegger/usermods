@@ -3,7 +3,7 @@ import type { AttachedImage, ImageThumb } from './images';
 import type { WaitCondition } from './agent/wait';
 import type { ImagesSetting } from './providers/vision';
 import type { ReasoningField, ThinkingLevel } from './thinking';
-import type { PageCard, Question, StepRow, ToolEffect } from './agent/questions';
+import type { PageCard, Question, SkillProposalCard, StepRow, ToolEffect } from './agent/questions';
 
 export type { AttachedImage, ImageThumb, ImagesSetting, ReasoningField, ThinkingLevel };
 
@@ -166,10 +166,18 @@ export interface Settings {
    * gate would have decided. Optional, and absent reads as off. Never read in a build with ACT_OFF.
    */
   askEveryStep?: boolean;
+  /**
+   * Settings' "Repair broken steps with the model". Absent reads as 'here'. Never read in a build
+   * with ACT_OFF. See lib/skillrepair.ts.
+   */
+  repairSkills?: RepairSetting;
 }
 
+/** Which skills a model may repair: none, the ones made on this device, or every one. */
+export type RepairSetting = 'never' | 'here' | 'every';
+
 /** The global preferences: the part of `Settings` stored under 'settings', none of it about a provider. */
-export type Prefs = Pick<Settings, 'autoNameChats' | 'theme' | 'contextBudget' | 'sidePanelScope' | 'checkUpdates' | 'askEveryStep'>;
+export type Prefs = Pick<Settings, 'autoNameChats' | 'theme' | 'contextBudget' | 'sidePanelScope' | 'checkUpdates' | 'askEveryStep' | 'repairSkills'>;
 
 /**
  * Default context budget, in estimated tokens. Well under the 200k window of the models this ships
@@ -376,6 +384,8 @@ export type AgentEventBody =
   | { type: 'question_done'; id: string }
   /** What the extension recorded of a run that operated the page, at the end of the run. */
   | { type: 'page_card'; card: PageCard }
+  /** propose_skill was accepted. The hero card, with the version it became on it. */
+  | { type: 'skill_proposal'; card: SkillProposalCard }
   | { type: 'proposal'; proposal: ModProposal }
   /**
    * The chat's draft mod gained a version. Emitted after the background has stored it, so the panel
@@ -445,6 +455,7 @@ export type ChatItem =
    */
   | { kind: 'proposal'; proposal: ModProposal; version?: number }
   | { kind: 'page_card'; card: PageCard }
+  | { kind: 'skill_proposal'; card: SkillProposalCard }
   | { kind: 'note'; text: string }
   /**
    * The model the turns after it were produced by, until the next one of these: which connection

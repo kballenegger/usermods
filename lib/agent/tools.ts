@@ -136,6 +136,78 @@ function withActing(base: ToolDef[]): ToolDef[] {
         additionalProperties: false,
       },
     },
+    {
+      name: 'propose_skill',
+      description:
+        'Offer what you just did as a skill the user can run again. You cannot write steps: usermods records them, and you name which ones by the [journal n] number on each act result and each find_elements. Do the task once with act first. Refused if nothing has run since your last proposal (unless a draft exists, when only its words, inputs and outputs change), if a named journal step does not exist, if a fill you did not name as an input or a constant typed anything, or if an output is not from a find_elements that matched.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Short human name, e.g. "File an expense".' },
+          description: { type: 'string', description: 'One sentence.' },
+          from_step: { type: 'integer', description: 'First journal step. Default: the latest run\'s first act.' },
+          to_step: { type: 'integer', description: 'Last journal step. Default: its last call.' },
+          after_step: { type: 'integer', description: 'With a draft skill: put the new journal steps after this step of the draft, counted from 1. 0 is before its first step.' },
+          inputs: {
+            type: 'array',
+            description: 'The typed values that change each run. Never put a value in a name or a label.',
+            items: {
+              type: 'object',
+              properties: { journal_step: { type: 'integer' }, name: { type: 'string', description: 'lower_snake_case' }, label: { type: 'string' }, optional: { type: 'boolean' } },
+              required: ['journal_step', 'name', 'label'],
+              additionalProperties: false,
+            },
+          },
+          outputs: {
+            type: 'array',
+            description: 'What a run should read from the page: find_elements calls you made.',
+            items: {
+              type: 'object',
+              properties: { name: { type: 'string', description: 'lower_snake_case' }, label: { type: 'string' }, from_step: { type: 'integer' }, take: { type: 'string', description: 'text, href, src, or an attribute name.' }, list: { type: 'boolean', description: 'Every match, rather than the first.' } },
+              required: ['name', 'label', 'from_step', 'take'],
+              additionalProperties: false,
+            },
+          },
+          constants: { type: 'array', items: { type: 'integer' }, description: 'Journal steps whose typed value stays in the file as it is. Only when the user asked for that.' },
+          rename_inputs: {
+            type: 'array',
+            description: 'Rename inputs the draft already has.',
+            items: { type: 'object', properties: { from: { type: 'string' }, to: { type: 'string' }, label: { type: 'string' } }, required: ['from', 'to'], additionalProperties: false },
+          },
+          replace: { type: 'boolean', description: 'Only after a refusal: take the place of a draft mod. Ask the user first.' },
+        },
+        required: ['name', 'description'],
+        additionalProperties: false,
+      },
+    },
+    {
+      name: 'open_skill',
+      description:
+        'Adopt a listed skill as this chat\'s draft, so the next propose_skill revises it. Take the id from the "[Skills on this page]" list. It returns what the skill does, not its notes. A change that needs a new step is done on the page with act and proposed with after_step.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          skill_id: { type: 'string', description: 'The id, exactly as the list gives it.' },
+          replace: { type: 'boolean', description: 'Only after a refusal: take the place of a draft with unsaved changes. Ask the user first.' },
+        },
+        required: ['skill_id'],
+        additionalProperties: false,
+      },
+    },
+    {
+      name: 'run_skill',
+      description:
+        'Offer to run a listed skill on this page. The user sees a card with what it will do and your values, can change them, and starts it or does not: you cannot start it yourself. It runs with no model and returns its record and outputs when it ends.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          skill_id: { type: 'string', description: 'The id, exactly as the list gives it.' },
+          inputs: { type: 'object', description: 'Your suggestion for each input, by name.', additionalProperties: { type: 'string' } },
+        },
+        required: ['skill_id'],
+        additionalProperties: false,
+      },
+    },
   ];
 }
 
@@ -279,3 +351,15 @@ const BASE_TOOLS: ToolDef[] = [
 ];
 
 export const TOOLS: ToolDef[] = ACT_OFF ? BASE_TOOLS : withActing(BASE_TOOLS);
+
+/** What a repair of a skill's step may use (lib/skillrepair.ts). The loop refuses anything else, whatever is called. */
+export const repairTools = ACT_OFF
+  ? (): ToolDef[] => []
+  : (): ToolDef[] =>
+      TOOLS.filter((t) => ['find_elements', 'act', 'wait_for', 'note'].includes(t.name)).map((t) => {
+        if (t.name !== 'wait_for') return t;
+        // Your turn is the user's, and a repair has no business asking for it.
+        const schema = t.inputSchema as { properties: Record<string, unknown> };
+        const { ask_user: _ask, ...properties } = schema.properties;
+        return { ...t, description: t.description.split(' With ask_user')[0]!, inputSchema: { ...t.inputSchema, properties } };
+      });

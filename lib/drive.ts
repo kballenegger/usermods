@@ -59,6 +59,8 @@ function abortable(signal: AbortSignal, ms: number): Promise<void> {
 export interface DriveController {
   /** The driver for one run. Call `end` when the run is over. */
   driverFor(chatId: string, tabId: number): Driver;
+  /** Back to this driver, when one the model started has ended under it. */
+  adopt(chatId: string, tabId: number, driver: Driver): void;
   end(chatId: string): void;
   rpc(req: DriveRpc): Promise<unknown>;
   /** What each chat is waiting on, for a panel that opens mid-run. */
@@ -186,7 +188,7 @@ export function createDriveController(host: DriveHost): DriveController {
       wait: (spec, signal) => host.waitInTab(tabId, spec, signal),
       journalWrite: (step: Omit<PendingStep, 'at'>) => host.updateRuns((runs) => withPending(runs, chatId, step)),
       journalClear: (nextStep) => host.updateRuns((runs) => (nextStep === undefined ? withoutPending(runs, chatId) : withSkillStep(withoutPending(runs, chatId), chatId, nextStep))),
-      record: (entry) => void appendJournal(chatId, entry).catch(() => {}),
+      record: (entry) => appendJournal(chatId, entry).catch(() => undefined),
       loadAllowances: held.load,
       allowSite: held.allowSite,
       allowAction: held.allowAction,
@@ -204,6 +206,9 @@ export function createDriveController(host: DriveHost): DriveController {
       const driver = new Driver(depsFor(chatId, tabId));
       drivers.set(chatId, { driver, tabId });
       return driver;
+    },
+    adopt(chatId, tabId, driver) {
+      drivers.set(chatId, { driver, tabId });
     },
     end(chatId) {
       drivers.delete(chatId);

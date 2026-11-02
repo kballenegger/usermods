@@ -101,6 +101,14 @@ export function withRunSkill(runs: RunMap, chatId: string, skill: RunSkill, now:
   return { ...runs, [chatId]: { ...prev, skill, updatedAt: now } };
 }
 
+/** A skill the model started has ended, and the model's own run carries on. */
+export function withoutRunSkill(runs: RunMap, chatId: string, now: number = Date.now()): RunMap {
+  const prev = runs[chatId];
+  if (!prev?.skill) return runs;
+  const { skill: _skill, ...rest } = prev;
+  return { ...runs, [chatId]: { ...rest, updatedAt: now } };
+}
+
 /** Move a skill's run to this step. Nothing changes for a record that is not a skill's. */
 export function withSkillStep(runs: RunMap, chatId: string, step: number, now: number = Date.now()): RunMap {
   const prev = runs[chatId];

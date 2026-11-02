@@ -1,6 +1,7 @@
 // Matching a draft against the mods that already exist: which one a proposal revises, which ones
 // run on the page the user is looking at, and whether a save is about to mint a twin of something
 // already installed. Pure, so it is all testable under node.
+import { ACT_OFF } from './buildflags.ts';
 import { modMatchesUrl } from './mods.ts';
 import type { Mod } from './types';
 
@@ -132,9 +133,10 @@ export function modsBlock(mods: ModOnPage[]): string {
  */
 export type DraftStanding = 'none' | 'saved' | 'unsaved';
 
-export function draftStanding(a: { current: number; linkedModId?: string; savedVersion?: number } | null | undefined): DraftStanding {
+export function draftStanding(a: { current: number; linkedModId?: string; linkedSkillId?: string; savedVersion?: number } | null | undefined): DraftStanding {
   if (!a) return 'none';
   if (a.linkedModId && a.savedVersion === a.current) return 'saved';
+  if (!ACT_OFF && a.linkedSkillId && a.savedVersion === a.current) return 'saved';
   return 'unsaved';
 }
 

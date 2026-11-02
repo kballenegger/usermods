@@ -149,8 +149,8 @@ export interface DriverDeps {
   journalWrite(step: Omit<PendingStep, 'at'>): Promise<void>;
   /** With a skill's next step, written in one go: no moment says the step is over and the run is not past it. */
   journalClear(nextStep?: number): Promise<void>;
-  /** What a run did, for SAVE AS SKILL. Holds no value a field was filled with. */
-  record?(entry: NewJournalEntry): void;
+  /** What a run did, for SAVE AS SKILL. Holds no value a field was filled with. Answers with its number. */
+  record?(entry: NewJournalEntry): void | Promise<number | undefined>;
   loadAllowances(host: string): Promise<GateAllowances>;
   allowSite(host: string, standing: boolean): Promise<void>;
   allowAction(host: string, key: string): Promise<void>;
@@ -182,6 +182,33 @@ export function waitForFile(c: WaitCondition): SkillWait {
     case 'ms':
       return { ms: c.ms };
   }
+}
+
+/**
+ * What a repair may do with `act`, and whose step it is. Every step asks, consequential or not, and
+ * nothing it does can be allowed in advance. A `go` and a repeat are refused, and the only text it can
+ * type is the broken step's own value, which it is not told: it writes the token and usermods types it.
+ */
+export interface RepairRules {
+  /** The step being repaired, from 0. */
+  index: number;
+  total: number;
+  name: string;
+  /** What the broken step types, and how its file writes that. Absent when it types nothing. */
+  value?: { text: string; written: string };
+}
+
+/** The token a repair writes where the step's own value goes. See RepairRules. */
+export const VALUE_TOKEN = '$value';
+
+/** Why a repair may not take this step, or null. */
+export function repairRefusal(step: ActStep, rules: RepairRules): string | null {
+  if (step.do === 'go') return 'go is not available during a repair: do the step on this page.';
+  if (step.repeat) return 'repeat is not available during a repair: each action is asked on its own.';
+  if (step.do !== 'fill' && step.do !== 'select') return null;
+  if (!rules.value) return 'This step types nothing, so a repair of it cannot either.';
+  if (step.text !== VALUE_TOKEN) return `During a repair the only thing you can type is the step's own value: pass text "${VALUE_TOKEN}" and usermods types it.`;
+  return null;
 }
 
 export interface ActContext {
@@ -247,6 +274,8 @@ export class Driver {
   private barRaised = false;
   /** This run's name in the chat's journal. */
   private readonly run: string;
+  /** The skill's step a repair is working on, written on what it records. */
+  private repairing: number | null = null;
   private readonly deps: DriverDeps;
 
   constructor(deps: DriverDeps) {
@@ -257,6 +286,16 @@ export class Driver {
 
   get isDriving(): boolean {
     return this.driving;
+  }
+
+  /** This run's name in the chat's journal, where a repair's steps are looked up. */
+  get runId(): string {
+    return this.run;
+  }
+
+  /** What is recorded from here is what a repair did, or, with null, no longer. */
+  setRepairing(index: number | null): void {
+    this.repairing = index;
   }
 
   // ---------------------------------------------------------------------------
@@ -572,51 +611,69 @@ export class Driver {
   // ---------------------------------------------------------------------------
 
   /** Steps in order, stopping at the first that does not happen. What comes back goes to the model. */
-  async act(call: ActCall, ctx: ActContext, signal: AbortSignal): Promise<{ text: string; isError: boolean; waitedMs?: number }> {
+  async act(call: ActCall, ctx: ActContext, signal: AbortSignal, repair?: RepairRules): Promise<{ text: string; isError: boolean; waitedMs?: number; done?: number; declined?: boolean }> {
     const lines: string[] = [];
     let known: string[] | undefined;
+    let done = 0;
     const row = (index: number, step: StepRow) => this.deps.emit({ type: 'act_step', id: ctx.toolId, index, step });
-    for (const [i, step] of call.steps.entries()) {
+    const modelSays = call.description;
+    for (const [i, asked] of call.steps.entries()) {
+      const refusal = repair ? repairRefusal(asked, repair) : null;
+      if (refusal) {
+        row(i, { state: 'failed', text: `refused · ${refusal.split(':')[0]!.split('.')[0]}`, detail: { modelSays, result: refusal } });
+        lines.push(refusal);
+        return { text: lines.join('\n'), isError: true, done };
+      }
+      // The model wrote the token. What goes to the field is the step's own value, and the record keeps the token's meaning.
+      const typedAs = repair?.value && (asked.do === 'fill' || asked.do === 'select') ? repair.value : undefined;
+      const step: ActStep = typedAs ? { ...asked, text: typedAs.text } : asked;
       if (step.do === 'go') known ??= knownUrls(ctx.history, await this.deps.pageUrl().catch(() => ''));
-      const modelSays = call.description;
-      const outcome = await this.runStep(step, { modelSays, ...(known ? { knownUrls: known } : {}), ...(ctx.iteration ? { iteration: ctx.iteration } : {}), onRow: (r) => row(i, { ...r, detail: { modelSays } }) }, signal);
+      const repairing: StepOptions = repair
+        ? { forceConfirm: true, actions: [], journalKind: 'skill', skill: { name: repair.name, n: repair.index + 1, total: repair.total }, barStatus: `usermods is repairing ${repair.name} · step ${repair.index + 1}`, activity: `repairing ${repair.name} · step ${repair.index + 1}` }
+        : {};
+      const outcome = await this.runStep(step, { ...repairing, modelSays, ...(known ? { knownUrls: known } : {}), ...(ctx.iteration ? { iteration: ctx.iteration } : {}), onRow: (r) => row(i, { ...r, detail: { modelSays } }) }, signal);
       const left = call.steps.length - i - 1;
       const rest = left ? ` The ${left === 1 ? 'step' : `${left} steps`} after it did not run.` : '';
       switch (outcome.kind) {
         case 'done':
           row(i, { state: 'done', text: outcome.words, detail: { modelSays, read: readWords(outcome.described), result: outcome.result.text } });
-          lines.push(outcome.result.text);
-          this.journalAct(step, outcome.described, call.description, ctx.toolId, i);
+          done += outcome.result.clicks ?? 1;
+          {
+            // The number propose_skill names this step by. A repair proposes nothing.
+            const n = await this.journalAct(step, outcome.described, call.description, ctx.toolId, i, typedAs?.written);
+            lines.push(n && !repair ? `${outcome.result.text} [journal ${n}]` : outcome.result.text);
+          }
           continue;
         case 'declined':
-          this.note({ kind: 'dropped', label: outcome.label, consequential: true }, await this.deps.pageUrl().catch(() => ''));
+          await this.note({ kind: 'dropped', label: outcome.label, consequential: true }, await this.deps.pageUrl().catch(() => ''));
           row(i, { state: 'declined', text: `not done · you declined: ${outcome.label}`, detail: { modelSays } });
           lines.push(`The user declined this step: ${outcome.label}. It did not happen.${rest} Do not try it another way, by script or otherwise, unless they ask. You may carry on with anything else, or tell them what is left.`);
-          return { text: lines.join('\n'), isError: false };
+          return { text: lines.join('\n'), isError: false, ...(repair ? { done, declined: true } : {}) };
         case 'refused':
-          this.note({ kind: 'dropped', label: step.do, consequential: true }, await this.deps.pageUrl().catch(() => ''));
+          await this.note({ kind: 'dropped', label: step.do, consequential: true }, await this.deps.pageUrl().catch(() => ''));
           row(i, { state: 'failed', text: `refused · ${outcome.message.replace(/^Refused: /, '').split('.')[0]}`, detail: { modelSays, ...(outcome.described ? { read: readWords(outcome.described) } : {}), result: outcome.message } });
           lines.push(`${outcome.message}${rest}`);
-          return { text: lines.join('\n'), isError: true };
+          return { text: lines.join('\n'), isError: true, ...(repair ? { done } : {}) };
         case 'failed': {
           const verb = step.do === 'scroll_to' ? 'scroll to' : step.do;
           const what = outcome.described ? (outcome.described.name ? `"${outcome.described.name}"` : outcome.described.role) : 'that';
           row(i, { state: 'failed', text: `could not ${verb} ${what} · ${outcome.message}`, detail: { modelSays, ...(outcome.described ? { read: readWords(outcome.described) } : {}), result: outcome.message } });
           lines.push(`Step ${i + 1} failed: ${outcome.message}${rest}`);
-          return { text: lines.join('\n'), isError: true };
+          return { text: lines.join('\n'), isError: true, ...(repair ? { done } : {}) };
         }
         case 'stopped':
           row(i, { state: 'stopped', text: 'stopped', detail: { modelSays } });
           lines.push(`Stopped by the user.${rest}`);
-          return { text: lines.join('\n'), isError: false };
+          return { text: lines.join('\n'), isError: false, ...(repair ? { done } : {}) };
       }
     }
-    if (!call.thenWait) return { text: lines.join('\n'), isError: false };
+    const counted = repair ? { done } : {};
+    if (!call.thenWait) return { text: lines.join('\n'), isError: false, ...counted };
     const startedAt = this.deps.now();
     const outcome = await this.deps.wait(call.thenWait, signal);
     if (outcome.matched) await this.recordWait(call.thenWait);
     const waited = renderWaitResult(call.thenWait, outcome);
-    return { text: `${lines.join('\n')}\n\nthen_wait: ${waited.text}`, isError: !!outcome.failure, waitedMs: this.deps.now() - startedAt };
+    return { text: `${lines.join('\n')}\n\nthen_wait: ${waited.text}`, isError: !!outcome.failure, waitedMs: this.deps.now() - startedAt, ...counted };
   }
 
   // ---------------------------------------------------------------------------
@@ -624,14 +681,15 @@ export class Driver {
   // ---------------------------------------------------------------------------
 
   /** Into the chat's journal, once this run has touched the page. What it looked at before that is not part of it. */
-  private note(entry: JournalBody, url: string): void {
-    if (this.driving) this.deps.record?.({ ...entry, run: this.run, url } as NewJournalEntry);
+  private async note(entry: JournalBody, url: string): Promise<number | undefined> {
+    if (!this.driving) return undefined;
+    return (await this.deps.record?.({ ...entry, run: this.run, url, ...(this.repairing !== null ? { repairOf: this.repairing } : {}) } as NewJournalEntry)) ?? undefined;
   }
 
   /** A step that happened, as the extension read it. The value stays in the conversation, and the entry says where. */
-  private journalAct(step: ActStep, d: Described, why: string, toolId: string, stepIndex: number): void {
+  private journalAct(step: ActStep, d: Described, why: string, toolId: string, stepIndex: number, typedAs?: string): Promise<number | undefined> {
     const typed = step.do === 'fill' || step.do === 'select';
-    this.note(
+    return this.note(
       {
         kind: 'act',
         verb: step.do,
@@ -643,7 +701,7 @@ export class Driver {
         ...(step.do === 'check' && /^(false|off|no|uncheck|unticked?|0)$/i.test(step.text ?? '') ? { unchecked: true } : {}),
         ...(step.repeat ? { repeat: step.repeat } : {}),
         why,
-        ...(typed ? { toolId, stepIndex } : {}),
+        ...(typedAs !== undefined ? { typedAs } : typed ? { toolId, stepIndex } : {}),
       },
       d.pageUrl,
     );
@@ -651,18 +709,18 @@ export class Driver {
 
   /** wait_for and then_wait, when the condition held. */
   async recordWait(spec: WaitSpec): Promise<void> {
-    if (this.driving) this.note({ kind: 'wait', condition: waitForFile(spec.condition), ...(spec.timeoutMs !== DEFAULT_WAIT_MS && spec.condition.kind !== 'ms' ? { timeoutMs: spec.timeoutMs } : {}) }, await this.deps.pageUrl().catch(() => ''));
+    if (this.driving) await this.note({ kind: 'wait', condition: waitForFile(spec.condition), ...(spec.timeoutMs !== DEFAULT_WAIT_MS && spec.condition.kind !== 'ms' ? { timeoutMs: spec.timeoutMs } : {}) }, await this.deps.pageUrl().catch(() => ''));
   }
 
   /** A wait_for with ask_user, with the condition that ended it, if it had one. */
   async recordAsk(text: string, spec: WaitSpec | null): Promise<void> {
     const until = spec && spec.condition.kind !== 'ms' ? { until: waitForFile(spec.condition) } : {};
-    if (this.driving) this.note({ kind: 'ask', text: text.trim().slice(0, 300), ...until }, await this.deps.pageUrl().catch(() => ''));
+    if (this.driving) await this.note({ kind: 'ask', text: text.trim().slice(0, 300), ...until }, await this.deps.pageUrl().catch(() => ''));
   }
 
   /** A find_elements with a selector that matched, which SAVE AS SKILL can offer as an output. */
-  async recordLook(selector: string, matched: number, links: boolean): Promise<void> {
-    if (this.driving) this.note({ kind: 'look', selector, matched, links }, await this.deps.pageUrl().catch(() => ''));
+  async recordLook(selector: string, matched: number, links: boolean): Promise<number | undefined> {
+    return this.driving ? this.note({ kind: 'look', selector, matched, links }, await this.deps.pageUrl().catch(() => '')) : undefined;
   }
 
   // ---------------------------------------------------------------------------
@@ -727,7 +785,7 @@ export class Driver {
       this.deps.emit({ type: 'status', phase: 'tool', tool: 'run_script', detail: description.slice(0, 120), ...(iteration ? { iteration } : {}), ...(this.driving ? { driving: true } : {}) });
     }
     await this.deps.journalWrite({ kind: 'script', label: `run a script: ${description.slice(0, 120) || 'no description'}` }).catch(() => {});
-    this.note({ kind: 'script', label: description.slice(0, 120) }, await this.deps.pageUrl().catch(() => ''));
+    await this.note({ kind: 'script', label: description.slice(0, 120) }, await this.deps.pageUrl().catch(() => ''));
     return true;
   }
 

@@ -118,6 +118,8 @@ export function reduceItems(items: ChatItem[], event: AgentEventBody): ChatItem[
       // version and offers its old Save, which is the honest fallback.
       for (let i = items.length - 1; i >= 0; i--) {
         const it = items[i];
+        // A draft skill's card carries its own version, and a mod's card above it is about something else.
+        if (!ACT_OFF && it?.kind === 'skill_proposal') return items;
         if (it?.kind !== 'proposal') continue;
         // Already stamped with this number: the event is a duplicate, not a second proposal, so
         // nothing changes. (The de-duped re-proposal case — the model proposing the same script
@@ -201,6 +203,8 @@ function reduceOperating(items: ChatItem[], event: AgentEventBody): ChatItem[] |
     }
     case 'page_card':
       return [...items, { kind: 'page_card', card: event.card }];
+    case 'skill_proposal':
+      return [...items, { kind: 'skill_proposal', card: event.card }];
     case 'question':
     case 'question_done':
       // A question is a row of the chat column, not of the transcript: what it asked and how it was

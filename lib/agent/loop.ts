@@ -7,11 +7,11 @@ import { createProvider } from '../providers/index.ts';
 import { ATTACHMENT_DROPPED_PANEL_NOTE } from '../providers/vision.ts';
 import type { Provider } from '../providers/types';
 import { renderRunResult, type RunResult } from '../runscript.ts';
-import { DEFAULT_CONTEXT_BUDGET, type AgentEventBody, type ModProposal, type Msg, type Part, type Settings, type UserTurn } from '../types.ts';
+import { DEFAULT_CONTEXT_BUDGET, type AgentEventBody, type ModProposal, type Msg, type Part, type Settings, type ToolDef, type UserTurn } from '../types.ts';
 import { MAX_ITERATIONS, NO_READS, countReads, readBudgetNudge, wrapUpNudge, type ReadCall } from './budget.ts';
 import { compact, estimateTokens, needsCompaction } from './compact.ts';
 import { parseActInput, type ActCall, type ActContext } from './driver.ts';
-import { scriptEffect, type ToolEffect } from './questions.ts';
+import { scriptEffect, type SkillProposalCard, type ToolEffect } from './questions.ts';
 import { SYSTEM_PROMPT } from './prompt.ts';
 import { checkProposal, testedAs, testedNote, type ProposalContext } from './propose.ts';
 import { isContextLengthError, withRetry, type RetryDeps, type RetryPolicy } from './retry.ts';
@@ -84,6 +84,23 @@ export interface AgentEnv {
    * a build with ACT_OFF, where the tools that need it do not exist either.
    */
   operate?: OperateEnv;
+  /** A chat's skills: the three tools. The background owns the journal, the draft and the run card. */
+  skills?: SkillsEnv;
+}
+
+/** See AgentEnv.skills. */
+export interface SkillsEnv {
+  propose(input: Record<string, unknown>, history: readonly Msg[]): Promise<{ ok: true; text: string; card: SkillProposalCard } | { ok: false; reason: string }>;
+  open(skillId: string, replace: boolean): Promise<{ ok: true; text: string; version: number | null } | { ok: false; reason: string }>;
+  /** Shows the run card and waits. There is no parameter that starts a run without it. */
+  run(skillId: string, inputs: Record<string, string>, toolId: string, signal: AbortSignal): Promise<{ text: string; isError: boolean }>;
+}
+
+/** A loop that can do only this: a repair's. Anything else it calls is refused without running. */
+export interface AgentBounds {
+  system: string;
+  tools: ToolDef[];
+  maxCalls: number;
 }
 
 /** See AgentEnv.operate. */
@@ -99,7 +116,8 @@ export interface OperateEnv {
   /** What a run did besides its steps, for SAVE AS SKILL. */
   recordWait(spec: WaitSpec): Promise<void>;
   recordAsk(text: string, spec: WaitSpec | null): Promise<void>;
-  recordLook(selector: string, matched: number, links: boolean): Promise<void>;
+  /** Answers with the journal's number for it, which the model is told. */
+  recordLook(selector: string, matched: number, links: boolean): Promise<number | undefined | void>;
   changeNote(input: Record<string, unknown>): Promise<{ ok: true; text: string } | { ok: false; error: string }>;
 }
 
@@ -214,6 +232,8 @@ export interface AgentInput {
   canSeeImages?: () => boolean;
   /** The retry policy and its clock, for the model request (lib/agent/retry.ts). */
   retry?: { policy?: RetryPolicy; deps?: Partial<RetryDeps> };
+  /** See AgentBounds. */
+  bounds?: AgentBounds;
 }
 
 /**
@@ -229,6 +249,8 @@ export interface AgentInput {
 export interface RunOutcome {
   messages: Msg[];
   failure?: { message: string };
+  /** A bounded run used every tool call it had, and asked for more. */
+  spent?: boolean;
 }
 
 /**
@@ -366,6 +388,8 @@ export async function runAgent(input: AgentInput): Promise<RunOutcome> {
   const draft = () => [input.draft?.() ?? '', ACT_OFF ? '' : (input.note?.() ?? '')].filter(Boolean).join('\n');
   const installed = () => input.installed?.() ?? '';
   const checkpoint = () => Promise.resolve(input.onCheckpoint?.(trimUnanswered(messages))).catch(() => {});
+  const bounds = ACT_OFF ? undefined : input.bounds;
+  let spent = false;
 
   /**
    * Say so, in the transcript, when a picture the user attached will not reach the model.
@@ -412,6 +436,7 @@ export async function runAgent(input: AgentInput): Promise<RunOutcome> {
     // completed so far go back to the caller either way, which is the whole point.
     if (!signal.aborted) return { messages: trimUnanswered(messages), failure: { message: e instanceof Error ? e.message : String(e) } };
   }
+  if (!ACT_OFF && spent) return { messages: trimUnanswered(messages), spent };
   return { messages: signal.aborted ? trimUnanswered(messages) : messages };
 
   /**
@@ -469,6 +494,8 @@ export async function runAgent(input: AgentInput): Promise<RunOutcome> {
     // Every other exit from the for loop is deliberate and says something; falling off the end is
     // the one that used to say nothing at all.
     let ranOut = true;
+    // How many tool calls a bounded run has made. A call refused for its name still counts.
+    let called = 0;
 
     for (let i = 0; i < MAX_ITERATIONS; i++) {
       if (signal.aborted) {
@@ -499,12 +526,12 @@ export async function runAgent(input: AgentInput): Promise<RunOutcome> {
         () => {
           streamed = 0;
           return provider.chat({
-            system: SYSTEM_PROMPT,
+            system: bounds ? bounds.system : SYSTEM_PROMPT,
             messages,
             // Re-read per attempt, not captured once: the request that discovers a blind endpoint
             // is often the one making this very call, and the next step's tool list should already
             // say so.
-            tools: toolsFor(input.canSeeImages?.() ?? true),
+            tools: bounds ? bounds.tools : toolsFor(input.canSeeImages?.() ?? true),
             signal,
             callbacks: {
               onText: (delta) => {
@@ -610,7 +637,11 @@ export async function runAgent(input: AgentInput): Promise<RunOutcome> {
         if (!ACT_OFF) await env.operate?.guard(signal, i + 1).catch(() => {});
         emit({ type: 'tool_call', id: call.id, name: call.name, input: call.input });
         emit({ type: 'status', phase: 'tool', tool: call.name, detail: describeCall(call.name, call.input), iteration: i + 1 });
-        const r = !ACT_OFF && signal.aborted && env.operate
+        const outOfBounds = bounds ? boundsRefusal(bounds, call.name, called++) : null;
+        if (bounds && called > bounds.maxCalls) spent = true;
+        const r = outOfBounds
+          ? err(outOfBounds)
+          : !ACT_OFF && signal.aborted && env.operate
           ? err('Stopped before this ran.')
           : await executeTool(call.name, call.input, env, emit, ctx, signal, input.onProposal, input.onOpenMod, { toolId: call.id, history: messages, iteration: i + 1 });
         emit({ type: 'tool_result', id: call.id, summary: summarize(r.content), isError: !!r.isError, ...(r.effect ? { effect: r.effect } : {}) });
@@ -621,6 +652,7 @@ export async function runAgent(input: AgentInput): Promise<RunOutcome> {
         const content = late ? withLeadingLine(late, r.content) : r.content;
         results.push({ type: 'tool_result', toolCallId: call.id, content, isError: r.isError });
         if (call.name === 'propose_mod' && !r.isError) proposed = true;
+        if (!ACT_OFF && call.name === 'propose_skill' && !r.isError) proposed = true;
         waitedMs += r.waitedMs ?? 0;
         charged.push({
           name: call.name,
@@ -667,6 +699,10 @@ export async function runAgent(input: AgentInput): Promise<RunOutcome> {
         ranOut = false;
         break;
       }
+      if (spent) {
+        ranOut = false;
+        break;
+      }
       // A proposal ends the turn: the user decides what happens next.
       if (proposed && !queued.length) {
         ranOut = false;
@@ -699,6 +735,9 @@ function describeCall(name: string, input: Record<string, unknown>): string | un
   if (name === 'test_mod') return describeTest(input);
   if (!ACT_OFF && name === 'act' && typeof input.description === 'string') return input.description.trim() || undefined;
   if (!ACT_OFF && name === 'note') return 'keeping a note';
+  if (!ACT_OFF && name === 'propose_skill') return 'proposing a skill';
+  if (!ACT_OFF && name === 'open_skill') return 'opening a skill';
+  if (!ACT_OFF && name === 'run_skill') return 'asking you to run a skill';
   if (name === 'run_script' && typeof input.description === 'string' && input.description.trim()) return input.description.trim();
   if ((name === 'find_elements' || name === 'get_styles' || name === 'get_page') && typeof input.selector === 'string' && input.selector.trim()) {
     return input.selector.trim();
@@ -731,6 +770,13 @@ interface ToolOutcome {
   waitedMs?: number;
   /** What the extension observed this call do to the page. */
   effect?: ToolEffect;
+}
+
+/** Why a bounded run may not make this call. `made` is how many it had made before it. */
+function boundsRefusal(bounds: AgentBounds, name: string, made: number): string | null {
+  if (made >= bounds.maxCalls) return `You have used your ${bounds.maxCalls} tool calls. Reply with your one word now.`;
+  if (!bounds.tools.some((t) => t.name === name)) return `${name} is not available here. You have only ${bounds.tools.map((t) => t.name).join(', ')}.`;
+  return null;
 }
 
 /** A script that was refused by the user, as the model reads it. */
@@ -783,7 +829,8 @@ async function executeTool(
         const r = await env.sendToContent<{ text: string }>({ type: 'query', selector, text: needle, limit: Number(input.limit) || 20, styles, overlays });
         if (!ACT_OFF && env.operate && selector?.trim() && !needle?.trim() && !/^No elements match/.test(r.text)) {
           const said = /^(\d+) elements?/m.exec(r.text);
-          await env.operate.recordLook(selector.trim(), said ? Number(said[1]) : 1, /(^|[\s>+~])a([.#[:]|$)/.test(selector.trim().split(/\s+/).at(-1)!)).catch(() => {});
+          const n = await env.operate.recordLook(selector.trim(), said ? Number(said[1]) : 1, /(^|[\s>+~])a([.#[:]|$)/.test(selector.trim().split(/\s+/).at(-1)!)).catch(() => undefined);
+          if (n) return text(`${r.text}\n[journal ${n}]`);
         }
         return text(r.text);
       }
@@ -915,6 +962,29 @@ async function executeTool(
         return text(`${shown}${note ? ` ${note}` : ''} Wait for their feedback.`);
       }
       default:
+        if (!ACT_OFF && env.skills && call) {
+          if (name === 'propose_skill') {
+            const r = await env.skills.propose(input, call.history);
+            if (!r.ok) return err(r.reason);
+            emit({ type: 'skill_proposal', card: r.card });
+            emit({ type: 'artifact', version: r.card.version });
+            return text(r.text);
+          }
+          if (name === 'open_skill') {
+            if (typeof input.skill_id !== 'string' || !input.skill_id.trim()) return err('skill_id is required: take it from the "[Skills on this page]" list.');
+            const r = await env.skills.open(input.skill_id.trim(), input.replace === true);
+            if (!r.ok) return err(r.reason);
+            if (r.version != null) emit({ type: 'artifact', version: r.version });
+            return text(r.text);
+          }
+          if (name === 'run_skill') {
+            if (typeof input.skill_id !== 'string' || !input.skill_id.trim()) return err('skill_id is required: take it from the "[Skills on this page]" list.');
+            const given = input.inputs && typeof input.inputs === 'object' ? (input.inputs as Record<string, unknown>) : {};
+            const values = Object.fromEntries(Object.entries(given).filter((e): e is [string, string] => typeof e[1] === 'string'));
+            const r = await env.skills.run(input.skill_id.trim(), values, call.toolId, signal);
+            return r.isError ? err(r.text) : text(r.text);
+          }
+        }
         if (!ACT_OFF && env.operate && call) {
           if (name === 'act') {
             const parsed = parseActInput(input);

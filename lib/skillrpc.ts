@@ -4,7 +4,9 @@
 import { ACT_OFF } from './buildflags';
 import { skillInstallState } from './banner';
 import { previewSkill, readSkillFacts, skillFromSource, type Skill, type SkillOrigin, type SkillPreview } from './skills';
-import { removeAllowance, saveDraft, type DraftResult } from './skillcontroller';
+import { applyRepair, removeAllowance, repairPreview, saveDraft, type DraftResult } from './skillcontroller';
+import type { RepairOffer } from './agent/questions';
+import type { ModelSelection } from './connections';
 import type { SaveCard, SaveDecisions } from './skillcompile';
 import { deleteSkills, loadSkills, upsertSkill } from './skillstore';
 import { fetchText } from './install';
@@ -34,7 +36,12 @@ export type SkillsRpc =
   /** SAVE on the draft: a skill made here. */
   | { type: 'skills.saveDraft'; chatId: string }
   /** Settings: stop allowing one step of one skill without asking. */
-  | { type: 'skills.allowance-remove'; id: string; action: string };
+  | { type: 'skills.allowance-remove'; id: string; action: string }
+  /** Edit in chat on a row: which chat, by the same decision as a mod's. */
+  | { type: 'skills.edit'; skillId: string; currentChatId?: string; host: string; model?: ModelSelection | null }
+  /** What UPDATE SKILL WITH THE REPAIR would write. */
+  | { type: 'skills.repairPreview'; chatId: string; offer: RepairOffer }
+  | { type: 'skills.repairApply'; chatId: string; offer: RepairOffer };
 
 export interface SkillsRpcResults {
   'skills.list': Skill[];
@@ -50,6 +57,9 @@ export interface SkillsRpcResults {
   'skills.draft': DraftResult;
   'skills.saveDraft': { artifact: Artifact; skill: Skill };
   'skills.allowance-remove': Skill[];
+  'skills.edit': { chatId: string; host: string; created: boolean; reused: boolean; artifact: Artifact; skill: Skill; runsHere: boolean };
+  'skills.repairPreview': Awaited<ReturnType<typeof repairPreview>>;
+  'skills.repairApply': Awaited<ReturnType<typeof applyRepair>>;
 }
 
 export interface SkillRpcDeps {
@@ -59,6 +69,7 @@ export interface SkillRpcDeps {
   siteAllowed(chatId: string | undefined, host: string): Promise<boolean>;
   saveCard(req: Extract<SkillsRpc, { type: 'skills.saveCard' }>): Promise<SaveCard>;
   draft(req: Extract<SkillsRpc, { type: 'skills.draft' }>): Promise<DraftResult>;
+  edit(req: Extract<SkillsRpc, { type: 'skills.edit' }>): Promise<SkillsRpcResults['skills.edit']>;
 }
 
 export async function handleSkillsRpc(req: SkillsRpc, deps: SkillRpcDeps): Promise<unknown> {
@@ -106,5 +117,11 @@ export async function handleSkillsRpc(req: SkillsRpc, deps: SkillRpcDeps): Promi
     case 'skills.allowance-remove':
       await removeAllowance(req.id, req.action);
       return loadSkills();
+    case 'skills.edit':
+      return deps.edit(req);
+    case 'skills.repairPreview':
+      return repairPreview(req.chatId, req.offer);
+    case 'skills.repairApply':
+      return applyRepair(req.chatId, req.offer);
   }
 }
