@@ -915,6 +915,69 @@ const MODELS_SCRIPTS = [
 // In front: each of these prompts carries a unique token, and nothing scripted earlier may claim it.
 SCRIPTS.unshift(...MODELS_SCRIPTS, ...THINKING_SCRIPTS);
 
+/**
+ * Operating a page (npm run smoke:act; scripts/lib/act-flow.mjs). Selectors, because the replies are
+ * fixed text and a ref is only known once the page is read. The fixture is that flow's own.
+ */
+export const ACT = {
+  form: { prompt: 'ACTFLOW-FORM fill in the expense and submit it', done: 'ACTFLOW-FORM-DONE', value: 'ACTFLOW-TYPED-VALUE' },
+  never: { prompt: 'ACTFLOW-NEVER sign me in', done: 'ACTFLOW-NEVER-DONE', secret: 'ACTFLOW-SECRET' },
+  offsite: { prompt: 'ACTFLOW-OFFSITE have a look elsewhere', done: 'ACTFLOW-OFFSITE-DONE' },
+  tab: { prompt: 'ACTFLOW-TAB press the two buttons', done: 'ACTFLOW-TAB-DONE' },
+  stop: { prompt: 'ACTFLOW-STOP load all the rows', done: 'ACTFLOW-STOP-NEVER' },
+  barstop: { prompt: 'ACTFLOW-BARSTOP load all the rows', done: 'ACTFLOW-BARSTOP-NEVER' },
+  resume: { prompt: 'ACTFLOW-RESUME process it', done: 'ACTFLOW-RESUME-DONE', look: 'ACTFLOW-RESUME-LOOKED' },
+  every: { prompt: 'ACTFLOW-EVERY tidy this up', done: 'ACTFLOW-EVERY-DONE' },
+};
+
+const actStep = (description, steps, extra = {}) => ({ calls: [{ name: 'act', args: { description, steps } }], ...extra });
+const actScript = (name, conv, steps, extra = {}) => ({ name, match: new RegExp(conv.prompt, 'i'), steps, ...extra });
+
+SCRIPTS.unshift(
+  actScript('act-form', ACT.form, [
+    { text: 'Filling it in.', ...actStep('fill in the expense', [{ do: 'fill', target: '#merchant', text: ACT.form.value }]) },
+    actStep('submit the expense', [{ do: 'click', target: '#submit' }]),
+    { text: 'You said no. Asking again, since you asked me to submit it.', ...actStep('submit the expense', [{ do: 'click', target: '#submit' }]) },
+    { calls: [{ name: 'find_elements', args: { selector: 'h1', limit: 1 } }] },
+    { text: `${ACT.form.done} The expense went through.` },
+  ]),
+  actScript('act-never', ACT.never, [
+    actStep('type the password', [{ do: 'fill', target: '#password', text: ACT.never.secret }]),
+    actStep('press sign in', [{ do: 'click', target: '#signin' }]),
+    { calls: [{ name: 'wait_for', args: { ask_user: 'Sign in to this site yourself.' } }] },
+    { calls: [{ name: 'wait_for', args: { ask_user: 'Press One when you are ready.', selector: '#one[data-pressed]', state: 'attached' } }] },
+    { text: `${ACT.never.done} Over to you.` },
+  ]),
+  actScript('act-offsite', ACT.offsite, [
+    actStep('open the other page', [{ do: 'click', target: '#away' }]),
+    { calls: [{ name: 'find_elements', args: { selector: 'h1', limit: 1 } }] },
+    { text: `${ACT.offsite.done} Back where we started.` },
+  ]),
+  actScript('act-tab', ACT.tab, [
+    actStep('press one', [{ do: 'click', target: '#one' }]),
+    actStep('press two', [{ do: 'click', target: '#two' }], { firstByteDelay: 1500 }),
+    { text: `${ACT.tab.done} Both pressed.` },
+  ]),
+  actScript('act-stop', ACT.stop, [actStep('load every row', [{ do: 'click', target: '#more', repeat: 50 }]), { text: ACT.stop.done }]),
+  actScript('act-barstop', ACT.barstop, [actStep('load every row', [{ do: 'click', target: '#more', repeat: 50 }]), { text: ACT.barstop.done }]),
+  actScript(
+    'act-resume',
+    ACT.resume,
+    [actStep('process it', [{ do: 'click', target: '#process', repeat: 3 }]), { text: 'Never reached: the worker is stopped during the step above.' }],
+    {
+      afterCutOff: [
+        { text: `${ACT.resume.look} Looking before I do anything.`, calls: [{ name: 'find_elements', args: { selector: 'h1', limit: 1 } }] },
+        { text: `${ACT.resume.done} It had already gone through, so I left it.` },
+      ],
+    },
+  ),
+  actScript('act-every', ACT.every, [
+    { calls: [{ name: 'run_script', args: { code: 'document.title = "ACTFLOW-RAN"; 1', description: 'rename the tab' } }] },
+    actStep('point at one', [{ do: 'hover', target: '#one' }]),
+    { text: `${ACT.every.done} Done.` },
+  ]),
+);
+
 // ---------------------------------------------------------------------------
 // The edit-a-mod flow (screenshots.mjs --editmod).
 //
@@ -1601,6 +1664,11 @@ function pickScript(messages) {
  */
 function stepFor(script, messages, from = 0) {
   const turns = messages.slice(from).filter((m) => m.role === 'assistant').length;
+  // Told a step was cut off (lib/agent/driver.ts): a model that does what it is told looks first. A
+  // script without this would play the unanswered step again, which is not the extension's doing.
+  if (script.afterCutOff && messages.slice(from).some((m) => m.role === 'user' && /may or may not have happened/.test(messageText(m)))) {
+    return script.afterCutOff[Math.min(turns, script.afterCutOff.length - 1)];
+  }
   return script.steps[Math.min(turns, script.steps.length - 1)];
 }
 
