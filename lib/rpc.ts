@@ -130,7 +130,9 @@ export type RpcRequest =
    * after the background has written out any transcript it was keeping while no panel was open, so
    * the panel can read storage afterwards and trust it.
    */
-  | { type: 'agent.attach' };
+  | { type: 'agent.attach' }
+  /** Operating a page (lib/drive.ts): answering a question, and Settings' list. Only ever from an extension page. */
+  | import('./drive').DriveRpc;
 
 /** Response shape per request type. Anything not listed here answers { ok: true }. */
 interface RpcResults {
@@ -192,12 +194,17 @@ interface RpcResults {
     likelyUrl: string;
   };
   'agent.attach': AgentAttachState;
+  'act.answer': { ok: boolean };
+  'act.allowances': { sites: string[] };
+  'act.allowance-remove': { sites: string[] };
 }
 
 /** See 'agent.attach'. `status` is the last status event the run posted, if it has posted one. */
 export interface AgentAttachState {
   running: Record<string, { startedAt: number; status?: Extract<AgentEvent, { type: 'status' }> }>;
   resumable: Record<string, ResumableRun>;
+  /** The question each chat's run is waiting on. Absent in a build with ACT_OFF. */
+  questions?: Record<string, import('./agent/questions').Question>;
 }
 
 export type RpcResponse<T extends RpcRequest['type']> = T extends keyof RpcResults ? RpcResults[T] : { ok: true };

@@ -21,8 +21,8 @@ import { describeCallbackError, mapStack, mergeLateErrors, parseError, prepareRu
 import { watchDocument } from '@/lib/navwatch';
 import { shouldUpdate } from '@/lib/version';
 import { draftSourceFor, loadMods, matchPatternForUrl, modFromProposal, modFromSource, parseHeader, previewFromSource, upsertMod, deleteMod, saveMods } from '@/lib/mods';
-import { appendTurn, archiveChat, bulkChats, countTurns, createChat, deleteChat, getChat, hostFromUrl, isArchived, listChats, loadItems, loadMessages, markTitleRefreshed, renameChat, saveItems, saveMessages, setChatArtifact, setChatModel, setChatThinking, setModelTitle, touchChat } from '@/lib/chats';
-import { loadRuns, markInterrupted, nextRunRecord, pruneRuns, resumableRuns, saveRuns, type RunMap, type RunRecord } from '@/lib/runstate';
+import { addChatActions, appendTurn, archiveChat, bulkChats, countTurns, createChat, deleteChat, getChat, hostFromUrl, isArchived, listChats, loadItems, loadMessages, markTitleRefreshed, renameChat, saveItems, saveMessages, setChatArtifact, setChatModel, setChatThinking, setModelTitle, touchChat } from '@/lib/chats';
+import { loadRuns, markInterrupted, nextRunRecord, pruneRuns, resumableRuns, saveRuns, withoutPending, type RunMap, type RunRecord } from '@/lib/runstate';
 import { AUTO_RESUMED_TEXT, autoResumable, countAutoResume, holdExpired, KEEPALIVE_MAX_HOLD_MS, KEEPALIVE_PORT, TAB_CLOSED_TEXT } from '@/lib/keepalive';
 import { isTombstoned, withKey } from '@/lib/storagequeue';
 import { collectBlobs } from '@/lib/blobs';
@@ -37,6 +37,11 @@ import { VISION_FALLBACK_PANEL_NOTE, createVisionMemory, resolveImagesSetting, v
 import { MAX_EDGE, SCREENSHOT_CAPTURE_FORMAT, SCREENSHOT_QUALITY, fitWithin, parseDataUrl } from '@/lib/images';
 import { ACT_OFF, SAFARI_BUILD, SUBSCRIPTIONS_OFF, isSubscriptionProvider, unavailableProviderMessage } from '@/lib/buildflags';
 import { BAR_DONE, BAR_STOP } from '@/lib/pageui';
+import { pendingResumeNote } from '@/lib/agent/driver';
+import { noteBlock } from '@/lib/agent/note';
+import type { RunEnding } from '@/lib/agent/questions';
+import { fromExtensionPage } from '@/lib/agent/senders';
+import { createDriveController, type DriveRpc } from '@/lib/drive';
 import { listFailureMessage, listWithFallback, modelsRequest, parseModelIds, type ModelListResult, type ModelListTarget } from '@/lib/modellist';
 import type { OAuthKind } from '@/lib/oauth';
 import type { AgentAttachState, AgentPortRequest, OAuthLoginState, RpcRequest } from '@/lib/rpc';
@@ -181,8 +186,14 @@ export default defineBackground(() => {
   // case where this one is too early.
   void resumePendingLogins().catch(() => {});
 
-  chrome.runtime.onMessage.addListener((msg: RpcRequest | { type?: string }, _sender, sendResponse) => {
+  chrome.runtime.onMessage.addListener((msg: RpcRequest | { type?: string }, sender, sendResponse) => {
     if (!msg || typeof msg.type !== 'string' || !msg.type.includes('.')) return false; // not an RPC (e.g. content events)
+    // Every RPC comes from one of the extension's own pages. In a build that operates pages it is the
+    // rule: an answer to a question goes this way, and a page may say only Stop and "I have done it".
+    if (!ACT_OFF && !isExtensionPage(sender)) {
+      sendResponse({ ok: false, error: 'Not available to a page.' });
+      return false;
+    }
     handleRpc(msg as RpcRequest)
       .then((data) => sendResponse({ ok: true, data }))
       .catch((e: unknown) => sendResponse({ ok: false, error: e instanceof Error ? e.message : String(e) }));
@@ -247,6 +258,10 @@ export default defineBackground(() => {
     // A mod's GM shim and the Safari runner both connect too; exec.install() registered their
     // listener, so anything that is not the panel's agent port is not ours to handle here.
     if (port.name !== 'agent') return;
+    if (!ACT_OFF && !isExtensionPage(port.sender)) {
+      port.disconnect();
+      return;
+    }
     agentPorts.add(port);
     // A panel is listening again, so the transcript is its to write. Whatever was kept on its
     // behalf while nobody was (see recordDetached) goes to storage now, before it reads.
@@ -284,6 +299,13 @@ export default defineBackground(() => {
     // run produced rather than a conversation that stops where it was closed.
     port.onDisconnect.addListener(() => agentPorts.delete(port));
   });
+
+  // A new document has lost the bar. Only a run that is driving that tab has anything to put back.
+  if (!ACT_OFF) {
+    chrome.tabs.onUpdated.addListener((tabId, change) => {
+      if (change.status === 'complete') drive?.tabLoaded(tabId);
+    });
+  }
 });
 
 // ---------- agent sessions ----------
@@ -297,6 +319,21 @@ const sessions = new SessionMap();
 
 /** Every open side-panel port. A chat's events go to all of them; each panel routes by chat id. */
 const agentPorts = new Set<chrome.runtime.Port>();
+
+/** Is this sender one of the extension's own pages, as opposed to a content script on a page? */
+function isExtensionPage(sender: chrome.runtime.MessageSender | undefined): boolean {
+  return fromExtensionPage(sender, chrome.runtime.id, chrome.runtime.getURL(''));
+}
+
+/** Operating a page: the questions in the panel and each run's Driver. Null in a build with ACT_OFF. */
+const drive = ACT_OFF
+  ? null
+  : createDriveController({
+      sendToContent,
+      updateRuns,
+      post: postAgentEvent,
+      waitInTab,
+    });
 
 /**
  * Which OpenAI-compatible endpoints have refused an image (lib/providers/vision.ts).
@@ -564,7 +601,7 @@ async function attachState(): Promise<AgentAttachState> {
   const resumable = resumableRuns(runs);
   // A chat that is running in THIS worker is not resumable, whatever an old record says.
   for (const id of Object.keys(running)) delete resumable[id];
-  return { running, resumable };
+  return { running, resumable, ...(drive ? { questions: drive.questions() } : {}) };
 }
 
 /**
@@ -748,7 +785,12 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
   session.running = true;
   session.controller = new AbortController();
   const signal = session.controller.signal;
-  const post = (e: AgentEventBody) => postAgentEvent(chatId, e);
+  // How the run ended, for the card: the step cap is the one ending the loop only says as an event.
+  let ending: RunEnding = 'model';
+  const post = (e: AgentEventBody) => {
+    if (!ACT_OFF && e.type === 'stopped') ending = 'ceiling';
+    postAgentEvent(chatId, e);
+  };
   const release = holdWorker();
   // Safari's half: ask the page to hold a port open for as long as this run lasts. A no-op on
   // Chrome, and a no-op for a tab that cannot host a content script. See the keepalive block above.
@@ -757,6 +799,10 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
   // making the first token of every run wait on a storage read would be paying a real cost for an
   // optional one. `releaseHold` below is idempotent for a hold that was never taken.
   void loadSafariMode().then(() => acquireHold(session.tabId));
+  // A step the last run may or may not have got through. It goes to the model as a warning, and the
+  // record keeps it until that warning is safely in the saved conversation.
+  const cutOff = ACT_OFF ? undefined : (await loadRuns().catch(() => ({}) as RunMap))[chatId]?.pending;
+  const driver = drive ? drive.driverFor(chatId, session.tabId) : null;
   // Written before anything else happens, so there is no moment at which a run exists and storage
   // does not know. It also replaces a 'failed' or 'interrupted' record: whether this is a resume or
   // a new message, that run is no longer the thing to resume.
@@ -808,6 +854,8 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
     // owed mid-sentence, and re-reading the whole mod list for every queued message would put a
     // storage read (and every mod's full source) on the hot path of a streaming reply.
     const installedMods = await loadMods().catch(() => [] as Mod[]);
+    const notes = drive ? drive.note(chatId) : null;
+    let noted = notes ? await notes.read().catch(() => '') : '';
     await touchChat(chatId, history.length || !turn ? { url } : { title: turn.text, url });
     const outcome = await runAgent({
       settings,
@@ -816,7 +864,29 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
       pullQueued: () => session.queue.splice(0),
       // test_mod needs the draft (its kept header, its link to an installed mod), which only this
       // closure has; `artifact` is read at call time, so a test after open_mod tests that mod.
-      env: { ...envForTab(session.tabId), testMod: (code, reload, sig) => testModInTab(session.tabId, code, reload, artifact, sig) },
+      env: {
+        ...envForTab(session.tabId),
+        testMod: (code, reload, sig) => testModInTab(session.tabId, code, reload, artifact, sig),
+        ...(drive && driver && notes
+          ? {
+              screenshot: () => drive.hidingBar(session.tabId, envForTab(session.tabId).screenshot),
+              operate: {
+                guard: (sig: AbortSignal, iteration?: number) => driver.guard(sig, iteration),
+                act: (call: Parameters<typeof driver.act>[0], ctx: Parameters<typeof driver.act>[1], sig: AbortSignal) => driver.act(call, ctx, sig),
+                handoff: (words: string, spec: WaitSpec | null, sig: AbortSignal, iteration?: number) => driver.handoff(words, spec, sig, iteration),
+                beforeScript: (description: string, code: string, sig: AbortSignal, iteration?: number) => driver.beforeScript(description, code, sig, iteration),
+                afterScript: () => driver.afterScript(),
+                changeNote: async (input: Record<string, unknown>) => {
+                  const r = await notes.change(input);
+                  if (r.ok) noted = r.note;
+                  return r;
+                },
+              },
+            }
+          : {}),
+      },
+      ...(drive ? { note: () => noteBlock(noted) } : {}),
+      ...(cutOff ? { resumeNote: pendingResumeNote(cutOff) } : {}),
       emit: post,
       signal,
       // Built here rather than inside the loop so it carries the two things only the background
@@ -866,6 +936,8 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
       // worker is evicted half-way through a twenty-step run, nineteen steps are on disk.
       onCheckpoint: async (msgs) => {
         await saveMessages(chatId, msgs);
+        // The warning about a cut-off step is in the saved conversation now, so it can leave the record.
+        if (!ACT_OFF && cutOff && !checkpointed) await updateRuns((runs) => withoutPending(runs, chatId));
         checkpointed = true;
       },
       retry: { policy: retryPolicy },
@@ -962,6 +1034,15 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
     post({ type: 'error', message: failed, resumable: true });
   } else {
     await clearRuns([chatId]);
+  }
+  if (drive && driver) {
+    // What was recorded goes on the transcript after the model's report, and the bar comes down.
+    const card = await driver.finish(signal.aborted ? 'stopped' : ending).catch(() => null);
+    drive.end(chatId);
+    if (card) {
+      post({ type: 'page_card', card });
+      await addChatActions(chatId, card.total).catch(() => {});
+    }
   }
   release();
   releaseHold(session.tabId);
@@ -1361,12 +1442,6 @@ function cleanDetection(d: unknown): Detection | null {
   return { kind: x.kind as Detection['kind'], scripts, ...(gist ? { gist } : {}) };
 }
 
-/**
- * The handoffs waiting on "I have done it", by tab. wait_for with ask_user registers here and the
- * bar's button resolves it. The other things the page can reach cannot answer anything else.
- */
-const barDoneWaiters = new Map<number, () => void>();
-
 /** The same stop as the panel's: written down first, then aborted, one chat at a time. */
 async function stopRunsOnTab(tabId: number): Promise<void> {
   for (const chatId of sessions.ids()) {
@@ -1384,7 +1459,7 @@ async function handlePageMessage(msg: { type?: string } & Record<string, unknown
     // and nothing else. These two are all a page can say about a run: harmless if forged, so no
     // permission is ever behind a message from here.
     if (msg.type === BAR_STOP) await stopRunsOnTab(tab.id);
-    else barDoneWaiters.get(tab.id)?.();
+    else drive?.barDone(tab.id);
     return { ok: true };
   }
   switch (msg.type) {
@@ -1429,6 +1504,7 @@ async function handlePageMessage(msg: { type?: string } & Record<string, unknown
 // ---------- RPC ----------
 
 async function handleRpc(req: RpcRequest): Promise<unknown> {
+  if (!ACT_OFF && req.type.startsWith('act.')) return drive!.rpc(req as DriveRpc);
   switch (req.type) {
     case 'mods.list':
       return loadMods();
@@ -1573,6 +1649,7 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
       forgetDetached([req.id]);
       await deleteChat(req.id);
       await clearRuns([req.id]);
+      if (!ACT_OFF) await drive?.forget([req.id]).catch(() => {});
       return { ok: true };
     case 'chats.archive':
       await archiveChat(req.id, req.archived);
@@ -1584,6 +1661,7 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
       if (req.action === 'delete') forgetDetached(req.ids);
       await bulkChats(req.ids, req.action);
       if (req.action === 'delete') await clearRuns(req.ids);
+      if (!ACT_OFF && req.action === 'delete') await drive?.forget(req.ids).catch(() => {});
       return { ok: true };
     case 'mods.bulk': {
       const wanted = new Set(req.ids);
