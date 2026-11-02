@@ -289,7 +289,9 @@ async function launch(colorScheme = 'light', { args = [] } = {}) {
     colorScheme,
     viewport: PANEL,
     deviceScaleFactor: SCALE,
-    args: [`--disable-extensions-except=${EXT_DIR}`, `--load-extension=${EXT_DIR}`, ...args],
+    // Chromium ignores HTTPS_PROXY on macOS, so a machine whose network is behind a local proxy names
+    // it here, or every flow that opens the live test page times out. Loopback bypasses it by default.
+    args: [`--disable-extensions-except=${EXT_DIR}`, `--load-extension=${EXT_DIR}`, ...(process.env.USERMODS_BROWSER_PROXY ? [`--proxy-server=${process.env.USERMODS_BROWSER_PROXY}`] : []), ...args],
   });
 
   let [sw] = ctx.serviceWorkers();
