@@ -42,6 +42,20 @@ uploading. Done on 2026-10-11 for 0.1.1 (1): the archive log confirmed 39 staged
 `.appex`, versions 0.1.1 across app, extension and manifest, and an export signed *Apple
 Distribution* with App Store profiles for both bundles.
 
+`archive` starts with `launch-check`: the Release build has to start and draw on an iPhone and an iPad
+simulator on the newest runtime installed, and that runtime has to be at least as new as the SDK, or
+nothing is archived. It exists because 0.1.1 (1) was rejected for crashing on launch on iPadOS 27.2
+beta while passing every check here and a test on an iPhone; see
+[docs/safari.md](../../safari.md#scene-lifecycle). App Review runs current betas, so before a
+submission install the newest runtime Apple offers:
+
+```
+curl -s https://devimages-cdn.apple.com/downloads/xcode/simulators/index2.dvtdownloadableindex | plutil -p - | grep -E '"name" => "iOS 27'
+xcodebuild -downloadPlatform iOS -buildVersion <build>
+```
+
+An App Store Connect build number can be used once, so a new upload of 0.1.1 needs `--build 2`.
+
 ## Steps
 
 1. **Upload the build.** Same archive, no rebuild:
@@ -53,7 +67,7 @@ Distribution* with App Store profiles for both bundles.
    This goes through the Apple account signed in to Xcode on this Mac. Processing takes a few
    minutes; the build then appears under **TestFlight → iOS builds**. If it asks for export
    compliance anyway, answer *No* to non-exempt encryption (standard HTTPS only).
-2. **TestFlight on a real device.** Done on Kenneth's iPhone on 2026-10-13 (sign-in, a mod, a run surviving the popup's dismissal). For a later build: install it from TestFlight on an iPhone, enable the
+2. **TestFlight on a real device.** Done on Kenneth's iPhone on 2026-10-13 (sign-in, a mod, a run surviving the popup's dismissal). That did not catch the launch crash, because a device on an older iOS than the SDK does not show it, so the device's iOS version counts: note it here, and use one on at least the SDK's major version if there is one. For a later build: install it from TestFlight on an iPhone, enable the
    extension (Settings → Apps → Safari → Extensions → usermods, allow on all websites), connect a
    provider, write one mod and reload the page. Check that a subscription sign-in completes and
    that a run survives the popup being dismissed; the simulator cannot prove either (see
@@ -86,8 +100,10 @@ Distribution* with App Store profiles for both bundles.
 
 Before pressing Submit:
 
-- [x] The uploaded build is 0.1.1 (1) and its status is *Ready to Submit* (not *Missing
-      Compliance*). Uploaded 2026-10-13 after a first attempt was refused for an alpha channel in
+- [ ] The archive that was uploaded passed `launch-check` on the newest runtime Apple offers, not just
+      the newest one that happened to be installed.
+- [ ] The uploaded build is 0.1.1 (2) and its status is *Ready to Submit* (not *Missing
+      Compliance*). The first upload of 0.1.1 (1), on 2026-10-13, was refused for an alpha channel in
       the 1024 icon ([docs/safari.md](../../safari.md#the-host-app)); the second was accepted and
       processed within minutes.
 - [ ] The version string on the record reads 0.1.1.

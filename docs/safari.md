@@ -737,6 +737,7 @@ finishes. The other commands:
 ```sh
 node scripts/safari-xcode.mjs stage    # npm run build:safari, then copy the output into safari/
 node scripts/safari-xcode.mjs build    # stage, then xcodebuild for the simulator SDK
+node scripts/safari-xcode.mjs launch-check  # Release, on an iPhone and an iPad on the newest runtime
 node scripts/safari-xcode.mjs build --sdk iphoneos --team ABCDE12345 --bundle-id com.you.usermods
 node scripts/safari-xcode.mjs mac --team ABCDE12345 --launch
 ```
@@ -757,6 +758,35 @@ without change, because `NSExtensionPointIdentifier = com.apple.Safari.web-exten
 thing to WebKit on both. Only the entitlements differ, because only macOS has a sandbox to declare.
 `test/safari-mac.test.ts` asserts each of those lines, since all of them fail quietly: a missing
 `NSPrincipalClass` launches a Mac app that draws nothing and reports no error.
+
+### Scene lifecycle
+
+The iOS app declares one scene (`UIApplicationSceneManifest` in `App/Info.plist`) and `SceneDelegate`
+in `App/AppDelegate.swift` owns the window. It did not at first, on the reasoning that one
+screen does not need scenes, and App Review rejected 0.1.1 (1) for a crash on launch because of it:
+`EXC_BREAKPOINT` on the main thread in UIKit's
+`_UIApplicationEvaluateRuntimeIssueForNoSceneLifecycleAdoption`, under
+`-[UIApplication workspace:didCreateScene:withTransitionContext:completion:]`. Apple's note on it is
+[TN3187](https://developer.apple.com/documentation/technotes/tn3187-migrating-to-the-uikit-scene-based-life-cycle).
+
+Both the SDK the app links and the OS it runs on decide it. Measured in the simulator on 2026-11-02,
+Release build with no scene manifest, on iPhone 17 and iPad Air 11-inch (M4):
+
+| Runs on | Links iOS 27.0 SDK | Same binary, `LC_BUILD_VERSION` sdk rewritten to 26.5 |
+|---|---|---|
+| iOS 26.4, 26.5 | stays up | not run |
+| iOS 27.0 (24A434) | **traps** | stays up |
+| iOS 27.2 beta 2 (24B5089g) | **traps** | stays up |
+
+iPhone and iPad trap alike, and Debug traps as Release does. On iOS 26.5 the same condition is
+`_UIApplicationLogRuntimeIssueIfNeededForNoSceneLifecycleAdoption`, which only logs. So a build made
+with Xcode 27 looks fine on any device still on iOS 26, which is how it reached App Review.
+
+`node scripts/safari-xcode.mjs launch-check` builds Release for the simulator, then starts it on an
+iPhone and an iPad on the newest installed runtime, and fails if the app dies or draws nothing (a
+wrong `UISceneDelegateClassName` is a black window, not a crash). A runtime older than the SDK is a
+failure rather than a skip: `xcodebuild -downloadPlatform iOS` installs one, and `-buildVersion`
+picks a specific build, betas included. `archive` runs it first and has no flag to skip it.
 
 `stage` exists because the web resources come out of `wxt build -b safari` with content hashes in
 their file names, which Xcode cannot list in a Copy Bundle Resources phase. They are staged into
@@ -1079,6 +1109,9 @@ is checked in: with `-allowProvisioningUpdates`, xcodebuild asks the Apple accou
 Xcode on that machine for the Apple Distribution certificate and the two App Store profiles (app and
 extension), and keeps them in Xcode's own keychain. The archive's app still shows an *Apple
 Development* signature; the export is what re-signs it.
+
+Before any of that it runs [`launch-check`](#scene-lifecycle), because everything below reads the
+bundle and none of it starts the app.
 
 Then it looks inside, because the copy phase that puts the web extension into the `.appex` has
 shipped the previous web build before without a word in any log ([see the macOS section](#one-pair-of-targets-two-platforms)):

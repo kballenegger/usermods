@@ -6,6 +6,12 @@ All notable changes to usermods are recorded here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- iOS: the app crashed on launch on iOS 27 when built with the iOS 27 SDK, because it had no scene
+  manifest. It now adopts the UIScene lifecycle. `safari-xcode.mjs launch-check` starts the Release
+  build on an iPhone and an iPad simulator, and `archive` will not proceed without it.
+
 ## [0.1.1] — 2026-09-30
 
 The version resubmitted to the Chrome Web Store. 0.1.0 was submitted on 2026-09-22 and rejected the

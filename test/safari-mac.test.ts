@@ -142,6 +142,24 @@ test('the build script has an App Store archive command that checks the .ipa bef
   assert.match(script, /manageAppVersionAndBuildNumber<\/key>\s*<false\/>/);
 });
 
+test('the iOS app declares its scene, and the launch check stands between it and an upload', () => {
+  // UIKit traps at launch without a manifest on iOS 27; see "Scene lifecycle" in docs/safari.md.
+  const plist = read('safari/App/Info.plist');
+  assert.match(plist, /<key>UIApplicationSceneManifest<\/key>/);
+  const named = /<key>UISceneDelegateClassName<\/key>\s*<string>\$\(PRODUCT_MODULE_NAME\)\.(\w+)<\/string>/.exec(plist)?.[1];
+  assert.ok(named, 'no module-prefixed UISceneDelegateClassName');
+  assert.match(read('safari/App/AppDelegate.swift'), new RegExp(`class ${named}: UIResponder, UIWindowSceneDelegate`));
+  // AppKit has no scenes here, and a manifest there would only mislead.
+  assert.doesNotMatch(read('safari/App/Info-macOS.plist'), /UIApplicationSceneManifest/);
+
+  const script = read('scripts/safari-xcode.mjs');
+  const archive = script.slice(script.indexOf('function archive('));
+  assert.ok(archive.indexOf('launchCheck(') !== -1, 'archive does not run the launch check');
+  assert.ok(archive.indexOf('launchCheck(') < archive.indexOf("'archive',"), 'the launch check has to come before archiving');
+  // The rule that makes the check mean anything: no runtime older than the SDK.
+  assert.match(script, /newest\.version\[0\] < major/);
+});
+
 test('both app Info.plists declare exempt encryption, so uploads are not held on the compliance question', () => {
   for (const file of ['safari/App/Info.plist', 'safari/App/Info-macOS.plist']) {
     assert.match(read(file), /<key>ITSAppUsesNonExemptEncryption<\/key>\s*<false\/>/, file);

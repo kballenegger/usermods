@@ -27,6 +27,26 @@
 	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<!-- Required, not optional: UIKit traps at launch without it on iOS 27 (see App/AppDelegate.swift).
+	     One scene and no storyboard, so the delegate builds the one window in code. Only this plist
+	     has it; the Mac app has no scenes and reads App/Info-macOS.plist. -->
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+		<key>UISceneConfigurations</key>
+		<dict>
+			<key>UIWindowSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneConfigurationName</key>
+					<string>Default Configuration</string>
+					<key>UISceneDelegateClassName</key>
+					<string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
+				</dict>
+			</array>
+		</dict>
+	</dict>
 	<!-- An empty UILaunchScreen is the modern replacement for a launch storyboard. The app draws its
 	     one screen in code (App/ViewController.swift), so there is no storyboard to name, and iOS
 	     needs this key present or it letterboxes the window on large devices. -->
