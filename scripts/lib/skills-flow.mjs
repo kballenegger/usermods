@@ -324,10 +324,16 @@ export async function skillsFlow({ launch, openPanel, openSite, waitForComposer,
     check(/Download links · 9/.test(albumOut) && /https:\/\/photos\.example\.com\/photos\/9\.jpg/.test(albumOut), 'the album output is all nine links', albumOut);
     await albumCard.locator('[data-action="output-csv"]').click();
     await albumCard.locator('[data-action="output-csv"]', { hasText: 'Copied' }).waitFor({ timeout: 5000 });
-    const noteKey = await panel.evaluate(async () => {
+    // Written just after the card goes up, so on a loaded machine it can be a moment behind it.
+    const readNote = () => panel.evaluate(async () => {
       const all = await chrome.storage.local.get(null);
       return Object.entries(all).find(([k, v]) => /:note$/.test(k) && typeof v === 'string' && v.includes('Outputs of the skill'))?.[1] ?? '';
     });
+    let noteKey = await readNote();
+    for (let i = 0; i < 30 && !noteKey; i++) {
+      await sleep(500);
+      noteKey = await readNote();
+    }
     check(noteKey.includes('photos/9.jpg'), 'and goes to the chat’s note', noteKey);
     check(!noteKey.includes('Download links'), 'by its key: an author\'s label is not model input', noteKey);
     check((await modelCalls()) === callsBefore, 'nothing asked the model during the replays', { before: callsBefore, after: await modelCalls() });
