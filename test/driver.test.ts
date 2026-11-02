@@ -676,3 +676,23 @@ test('a lost answer clears the journal with the next step: a resume does not ask
   await new Driver(failed.deps).runStep({ do: 'click', target: { selector: 'x' } }, { nextStep: 4 }, new AbortController().signal);
   assert.deepEqual(after, [undefined], 'a step that failed is still the step the run is on');
 });
+
+test('a question with no bar before it does not leave one saying usermods is waiting once it is answered', async () => {
+  const w = world({ answers: [{ kind: 'decline' }] });
+  const d = new Driver(w.deps);
+  const answer = await d.ask({ kind: 'skill-ceiling', id: 'q', skill: 'S', actions: 1 }, new AbortController().signal);
+  assert.ok(answer);
+  assert.equal(d.barIsShowing, false, 'a screenshot would not hide it');
+  assert.equal(w.log.at(-1), 'bar:off', 'the page is not left saying it');
+});
+
+test('a question over a bar that was up puts that bar back', async () => {
+  const w = world({ answers: [{ kind: 'allow' }, { kind: 'carry-on' }], allowed: { site: true, actions: [] } });
+  const d = new Driver(w.deps);
+  const signal = new AbortController().signal;
+  await d.runStep({ do: 'click', target: { selector: 'Thing' } }, {}, signal);
+  w.log.length = 0;
+  await d.ask({ kind: 'skill-ceiling', id: 'q', skill: 'S', actions: 1 }, signal);
+  assert.ok(!w.log.includes('bar:off'));
+  assert.match(w.log.at(-1)!, /^bar:usermods is driving/);
+});

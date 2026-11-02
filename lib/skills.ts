@@ -15,6 +15,7 @@
 // Pure: no chrome.*, no DOM, tested under node (test/skills.test.ts).
 
 // The .ts extensions: see lib/agent/tools.ts. node's test runner loads this file directly.
+import { hostOf } from './agent/boundary.ts';
 import { CHECKABLE_ROLES, consequentialReasons, type Verb } from './agent/gate.ts';
 import { parseCondition } from './agent/wait.ts';
 import type { Described } from './interact/describe';
@@ -795,6 +796,23 @@ export function atStart(start: string, url: string): boolean {
 }
 
 export const isHistoryGo = (to: string) => to === 'back' || to === 'forward' || to === 'reload';
+
+/**
+ * The hosts this file names: where it starts and where its own steps go, as far as its match covers them.
+ * The preview refuses anything else, and said these. A run may be on them; any other host its match
+ * happens to cover is another site to the run, and the user is asked.
+ */
+export function addressedHosts(skill: Pick<Skill, 'start' | 'steps' | 'matches'>): string[] {
+  const urls = [skill.start, ...skill.steps.map((s) => (s.verb === 'go' && !isHistoryGo(s.to) ? resolveGo(s.to, skill.start) : null))];
+  return [...new Set(urls.filter((u): u is string => !!u && skillMatchesUrl(skill, u)).map(hostOf))];
+}
+
+/**
+ * Where a run's site is fixed, once it has opened where it starts. A landing page its match covers is
+ * the site; one it does not cover is somewhere a redirect took it, and fixing the site there would make
+ * every step look at home on it. So the site is `start`, and the first step finds the tab off it and asks.
+ */
+export const pinAddress = (skill: Pick<Skill, 'start' | 'matches'>, landed: string): string => (skillMatchesUrl(skill, landed) ? landed : skill.start);
 
 /** A two-letter country's second level that sells to anyone: `a.co.uk` and `b.co.uk` are not one site. */
 const SHARED_SECOND_LEVEL = /^(?:ac|co|com|edu|go|gob|gov|ne|net|or|org)\.[a-z]{2}$/;

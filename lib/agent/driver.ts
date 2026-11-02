@@ -351,9 +351,13 @@ export class Driver {
     return (this.hosts ?? []).includes(host);
   }
 
-  /** A skill drives from its first step, whatever kind of step that is: Stop and the boundary hold from there. */
-  async startDriving(pageUrl: string): Promise<void> {
+  /**
+   * A skill drives from its first step, whatever kind of step that is: Stop and the boundary hold from
+   * there. `named` is the hosts its file names, which its preview said and its match covers.
+   */
+  async startDriving(pageUrl: string, named: readonly string[] = []): Promise<void> {
     await this.pinSite(pageUrl);
+    this.hosts = [...new Set([...this.hosts!, ...named])];
     if (this.driving) return;
     this.driving = true;
     this.record = recordPage({ ...this.record, startedAt: this.deps.now() }, pageUrl, hostOf(pageUrl));
@@ -403,9 +407,15 @@ export class Driver {
     return this.barStatus !== null;
   }
 
-  /** A question that is not about a step: a skill's stop, its ceiling, a resume. */
-  ask(q: Question, signal: AbortSignal): Promise<Answer | null> {
-    return this.askUser(q, signal);
+  /**
+   * A question that is not about a step: a skill's stop, its ceiling, a resume, run_skill's card. With no
+   * bar up before it, the page should not go on saying usermods is waiting once the user has answered.
+   */
+  async ask(q: Question, signal: AbortSignal): Promise<Answer | null> {
+    const hadBar = this.barStatus !== null;
+    const answer = await this.askUser(q, signal);
+    if (answer && !hadBar && this.barRaised) await this.clearBar();
+    return answer;
   }
 
   /** A skill's own words on the bar and the line, for a step that goes round runStep. */
@@ -629,7 +639,7 @@ export class Driver {
       const step: ActStep = typedAs ? { ...asked, text: typedAs.text } : asked;
       if (step.do === 'go') known ??= knownUrls(ctx.history, await this.deps.pageUrl().catch(() => ''));
       const repairing: StepOptions = repair
-        ? { forceConfirm: true, actions: [], journalKind: 'skill', skill: { name: repair.name, n: repair.index + 1, total: repair.total, repairing: true }, barStatus: `usermods is repairing ${repair.name} · step ${repair.index + 1}`, activity: `repairing ${repair.name} · step ${repair.index + 1}` }
+        ? { forceConfirm: true, actions: [], journalKind: 'skill-repair', skill: { name: repair.name, n: repair.index + 1, total: repair.total, repairing: true }, barStatus: `usermods is repairing ${repair.name} · step ${repair.index + 1}`, activity: `repairing ${repair.name} · step ${repair.index + 1}` }
         : {};
       const outcome = await this.runStep(step, { ...repairing, modelSays, ...(known ? { knownUrls: known } : {}), ...(ctx.iteration ? { iteration: ctx.iteration } : {}), onRow: (r) => row(i, { ...r, detail: { modelSays } }) }, signal);
       const left = call.steps.length - i - 1;

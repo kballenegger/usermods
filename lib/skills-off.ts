@@ -13,6 +13,8 @@ export const stepLine = () => '';
 export const setSkillFields = (source: string) => source;
 export const skillFileName = () => '';
 export const skillHosts = () => [];
+export const addressedHosts = () => [];
+export const pinAddress = () => '';
 export const skillFromSource = none;
 export const skillMatchesUrl = () => false;
 export const serialiseSkill = () => '';

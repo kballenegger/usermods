@@ -14,9 +14,9 @@ import { installPageUrl, isInstallableUrl, isUserScriptUrl, scriptIdentity, SKIL
 import { handleSkillsRpc, type SkillsRpc } from '@/lib/skillrpc';
 import { dropCarry, draftAsSkill, draftFromRun, keepAllowance, loadCarry, markWalked, openSkillDraft, openedText, proposeSkill, saveCard, saveCarry } from '@/lib/skillcontroller';
 import { repairAllowed, runRepair } from '@/lib/skillrepair';
-import { outputsNote, runReport, runSkill, stepsKey, type RepairResult, type RunCarry, type RunResult as SkillRunResult } from '@/lib/skillrun';
+import { needsGoToStart, outputsNote, runReport, runSkill, stepsKey, type RepairResult, type RunCarry, type RunResult as SkillRunResult } from '@/lib/skillrun';
 import { loadSkills, upsertSkill } from '@/lib/skillstore';
-import { atStart, setSkillFields, skillFromSource, skillHosts, skillMatchesUrl, skillsBlock, type Skill, type SkillStep } from '@/lib/skills';
+import { addressedHosts, pinAddress, setSkillFields, skillFromSource, skillHosts, skillMatchesUrl, skillsBlock, type Skill, type SkillStep } from '@/lib/skills';
 import { addDismissal, BANNER_DISMISSED_KEY, bannerWorthShowing, installState, isDismissed, skillInstallState, type Detection } from '@/lib/banner';
 import type { BannerStateReply } from '@/lib/bannerclient';
 import { createShareController } from '@/lib/sharecontroller';
@@ -28,7 +28,7 @@ import { watchDocument } from '@/lib/navwatch';
 import { shouldUpdate } from '@/lib/version';
 import { draftSourceFor, loadMods, matchPatternForUrl, modFromProposal, modFromSource, parseHeader, upsertMod, deleteMod, saveMods } from '@/lib/mods';
 import { addChatActions, appendTurn, archiveChat, bulkChats, countTurns, createChat, deleteChat, getChat, hostFromUrl, isArchived, listChats, loadItems, loadMessages, markTitleRefreshed, renameChat, saveItems, saveMessages, setChatArtifact, setChatModel, setChatRanSkill, setChatThinking, setModelTitle, touchChat } from '@/lib/chats';
-import { loadRuns, markInterrupted, nextRunRecord, pruneRuns, resumableRuns, saveRuns, withRunSkill, withSkillStep, withoutPending, withoutRunSkill, type RunMap, type RunRecord } from '@/lib/runstate';
+import { loadRuns, markInterrupted, nextRunRecord, pruneRuns, resumableRuns, saveRuns, withRunSkill, withSkillStep, withoutPending, withoutRunSkill, type PendingStep, type RunMap, type RunRecord } from '@/lib/runstate';
 import { AUTO_RESUMED_TEXT, autoResumable, countAutoResume, holdExpired, KEEPALIVE_MAX_HOLD_MS, KEEPALIVE_PORT, TAB_CLOSED_TEXT } from '@/lib/keepalive';
 import { isTombstoned, withKey } from '@/lib/storagequeue';
 import { collectBlobs } from '@/lib/blobs';
@@ -1119,14 +1119,14 @@ async function resumeRun(chatId: string, tabId: number): Promise<void> {
     postAgentEvent(chatId, { type: 'done' });
     return;
   }
-  await runSkillChat(chatId, tabId, skill, await loadCarry(chatId), { from: ran.step, ...(pending ? { pending: pending.label } : {}), draft: ran.draft === true });
+  await runSkillChat(chatId, tabId, skill, await loadCarry(chatId), { from: ran.step, ...(pending ? { pending: pending.label, pendingKind: pending.kind } : {}), draft: ran.draft === true });
 }
 
 /**
  * One run of a skill: no model and no conversation, the same session, Stop, bar and journal as a chat's
  * run, and the rows and the card of a driving one. lib/skillrun.ts is what happens; this is where.
  */
-async function runSkillChat(chatId: string, tabId: number, skill: Skill, carry: RunCarry, opts: { from?: number; pending?: string; draft?: boolean } = {}): Promise<void> {
+async function runSkillChat(chatId: string, tabId: number, skill: Skill, carry: RunCarry, opts: { from?: number; pending?: string; pendingKind?: PendingStep['kind']; draft?: boolean } = {}): Promise<void> {
   const session = sessions.ensure(chatId, tabId);
   session.running = true;
   session.controller = new AbortController();
@@ -1155,7 +1155,7 @@ async function runSkillChat(chatId: string, tabId: number, skill: Skill, carry: 
  * A skill's run, inside whichever run holds the tab: the user's Run, or the model's run_skill. Everything
  * from the journal to the card, and what became of it.
  */
-async function carrySkill(chatId: string, tabId: number, driver: Driver, skill: Skill, carry: RunCarry, signal: AbortSignal, post: (e: AgentEventBody) => void, toolId: string, opts: { from?: number; pending?: string; draft?: boolean; byModel?: boolean }): Promise<SkillRunResult | null> {
+async function carrySkill(chatId: string, tabId: number, driver: Driver, skill: Skill, carry: RunCarry, signal: AbortSignal, post: (e: AgentEventBody) => void, toolId: string, opts: { from?: number; pending?: string; pendingKind?: PendingStep['kind']; draft?: boolean; byModel?: boolean }): Promise<SkillRunResult | null> {
   const key = stepsKey(skill.steps);
   await updateRuns((runs) => withRunSkill(runs, chatId, { id: skill.id, name: skill.name, step: opts.from ?? 0, total: skill.steps.length, key, ...(opts.draft ? { draft: true } : {}) }));
   await saveCarry(chatId, carry).catch(() => {});
@@ -1181,7 +1181,6 @@ async function carrySkill(chatId: string, tabId: number, driver: Driver, skill: 
     post({ type: 'act_step', id: at.id, index: at.index, step });
   };
   // What the row and the card show. Numbers, and what the extension read: no input's value.
-  let rowsUsed = 0;
   if (opts.from === undefined) {
     const named = Object.keys(skill.inputs).filter((k) => carry.inputs[k]);
     post({ type: 'note', text: `you ran ${skill.name} v${skill.version}${named.length ? ` · ${named.join(', ')}` : ''}` });
@@ -1200,9 +1199,7 @@ async function carrySkill(chatId: string, tabId: number, driver: Driver, skill: 
       await chrome.tabs.update(tabId, { url: skill.start });
       await drive!.settled(tabId, signal);
     }
-    await driver.startDriving(await tabUrl(tabId));
-    if (opts.from === undefined && !signal.aborted) rowsUsed = await goToStart(driver, skill, here, onSite, row, signal);
-    const cooked = rowsUsed;
+    await driver.startDriving(pinAddress(skill, await tabUrl(tabId)), addressedHosts(skill));
     const repair = await repairFor(chatId, skill, opts.draft === true, tabId, driver, post, () => (split = true));
     result = await runSkill(
       skill,
@@ -1214,12 +1211,12 @@ async function carrySkill(chatId: string, tabId: number, driver: Driver, skill: 
         pastStep: (i) => updateRuns((runs) => withSkillStep(withoutPending(runs, chatId), chatId, i)),
         carry: (c) => saveCarry(chatId, c).catch(() => {}),
         keepAllowance: (action) => keepAllowance(skill.id, action),
-        row: (i, r) => row(i + cooked, r),
+        row,
         note: (text) => post({ type: 'note', text }),
         newId: () => crypto.randomUUID(),
         ...(repair ? { repair: (req, sig) => repair(skill, req, sig) } : {}),
       },
-      { ...(opts.from !== undefined ? { from: opts.from } : {}), ...(opts.pending !== undefined ? { pending: opts.pending } : {}), carry },
+      { ...(opts.from !== undefined ? { from: opts.from } : { toStart: needsGoToStart(skill, here, onSite) }), ...(opts.pending !== undefined ? { pending: opts.pending, ...(opts.pendingKind ? { pendingKind: opts.pendingKind } : {}) } : {}), carry },
       signal,
     );
   } catch (e) {
@@ -1330,18 +1327,6 @@ async function editSkillInChat(skillId: string, currentChatId: string | null, ho
   const existing = await loadArtifact(chatId);
   const artifact = plan.action === 'reuse' && existing?.linkedSkillId === skillId ? existing : await openSkillDraft(chatId, skill);
   return { chatId, host: (await getChat(chatId))?.host ?? host, created, reused: plan.action === 'reuse', artifact, skill, runsHere };
-}
-
-/**
- * A run from elsewhere on the site lands on `start` first, shown as a step. A file that begins with its
- * own `go` does that itself, and a `start` ending in / means whichever page under it the run is on.
- * Returns how many rows it used.
- */
-async function goToStart(driver: Driver, skill: Skill, here: string, wasOnSite: boolean, row: (i: number, r: StepRow) => void, signal: AbortSignal): Promise<number> {
-  if (!wasOnSite || skill.steps[0]?.verb === 'go' || atStart(skill.start, here)) return 0;
-  const outcome = await driver.runStep({ do: 'go', text: skill.start }, { journalKind: 'skill', knownUrls: [skill.start], barStatus: `usermods is running ${skill.name}`, activity: `running ${skill.name}`, actions: [] }, signal);
-  if (outcome.kind === 'done') row(0, { state: 'done', text: outcome.words });
-  return outcome.kind === 'done' ? 1 : 0;
 }
 
 /**

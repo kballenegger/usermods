@@ -9,8 +9,8 @@ import { Driver, type DescribeReply, type DriverDeps } from '../lib/agent/driver
 import { answerFits, type Answer, type Question } from '../lib/agent/questions.ts';
 import type { ActResult, ActStep } from '../lib/interact/actions.ts';
 import type { Described } from '../lib/interact/describe.ts';
-import { MAX_RUN_ACTIONS, STANDING_LABEL, initialRun, inputsInOrder, next, outputCsv, outputsNote, planStep, runSkill, runSummary, stepsKey, type RunCarry, type SkillRunDeps } from '../lib/skillrun.ts';
-import { atStart, skillFromSource, type Skill, type SkillStep } from '../lib/skills.ts';
+import { MAX_RUN_ACTIONS, STANDING_LABEL, initialRun, inputsInOrder, needsGoToStart, next, outputCsv, outputsNote, planStep, runSkill, runSummary, stepsKey, type RunCarry, type SkillRunDeps } from '../lib/skillrun.ts';
+import { addressedHosts, atStart, pinAddress, skillFromSource, type Skill, type SkillStep } from '../lib/skills.ts';
 import type { AgentEventBody } from '../lib/types.ts';
 
 const PAGE = 'https://forms.example.com/';
@@ -48,12 +48,13 @@ interface Harness {
   kept: string[];
   carry: RunCarry[];
   deps: SkillRunDeps;
+  driver: Driver;
   events: AgentEventBody[];
 }
 
 /** A page where every target reads as what the step names it, unless `read` says otherwise. */
-function harness(init: { read?: (s: ActStep) => DescribeReply; answers?: Array<Answer | null>; perform?: (s: ActStep) => ActResult | Promise<ActResult>; values?: string[] } = {}): Harness {
-  const h: Harness = { log: [], performed: [], questions: [], rows: [], notes: [], kept: [], carry: [], deps: null as unknown as SkillRunDeps, events: [] };
+function harness(init: { read?: (s: ActStep) => DescribeReply; answers?: Array<Answer | null>; perform?: (s: ActStep) => ActResult | Promise<ActResult>; values?: string[]; url?: string; allowed?: boolean; onAsk?: () => void } = {}): Harness {
+  const h: Harness = { log: [], performed: [], questions: [], rows: [], notes: [], kept: [], carry: [], deps: null as unknown as SkillRunDeps, driver: null as unknown as Driver, events: [] };
   const answers = [...(init.answers ?? [])];
   const read =
     init.read ??
@@ -80,12 +81,13 @@ function harness(init: { read?: (s: ActStep) => DescribeReply; answers?: Array<A
     raiseAgain: async () => ({ up: true }),
     ask: async (q) => {
       h.questions.push(q);
+      init.onAsk?.();
       const a = answers.shift();
       if (a === undefined) throw new Error(`no answer for ${q.kind}`);
       if (a) assert.ok(answerFits(q, a), `${JSON.stringify(a)} does not fit ${q.kind}`);
       return a;
     },
-    pageUrl: async () => PAGE,
+    pageUrl: async () => init.url ?? PAGE,
     tabActive: async () => true,
     whenActive: async () => {},
     goBackTo: async () => {},
@@ -93,7 +95,7 @@ function harness(init: { read?: (s: ActStep) => DescribeReply; answers?: Array<A
     wait: async () => ({ matched: true, elapsedMs: 5 }),
     journalWrite: async (j) => void h.log.push(`write:${j.kind}:${j.label}`),
     journalClear: async (n) => void h.log.push(`clear:${n ?? '-'}`),
-    loadAllowances: async () => ({ site: true, actions: ['click button "from the chat"'] }),
+    loadAllowances: async () => ({ site: init.allowed ?? true, actions: ['click button "from the chat"'] }),
     allowSite: async () => {},
     allowAction: async () => void h.log.push('allow-action-in-chat'),
     chatSites: async () => [],
@@ -104,6 +106,7 @@ function harness(init: { read?: (s: ActStep) => DescribeReply; answers?: Array<A
     sleep: async () => {},
   };
   const driver = new Driver(deps);
+  h.driver = driver;
   h.deps = {
     driver: { runStep: (s, o, sig) => driver.runStep(s, o, sig), ask: (q, sig) => driver.ask(q, sig), guard: (sig) => driver.guard(sig), announce: (b, a, sig) => driver.announce(b, a, sig), handoff: (t, spec, sig) => driver.handoff(t, spec, sig), didYourself: () => driver.didYourself() },
     wait: async () => ({ matched: true, elapsedMs: 5 }),
@@ -464,4 +467,185 @@ test('a start ending in a path and a slash covers the pages under it; a site’s
   assert.ok(!atStart('https://p.example.com/albums/new', 'https://p.example.com/albums/new/x'));
   assert.ok(!atStart('https://p.example.com/', 'https://p.example.com/other'));
   assert.ok(atStart('https://p.example.com/', 'https://p.example.com/'));
+});
+
+// ---------- Getting to where a skill starts ----------
+
+const SIBLINGS = (steps: string, front = 'inputs: {}\noutputs: {}') =>
+  FILE(steps, front).replace('"*://forms.example.com/*"', '"*://*.example.com/*"').replace('start: https://forms.example.com/', 'start: https://expenses.example.com/new');
+const FILL_NOTE = '- fill: $note\n  into: textbox "Note"\n  at: { css: "#n" }\n  when: $note';
+const NOTE_INPUT = 'inputs: { note: { label: Note, optional: true } }\noutputs: {}';
+
+test('a run sent to `start` that is declined does not carry on from step 1', async () => {
+  const skill = skillFromSource(SIBLINGS(CLICK), { origin: 'local', id: 's' });
+  const h = harness({ allowed: false, answers: [{ kind: 'decline' }] });
+  await h.driver.startDriving(PAGE, addressedHosts(skill));
+  const r = await go(skill, h, { toStart: true });
+  assert.equal(r.outcome.kind, 'declined');
+  assert.deepEqual(h.performed, [], 'neither the go nor the step');
+  assert.ok(!h.log.includes('at:0'), 'step 1 was never started');
+});
+
+test('a run sent to `start` that is refused or fails does not carry on from step 1', async () => {
+  const skill = skillFromSource(SIBLINGS(CLICK), { origin: 'local', id: 's' });
+  const refusing = harness({ read: () => ({ ok: true, signature: 'go', described: { ...described('', ''), go: { kind: 'url', href: 'chrome://settings/', path: '/', host: 'settings' } } }) });
+  const a = await go(skill, refusing, { toStart: true });
+  assert.equal(a.outcome.kind, 'refused');
+  assert.match((a.outcome as { message: string }).message, /browser or extension page/);
+  assert.deepEqual(refusing.performed, []);
+  const failing = harness({ read: () => ({ ok: false, code: 'unreachable', message: 'The page could not be reached' }) });
+  const b = await go(skill, failing, { toStart: true });
+  assert.equal(b.outcome.kind, 'refused');
+  assert.deepEqual(failing.performed, []);
+  assert.ok(!failing.log.includes('at:0'));
+});
+
+test('a run sent to `start` stops when it is stopped', async () => {
+  const skill = skillFromSource(SIBLINGS(CLICK), { origin: 'local', id: 's' });
+  const stop = new AbortController();
+  const h = harness({ allowed: false, answers: [null] });
+  stop.abort();
+  const r = await go(skill, h, { toStart: true }, stop.signal);
+  assert.equal(r.outcome.kind, 'stopped');
+  assert.deepEqual(h.performed, []);
+});
+
+test('`start` on a sibling host the match covers is on the site, and so is a file\'s own go there', async () => {
+  const skill = skillFromSource(SIBLINGS(`- go: https://billing.example.com/\n${CLICK}`), { origin: 'local', id: 's' });
+  assert.deepEqual(addressedHosts(skill).sort(), ['billing.example.com', 'expenses.example.com']);
+  const h = harness();
+  await h.driver.startDriving(PAGE, addressedHosts(skill));
+  const r = await go(skill, h, { toStart: true });
+  assert.equal(r.outcome.kind, 'finished');
+  assert.deepEqual(h.performed.filter((s) => s.do === 'go').map((s) => s.text), ['https://expenses.example.com/new', 'https://billing.example.com/']);
+});
+
+test('a host the match covers but the file does not name is still another site to the run', async () => {
+  const skill = skillFromSource(SIBLINGS(CLICK), { origin: 'local', id: 's' });
+  const h = harness({ url: 'https://elsewhere.example.com/', answers: [{ kind: 'back' }] });
+  await h.driver.startDriving(PAGE, addressedHosts(skill));
+  await h.driver.guard(new AbortController().signal).catch(() => {});
+  assert.equal(h.questions[0]?.kind, 'left-site');
+});
+
+test('`start` that redirected off the match is not where the run is pinned', async () => {
+  const skill = skillFromSource(FILE(CLICK), { origin: 'local', id: 's' });
+  assert.equal(pinAddress(skill, 'https://bank.test/account'), skill.start);
+  assert.equal(pinAddress(skill, 'https://forms.example.com/landed'), 'https://forms.example.com/landed');
+  // The pause holds from the first step: nothing is performed on the bank.
+  const stop = new AbortController();
+  const h = harness({ url: 'https://bank.test/account', answers: [null], onAsk: () => stop.abort() });
+  await h.driver.startDriving(pinAddress(skill, 'https://bank.test/account'));
+  const r = await go(skill, h, {}, stop.signal);
+  const q = h.questions[0];
+  assert.equal(q?.kind, 'left-site');
+  assert.equal((q as { canContinue: boolean }).canContinue, false, 'another site is never one button away');
+  assert.equal(r.outcome.kind, 'stopped');
+  assert.deepEqual(h.performed, []);
+});
+
+test('whether a run goes to `start` at all', () => {
+  const skill = skillFromSource(FILE(CLICK), { origin: 'local', id: 's' });
+  assert.equal(needsGoToStart(skill, 'https://forms.example.com/other', true), true);
+  assert.equal(needsGoToStart(skill, 'https://forms.example.com/', true), false, 'already there');
+  assert.equal(needsGoToStart(skill, 'https://forms.example.com/', false), false, 'pressing Run opened it');
+  const own = skillFromSource(FILE(`- go: /x\n${CLICK}`), { origin: 'local', id: 's' });
+  assert.equal(needsGoToStart(own, 'https://forms.example.com/other', true), false, 'the file goes itself');
+});
+
+// ---------- A pending step that was not a step of the file ----------
+
+test('the go to start, cut off: "it did" runs step 1, and it is not skipped', async () => {
+  const skill = skillFromSource(SIBLINGS(CLICK), { origin: 'local', id: 's' });
+  const h = harness({ answers: [{ kind: 'it-did' }] });
+  const r = await go(skill, h, { from: 0, pending: 'go to https://expenses.example.com/new', pendingKind: 'skill-start' });
+  const q = h.questions[0] as Extract<Question, { kind: 'did-happen' }>;
+  assert.equal(q.kind, 'did-happen');
+  assert.equal(q.n, 0, 'the button then says continue from 1');
+  assert.equal(r.outcome.kind, 'finished');
+  assert.deepEqual(h.performed.map((s) => s.do), ['click'], 'step 1 happened, and the go did not again');
+});
+
+test('the go to start, cut off: "do it again" goes there and then runs step 1, through the gate', async () => {
+  const skill = skillFromSource(SIBLINGS(CLICK), { origin: 'local', id: 's' });
+  const h = harness({ answers: [{ kind: 'do-again' }] });
+  await h.driver.startDriving(PAGE, addressedHosts(skill));
+  const r = await go(skill, h, { from: 0, pending: 'go to x', pendingKind: 'skill-start' });
+  assert.equal(r.outcome.kind, 'finished');
+  assert.deepEqual(h.performed.map((s) => s.do), ['go', 'click']);
+});
+
+test('a repair\'s action, cut off: "it did" does not mark the broken step as past', async () => {
+  const skill = asLocal(`${CLICK}\n${SUBMIT.replace('Delete it', 'Next').replace('tidy up', 'on')}`);
+  const h = harness({ answers: [{ kind: 'it-did' }, { kind: 'continue-from' }] });
+  const r = await go(skill, h, { from: 0, pending: 'click button "Thing"', pendingKind: 'skill-repair' });
+  assert.deepEqual(h.questions.map((q) => q.kind), ['did-happen', 'skill-broken']);
+  assert.equal((h.questions[0] as Extract<Question, { kind: 'did-happen' }>).n, 0, 'it said continue from this step, not past it');
+  assert.equal((h.questions[1] as Extract<Question, { kind: 'skill-broken' }>).n, 1);
+  assert.equal(r.outcome.kind, 'finished');
+  assert.deepEqual(h.performed.map((s) => s.do), ['click'], 'only the step after it');
+});
+
+test('a repair\'s action, cut off: nothing replays it, "do it again" goes back to the file\'s step', async () => {
+  const h = harness({ answers: [{ kind: 'do-again' }] });
+  const r = await go(asLocal(CLICK), h, { from: 0, pending: 'click button "Elsewhere"', pendingKind: 'skill-repair' });
+  assert.equal(r.outcome.kind, 'finished');
+  assert.equal(h.performed.length, 1);
+  assert.deepEqual(h.performed[0]!.target && 'name' in h.performed[0]!.target ? h.performed[0]!.target.name : '', 'Go on');
+});
+
+// ---------- A walk is every step shown ----------
+
+test('a step skipped by `when` costs the walk: it was not shown', async () => {
+  const s = initialRun(2, { walking: true });
+  const r = next(s, { type: 'skipped' });
+  assert.equal(r.state.walkIntact, false);
+  const skill = asImported(`${FILL_NOTE}\n${CLICK}`, NOTE_INPUT);
+  const h = harness({ answers: [{ kind: 'next' }] });
+  const run = await go(skill, h);
+  assert.deepEqual(run.outcome, { kind: 'finished', walked: false });
+});
+
+// ---------- Resume after the browser closed ----------
+
+test('resume with the typed values gone asks about a `when`, where an empty one used to mean skip', async () => {
+  const skill = asLocal(`${FILL_NOTE}\n${CLICK}`, NOTE_INPUT);
+  const lost = (answers: Answer[]) => {
+    const h = harness({ answers });
+    return { h, run: go(skill, h, { from: 0, carry: { inputs: {}, outputs: {}, lost: true } }) };
+  };
+  const a = lost([{ kind: 'input', value: 'the note' }]);
+  await a.run;
+  const q = a.h.questions[0] as Extract<Question, { kind: 'skill-input' }>;
+  assert.equal(q.kind, 'skill-input');
+  assert.equal(q.optional, true);
+  assert.equal(q.lost, true);
+  assert.equal(a.h.performed[0]?.text, 'the note');
+  assert.ok(a.h.carry.every((c) => c.lost === true), 'a second restart still knows');
+  assert.ok(a.h.notes.some((n) => /what you typed/.test(n)));
+
+  const b = lost([{ kind: 'input', value: '' }]);
+  await b.run;
+  assert.deepEqual(b.h.performed.map((s) => s.do), ['click'], 'left empty on purpose: skipped');
+
+  const c = lost([{ kind: 'input', value: 'x' }]);
+  const asked = harness({ answers: [] });
+  await go(skill, asked, { from: 0, carry: { inputs: { note: 'kept' }, outputs: {}, lost: true } });
+  assert.equal(asked.questions.length, 0, 'an answer already given is not asked again');
+  await c.run;
+});
+
+test('an ordinary run with an empty `when` still skips without asking', async () => {
+  const h = harness();
+  await go(asLocal(`${FILL_NOTE}\n${CLICK}`, NOTE_INPUT), h);
+  assert.equal(h.questions.length, 0);
+  assert.deepEqual(h.performed.map((s) => s.do), ['click']);
+});
+
+test('only a question that offered it takes an empty answer', () => {
+  const base = { kind: 'skill-input', id: 'q', skill: 'S', n: 1, label: 'L' } as const;
+  assert.equal(answerFits(base, { kind: 'input', value: '' }), false);
+  assert.equal(answerFits(base, { kind: 'input', value: '  ' }), false);
+  assert.equal(answerFits(base, { kind: 'input', value: 'x' }), true);
+  assert.equal(answerFits({ ...base, optional: true }, { kind: 'input', value: '' }), true);
 });

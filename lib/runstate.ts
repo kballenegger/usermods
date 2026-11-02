@@ -84,7 +84,8 @@ export type RunMap = Record<string, RunRecord>;
  * was filled with.
  */
 export interface PendingStep {
-  kind: 'act' | 'script' | 'skill';
+  /** `skill-start` and `skill-repair` are not a step of the file, so an answer about them settles no step of it. */
+  kind: 'act' | 'script' | 'skill' | 'skill-start' | 'skill-repair';
   label: string;
   at: number;
 }
@@ -222,7 +223,7 @@ function parsePending(raw: unknown): PendingStep | undefined {
   if (raw === undefined || raw === null) return undefined;
   const p = raw as Partial<PendingStep>;
   return {
-    kind: p.kind === 'script' || p.kind === 'skill' ? p.kind : 'act',
+    kind: p.kind === 'script' || p.kind === 'skill' || p.kind === 'skill-start' || p.kind === 'skill-repair' ? p.kind : 'act',
     label: typeof p.label === 'string' && p.label ? p.label : 'an action',
     at: typeof p.at === 'number' && Number.isFinite(p.at) ? p.at : 0,
   };

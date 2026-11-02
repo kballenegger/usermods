@@ -20,7 +20,8 @@ import type { TargetSpec } from './interact/target';
 import type { Answer, CardOutput, Question, RunEnding, StepRow } from './agent/questions';
 import type { StepOptions, StepOutcome } from './agent/driver';
 import { formatMs, parseWaitInput, renderWaitResult, type WaitOutcome, type WaitSpec } from './agent/wait.ts';
-import { isHistoryGo, isInputRef, parseTarget, resolveGo, skillMatchesUrl, stepLine, type Skill, type SkillInput, type SkillStep } from './skills.ts';
+import type { PendingStep } from './runstate';
+import { atStart, isHistoryGo, isInputRef, parseTarget, resolveGo, skillMatchesUrl, stepLine, type Skill, type SkillInput, type SkillStep } from './skills.ts';
 
 /** What one run may do before it pauses and asks. A replay has no model round trips to bound it. */
 export const MAX_RUN_ACTIONS = 500;
@@ -70,7 +71,8 @@ export type RunEvent =
   /** Answers to the questions below. */
   | { type: 'continue-from' }
   | { type: 'try-again' }
-  | { type: 'it-did' }
+  /** `partial`: what happened was not the whole step, so the step itself is not settled. */
+  | { type: 'it-did'; partial?: boolean }
   | { type: 'do-again' }
   | { type: 'carry-on' };
 
@@ -109,7 +111,8 @@ export function next(s: RunState, e: RunEvent): { state: RunState; effect: RunEf
     case 'done':
       return onward({ ...s, index: s.index + 1, ran: s.ran + 1, actions: s.actions + e.actions });
     case 'skipped':
-      return onward({ ...s, index: s.index + 1 });
+      // The user was not shown it, and with the input filled it would run for the first time unshown.
+      return onward({ ...s, index: s.index + 1, walkIntact: false });
     case 'broken':
       if (e.repairable && s.canRepair && !s.repairTried.includes(s.index)) return { state: { ...s, repairTried: [...s.repairTried, s.index] }, effect: { do: 'repair', index: s.index, message: e.message } };
       return { state: s, effect: { do: 'ask-broken', index: s.index, message: e.message } };
@@ -133,6 +136,7 @@ export function next(s: RunState, e: RunEvent): { state: RunState; effect: RunEf
       // The user did it by hand. It is journalled as theirs, and a walk with a gap in it is not a walk.
       return onward({ ...s, index: s.index + 1, walkIntact: false });
     case 'it-did':
+      if (e.partial) return { state: s, effect: { do: 'ask-broken', index: s.index, message: 'A repair of this step was cut off. Its last action happened, and usermods does not know whether the step is done.' } };
       return onward({ ...s, index: s.index + 1 });
     case 'do-again':
       return { state: s, effect: { do: 'step', index: s.index } };
@@ -274,6 +278,17 @@ export function outputsNote(name: string, outputs: readonly CardOutput[]): strin
 export interface RunCarry {
   inputs: Record<string, string>;
   outputs: Record<string, string[]>;
+  /** It went with the browser. An input not here now was not left empty: nobody knows what it was. */
+  lost?: boolean;
+}
+
+/**
+ * A run from elsewhere on the site lands on `start` first, shown as a step. A file that begins with its
+ * own `go` does that itself, a `start` ending in / means whichever page under it the run is on, and off
+ * the site pressing Run has already opened it.
+ */
+export function needsGoToStart(skill: Pick<Skill, 'start' | 'steps'>, here: string, wasOnSite: boolean): boolean {
+  return wasOnSite && skill.steps[0]?.verb !== 'go' && !atStart(skill.start, here);
 }
 
 export interface SkillRunDriver {
@@ -311,6 +326,10 @@ export interface RunOptions {
   from?: number;
   /** The step in flight when the last run died, if any. */
   pending?: string;
+  /** Whose it was, when it was not a step of the file. */
+  pendingKind?: PendingStep['kind'];
+  /** Go to `start` before the first step. See needsGoToStart. */
+  toStart?: boolean;
   /** The answers to the card: what the user typed, and what an interrupted run had read. */
   carry: RunCarry;
   maxActions?: number;
@@ -347,10 +366,63 @@ export async function runSkill(skill: Pick<Skill, 'name' | 'start' | 'steps' | '
   const numbered = (i: number, text: string) => `${i + 1}/${total} · ${text}`;
 
   let state = initialRun(total, { ...(opts.from ? { from: opts.from } : {}), walking: !skill.walked, ...(opts.maxActions ? { maxActions: opts.maxActions } : {}), canRepair: !!deps.repair });
-  let step = next(state, { type: 'begin', ...(opts.pending !== undefined ? { pending: opts.pending } : {}) });
 
   const ask = async (q: Question): Promise<Answer | null> => driver.ask(q, signal);
   const says = (s: SkillStep) => ('why' in s && s.why ? { says: s.why } : {});
+  const lost = opts.carry.lost === true;
+  const saveCarry = () => deps.carry({ inputs, outputs, ...(lost ? { lost: true } : {}) });
+  if (lost && (Object.keys(skill.inputs).length || Object.keys(skill.outputs).length)) deps.note('the browser closed during this run, so what you typed and what it had read are gone. usermods asks again for what it needs');
+
+  /**
+   * The go to `start`, which is not a step of the file. It goes through the gate like one, and what
+   * stops it stops the run: step 1 was recorded on that page and not on this one. Null when it got there.
+   */
+  async function toStart(): Promise<RunEvent | null> {
+    const outcome = await driver.runStep({ do: 'go', text: skill.start }, { journalKind: 'skill-start', knownUrls: [skill.start], barStatus: `usermods is running ${skill.name}`, activity: `running ${skill.name}`, actions: [] }, signal);
+    switch (outcome.kind) {
+      case 'done':
+        deps.row(-1, { state: 'done', text: outcome.words });
+        return null;
+      case 'declined':
+        deps.row(-1, { state: 'declined', text: `not done · you declined: ${outcome.label}` });
+        return { type: 'declined', label: outcome.label };
+      case 'refused': {
+        const reason = outcome.reason ?? outcome.message;
+        deps.row(-1, { state: 'failed', text: `refused · ${reason}` });
+        return { type: 'refused', message: `going to where it starts was refused: ${reason}` };
+      }
+      case 'failed':
+        deps.row(-1, { state: 'failed', text: outcome.message });
+        return { type: 'refused', message: `could not go to where it starts: ${outcome.message}` };
+      case 'stopped':
+        return { type: 'stopped' };
+    }
+  }
+
+  /** A go to `start` cut off last time. What the user says happened to it decides nothing about step 1. */
+  async function settleStart(label: string): Promise<RunEvent | null> {
+    const answer = await ask({ kind: 'did-happen', id: deps.newId(), skill: skill.name, n: 0, total, label });
+    if (!answer) return { type: 'stopped' };
+    if (answer.kind !== 'it-did') return toStart();
+    await deps.pastStep(0);
+    deps.note(`you said this happened: ${label}`);
+    return null;
+  }
+
+  const before = opts.pendingKind === 'skill-start' && opts.pending !== undefined ? await settleStart(opts.pending) : opts.toStart ? await toStart() : null;
+  const carriesPending = opts.pending !== undefined && opts.pendingKind !== 'skill-start';
+  let step = next(state, before ?? { type: 'begin', ...(carriesPending ? { pending: opts.pending! } : {}) });
+
+  /** With what was typed gone, an empty `when` is not the user leaving it empty. It is asked, not assumed. */
+  async function recover(s: SkillStep, i: number): Promise<boolean> {
+    const name = s.when && isInputRef(s.when) ? s.when.slice(1) : undefined;
+    if (!lost || !name || Object.hasOwn(inputs, name)) return true;
+    const answer = await ask({ kind: 'skill-input', id: deps.newId(), skill: skill.name, n: i + 1, label: skill.inputs[name]?.label ?? name, optional: true, lost: true });
+    if (!answer || answer.kind !== 'input') return false;
+    inputs[name] = answer.value;
+    await saveCarry();
+    return true;
+  }
 
   /** One step, to the event it comes to. */
   async function perform(i: number): Promise<RunEvent> {
@@ -359,6 +431,7 @@ export async function runSkill(skill: Pick<Skill, 'name' | 'start' | 'steps' | '
     const bar = `usermods is running ${skill.name} · ${here}`;
     const activity = `${state.walking ? 'walking through' : 'running'} ${skill.name} · ${here}`;
     await deps.atStep(i);
+    if (!(await recover(s, i))) return { type: 'stopped' };
 
     if (s.verb === 'wait' || s.verb === 'read') {
       await driver.guard(signal);
@@ -396,7 +469,7 @@ export async function runSkill(skill: Pick<Skill, 'name' | 'start' | 'steps' | '
         return { type: 'broken', message: got.message };
       }
       outputs[s.output] = [...(outputs[s.output] ?? []), ...got.values];
-      await deps.carry({ inputs, outputs });
+      await saveCarry();
       const count = got.values.length;
       deps.row(rowFor(i), { state: 'done', looked: true, text: numbered(i, `read ${count} ${skill.outputs[s.output]?.label ?? s.output}`) });
       await deps.pastStep(i + 1);
@@ -428,10 +501,10 @@ export async function runSkill(skill: Pick<Skill, 'name' | 'start' | 'steps' | '
     let plan = planStep(s, inputs, skill.start);
     if (plan.kind === 'needs-input') {
       const declared: SkillInput | undefined = skill.inputs[plan.name];
-      const answer = await ask({ kind: 'skill-input', id: deps.newId(), skill: skill.name, n: i + 1, label: declared?.label ?? plan.name });
+      const answer = await ask({ kind: 'skill-input', id: deps.newId(), skill: skill.name, n: i + 1, label: declared?.label ?? plan.name, ...(lost ? { lost: true } : {}) });
       if (!answer || answer.kind !== 'input') return { type: 'stopped' };
       inputs[plan.name] = answer.value;
-      await deps.carry({ inputs, outputs });
+      await saveCarry();
       plan = planStep(s, inputs, skill.start);
     }
     if (plan.kind === 'skip') {
@@ -508,15 +581,17 @@ export async function runSkill(skill: Pick<Skill, 'name' | 'start' | 'steps' | '
       continue;
     }
     if (effect.do === 'ask-pending') {
-      const answer = await ask({ kind: 'did-happen', id: deps.newId(), skill: skill.name, n: effect.index + 1, total, label: effect.label });
+      // A repair's action going through says nothing about the step it was repairing, so that step stays open.
+      const partial = opts.pendingKind === 'skill-repair';
+      const answer = await ask({ kind: 'did-happen', id: deps.newId(), skill: skill.name, n: partial ? effect.index : effect.index + 1, total, label: effect.label });
       if (!answer) {
         step = next(state, { type: 'stopped' });
         continue;
       }
       if (answer.kind === 'it-did') {
-        await deps.pastStep(effect.index + 1);
+        await deps.pastStep(partial ? effect.index : effect.index + 1);
         deps.note(`you said this happened: ${effect.label}`);
-        step = next(state, { type: 'it-did' });
+        step = next(state, { type: 'it-did', ...(partial ? { partial: true } : {}) });
       } else step = next(state, { type: 'do-again' });
       continue;
     }

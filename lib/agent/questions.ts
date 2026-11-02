@@ -56,12 +56,19 @@ export type Question =
   | { kind: 'walk'; id: string; skill: string; n: number; total: number; headline: string; where?: string; skillSays?: string }
   /** A skill's step whose target did not resolve. The run stops here until the user says. */
   | { kind: 'skill-broken'; id: string; skill: string; n: number; total: number; message: string }
-  /** A resumed skill run with a step in flight when the worker died. Nothing replays it. */
+  /**
+   * A resumed skill run with a step in flight when the worker died. Nothing replays it. `n` is the last
+   * step that answer settles: the one in flight, or for what was not a step of the file (the go to
+   * `start`, a repair's action) the one before it, so "continue from" names what comes next.
+   */
   | { kind: 'did-happen'; id: string; skill: string; n: number; total: number; label: string }
   /** The run has done its 500 actions. */
   | { kind: 'skill-ceiling'; id: string; skill: string; actions: number }
-  /** A step wants an input the run card left empty. */
-  | { kind: 'skill-input'; id: string; skill: string; n: number; label: string }
+  /**
+   * A step wants an input the run card left empty. `lost`: the browser closed, so what was typed for this
+   * run is gone. `optional`: the step says `when`, and leaving it empty is an answer.
+   */
+  | { kind: 'skill-input'; id: string; skill: string; n: number; label: string; optional?: boolean; lost?: boolean }
   /**
    * The model called run_skill. This is the run card, and nothing starts until it is answered here:
    * no tool can answer a question. `values` are what the model suggested, for the user to change.
@@ -113,7 +120,7 @@ export function answerFits(q: Question, a: Answer): boolean {
     case 'skill-ceiling':
       return a.kind === 'carry-on';
     case 'skill-input':
-      return a.kind === 'input' && typeof a.value === 'string';
+      return a.kind === 'input' && typeof a.value === 'string' && (q.optional === true || !!a.value.trim());
     case 'run-skill':
       return a.kind === 'decline' || (a.kind === 'run' && !!a.inputs && typeof a.inputs === 'object' && Object.values(a.inputs).every((v) => typeof v === 'string') && (!a.standing || !q.siteAllowed));
   }

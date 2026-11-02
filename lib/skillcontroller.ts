@@ -227,7 +227,9 @@ export function saveCarry(chatId: string, carry: RunCarry): Promise<void> {
 export async function loadCarry(chatId: string): Promise<RunCarry> {
   const key = carryKey(chatId);
   const raw = (await chrome.storage.session.get(key).catch(() => ({}) as Record<string, unknown>))[key] as RunCarry | undefined;
-  return { inputs: raw?.inputs ?? {}, outputs: raw?.outputs ?? {} };
+  // Every run writes this before its first step, so none here means it went with the browser.
+  if (!raw) return { inputs: {}, outputs: {}, lost: true };
+  return { inputs: raw.inputs ?? {}, outputs: raw.outputs ?? {}, ...(raw.lost ? { lost: true } : {}) };
 }
 
 export function dropCarry(chatId: string): Promise<void> {

@@ -263,6 +263,7 @@ function InputQuestion({ question: q, onAnswer, onStop }: { question: Extract<Qu
   return (
     <div data-testid="question" data-question={q.kind} className="question ask" role="group" aria-label={`Step ${q.n} needs ${q.label}`}>
       <div className="question-head">Step {q.n} needs this</div>
+      {q.lost ? <p>The browser closed during this run, so what you typed is gone.</p> : null}
       <label className="field">
         <span>{q.label}</span>
         <input type="text" data-testid="question-input" value={value} onChange={(e) => setValue(e.target.value)} />
@@ -271,6 +272,11 @@ function InputQuestion({ question: q, onAnswer, onStop }: { question: Extract<Qu
         <button className="btn primary" data-action="question-input" disabled={!value.trim()} onClick={() => onAnswer({ kind: 'input', value })}>
           Go on
         </button>
+        {q.optional ? (
+          <button className="btn" data-action="question-input-empty" onClick={() => onAnswer({ kind: 'input', value: '' })}>
+            Leave it empty
+          </button>
+        ) : null}
         <button className="linklike" data-action="question-stop" onClick={onStop}>
           Stop
         </button>
