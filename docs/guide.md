@@ -335,6 +335,51 @@ the item becomes **Post new version on Greasy Fork**, which opens that script's 
 the bumped version. If the mod also has a gist, the bubble mentions that Greasy Fork can *sync* from
 the gist's raw link (your script's Admin tab), so new versions post themselves.
 
+## Skills
+
+Skills are in the build from GitHub, and in neither the store build nor Safari. A mod changes a page on
+every visit; a skill runs steps on a site when you ask, and is off until you do. It holds no code: it is
+the clicks, typed fields, waits and reads the extension itself saw, in a file called `<name>.skill.md`.
+Filling a form you fill every week, or stepping through the same few pages, is what they are for.
+
+**Making one.** After a chat has operated a page, its On the page card has **Save as skill**, which asks
+which typed values change each time. Or ask for one: "write me a skill that files this form" makes the
+model do it once and propose it, as a **Proposed skill** card with **Run again** and **Save**. Either way
+what was typed becomes an input with a name and a label. Its value is not kept in the file, and the
+model cannot write a step: usermods records them.
+
+**Running one.** Three places: **Run** on its row on the Mods tab, the chat's empty state, and **Run a
+skill…** in the **+** menu. The model can also suggest one when you ask for what it does. Every start
+shows a card saying what it will do and asking for its inputs, and only your press starts it. If the
+model suggested values you can change them. A run needs no model at all.
+
+As it runs, usermods reads each element as it finds it and asks before anything it can tell sends, buys,
+deletes or unsubscribes. It never types a password, a one-time code or a card number; those are **Your
+turn** steps, where you do it and press **I have done it**. Stop is in the panel and on the bar on the page.
+A skill you installed walks its first run, showing each step before it happens, with **Run the rest
+without asking** once you have seen enough.
+
+**When a page has changed.** A step whose button is gone, or now says something else, stops the run:
+continue from the next step having done it by hand, or try again. With a model connected, and
+**Settings › Operating pages › Repair broken steps with the model** allowing it, the model is shown that
+one step and asked to do it instead. It has four tools, eight tool calls, no way to go elsewhere and no
+scripts; each thing it does is asked, consequential or not; and if you decline, the run stops as it would
+have. The setting has three values: *never*, *skills made here* (the default) and *every skill*. For a skill you
+installed, turning it on means the words of whoever wrote it reach your model, fenced as untrusted. A
+repaired run ends with **Update skill with the repair**, which shows the change and writes a new patch
+version if you say so.
+
+**Changing one.** **Edit in chat** on a row opens it as the chat's draft. A change of words or input names
+needs no new run; a new step is done on the page and placed where the model says. Editing by hand is on
+the dashboard, and costs the skill its standing allowances until it has walked a run again. Outside a
+repair the model is shown what a skill does and not what it says: never its notes or a `why`, and for a
+skill made elsewhere not its description either.
+
+**Sharing one.** Export has Download, Copy and Share as Gist, like a mod's, with a leak check that catches
+typed values and tokens in addresses. A raw `.skill.md` link opens the install page, which lists its sites,
+its steps, what it will ask you for and what it reads, all computed from the steps. Greasy Fork is not a
+target: a skill is not a script.
+
 ## The install banner
 
 When a page offers a userscript, usermods says so at the top of the page:
