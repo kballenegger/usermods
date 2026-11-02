@@ -531,6 +531,9 @@ function clock() {
   return { now: () => t, sleep: async (ms: number) => void (t += ms) };
 }
 
+/** What the fake watch says the page has done; a test's click handler moves it. */
+let pageChanges = 0;
+
 function deps(reg: Registry, over: Partial<ActionDeps> = {}): ActionDeps {
   const c = clock();
   return {
@@ -541,7 +544,7 @@ function deps(reg: Registry, over: Partial<ActionDeps> = {}): ActionDeps {
     sleep: c.sleep,
     nextFrame: async () => {},
     hit: () => null,
-    watch: () => ({ finish: () => ({ dom: { added: 0, removed: 0, attributes: 0 }, urlBefore: PAGE, urlAfter: PAGE, newOperable: [] }) }),
+    watch: () => ({ changes: () => pageChanges, finish: () => ({ dom: { added: 0, removed: 0, attributes: 0 }, urlBefore: PAGE, urlAfter: PAGE, newOperable: [] }) }),
     ...over,
   };
 }
@@ -799,15 +802,44 @@ test('repeat finds the next one with the same name and stops when none is left',
   assert.equal(document.querySelectorAll('button').length, 1, 'a button with another name is left alone');
 });
 
-test('repeat clicks a control that stays, once the page has had a moment, up to the count', async () => {
+test('repeat clicks a control that stays, once the page has answered and gone still, up to the count', async () => {
   load('<body><button id="m">Show more</button></body>');
   const reg = createRegistry(1, { probe });
   const m = document.getElementById('m')!;
   let n = 0;
-  m.addEventListener('click', () => n++);
+  m.addEventListener('click', () => {
+    n++;
+    pageChanges++;
+  });
   const r = await act({ target: { ref: reg.refFor(m) }, do: 'click', repeat: 4 }, deps(reg));
   assert.equal(n, 4);
   assert.match(r.ok ? r.text : '', /4 times\./);
+});
+
+test('a control that stays and answers nothing is pressed once, and the result says so', async () => {
+  load('<body><button id="m">Unsubscribe</button></body>');
+  const reg = createRegistry(1, { probe });
+  const m = document.getElementById('m')!;
+  let n = 0;
+  m.addEventListener('click', () => n++);
+  const r = await act({ target: { ref: reg.refFor(m) }, do: 'click', repeat: 5 }, deps(reg));
+  assert.equal(n, 1);
+  assert.match(r.ok ? r.text : '', /1 time; it did not change the page\./);
+});
+
+test('a row still waiting to vanish gets no second click, whatever else on the page moves', async () => {
+  load('<body><button class="u">Unsubscribe</button><button class="u">Unsubscribe</button></body>');
+  const reg = createRegistry(1, { probe });
+  const counts = new Map<Element, number>();
+  for (const b of document.querySelectorAll('button')) {
+    b.addEventListener('click', () => {
+      counts.set(b, (counts.get(b) ?? 0) + 1);
+      pageChanges++; // a toast, say, while the row itself is slow
+    });
+  }
+  const r = await act({ target: { selector: 'button.u:first-child' }, do: 'click', repeat: 10 }, deps(reg));
+  assert.deepEqual([...counts.values()], [1, 1]);
+  assert.equal(r.ok && r.clicks, 2);
 });
 
 test('repeat is capped however many are asked for', async () => {
@@ -815,7 +847,10 @@ test('repeat is capped however many are asked for', async () => {
   const reg = createRegistry(1, { probe });
   const m = document.getElementById('m')!;
   let n = 0;
-  m.addEventListener('click', () => n++);
+  m.addEventListener('click', () => {
+    n++;
+    pageChanges++;
+  });
   await act({ target: { ref: reg.refFor(m) }, do: 'click', repeat: 500 }, deps(reg));
   assert.equal(n, MAX_REPEAT);
 });
@@ -827,6 +862,7 @@ test('Stop reaches a repeat between clicks', async () => {
   let n = 0;
   let cancelled = false;
   m.addEventListener('click', () => {
+    pageChanges++;
     if (++n === 2) cancelled = true;
   });
   const r = await act({ target: { ref: reg.refFor(m) }, do: 'click', repeat: 20 }, deps(reg, { isCancelled: () => cancelled }));

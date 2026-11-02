@@ -22,7 +22,7 @@ import { watchDocument } from '@/lib/navwatch';
 import { shouldUpdate } from '@/lib/version';
 import { draftSourceFor, loadMods, matchPatternForUrl, modFromProposal, modFromSource, parseHeader, previewFromSource, upsertMod, deleteMod, saveMods } from '@/lib/mods';
 import { appendTurn, archiveChat, bulkChats, countTurns, createChat, deleteChat, getChat, hostFromUrl, isArchived, listChats, loadItems, loadMessages, markTitleRefreshed, renameChat, saveItems, saveMessages, setChatArtifact, setChatModel, setChatThinking, setModelTitle, touchChat } from '@/lib/chats';
-import { loadRuns, markInterrupted, pruneRuns, resumableRuns, saveRuns, type RunMap, type RunRecord } from '@/lib/runstate';
+import { loadRuns, markInterrupted, nextRunRecord, pruneRuns, resumableRuns, saveRuns, type RunMap, type RunRecord } from '@/lib/runstate';
 import { AUTO_RESUMED_TEXT, autoResumable, countAutoResume, holdExpired, KEEPALIVE_MAX_HOLD_MS, KEEPALIVE_PORT, TAB_CLOSED_TEXT } from '@/lib/keepalive';
 import { isTombstoned, withKey } from '@/lib/storagequeue';
 import { collectBlobs } from '@/lib/blobs';
@@ -35,7 +35,8 @@ import { buildTitleInput, completedTurns, sanitizeTitle, titleDecision, TITLE_SY
 import { createProvider } from '@/lib/providers';
 import { VISION_FALLBACK_PANEL_NOTE, createVisionMemory, resolveImagesSetting, visionKeyFor } from '@/lib/providers/vision';
 import { MAX_EDGE, SCREENSHOT_CAPTURE_FORMAT, SCREENSHOT_QUALITY, fitWithin, parseDataUrl } from '@/lib/images';
-import { SAFARI_BUILD, SUBSCRIPTIONS_OFF, isSubscriptionProvider, unavailableProviderMessage } from '@/lib/buildflags';
+import { ACT_OFF, SAFARI_BUILD, SUBSCRIPTIONS_OFF, isSubscriptionProvider, unavailableProviderMessage } from '@/lib/buildflags';
+import { BAR_DONE, BAR_STOP } from '@/lib/pageui';
 import { listFailureMessage, listWithFallback, modelsRequest, parseModelIds, type ModelListResult, type ModelListTarget } from '@/lib/modellist';
 import type { OAuthKind } from '@/lib/oauth';
 import type { AgentAttachState, AgentPortRequest, OAuthLoginState, RpcRequest } from '@/lib/rpc';
@@ -461,10 +462,7 @@ function setRun(chatId: string, patch: Pick<RunRecord, 'state' | 'tabId'> & { er
   if (isTombstoned(chatId)) return Promise.resolve();
   return updateRuns((runs) => {
     if (isTombstoned(chatId)) return runs;
-    const now = Date.now();
-    const prev = runs[chatId];
-    const startedAt = patch.state === 'running' || !prev ? now : prev.startedAt;
-    return { ...runs, [chatId]: { state: patch.state, tabId: patch.tabId, startedAt, updatedAt: now, ...(patch.error ? { error: patch.error } : {}) } };
+    return { ...runs, [chatId]: nextRunRecord(runs[chatId], patch) };
   });
 }
 
@@ -1363,8 +1361,32 @@ function cleanDetection(d: unknown): Detection | null {
   return { kind: x.kind as Detection['kind'], scripts, ...(gist ? { gist } : {}) };
 }
 
+/**
+ * The handoffs waiting on "I have done it", by tab. wait_for with ask_user registers here and the
+ * bar's button resolves it. The other things the page can reach cannot answer anything else.
+ */
+const barDoneWaiters = new Map<number, () => void>();
+
+/** The same stop as the panel's: written down first, then aborted, one chat at a time. */
+async function stopRunsOnTab(tabId: number): Promise<void> {
+  for (const chatId of sessions.ids()) {
+    if (sessions.get(chatId)?.tabId !== tabId || !sessions.isRunning(chatId)) continue;
+    await markStopped(chatId);
+    for (const id of sessions.abort(chatId)) postAgentEvent(chatId, { type: 'unqueued', id });
+  }
+}
+
 async function handlePageMessage(msg: { type?: string } & Record<string, unknown>, sender: chrome.runtime.MessageSender): Promise<unknown> {
   const tab = sender.tab!;
+  if (!ACT_OFF && (msg.type === BAR_STOP || msg.type === BAR_DONE)) {
+    if (tab.id == null) return undefined;
+    // Stop from the bar on the page is the same stop as the panel's. "I have done it" ends a handoff
+    // and nothing else. These two are all a page can say about a run: harmless if forged, so no
+    // permission is ever behind a message from here.
+    if (msg.type === BAR_STOP) await stopRunsOnTab(tab.id);
+    else barDoneWaiters.get(tab.id)?.();
+    return { ok: true };
+  }
   switch (msg.type) {
     case 'usermods:banner-state': {
       const quiet: BannerStateReply = { show: false, states: [] };

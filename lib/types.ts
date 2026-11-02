@@ -467,7 +467,7 @@ export type ContentRequest =
   /** `text`: readable text instead of HTML (lib/pagetext.ts), from character `offset`. */
   | { type: 'snapshot'; selector?: string; maxChars?: number; includeHidden?: boolean; text?: boolean; offset?: number }
   /** `styles` and `overlays`: see FindOptions in lib/inspect.ts. */
-  | { type: 'query'; selector?: string; limit?: number; text?: string; styles?: string[]; overlays?: boolean }
+  | { type: 'query'; selector?: string; limit?: number; text?: string; styles?: string[]; overlays?: boolean; /** The inventory of what can be operated (lib/interact/view.ts), scoped by `selector`. */ operable?: boolean }
   | { type: 'styles'; selector: string; properties?: string[] }
   | { type: 'pick' }
   /**
@@ -495,6 +495,8 @@ export type ContentRequest =
   | { type: 'share-fill'; req: import('./sharefill').FillRequest }
   | { type: 'share-hint'; hint: ShareHintSpec }
   | { type: 'share-files' }
+  /** Operating the page (lib/interact/client.ts). Absent from a build with ACT_OFF. */
+  | import('./interact/client').InteractMessage
   | { type: 'ping' };
 
 /** A hint bubble, as the background asks for it. The content script finds the anchor itself. */

@@ -22,7 +22,7 @@ import { neverReason, type Verb } from '../agent/gate.ts';
 import { describeNode, liveProbe, parentOf, type Probe } from '../inspect.ts';
 import { paste, selectAll, setFieldValue, settle } from '../sharefill.ts';
 import { normalizeText } from '../waitdom.ts';
-import { renderDelta, watchDelta, type Delta } from './delta.ts';
+import { renderDelta, watchDelta, type Delta, type DeltaWatch } from './delta.ts';
 import { describeGo, describeTarget, formOf, signatureOf, type Described } from './describe.ts';
 import { formatRoleName, isDisabled, isEditable, nameOf, roleOf, sameName } from './name.ts';
 import type { Registry } from './registry.ts';
@@ -40,9 +40,9 @@ export interface ActStep {
 /** The most clicks one step may make. */
 export const MAX_REPEAT = 50;
 
-/** How long a repeat waits for the next element to appear before it says none is left. */
-const REPEAT_WAIT_MS = 1500;
-/** How long a repeat lets the page answer before clicking the same element again. */
+/** How long a repeat waits for the next element, or for an answer, before it ends. */
+const REPEAT_WAIT_MS = 2500;
+/** How long the page must have been still, after it answered, before the same control is pressed again. */
 const REPEAT_QUIET_MS = 300;
 const REPEAT_POLL_MS = 50;
 /** How long a moving element gets to come to rest. */
@@ -104,7 +104,7 @@ export interface ActionDeps {
   /** Resolves if the page starts to unload. */
   leaving?: Promise<void>;
   /** Start counting what changes. Tests hand in a fake; the page has a MutationObserver. */
-  watch?: () => { finish(): Delta };
+  watch?: () => DeltaWatch;
 }
 
 const liveSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -476,9 +476,10 @@ export async function runStep(step: ActStep, expect: string, deps: ActionDeps): 
   switch (step.do) {
     case 'click': {
       const times = Math.min(Math.max(1, Math.floor(step.repeat ?? 1)), MAX_REPEAT);
+      const before = watch.changes();
       pressWithPointer(el, can.point);
       if (times === 1) return finish({ words: `Clicked ${label}${refNote}.`, clicks: 1 });
-      return finish(await repeatClicks(el, described, label, refNote, times, { ...ready, doc, pageUrl: deps.pageUrl ?? location.href, flash: deps.flash }));
+      return finish(await repeatClicks(el, before, described, label, refNote, times, { ...ready, doc, pageUrl: deps.pageUrl ?? location.href, flash: deps.flash, changes: () => watch.changes() }));
     }
     case 'hover': {
       const init = { clientX: can.point.x, clientY: can.point.y };
@@ -530,39 +531,50 @@ function runGo(described: Described, deps: ActionDeps): ActResult {
 
 /**
  * The rest of a `repeat`, after the first click: find the element with the same role and name again,
- * preferring one not clicked yet, and stop when none is left. A control that stays where it is
- * ("Show more") is clicked again once the page has had a moment to answer. Stop is honoured between
- * clicks, and the never list and the submit fact are read again for each new element, since it was
- * asked about once.
+ * and stop when none is left. An element clicked once is not clicked again while another is there, or
+ * while nothing has answered: a row that takes two seconds to vanish must not get a second Unsubscribe.
+ * So the one case that re-presses is a single control that stays ("Show more"), after the page has
+ * visibly answered the last press and then gone still. Stop is honoured between clicks, and the never
+ * list and the submit fact are read again for each new element, since it was asked about once.
  */
-async function repeatClicks(first: Element, described: Described, label: string, refNote: string, times: number, deps: Ready & { doc: Document; pageUrl: string; flash?: ((el: Element) => void) | undefined }): Promise<{ words: string; clicks: number }> {
+async function repeatClicks(first: Element, firstPressedAt: number, described: Described, label: string, refNote: string, times: number, deps: Ready & { doc: Document; pageUrl: string; flash?: ((el: Element) => void) | undefined; changes: () => number }): Promise<{ words: string; clicks: number }> {
   const clicked = new Set<Element>([first]);
   let clicks = 1;
+  let last = first;
+  // The change count just before the latest press: a handler that answers synchronously still counts.
+  let pressedAt = firstPressedAt;
   let ending = 'none left';
   const same = (el: Element) => roleOf(el) === described.role && sameName(nameOf(el), described.name) && !isDisabled(el);
-  const nextOne = (quietOver: boolean): Element | null => {
-    const candidates = operableElements(deps.probe, undefined, deps.doc).found.filter(same);
-    const fresh = candidates.find((el) => !clicked.has(el));
-    if (fresh) return fresh;
-    return quietOver ? (candidates[0] ?? null) : null;
-  };
   while (clicks < times) {
     if (deps.isCancelled()) {
       ending = 'stopped';
       break;
     }
     const startedWaiting = deps.now();
+    let seen = pressedAt;
+    let stillSince = startedWaiting;
     let next: Element | null = null;
     while (!next && deps.now() - startedWaiting < REPEAT_WAIT_MS) {
       await deps.sleep(REPEAT_POLL_MS);
       if (deps.isCancelled()) break;
-      next = nextOne(deps.now() - startedWaiting >= REPEAT_QUIET_MS);
+      const now = deps.changes();
+      if (now !== seen) {
+        seen = now;
+        stillSince = deps.now();
+      }
+      const candidates = operableElements(deps.probe, undefined, deps.doc).found.filter(same);
+      next = candidates.find((el) => !clicked.has(el)) ?? null;
+      const answered = seen !== pressedAt && deps.now() - stillSince >= REPEAT_QUIET_MS;
+      if (!next && answered && clicked.size === 1 && candidates.includes(last)) next = last;
     }
     if (deps.isCancelled()) {
       ending = 'stopped';
       break;
     }
-    if (!next) break;
+    if (!next) {
+      if (last.isConnected && clicked.size === 1 && seen === pressedAt) ending = 'it did not change the page';
+      break;
+    }
     const live = describeTarget(next, { probe: deps.probe, pageUrl: deps.pageUrl, doc: deps.doc });
     const never = neverReason(live, 'click');
     if (never) {
@@ -579,8 +591,10 @@ async function repeatClicks(first: Element, described: Described, label: string,
       ending = `stopped: ${can.message}`;
       break;
     }
+    pressedAt = deps.changes();
     pressWithPointer(next, can.point);
     clicked.add(next);
+    last = next;
     clicks++;
     if (clicks === times) ending = '';
   }

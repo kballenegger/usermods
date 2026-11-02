@@ -125,6 +125,8 @@ export function renderDelta(d: Delta): string {
 
 export interface DeltaWatch {
   finish(): Delta;
+  /** How many changes so far, ours left out: whether the page has answered anything yet. */
+  changes(): number;
 }
 
 /** Start counting. `finish` flushes the observer and stops it; nothing is left on the page. */
@@ -138,6 +140,11 @@ export function watchDelta(opts: { doc?: Document; probe?: Probe; url?: () => st
   });
   observer.observe(doc.documentElement, { childList: true, subtree: true, attributes: true });
   return {
+    changes() {
+      records.push(...observer.takeRecords());
+      const d = tallyRecords(records);
+      return d.added + d.removed + d.attributes;
+    },
     finish() {
       records.push(...observer.takeRecords());
       observer.disconnect();

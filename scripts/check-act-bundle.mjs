@@ -1,0 +1,63 @@
+// A build with ACT_OFF must hold none of the code the flag names: "removes the code, not only the
+// controls" (docs/specs/browser-use.md, section 5.9). This reads the packages themselves.
+//
+// Run through `npm run check:act-bundle`, which builds them first. The strings below are ones that
+// exist only in flagged code. They are looked for in the test build too, the one with the flag on,
+// so a string that a refactor removed fails here instead of quietly proving nothing.
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+const FLAGGED = [
+  'usermods:bar-stop', // the bar's message, lib/pageui.ts
+  'usermods:bar-done',
+  'I HAVE DONE IT', // the bar itself
+  'kept moving', // lib/interact/actions.ts
+  'Nothing to operate here', // lib/interact/view.ts
+  'one-time code', // lib/interact/describe.ts
+  'find_elements to get refs', // lib/interact/delta.ts
+];
+
+function bundleText(dir) {
+  const full = path.join(ROOT, '.output', dir);
+  if (!fs.existsSync(path.join(full, 'manifest.json'))) throw new Error(`${dir} has not been built`);
+  const out = [];
+  const walk = (d) => {
+    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      const p = path.join(d, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (/\.(js|html|json)$/.test(e.name)) out.push([path.relative(full, p), fs.readFileSync(p, 'utf8')]);
+    }
+  };
+  walk(full);
+  return out;
+}
+
+let failed = 0;
+const on = bundleText('test-chrome-mv3');
+for (const s of FLAGGED) {
+  if (!on.some(([, text]) => text.includes(s))) {
+    console.error(`[act-bundle] "${s}" is not in the flag-on build, so finding it absent elsewhere would prove nothing`);
+    failed++;
+  }
+}
+for (const dir of ['store-chrome-mv3', 'safari-mv3', 'store-safari-mv3']) {
+  const files = bundleText(dir);
+  for (const s of FLAGGED) {
+    for (const [file, text] of files) {
+      if (text.includes(s)) {
+        console.error(`[act-bundle] ${dir}/${file} holds "${s}"`);
+        failed++;
+      }
+    }
+  }
+  const content = files.find(([f]) => f.endsWith('content-scripts/content.js'));
+  console.log(`[act-bundle] ${dir}: ${files.length} files, content script ${content ? content[1].length : '?'} bytes`);
+}
+if (failed) {
+  console.error(`[act-bundle] ${failed} problem(s)`);
+  process.exit(1);
+}
+console.log(`[act-bundle] ok: none of ${FLAGGED.length} flagged strings in the three flag-off builds`);

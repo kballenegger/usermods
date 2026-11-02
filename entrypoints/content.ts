@@ -1,9 +1,11 @@
+import { ACT_OFF } from '@/lib/buildflags';
 import { createHolder } from '@/lib/keepalive-holder';
 import { computedStyles, describeElements } from '@/lib/inspect';
 import { pageText, sliceText, TEXT_DEFAULT_CHARS } from '@/lib/pagetext';
 import { reachFor, selectorFor, snapshot } from '@/lib/snapshot';
 import { queryAllDeep, waitForDom } from '@/lib/waitdom';
 import { initBanner } from '@/lib/bannerclient';
+import { handleInteractMessage, interactQuery } from '@/lib/interact/client';
 import { handleShareMessage } from '@/lib/shareclient';
 import type { ContentEvent, ContentRequest } from '@/lib/types';
 
@@ -111,7 +113,7 @@ export default defineContentScript({
           return;
         }
         case 'query':
-          sendResponse({ text: describeElements(msg.selector, msg.limit, msg.text, { styles: msg.styles, overlays: msg.overlays }) });
+          sendResponse({ text: ACT_OFF ? describeElements(msg.selector, msg.limit, msg.text, { styles: msg.styles, overlays: msg.overlays }) : interactQuery(msg) });
           return;
         case 'styles':
           sendResponse({ text: computedStyles(msg.selector, msg.properties) });
@@ -129,6 +131,14 @@ export default defineContentScript({
             sendResponse({ state: 'missing', reason: e instanceof Error ? e.message : String(e) }),
           );
           return true;
+        case 'inventory':
+        case 'describe':
+        case 'act':
+        case 'act-cancel':
+        case 'highlight':
+        case 'indicator':
+          // The folded flag is what keeps lib/interact out of a store or Safari bundle.
+          return ACT_OFF ? undefined : handleInteractMessage(msg, sendResponse);
       }
     });
 

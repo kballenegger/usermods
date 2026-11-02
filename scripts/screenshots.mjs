@@ -92,6 +92,7 @@ import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { ARTIFACT_V1, ARTIFACT_V2, ARTIFACT_V3, COMPACT_MARKER, EDITMOD_PROMPTS, editModSource, FAST_MARKER, IMAGES_MARKER, MARKDOWN_REPLY, MODELS, RESUME as RESUME_CONV, SLOW_MARKER, SUMMARY_MARKER, THINKING, VISION as VISION_CONV, WAIT_MARKER } from './mock-llm.mjs';
 import { extDir } from './build-dir.mjs';
+import { interactFlow } from './lib/interact-flow.mjs';
 import { bannerFlow, shareFlow } from './lib/share-flows.mjs';
 import { updatesFlow } from './lib/update-flow.mjs';
 import fs from 'node:fs';
@@ -110,6 +111,8 @@ const PANEL = { width: 420, height: 820 };
 const SCALE = 2;
 
 const SMOKE = process.argv.includes('--smoke');
+/** The content messages behind operating a page, driven through the built extension. */
+const INTERACT = process.argv.includes('--interact');
 const CHATS = process.argv.includes('--chats');
 const ISOLATION = process.argv.includes('--isolation');
 const COMPACTION = process.argv.includes('--compaction');
@@ -209,7 +212,7 @@ const CAPTURING =
   !SMOKE && !CHATS && !ISOLATION && !COMPACTION && !DASHBOARD && !DASHBOARD_SHOT && !THEME &&
   !TABBAR && !TABBAR_SHOT && !WAIT && !IMAGES && !VISION && !STYLEGUIDE && !ARTIFACT && !ARTIFACT_SHOT &&
   !PANELSCOPE && !RESUME && !EDITMOD && !COMPOSER && !MODELS_FLOW && !THINKING_FLOW && !COMPOSER_HEIGHT &&
-  !SHARE_FLOW && !SHARE_SHOT && !BANNER_FLOW && !BANNER_SHOT && !EXPORT_SHOT && !UPDATES_FLOW && !UPDATES_SHOT;
+  !SHARE_FLOW && !SHARE_SHOT && !BANNER_FLOW && !BANNER_SHOT && !EXPORT_SHOT && !UPDATES_FLOW && !UPDATES_SHOT && !INTERACT;
 // --editmod-capture writes screenshots, so it wears the capture mask (the untested line is an
 // artefact of the automated profile, not of the product; see HIDE_UNTESTED_LINE).
 const CAPTURING_EDITMOD = EDITMOD_SHOT || COMPOSER_SHOT || EXPORT_SHOT;
@@ -5743,6 +5746,10 @@ async function main() {
       await waitFlow();
       return;
     }
+    if (INTERACT) {
+      await interactFlow({ launch, log });
+      return;
+    }
     if (IMAGES) {
       await imagesFlow();
       return;
@@ -5879,6 +5886,7 @@ async function main() {
       await shareFlow({ launch, openPanel, openSite, log, outDir: OUT_DIR });
       await bannerFlow({ launch, log, outDir: OUT_DIR });
       await updatesFlow({ launch, openPanel, openSite, log, controlBase: CONTROL_BASE });
+      await interactFlow({ launch, log });
       return;
     }
     // The dark set: the design system's own palette, and what the README leads with.
