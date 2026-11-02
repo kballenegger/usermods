@@ -28,6 +28,12 @@ export type InteractMessage =
   | { type: 'highlight'; target?: TargetSpec; mode: 'flash' | 'hold' | 'clear'; label?: string }
   | { type: 'indicator'; state: IndicatorState };
 
+const INTERACT_TYPES: ReadonlySet<string> = new Set<InteractMessage['type']>(['inventory', 'describe', 'act', 'act-cancel', 'highlight', 'indicator']);
+
+export function isInteractMessage(msg: { type: string }): msg is InteractMessage {
+  return INTERACT_TYPES.has(msg.type);
+}
+
 let registry: Registry | null = null;
 
 /** One registry for this document, made on first use: its prefix is the document's identity. */

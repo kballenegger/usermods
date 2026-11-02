@@ -76,8 +76,10 @@ export interface PendingStep {
   at: number;
 }
 
-/** What a resume says when the record holds a pending step. */
-export const PENDING_RESUME_NOTE = 'The last action may or may not have happened. Look at the page before doing anything else.';
+/** What the Resume block says when the record holds a pending step. */
+export function pendingResumeText(step: Pick<PendingStep, 'label'>): string {
+  return `The last action may or may not have happened: ${step.label}. usermods will look at the page before doing anything else.`;
+}
 
 /** Write the step down, before it runs. */
 export function withPending(runs: RunMap, chatId: string, step: Omit<PendingStep, 'at'>, now: number = Date.now()): RunMap {

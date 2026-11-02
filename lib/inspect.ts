@@ -15,6 +15,7 @@
 // parsed page by reading boxes and styles from attributes (see test/inspect.test.ts).
 
 // The .ts extension: see lib/agent/tools.ts. node's test runner loads this file directly.
+import { ACT_OFF } from './buildflags.ts';
 import { durabilityLabel, isGeneratedClass, isVisible, reachFor, selectorFor, trunc } from './snapshot.ts';
 import { deepestOnly, elementsWithText, hasText, queryAllDeep, type DeepMatch } from './waitdom.ts';
 
@@ -291,7 +292,7 @@ function describeMatches(sel: string | undefined, needle: string | undefined, li
     const style = probe.style(el);
     const layout = layoutFacts(style);
     const out = [
-      `${i + 1}. ${s} ${durabilityLabel(s)}${refOf ? ` ref=${refOf(el)}` : ''} [${size(r)} @${Math.round(r.x)},${Math.round(r.y)}]${layout ? ` ${layout}` : ''} ${m.hosts.length ? '(in shadow root) ' : ''}${probe.visible(el) ? '' : '(hidden) '}${trunc((el as HTMLElement).innerText ?? el.textContent ?? '', 120)}`,
+      `${i + 1}. ${s} ${durabilityLabel(s)}${!ACT_OFF && refOf ? ` ref=${refOf(el)}` : ''} [${size(r)} @${Math.round(r.x)},${Math.round(r.y)}]${layout ? ` ${layout}` : ''} ${m.hosts.length ? '(in shadow root) ' : ''}${probe.visible(el) ? '' : '(hidden) '}${trunc((el as HTMLElement).innerText ?? el.textContent ?? '', 120)}`,
     ];
     if (styles.length) out.push(`   ${styles.map((p) => `${p}: ${trunc(style(p), MAX_STYLE_VALUE) || '(none)'}`).join('; ')}`);
     if (i < CHAIN_MATCHES) {

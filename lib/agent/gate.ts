@@ -113,7 +113,8 @@ const ACTIVATES = new Set<Verb>(['click', 'check', 'select', 'press']);
 export function consequentialReasons(d: Described, ctx: GateContext): string[] {
   const reasons: string[] = [];
   if (ctx.verb === 'go') {
-    if (d.go?.kind === 'url' && !(ctx.knownUrls ?? []).some((u) => sameAddress(u, d.go!.kind === 'url' ? d.go!.href : ''))) reasons.push('it goes to an address not seen on this site');
+    const go = d.go;
+    if (go?.kind === 'url' && !(ctx.knownUrls ?? []).some((u) => sameAddress(u, go.href))) reasons.push('it goes to an address not seen on this site');
     return reasons;
   }
   if (!ACTIVATES.has(ctx.verb)) return reasons;

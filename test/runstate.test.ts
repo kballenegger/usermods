@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { activityFor, activityFromEvent, activityText, IDLE_ACTIVITY, STALL_MS } from '../lib/activity.ts';
-import { markInterrupted, nextRunRecord, parseRuns, pruneRuns, resumableRuns, withoutPending, withPending, type RunMap, type RunRecord } from '../lib/runstate.ts';
+import { markInterrupted, nextRunRecord, parseRuns, pendingResumeText, pruneRuns, resumableRuns, withoutPending, withPending, type RunMap, type RunRecord } from '../lib/runstate.ts';
 import { INTERRUPTED_TOOL_SUMMARY, looksUnfinished, reduceItems, settleInterrupted } from '../lib/transcript.ts';
 import type { ChatItem } from '../lib/types.ts';
 
@@ -164,6 +164,10 @@ test('a pending step survives everything that can happen to the record before so
   // A state change on top of it: Resume writes 'running', and a provider failure writes 'failed'.
   assert.deepEqual(nextRunRecord(runs.c, { state: 'running', tabId: 1 }, 10).pending, pending);
   assert.deepEqual(nextRunRecord(runs.c, { state: 'failed', tabId: 1, error: 'no' }, 10).pending, pending);
+});
+
+test('the Resume block names the step and promises to look first', () => {
+  assert.equal(pendingResumeText({ label: 'click button "Place order"' }), 'The last action may or may not have happened: click button "Place order". usermods will look at the page before doing anything else.');
 });
 
 test('a stored pending step that cannot be read still counts as one', () => {
