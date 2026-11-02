@@ -26,6 +26,7 @@ import {
   skillFromSource,
   skillIdentity,
   skillMatchesUrl,
+  skillStepWords,
   stepLine,
   summariseSteps,
   type ParsedSkill,
@@ -726,4 +727,11 @@ test('a plain value holding other whitespace before # comes back whole', () => {
   assert.deepEqual(parseYaml('a: x #y').value, { a: 'x' });
   assert.deepEqual(parseYaml('a: x\t#y').value, { a: 'x' });
   assert.deepEqual(parseYaml('a: "x"\t#y').value, { a: 'x' });
+});
+
+test('a draft\'s step count is its steps, not its bullets', () => {
+  const source = SMALL('').replace('```steps', 'A list:\n- one\n- two\n- three\n\n```steps');
+  assert.equal(skillStepWords(source), '1 step');
+  assert.equal(skillStepWords(SMALL('', '- click: button "A"\n  at: { css: "#a" }\n- click: button "B"\n  at: { css: "#b" }')), '2 steps');
+  assert.equal(skillStepWords('not a skill'), '');
 });

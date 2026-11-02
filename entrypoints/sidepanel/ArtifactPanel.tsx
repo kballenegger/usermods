@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { currentVersion, diffLines, lineCount, type Artifact } from '@/lib/artifact';
 import { ACT_OFF } from '@/lib/buildflags';
+import { skillStepWords } from '@/lib/skills';
 import { DraftSteps } from './Skills';
 import './artifact.css';
 
@@ -98,7 +99,7 @@ export function ArtifactPanel({
 
   /** A draft skill's version holds the whole file, and its panel says what it is in those words. */
   const isSkill = !ACT_OFF && artifact.kind === 'skill';
-  const skillSize = ACT_OFF ? '' : `${(current.code.match(/^- /gm) ?? []).length} steps`;
+  const skillSize = ACT_OFF ? '' : skillStepWords(current.code);
   const saveLabel = !ACT_OFF && isSkill ? (artifact.linkedSkillId ? 'Update skill' : 'Save') : artifact.linkedModId ? 'Update mod' : 'Save';
 
   function commitRename() {

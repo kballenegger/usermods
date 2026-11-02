@@ -969,6 +969,12 @@ export function skillForModel(s: ParsedSkill, own: boolean): string {
   ].join('\n');
 }
 
+/** The draft panel's count, from the steps and not from what looks like a list in the notes. */
+export function skillStepWords(source: string): string {
+  const r = parseSkill(source);
+  return r.ok ? plural(r.skill.steps.length, 'step') : '';
+}
+
 /**
  * The block on a user turn that names the skills matching this page, as modsBlock names the mods. It is
  * enough to choose one and fill its inputs. An installed skill's description is its author's, so a
