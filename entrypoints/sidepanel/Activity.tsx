@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { activityFor, TICK_MS, type ChatActivity, type Phase } from '@/lib/activity';
+import { ACT_OFF } from '@/lib/buildflags';
 import './activity.css';
 
 /**
@@ -22,6 +23,8 @@ export interface ActivityProps {
   tool?: string;
   detail?: string;
   iteration?: number;
+  /** The run has operated the page. */
+  driving?: boolean;
   /** performance.now()-style timestamp of when the current run started. */
   startedAt: number | null;
   /** …and of the last event of any kind from the port. Silence here is what a stall is. */
@@ -66,6 +69,7 @@ export function Activity(props: ActivityProps) {
     tool: props.tool,
     detail: props.detail,
     iteration: props.iteration,
+    ...(!ACT_OFF && props.driving ? { driving: true } : {}),
     elapsed: startedAt == null ? 0 : now - startedAt,
     sinceLastEvent: lastEventAt == null ? 0 : now - lastEventAt,
     writing: props.writing,
@@ -79,7 +83,13 @@ export function Activity(props: ActivityProps) {
   return (
     <div className={`activity${a.tone === 'live' ? '' : ` ${a.tone}`}`} role="status" aria-live="polite">
       {/* The design system's own dot, so a running line reads like a running tool row. */}
-      <span className="dot" aria-hidden="true" />
+      {!ACT_OFF && a.pointer ? (
+        <svg className="pointer-mark" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" shapeRendering="crispEdges">
+          <path fill="currentColor" d="M3 1h2v1h1v1h1v1h1v1h1v1h1v1h1v1h1v2H9v1h1v2H8v-2H7v-1H6v1H5v1H3z" />
+        </svg>
+      ) : (
+        <span className="dot" aria-hidden="true" />
+      )}
       {/* A wait reads "waiting for .result": prose first, identifier second. Everything else leads
           with the identifier ("find_elements #login"), so the order is a property of the line. */}
       {a.labelFirst && a.label && <span className="activity-label">{a.label}</span>}

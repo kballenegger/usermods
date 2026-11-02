@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { ACT_OFF } from '@/lib/buildflags';
 import { isArchived, type Chat } from '@/lib/chats';
 import {
   bulkTargets,
@@ -551,6 +552,11 @@ function ChatRow({
           {chat.editingModName && (
             <span className="badge" data-testid="chat-editing" title={`This chat edits the installed mod “${chat.editingModName}”. Saving its draft rewrites that mod in place.`}>
               editing · {chat.editingModName}
+            </span>
+          )}
+          {!ACT_OFF && !!chat.actions && (
+            <span className="badge" data-testid="chat-actions" title="usermods operated the page in this chat. Open it to see what it did.">
+              on the page · {chat.actions} action{chat.actions === 1 ? '' : 's'}
             </span>
           )}
           {archived && <span className="badge" data-testid="chat-archived">archived</span>}

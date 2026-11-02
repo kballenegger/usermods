@@ -18,6 +18,22 @@ const FLAGGED = [
   'Nothing to operate here', // lib/interact/view.ts
   'one-time code', // lib/interact/describe.ts
   'find_elements to get refs', // lib/interact/delta.ts
+  'Carry out steps on the page', // the act tool, lib/agent/tools.ts
+  'ask_user', // wait_for's handoff, and the prompt
+  '## Operating the page', // the prompt section, lib/agent/prompt.ts
+  'it leaves this site', // the gate, lib/agent/gate.ts
+  'act.answer', // the panel's answer, lib/drive.ts and Chat.tsx
+  'Let usermods operate', // the questions, entrypoints/sidepanel/Operate.tsx
+  'I have done it',
+  'The page left',
+  'Your turn',
+  'Operating pages', // Settings
+  'waiting for you', // the activity line, lib/agent/questions.ts
+  'you left the tab', // lib/agent/driver.ts
+  'page_card', // the events and rows
+  'act_step',
+  'question_done',
+  'keeping a note', // lib/agent/loop.ts
 ];
 
 function bundleText(dir) {
@@ -28,7 +44,7 @@ function bundleText(dir) {
     for (const e of fs.readdirSync(d, { withFileTypes: true })) {
       const p = path.join(d, e.name);
       if (e.isDirectory()) walk(p);
-      else if (/\.(js|html|json)$/.test(e.name)) out.push([path.relative(full, p), fs.readFileSync(p, 'utf8')]);
+      else if (/\.(js|html|json|css)$/.test(e.name)) out.push([path.relative(full, p), fs.readFileSync(p, 'utf8')]);
     }
   };
   walk(full);

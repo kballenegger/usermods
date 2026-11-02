@@ -25,7 +25,10 @@ import type { ThinkingLevel } from '@/lib/thinking';
 import { exportFilename, HANDOFF_KEY, resolveHandoff, type ChatHandoff } from '@/lib/dashboard';
 import { ACCEPT_ATTR, MAX_IMAGES_PER_MESSAGE, capNote, emptyTextFor, type AttachedImage, type ImageThumb } from '@/lib/images';
 import { rpc, type AgentPortRequest } from '@/lib/rpc';
-import { INTERRUPTED_TEXT, RESUME_HINT, RESUME_LABEL, type ResumableRun } from '@/lib/runstate';
+import { INTERRUPTED_TEXT, RESUME_HINT, RESUME_LABEL, pendingResumeText, type ResumableRun } from '@/lib/runstate';
+import { ACT_OFF } from '@/lib/buildflags';
+import type { Answer, Question } from '@/lib/agent/questions';
+import { PageCardRow, QuestionRow, TouchedScript, TouchedSteps } from './Operate';
 import { tombstone } from '@/lib/storagequeue';
 import { lastModel, modelRowText, reduceItems, repairRowGap, settleInterrupted, toolDotClass, toolDotState, toolRowTitle, unqueuedItem } from '@/lib/transcript';
 import type { AgentEvent, ChatItem, ContentEvent, ElementRef, Mod, ModProposal } from '@/lib/types';
@@ -70,7 +73,7 @@ const EMPTY_DRAFT: Draft = { text: '', refs: [], images: [] };
 /** Where the draft of a chat that does not exist yet lives. A chat id is a UUID, so this is safe. */
 const NEW_CHAT_DRAFT = 'new';
 
-export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number | null; pageUrl: string; host: string; onOpenSettings?: () => void }) {
+export function Chat({ tabId, pageUrl, host: liveHost, onOpenSettings }: { tabId: number | null; pageUrl: string; host: string; onOpenSettings?: () => void }) {
   const [chats, setChats] = useState<ChatRecord[]>([]);
   const [chatId, setChatId] = useState<string | null>(null);
   const [items, setItems] = useState<ChatItem[]>([]);
@@ -103,6 +106,8 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
    * switching to a running chat shows that chat's real progress rather than starting from nothing.
    */
   const [activities, setActivities] = useState<ReadonlyMap<string, ChatActivity>>(() => new Map());
+  /** What each chat's run is waiting for the user to answer. One at a time, per chat. */
+  const [questions, setQuestions] = useState<ReadonlyMap<string, Question>>(() => new Map());
   /**
    * Chats whose last run stopped short with its progress saved — the model request failed for good,
    * or the run died with the service worker — and can be carried on with Resume. Per chat, like
@@ -198,6 +203,15 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
   const genRef = useRef(0);
   /** Whether the title-refetch after the first accepted turn has already been done for this run. */
   const titleFixRef = useRef(false);
+  /**
+   * While a run holds this tab, the panel stays on that run's chat, whatever host the page goes to:
+   * the question about the page leaving the site has to be on screen when the page has left it. The
+   * host catches up when the hold ends.
+   */
+  const heldHostRef = useRef(liveHost);
+  const held = !ACT_OFF && chatIdHeld(chatId, activities, questions);
+  if (!held) heldHostRef.current = liveHost;
+  const host = heldHostRef.current;
   /** The current host, readable from the port listener, which is registered once and outlives renders. */
   const hostRef = useRef(host);
   hostRef.current = host;
@@ -528,6 +542,7 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
       // below, and for off-screen chats too: a run the user is not watching still has to have its
       // progress recorded, so switching to it shows where it actually is rather than nothing.
       setActivities((prev) => withActivity(prev, e.chatId, (a) => activityFromEvent(a, e)));
+      if (!ACT_OFF) setQuestions((prev) => questionsAfter(prev, e));
 
       // Route by the event's own chat, never by "the chat this port last started". One port serves
       // the whole panel, and the panel may well be showing a different chat than the one running.
@@ -645,6 +660,7 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
       resumableRef.current = nextResumable;
       setResumable(nextResumable);
       setRunningChats((prev) => new Set([...prev, ...running]));
+      if (!ACT_OFF) setQuestions(new Map(Object.entries(state.questions ?? {})));
       const now = Date.now();
       setActivities((prev) => {
         const next = new Map<string, ChatActivity>();
@@ -935,6 +951,11 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
   function abort() {
     if (!chatId) return;
     portRef.current?.postMessage({ type: 'abort', chatId } satisfies AgentPortRequest);
+    // A step in flight finishes first, so a driving line says that rather than going quiet.
+    if (!ACT_OFF && activities.get(chatId)?.driving) {
+      setActivities((prev) => withActivity(prev, chatId, (a) => ({ ...a, phase: 'waiting-user', detail: 'stopping · finishing the current step' })));
+      return;
+    }
     // Only this chat's line goes quiet. The background still posts this chat's 'idle'/'done', but
     // clearing here means the button the user just pressed has a visible effect immediately.
     setActivities((prev) => withoutActivity(prev, chatId));
@@ -1450,6 +1471,11 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
    */
   const resumeBlock = resumeState ? (
     <div className="resume" data-testid="resume" data-resume-state={resumeState.state}>
+      {!ACT_OFF && resumeState.pending && (
+        <span className="resume-hint" data-testid="resume-pending">
+          {pendingResumeText(resumeState.pending)}
+        </span>
+      )}
       <span className="resume-hint">{RESUME_HINT}</span>
       <button className="btn primary" data-action="resume" onClick={resume} disabled={tabId == null || unsupported}>
         {RESUME_LABEL}
@@ -1637,6 +1663,7 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
           const fold = folds.get(i);
           if (fold === 'folded') return null;
           if (fold) return <StepsRow key={i} tools={fold.map((n) => items[n]).filter((t): t is ToolItem => t?.kind === 'tool')} />;
+          if (!ACT_OFF && it.kind === 'page_card') return <PageCardRow key={i} card={it.card} />;
           switch (it.kind) {
             case 'user':
               return (
@@ -1868,9 +1895,14 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
           )}
         </div>
       )}
+      {!ACT_OFF && chatId && questions.get(chatId) && (
+        // The one route an answer has: an RPC, which the background takes only from an extension page.
+        <QuestionRow question={questions.get(chatId)!} onAnswer={(answer: Answer) => void rpc({ type: 'act.answer', chatId, questionId: questions.get(chatId)!.id, answer }).catch(() => {})} onStop={abort} />
+      )}
       <Activity
         phase={activity.phase}
         tool={activity.tool}
+        {...(!ACT_OFF && activity.driving ? { driving: true } : {})}
         detail={activity.detail}
         iteration={activity.iteration}
         startedAt={activity.startedAt}
@@ -2381,6 +2413,21 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
  *
  * The name comes off the chat index mirror (Chat.editingModName), so this costs no extra read.
  */
+/** Is this chat's run holding the panel on it? Once it has operated the page, or asked the user. */
+function chatIdHeld(chatId: string | null, activities: ReadonlyMap<string, ChatActivity>, questions: ReadonlyMap<string, Question>): boolean {
+  return !!chatId && (activities.get(chatId)?.driving === true || questions.has(chatId));
+}
+
+/** One event's effect on what the chats are waiting for the user to answer. */
+function questionsAfter(prev: ReadonlyMap<string, Question>, e: AgentEvent): ReadonlyMap<string, Question> {
+  if (e.type === 'question') return new Map(prev).set(e.chatId, e.question);
+  const up = prev.get(e.chatId);
+  if (!up || !(e.type === 'done' || (e.type === 'question_done' && e.id === up.id))) return prev;
+  const next = new Map(prev);
+  next.delete(e.chatId);
+  return next;
+}
+
 function chatOptionLabel(c: ChatRecord): string {
   // The mod comes BEFORE the relative time, and the time is dropped entirely when there is one.
   //
@@ -2460,6 +2507,8 @@ type ToolItem = Extract<ChatItem, { kind: 'tool' }>;
  * dot, not the coral one: the page did not do the thing, which is a result, not a failure.
  */
 function ToolRow({ item }: { item: ToolItem }) {
+  if (!ACT_OFF && item.steps?.length) return <TouchedSteps steps={item.steps} finished={item.summary !== undefined} />;
+  if (!ACT_OFF && item.effect) return <TouchedScript effect={item.effect} {...(typeof item.input.code === 'string' ? { code: item.input.code } : {})} {...(item.summary ? { summary: item.summary } : {})} isError={!!item.isError} />;
   return (
     <details className={`tool${item.isError ? ' error' : ''}`}>
       <summary>

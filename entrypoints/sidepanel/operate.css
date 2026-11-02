@@ -1,0 +1,150 @@
+/*
+ * A run that operates the page. Everything is built from the design system's own parts: the question
+ * rows are rows of the chat column (nothing in the panel is a modal), on --surface-2 with a rail and
+ * a word, and a touched row differs from a looked row by mark, rail and typeface at once, so none of
+ * it rests on colour.
+ */
+
+.question {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--surface-2);
+  border-top: 1px solid var(--border-hair);
+  border-left: var(--border-width) solid var(--primary);
+  font: 400 var(--fs-meta) / 1.45 var(--font-ui);
+  color: var(--text-1);
+  overflow-wrap: anywhere;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.question.warn {
+  border-left-color: var(--warn);
+}
+.question p {
+  margin: 0;
+}
+.question-head {
+  font: 400 var(--fs-meta) / 1.35 var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.question-headline {
+  font-family: var(--font-mono);
+}
+.question-where {
+  color: var(--text-2);
+}
+.question-check {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--text-2);
+}
+.question-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-3);
+}
+.question-code pre {
+  margin: var(--sp-2) 0 0;
+  max-height: 180px;
+  overflow: auto;
+  font: 400 var(--fs-meta) / 1.4 var(--font-mono);
+}
+.question-code summary {
+  cursor: pointer;
+  color: var(--text-2);
+}
+
+/* Touched: the pixel pointer takes the dot's place and its state colours, on the primary rail, in the text face. */
+.tool.touched {
+  border-left-color: var(--primary);
+  color: var(--text-1);
+}
+.tool.touched summary {
+  grid-template-columns: 16px 1fr;
+  font-family: var(--font-ui);
+}
+.pointer-mark {
+  display: block;
+  color: var(--primary);
+  margin-top: 1px;
+}
+.tool.touched.is-running .pointer-mark {
+  animation: activity-pulse 1s ease-in-out infinite;
+}
+.tool.touched.is-declined,
+.tool.touched.is-stopped {
+  border-left-color: var(--warn);
+}
+.tool.touched.is-declined .pointer-mark,
+.tool.touched.is-stopped .pointer-mark {
+  color: var(--warn);
+}
+.tool.touched.is-failed {
+  border-left-color: var(--error);
+}
+.tool.touched.is-failed .pointer-mark {
+  color: var(--error);
+}
+.touched-detail {
+  margin: var(--sp-1) 0 0;
+  color: var(--text-2);
+}
+
+/* The card holds what was recorded and nothing else. It is a plain card: the accent edge is the proposal's. */
+.page-card {
+  gap: var(--sp-1);
+}
+.page-card-line {
+  margin: 0;
+  font-size: var(--fs-meta);
+  color: var(--text-2);
+}
+.page-card-list {
+  margin: var(--sp-2) 0;
+  padding-left: var(--sp-5);
+  font-size: var(--fs-meta);
+}
+
+.activity .pointer-mark {
+  flex: none;
+  animation: activity-pulse 1s ease-in-out infinite;
+}
+
+.operating-list {
+  list-style: none;
+  margin: var(--sp-2) 0;
+  padding: 0;
+}
+.operating-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-1) 0;
+  overflow-wrap: anywhere;
+}
+.operating-host {
+  font-family: var(--font-mono);
+}
+.operating-switch {
+  display: block;
+  margin-top: var(--sp-3);
+}
+.settings-subhead {
+  font: 400 var(--fs-meta) / 1.35 var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .activity .pointer-mark,
+  .tool.touched.is-running .pointer-mark {
+    animation: none;
+  }
+}
