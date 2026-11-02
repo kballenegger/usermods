@@ -108,7 +108,7 @@ function readQuoted(s: string, from: number, no: number): { value: string; end: 
 /** Nothing may follow a value but a comment. */
 function expectEnd(s: string, from: number, no: number): void {
   const rest = s.slice(from);
-  if (rest.trim() && !/^\s+#/.test(rest)) throw new YamlError(no, `unexpected text after the value: ${rest.trim().slice(0, 40)}`);
+  if (rest.trim() && !/^[ \t]+#/.test(rest)) throw new YamlError(no, `unexpected text after the value: ${rest.trim().slice(0, 40)}`);
 }
 
 /** A plain scalar's text as a value. */
@@ -213,7 +213,8 @@ function readInline(s: string, no: number): YamlValue {
     expectEnd(s, r.end, no);
     return r.value;
   }
-  const hash = s.search(/\s#/);
+  // Only a space or a tab opens a comment, as in YAML: a value can hold a no-break space before a #.
+  const hash = s.search(/[ \t]#/);
   const text = hash >= 0 ? s.slice(0, hash).trim() : s;
   return plainValue(text, no);
 }
@@ -346,7 +347,8 @@ const UNPRINTABLE = /[\u0000-\u001f\u007f-\u009f\u2028\u2029\ufeff\ud800-\udfff]
 function blockPlainOk(s: string): boolean {
   if (!s || s !== s.trim() || READS_AS_OTHER.test(s) || UNPRINTABLE.test(s)) return false;
   if (/^[-?:,[\]{}#&*!|>'"%@`]/.test(s)) return false;
-  return !/:( |$)| #/.test(s);
+  // \s and not only a space: this file may be read by another YAML reader, and it costs a pair of quotes.
+  return !/:(\s|$)|\s#/.test(s);
 }
 
 /** Stricter inside braces, where commas and brackets mean something. */

@@ -15,7 +15,7 @@
 // Pure: no chrome.*, no DOM, tested under node (test/skills.test.ts).
 
 // The .ts extensions: see lib/agent/tools.ts. node's test runner loads this file directly.
-import { consequentialReasons, type Verb } from './agent/gate.ts';
+import { CHECKABLE_ROLES, consequentialReasons, type Verb } from './agent/gate.ts';
 import { parseCondition } from './agent/wait.ts';
 import type { Described } from './interact/describe';
 import { sensitiveWords } from './interact/describe.ts';
@@ -214,7 +214,10 @@ function findStepsFence(body: string[], bodyLine: number): { open: number; close
 }
 
 const CONTROL_CHARS = /[\u0000-\u001f\u007f\u200e\u200f‪-‮⁦-⁩]/;
-const INPUT_NAME = /^[A-Za-z_][A-Za-z0-9_-]*$/;
+/** A name is an identifier, not a place for a sentence: inputs' and outputs' names are shown to a model. */
+const INPUT_NAME = /^[A-Za-z_][A-Za-z0-9_-]{0,63}$/;
+/** What a version looks like. It goes to a model on every turn on this site, so anything else is refused. */
+const VERSION = /^[\w.+~-]{1,64}$/;
 const REFERENCE = /^\$([A-Za-z_][A-Za-z0-9_-]*)$/;
 const TARGET = /^([a-z][a-z0-9-]*)(?: "((?:[^"\\]|\\.)*)")?$/;
 const WAIT_KEYS = new Set(['selector', 'state', 'count', 'text', 'gone', 'url', 'load', 'idle', 'quiet_ms', 'ms']);
@@ -232,6 +235,13 @@ const STEP_KEYS: Record<SkillVerb, ReadonlySet<string>> = {
   wait: new Set(['timeout_ms', 'when']),
   ask: new Set(['until', 'when']),
   read: new Set(['from', 'take', 'each', 'why', 'when']),
+};
+
+const CHECKABLE_TARGET = (target: string) => CHECKABLE_ROLES.has(parseTarget(target)?.role ?? '');
+
+/** Refuse a one-line field with a line break or a direction mark in it. The preview and a model both read these. */
+const oneLineOnly = (v: unknown, what: string, err: (m: string) => void) => {
+  if (typeof v === 'string' && CONTROL_CHARS.test(v)) err(`${what} holds characters that could hide what it says`);
 };
 
 const isMap = (v: unknown): v is YamlMap => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -261,6 +271,7 @@ function parseAt(v: YamlValue | undefined, err: (m: string) => void): SkillAt | 
   if (v['in'] !== undefined) {
     if (typeof v['in'] === 'string') at.in = v['in'];
     else err('at.in must be a string');
+    oneLineOnly(v['in'], 'at.in', err);
   }
   if (v['nth'] !== undefined) {
     if (Number.isInteger(v['nth']) && (v['nth'] as number) >= 0) at.nth = v['nth'] as number;
@@ -360,6 +371,7 @@ function parseStep(raw: YamlValue, err: (m: string) => void): SkillStep | null {
     case 'press': {
       const key = typedValue(value);
       if (!key) err('press needs a key, such as Enter');
+      oneLineOnly(key, 'press', err);
       if (raw['into'] === undefined) {
         if (raw['at'] !== undefined) err('press has an at but no into');
         return key ? { verb, key, ...base } : null;
@@ -377,6 +389,7 @@ function parseStep(raw: YamlValue, err: (m: string) => void): SkillStep | null {
         err('go needs a URL on the site, or back, forward, reload');
         return null;
       }
+      oneLineOnly(value, 'go', err);
       return { verb, to: value, ...base };
     }
     case 'wait': {
@@ -401,6 +414,7 @@ function parseStep(raw: YamlValue, err: (m: string) => void): SkillStep | null {
       }
       const from = raw['from'];
       if (typeof from !== 'string' || !from) err('read needs a from selector');
+      oneLineOnly(from, 'from', err);
       const take = raw['take'] ?? 'text';
       if (typeof take !== 'string' || !/^[a-zA-Z][\w:-]*$/.test(take)) err('take must be text, href, src or an attribute name');
       // What a field holds never goes to the model (lib/snapshot.ts valueIsSafe), and outputs do.
@@ -428,6 +442,7 @@ function parseInputs(v: YamlValue | undefined, lines: Record<string, number>, er
       continue;
     }
     for (const k of Object.keys(raw)) if (!['label', 'example', 'optional', 'kind', 'options'].includes(k)) err(`has a key this format does not know: ${k}`);
+    oneLineOnly(raw['label'], 'its label', err);
     const input: SkillInput = { label: raw['label'] };
     const example = typedValue(raw['example']);
     if (example !== null) input.example = example;
@@ -464,6 +479,7 @@ function parseOutputs(v: YamlValue | undefined, lines: Record<string, number>, e
       continue;
     }
     for (const k of Object.keys(raw)) if (k !== 'label' && k !== 'list') err(`has a key this format does not know: ${k}`);
+    oneLineOnly(raw['label'], 'its label', err);
     const output: SkillOutput = { label: raw['label'] };
     if (raw['list'] !== undefined) {
       if (typeof raw['list'] === 'boolean') output.list = raw['list'];
@@ -508,8 +524,10 @@ export function parseSkill(source: string): ParseResult {
   const description = required('description');
   const version = required('version');
   const start = required('start');
-  if (CONTROL_CHARS.test(name)) errs.push({ line: at('name'), message: 'name holds characters that could hide what it says' });
-  if (CONTROL_CHARS.test(description)) errs.push({ line: at('description'), message: 'description holds characters that could hide what it says' });
+  for (const [key, value] of [['name', name], ['description', description], ['start', start], ['namespace', scalarText(front['namespace'])], ['license', scalarText(front['license'])]] as const) {
+    oneLineOnly(value, key, (message) => errs.push({ line: at(key), message }));
+  }
+  if (version.trim() && !VERSION.test(version)) errs.push({ line: at('version'), message: 'version must be letters, digits and . + ~ - _, at most 64 of them, such as 1.0.0' });
 
   const rawMatch = front['match'];
   const list = Array.isArray(rawMatch) ? rawMatch : typeof rawMatch === 'string' ? [rawMatch] : [];
@@ -799,6 +817,7 @@ export function siteOf(host: string): string {
 /** Why a pattern is wider than one site, or null. */
 function tooWide(p: Pattern): string | null {
   if (!p.host) return 'it covers every site';
+  if (p.host.endsWith('.')) return 'a host with a final dot is not a name this format takes';
   if (!p.subdomains) return null;
   if (IS_ADDRESS.test(p.host)) return 'an address has no subdomains';
   const labels = p.host.split('.');
@@ -852,31 +871,65 @@ export function stepLine(s: SkillStep): string {
   }
 }
 
-/**
- * A step as the model may read it outside a repair. `own` is a file written on this device; in anyone
- * else's, the fixed values, a Your turn's words and what a wait looks for are that person's, and stay out.
- * A `why` stays out of both, because it is the model's words back at it and has no power either way.
- */
-function modelLine(s: SkillStep, own: boolean): string {
-  if (own) return stepLine(s);
-  switch (s.verb) {
-    case 'fill':
-      return `fill ${s.target}${inPlace(s.at)} with ${REFERENCE.test(s.value) ? s.value : 'a fixed value'}`;
-    case 'select':
-      return `choose ${REFERENCE.test(s.value) ? s.value : 'a fixed value'} in ${s.target}${inPlace(s.at)}`;
-    case 'wait':
-      return 'wait for the page';
-    case 'ask':
-      return 'your turn: the user does this one';
-    default:
-      return stepLine(s);
-  }
-}
-
 const oneLine = (s: string, max: number) => {
   const flat = s.replace(/\s+/g, ' ').trim();
   return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
 };
+
+/** A target for a model: the role, and the name quoted and clipped. */
+function targetWords(target: string): string {
+  const t = parseTarget(target);
+  if (!t) return 'an element';
+  return `${oneLine(t.role, 30)}${t.name ? ` ${JSON.stringify(oneLine(t.name, 80))}` : ''}`;
+}
+
+/** An address for a model: as the URL parser writes it, so a space in one is not a sentence. */
+const addressWords = (to: string, start: string) => {
+  const url = resolveGo(to, start);
+  return url ? oneLine(url, 160) : 'an address';
+};
+
+/** A key that does not read as a key is someone's words. */
+const keyWords = (key: string) => (key === ' ' || /^\S{1,16}$/.test(key) ? key : 'a key');
+
+/** A version for a model. A stored record has been through the parser, and this does not take its word for it. */
+const versionWords = (v: string) => (VERSION.test(v) ? v : 'unknown');
+
+/**
+ * A step as the model may read it outside a repair, on one line. `own` is a file written on this device,
+ * and its words are read as written. Anyone else's file is told by what it does: its fixed values, a Your
+ * turn's words, what a wait looks for, its selectors and the places it names are that person's, and stay
+ * out; a name is quoted and clipped. A `why` stays out of both, because it is the model's words back at it
+ * and has no power either way.
+ */
+function modelLine(s: SkillStep, own: boolean, start: string): string {
+  if (own) return oneLine(stepLine(s), 300);
+  switch (s.verb) {
+    case 'click':
+      return `click ${targetWords(s.target)}${s.repeat ? ` · up to ${s.repeat} times` : ''}`;
+    case 'fill':
+      return `fill ${targetWords(s.target)} with ${REFERENCE.test(s.value) ? s.value : 'a fixed value'}`;
+    case 'select':
+      return `choose ${REFERENCE.test(s.value) ? s.value : 'a fixed value'} in ${targetWords(s.target)}`;
+    case 'check':
+      return `${s.checked === false ? 'untick' : 'tick'} ${targetWords(s.target)}`;
+    case 'press':
+      return `press ${keyWords(s.key)}${s.target ? ` in ${targetWords(s.target)}` : ''}`;
+    case 'hover':
+      return `hover ${targetWords(s.target)}`;
+    case 'scroll_to':
+      return `scroll to ${targetWords(s.target)}`;
+    case 'go':
+      return `go ${isHistoryGo(s.to) ? s.to : addressWords(s.to, start)}`;
+    case 'wait':
+      return 'wait for the page';
+    case 'ask':
+      return 'your turn: the user does this one';
+    case 'read':
+      return `read into ${s.output}`;
+  }
+}
+
 
 /**
  * A skill as the model reads it when it is not repairing one: what it does, and none of what it says.
@@ -888,13 +941,13 @@ export function skillForModel(s: ParsedSkill, own: boolean): string {
   return [
     `name: ${JSON.stringify(oneLine(s.name, 120))}`,
     ...(own ? [`description: ${JSON.stringify(oneLine(s.description, 300))}`] : []),
-    `version: ${s.version}`,
-    `match: ${s.matches.join(', ')}`,
-    `start: ${s.start}`,
+    `version: ${versionWords(s.version)}`,
+    `match: ${s.matches.map((m) => oneLine(m, 120)).join(', ')}`,
+    `start: ${addressWords(s.start, s.start)}`,
     `inputs: ${list(s.inputs)}`,
     `outputs: ${list(s.outputs)}`,
     'steps:',
-    ...s.steps.map((step, i) => `${i + 1}. ${modelLine(step, own)}`),
+    ...s.steps.map((step, i) => `${i + 1}. ${modelLine(step, own, s.start)}`),
   ].join('\n');
 }
 
@@ -911,7 +964,7 @@ export function skillsBlock(skills: readonly Skill[], url: string, editingId?: s
     const inputs = Object.entries(s.inputs).map(([k, v]) => `${k}${v.optional ? ' (optional)' : ''}`);
     const parts = [
       `- id=${s.id} ${JSON.stringify(oneLine(s.name, 60))}`,
-      `v${s.version}`,
+      `v${versionWords(s.version)}`,
       `${s.steps.length} step${s.steps.length === 1 ? '' : 's'}`,
       `inputs: ${inputs.join(', ') || 'none'}`,
       `outputs: ${Object.keys(s.outputs).join(', ') || 'none'}`,
@@ -1071,7 +1124,7 @@ function checkSemantics(skill: ParsedSkill, lines: SkillLines, source: string): 
     const name = v ? REFERENCE.exec(v)?.[1] : undefined;
     if (!name) return;
     used.add(name);
-    if (!(name in skill.inputs)) out.push({ line, message: `step ${n} refers to $${name}, which no input declares` });
+    if (!Object.hasOwn(skill.inputs, name)) out.push({ line, message: `step ${n} refers to $${name}, which no input declares` });
   };
   skill.steps.forEach((s, i) => {
     const n = i + 1;
@@ -1087,9 +1140,10 @@ function checkSemantics(skill: ParsedSkill, lines: SkillLines, source: string): 
       const field = /type\s*=\s*["']?password/i.test(s.at?.css ?? '') ? 'password' : /autocomplete\s*=\s*["']?one-time-code/i.test(s.at?.css ?? '') ? 'one-time code' : /autocomplete\s*=\s*["']?cc-/i.test(s.at?.css ?? '') ? 'card' : sensitiveWords(said);
       if (field && (s.verb !== 'press' || s.target)) out.push({ line, message: `step ${n} types into a ${field} field. usermods never does, and a skill cannot ask it to` });
     }
+    if (s.verb === 'check' && !CHECKABLE_TARGET(s.target)) out.push({ line, message: `step ${n} ticks ${s.target}, which is not something that can be ticked` });
     if (s.verb === 'read') {
       read.add(s.output);
-      if (!(s.output in skill.outputs)) out.push({ line, message: `step ${n} reads into ${s.output}, which no output declares` });
+      if (!Object.hasOwn(skill.outputs, s.output)) out.push({ line, message: `step ${n} reads into ${s.output}, which no output declares` });
     }
   });
   for (const name of Object.keys(skill.inputs)) if (!used.has(name)) out.push({ line: lines.front[`inputs/${name}`] ?? front('inputs'), message: `input ${name} is declared and no step uses it` });
@@ -1312,7 +1366,7 @@ export function makeItAnInput(source: string, stepIndex: number): string | null 
   if (!step || (step.verb !== 'fill' && step.verb !== 'select') || REFERENCE.test(step.value)) return null;
   const label = parseTarget(step.target)?.name || step.target;
   const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-  const base = /^[a-z_]/.test(slug) ? slug : `value${slug ? `_${slug}` : ''}`;
+  const base = (/^[a-z_]/.test(slug) ? slug : `value${slug ? `_${slug}` : ''}`).slice(0, 50);
   let name = base;
   for (let i = 2; name in r.skill.inputs; i++) name = `${base}_${i}`;
   step.value = `$${name}`;

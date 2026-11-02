@@ -114,7 +114,7 @@ const MIN_QUOTED = 3;
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
 
 function uniqueName(wanted: string, fallback: string, taken: Set<string>): string {
-  const clean = slug(wanted);
+  const clean = slug(wanted).slice(0, 50);
   const base = /^[a-z_]/.test(clean) ? clean : clean ? `${fallback}_${clean}` : fallback;
   let name = base;
   for (let i = 2; taken.has(name); i++) name = `${base}_${i}`;

@@ -1288,7 +1288,7 @@ async function runSkillForModel(chatId: string, tabId: number, parent: Driver, s
   const host = hostOf(here);
   const siteAllowed = await drive!.siteAllowed(chatId, host);
   // What the model suggested for what the file declares, and nothing else.
-  const suggested = Object.fromEntries(Object.entries(values).filter(([k]) => k in skill.inputs));
+  const suggested = Object.fromEntries(Object.entries(values).filter(([k]) => Object.hasOwn(skill.inputs, k)));
   const answer = await parent.ask({ kind: 'run-skill', id: crypto.randomUUID(), skill, values: suggested, siteAllowed, host }, signal);
   if (!answer) return { text: 'Stopped by the user.', isError: false };
   if (answer.kind !== 'run') {
@@ -1296,7 +1296,7 @@ async function runSkillForModel(chatId: string, tabId: number, parent: Driver, s
     return { text: 'The user chose not to run it. Nothing ran. Do not do the same steps another way unless they ask.', isError: false };
   }
   if (!siteAllowed) await drive!.allowSiteFor(chatId, host, answer.standing === true);
-  const declared = Object.fromEntries(Object.entries(answer.inputs).filter(([k, v]) => k in skill.inputs && v.trim()));
+  const declared = Object.fromEntries(Object.entries(answer.inputs).filter(([k, v]) => Object.hasOwn(skill.inputs, k) && v.trim()));
   const driver = drive!.driverFor(chatId, tabId);
   try {
     const result = await carrySkill(chatId, tabId, driver, skill, { inputs: declared, outputs: {} }, signal, post, toolId, { byModel: true });

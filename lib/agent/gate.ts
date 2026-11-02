@@ -19,6 +19,9 @@ export type Verb = 'click' | 'fill' | 'select' | 'check' | 'press' | 'hover' | '
 /** A control or link whose name or path holds one of these, as a whole word, is consequential. */
 export const CONSEQUENTIAL_WORDS: ReadonlySet<string> = new Set(['send', 'post', 'publish', 'pay', 'buy', 'purchase', 'order', 'checkout', 'delete', 'remove', 'cancel', 'unsubscribe', 'confirm', 'transfer']);
 
+/** What `check` is for. It presses the element, so on anything else it is a click under another name. */
+export const CHECKABLE_ROLES: ReadonlySet<string> = new Set(['checkbox', 'radio', 'switch', 'menuitemcheckbox', 'menuitemradio']);
+
 /** What the user has answered, for this chat on this site. lib/agent/allowances.ts holds them. */
 export interface GateAllowances {
   /** usermods may operate this site, standing or for this chat. */
