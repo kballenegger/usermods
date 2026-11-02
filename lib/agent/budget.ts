@@ -5,6 +5,8 @@
 // "do not over-investigate", makes twelve get_page calls anyway, and nothing ever contradicts it.
 // A counter the loop keeps, surfaced in the conversation at the moment it matters, is.
 
+import { ACT_OFF } from '../buildflags.ts';
+
 /** The hard cap on model round-trips in one turn. */
 export const MAX_ITERATIONS = 30;
 
@@ -15,7 +17,7 @@ export const WRAPUP_AT = 5;
 export const READ_TOOLS = new Set(['get_page', 'find_elements', 'get_styles', 'screenshot']);
 
 /** Tools that count as acting, and so reset the read counter. */
-export const ACT_TOOLS = new Set(['run_script', 'test_mod', 'propose_mod']);
+export const ACT_TOOLS = new Set(['run_script', 'test_mod', 'propose_mod', ...(ACT_OFF ? [] : ['act'])]);
 
 /**
  * wait_for is in NEITHER set, deliberately, and this constant exists to say so out loud.
@@ -37,8 +39,10 @@ export const ACT_TOOLS = new Set(['run_script', 'test_mod', 'propose_mod']);
  * Nor is it an act: adopting a draft proves nothing about the page, so it must not clear a streak
  * of get_page calls that had earned a nudge. It is idempotent and bounded by the mods on the page,
  * so there is nothing here to overuse.
+ *
+ * note is neutral too: writing down what was collected neither looks at the page nor changes it.
  */
-export const NEUTRAL_TOOLS = new Set(['wait_for', 'open_mod']);
+export const NEUTRAL_TOOLS = new Set(['wait_for', 'open_mod', ...(ACT_OFF ? [] : ['note'])]);
 
 /** More than this many whole page reads with nothing acted on earns a nudge. */
 export const READ_BUDGET = 3;

@@ -1,3 +1,4 @@
+import { ACT_OFF } from '../buildflags.ts';
 import type { ToolDef } from '../types';
 // The .ts extension is needed because this is a VALUE import and `npm test` loads these files
 // under node --experimental-strip-types, whose resolver does not guess extensions. tsconfig sets
@@ -61,7 +62,84 @@ export function toolsFor(canSeeImages: boolean): ToolDef[] {
   return TOOLS.map((t) => (t.name === 'screenshot' ? { ...t, description: SCREENSHOT_DESCRIPTION_BLIND } : t));
 }
 
-export const TOOLS: ToolDef[] = [
+/**
+ * What a build that can operate pages adds: `act` and `note`, `ask_user` on wait_for, and the
+ * inventory on find_elements. `TOOLS` is the list unchanged when the flag is off, and this function
+ * is dropped with the branch that calls it.
+ */
+function withActing(base: ToolDef[]): ToolDef[] {
+  const extended = base.map((t) => {
+    if (t.name === 'find_elements') {
+      const schema = t.inputSchema as { properties: Record<string, unknown> };
+      return {
+        ...t,
+        description: `${t.description} Each match carries a ref for act. operable: true lists what can be clicked or typed into, scoped by selector.`,
+        inputSchema: { ...t.inputSchema, properties: { ...schema.properties, operable: { type: 'boolean', description: 'List what can be operated, with refs, under the selector or on the whole page. Needs no text.' } } },
+      };
+    }
+    if (t.name === 'wait_for') {
+      const schema = t.inputSchema as { properties: Record<string, unknown> };
+      return {
+        ...t,
+        description: `${t.description} With ask_user it hands the page to the user: they see your words, and it ends when the condition holds or they say they are done, however long that takes. Use it for a login, a code, a captcha, a card number.`,
+        inputSchema: { ...t.inputSchema, properties: { ...schema.properties, ask_user: { type: 'string', description: 'What the user should do, in one sentence. Any condition is then optional.' } } },
+      };
+    }
+    return t;
+  });
+  return [
+    ...extended,
+    {
+      name: 'act',
+      description:
+        'Carry out steps on the page for the user: click, type, choose, go. Steps run in order and stop at the first that does not happen. Returns what changed. The user may be asked first, and may say no. A target is a ref from find_elements, or a selector that matches exactly one element.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          steps: {
+            type: 'array',
+            minItems: 1,
+            maxItems: 20,
+            items: {
+              type: 'object',
+              properties: {
+                do: { type: 'string', enum: ['click', 'fill', 'select', 'check', 'press', 'hover', 'scroll_to', 'go'] },
+                target: { type: 'string', description: 'A ref such as k3e14, or a selector matching one element. Not for go; press without one goes to whatever has focus.' },
+                text: { type: 'string', description: 'fill: what to type. select: the option. check: "off" to untick. press: the key, such as Enter. go: a URL on this site, or back, forward, reload.' },
+                repeat: { type: 'integer', description: 'Click only, at most 50: click, find the same control again, and stop when none is left.' },
+              },
+              required: ['do'],
+              additionalProperties: false,
+            },
+          },
+          description: { type: 'string', description: 'One line saying what these steps are for. The user sees it labelled as yours.' },
+          then_wait: {
+            type: 'object',
+            description: 'Optional. After the last step, wait for this condition before returning. Same shape as wait_for.',
+            properties: { ...WAIT_CONDITION_PROPERTIES, timeout_ms: { type: 'integer', description: `Default 5000, max ${MAX_TIMEOUT_MS}.` } },
+            additionalProperties: false,
+          },
+        },
+        required: ['steps', 'description'],
+        additionalProperties: false,
+      },
+    },
+    {
+      name: 'note',
+      description: 'Your scratchpad in this chat. It comes back on every user turn and survives compaction and navigation, so put collected data here.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          set: { type: 'string', description: 'Replace the note with this.' },
+          append: { type: 'string', description: 'Add this as a new line.' },
+        },
+        additionalProperties: false,
+      },
+    },
+  ];
+}
+
+const BASE_TOOLS: ToolDef[] = [
   {
     name: 'get_page',
     description:
@@ -199,3 +277,5 @@ export const TOOLS: ToolDef[] = [
     },
   },
 ];
+
+export const TOOLS: ToolDef[] = ACT_OFF ? BASE_TOOLS : withActing(BASE_TOOLS);

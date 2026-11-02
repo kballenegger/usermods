@@ -1,12 +1,14 @@
 // Persistent chats. A chat is scoped to a site (host) and lives in chrome.storage.local so it
-// survives side-panel reloads and browser restarts. One index plus four keys per chat:
+// survives side-panel reloads and browser restarts. One index plus these keys per chat:
 //   'chats'              — Chat[] metadata index, newest activity first
 //   'chat:<id>:messages' — Msg[] model history, written by the background worker
 //   'chat:<id>:items'    — ChatItem[] panel transcript, written by the side panel
 //   'chat:<id>:blobs'    — full-size attached images by content hash (lib/blobs.ts)
 //   'chat:<id>:artifact' — Artifact draft mod (lib/artifact.ts), written by the background
+//   'chat:<id>:note'     — the note tool's scratchpad (lib/agent/note.ts), written by the background
 // chatKeys() below is the single list of the per-chat keys, so deleting a chat cannot leave one.
 import { artifactKey } from './artifact.ts';
+import { ACT_OFF } from './buildflags.ts';
 import { referencedHashes } from './blobs.ts';
 import { blobsKey, elidedImageNote, type AttachedImage } from './images.ts';
 import { trySet } from './quota.ts';
@@ -105,6 +107,11 @@ export interface Chat {
    */
   editingModId?: string;
   editingModName?: string;
+  /**
+   * How many things usermods has done on a page in this chat, for the dashboard's badge. Written at
+   * the end of a run by the background, from what the extension recorded, never from the model.
+   */
+  actions?: number;
 }
 
 /** A chat's title source, defaulting for records written before the field existed. */
@@ -119,6 +126,8 @@ export function isArchived(chat: Chat): boolean {
 
 export const messagesKey = (id: string) => `chat:${id}:messages`;
 export const itemsKey = (id: string) => `chat:${id}:items`;
+/** The chat's scratchpad, the note tool's. See lib/agent/note.ts. */
+export const noteKey = (id: string) => `chat:${id}:note`;
 export { blobsKey };
 
 /**
@@ -131,7 +140,8 @@ export { blobsKey };
  * blob and artifact keys arrived, which is exactly how that mistake gets made.)
  */
 export function chatKeys(id: string): string[] {
-  return [messagesKey(id), itemsKey(id), blobsKey(id), artifactKey(id)];
+  const keys = [messagesKey(id), itemsKey(id), blobsKey(id), artifactKey(id)];
+  return ACT_OFF ? keys : [...keys, noteKey(id)];
 }
 
 /** Hostname of a page URL, without "www.". Empty string for chrome:// and other non-http pages. */
@@ -315,6 +325,15 @@ export function touchChat(id: string, patch: { title?: string; url?: string; tur
     }
     if (patch.url && /^https?:\/\//i.test(patch.url)) chat.url = patch.url;
     if (typeof patch.turns === 'number') chat.turns = patch.turns;
+    return true;
+  });
+}
+
+/** Add to the chat's count of actions on a page. Not activity, like setChatModel below. */
+export function addChatActions(id: string, count: number): Promise<void> {
+  return patchChat(id, (chat) => {
+    if (count <= 0) return false;
+    chat.actions = (chat.actions ?? 0) + count;
     return true;
   });
 }

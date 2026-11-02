@@ -1,6 +1,7 @@
 // The .ts extension is load-bearing, as in lib/transcript.ts and lib/agent/retry.ts: `npm test`
 // runs this through node --experimental-strip-types, whose ESM resolver does not guess extensions.
 // It matters here now that test/settings.test.ts imports this module directly.
+import { ACT_OFF } from './buildflags.ts';
 import { DEFAULT_CONTEXT_BUDGET, DEFAULT_SETTINGS, resolveTheme, type Prefs, type Settings, type ThemeChoice } from './types.ts';
 
 const KEY = 'settings';
@@ -63,6 +64,7 @@ export async function loadSettings(): Promise<Settings> {
     contextBudget: stored?.contextBudget ?? DEFAULT_SETTINGS.contextBudget,
     sidePanelScope: stored?.sidePanelScope ?? DEFAULT_SETTINGS.sidePanelScope,
     checkUpdates: stored?.checkUpdates !== false,
+    ...(!ACT_OFF && stored?.askEveryStep === true ? { askEveryStep: true } : {}),
   };
   return { ...DEFAULT_SETTINGS, ...prefs };
 }
