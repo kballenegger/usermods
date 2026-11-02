@@ -112,7 +112,8 @@ export function looksNotFound(doc: Document): boolean {
  * tracks the value (React, GitHub's own behaviours) sees a change rather than a stale value.
  */
 export function setFieldValue(el: HTMLInputElement | HTMLTextAreaElement, value: string): void {
-  const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+  // By tag rather than instanceof: an element in a same-origin frame is another realm's instance.
+  const proto = el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
   const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
   if (setter) setter.call(el, value);
   else el.value = value;
@@ -172,7 +173,7 @@ function escapeRe(s: string): string {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function settle(check: () => boolean, ms = 900): Promise<boolean> {
+export async function settle(check: () => boolean, ms = 900): Promise<boolean> {
   const end = Date.now() + ms;
   while (Date.now() < end) {
     if (check()) return true;
@@ -182,17 +183,17 @@ async function settle(check: () => boolean, ms = 900): Promise<boolean> {
 }
 
 /** Select everything in a code editor the way its user would: its own Select All binding. */
-function selectAll(input: HTMLElement): void {
+export function selectAll(input: HTMLElement): void {
   input.focus();
   const mac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
   const init: KeyboardEventInit & { keyCode?: number; which?: number } = { key: 'a', code: 'KeyA', keyCode: 65, which: 65, bubbles: true, cancelable: true, metaKey: mac, ctrlKey: !mac };
   input.dispatchEvent(new KeyboardEvent('keydown', init));
   input.dispatchEvent(new KeyboardEvent('keyup', init));
   // A plain textarea (or a contenteditable the editor maps a DOM selection from) also takes this.
-  if (input instanceof HTMLTextAreaElement) input.select();
+  if (input.tagName === 'TEXTAREA') (input as HTMLTextAreaElement).select();
 }
 
-function paste(input: HTMLElement, text: string): boolean {
+export function paste(input: HTMLElement, text: string): boolean {
   try {
     const dt = new DataTransfer();
     dt.setData('text/plain', text);
