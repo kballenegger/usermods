@@ -547,7 +547,8 @@ export async function skillsFlow({ launch, openPanel, openSite, waitForComposer,
     await panel.locator('[data-testid="skill-run-opens"]').waitFor({ timeout: 60_000 });
     await panel.locator('[data-testid="skill-run"]').click();
     await question('left-site').waitFor({ timeout: 30_000 });
-    check(page.url().startsWith('https://elsewhere.example.org/'), 'the redirect took it off the site', page.url());
+    // The page itself is a browser error here: a redirected request does not come back through the route.
+    check(/forms\.example\.com[\s\S]*elsewhere\.example\.org/.test(await question('left-site').textContent()), 'the question names both', await question('left-site').textContent());
     check(!(await action('question-continue').count()), 'and another site is not one button away');
     await action('question-stop').click();
     await panel.locator('[data-testid="page-card"]', { hasText: 'Redirected' }).last().waitFor({ timeout: 30_000 });
