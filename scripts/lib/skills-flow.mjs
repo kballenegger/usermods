@@ -326,9 +326,10 @@ export async function skillsFlow({ launch, openPanel, openSite, waitForComposer,
     await albumCard.locator('[data-action="output-csv"]', { hasText: 'Copied' }).waitFor({ timeout: 5000 });
     const noteKey = await panel.evaluate(async () => {
       const all = await chrome.storage.local.get(null);
-      return Object.entries(all).find(([k, v]) => /:note$/.test(k) && typeof v === 'string' && v.includes('Download links'))?.[1] ?? '';
+      return Object.entries(all).find(([k, v]) => /:note$/.test(k) && typeof v === 'string' && v.includes('Outputs of the skill'))?.[1] ?? '';
     });
     check(noteKey.includes('photos/9.jpg'), 'and goes to the chat’s note', noteKey);
+    check(!noteKey.includes('Download links'), 'by its key: an author\'s label is not model input', noteKey);
     check((await modelCalls()) === callsBefore, 'nothing asked the model during the replays', { before: callsBefore, after: await modelCalls() });
     await shotAt360('skill-outputs-360.png');
 
