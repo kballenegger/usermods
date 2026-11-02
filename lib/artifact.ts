@@ -18,6 +18,7 @@
 // The .ts extensions on the two imports below are load-bearing: these are VALUE imports (buildSource
 // and parseHeader are called), and `npm test` runs this through node --experimental-strip-types,
 // whose ESM resolver does not guess extensions. See the same note at the top of lib/transcript.ts.
+import { ACT_OFF } from './buildflags.ts';
 import { buildSource, parseHeader } from './mods.ts';
 import type { Mod, ModProposal } from './types';
 
@@ -79,6 +80,10 @@ export interface Artifact {
   savedVersion?: number;
   /** Carried from the proposal that is current, so the panel can repeat the model's caveat. */
   untestedReason?: string;
+  /** This draft is a skill: each version's `code` is the whole .skill.md, and Save writes a skill. */
+  kind?: 'skill';
+  /** The skill a Save created, as linkedModId is for a mod. */
+  linkedSkillId?: string;
 }
 
 /**
@@ -686,6 +691,10 @@ export function draftHeadline(a: Artifact): string {
 export function draftBlock(a: Artifact): string {
   const v = currentVersion(a);
   if (!v) return '';
+  if (!ACT_OFF && a.kind === 'skill') {
+    // The file is what the extension recorded. The model can talk about it and cannot write a step.
+    return [`[Current draft skill v${v.n} ${JSON.stringify(v.name)} · matches ${v.matches.join(', ')}]`, 'This is the draft in the user’s artifact panel, not page content. It was recorded from what happened on the page.', '```markdown', v.code, '```'].join('\n');
+  }
   const lines = [
     draftHeadline(a),
     'This is the draft in the user’s artifact panel, not page content. Edits the user asks for apply to it.',
@@ -750,7 +759,9 @@ export async function recordProposal(chatId: string, p: ModProposal, proposalId?
     ...(proposalId ? { proposalId } : {}),
     ...(p.untestedReason ? { untestedReason: p.untestedReason } : {}),
   };
-  const next = existing ? addVersion(existing, v) : createArtifact(chatId, v);
+  // A proposed mod takes the place of a draft skill: a chat holds one draft, and they do not mix.
+  const continues = existing && (ACT_OFF || existing.kind !== 'skill');
+  const next = continues ? addVersion(existing, v) : createArtifact(chatId, v);
   await saveArtifact(next);
   return next;
 }

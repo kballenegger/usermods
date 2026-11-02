@@ -43,6 +43,9 @@ function operate(over: Partial<OperateEnv> = {}): OperateEnv & { guards: number;
     handoff: async () => ({ by: 'user' as const }),
     beforeScript: async () => true,
     afterScript: async () => void log.push('after-script'),
+    recordWait: async () => {},
+    recordAsk: async () => {},
+    recordLook: async () => {},
     changeNote: async () => ({ ok: true as const, text: 'Noted.' }),
     ...over,
   };

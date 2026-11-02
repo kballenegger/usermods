@@ -96,6 +96,10 @@ export interface OperateEnv {
   /** False when the user declined it. Writes the journal entry the result clears. */
   beforeScript(description: string, code: string, signal: AbortSignal, iteration?: number): Promise<boolean>;
   afterScript(): Promise<void>;
+  /** What a run did besides its steps, for SAVE AS SKILL. */
+  recordWait(spec: WaitSpec): Promise<void>;
+  recordAsk(text: string, spec: WaitSpec | null): Promise<void>;
+  recordLook(selector: string, matched: number, links: boolean): Promise<void>;
   changeNote(input: Record<string, unknown>): Promise<{ ok: true; text: string } | { ok: false; error: string }>;
 }
 
@@ -777,6 +781,10 @@ async function executeTool(
           return text(r.text);
         }
         const r = await env.sendToContent<{ text: string }>({ type: 'query', selector, text: needle, limit: Number(input.limit) || 20, styles, overlays });
+        if (!ACT_OFF && env.operate && selector?.trim() && !needle?.trim() && !/^No elements match/.test(r.text)) {
+          const said = /^(\d+) elements?/m.exec(r.text);
+          await env.operate.recordLook(selector.trim(), said ? Number(said[1]) : 1, /(^|[\s>+~])a([.#[:]|$)/.test(selector.trim().split(/\s+/).at(-1)!)).catch(() => {});
+        }
         return text(r.text);
       }
       case 'get_styles': {
@@ -853,6 +861,7 @@ async function executeTool(
         const outcome = await env.wait(parsed.spec, signal);
         const waitedMs = Date.now() - startedAt;
         const rendered = renderWaitResult(parsed.spec, outcome);
+        if (!ACT_OFF && env.operate && outcome.matched) await env.operate.recordWait(parsed.spec).catch(() => {});
         return { content: [{ type: 'text', text: rendered.text }], isError: rendered.isError || undefined, waitedMs };
       }
       case 'screenshot': {
@@ -952,6 +961,7 @@ async function handOff(input: Record<string, unknown>, words: string, operate: O
   const parsed = hasCondition ? parseWaitInput(rest) : null;
   if (parsed && !parsed.ok) return err(parsed.error);
   const r = await operate.handoff(words, parsed?.ok ? parsed.spec : null, signal, iteration);
+  if (r.by === 'user' || r.by === 'page') await operate.recordAsk(words, parsed?.ok ? parsed.spec : null).catch(() => {});
   if (r.by === 'user') return text('The user says they have done it. Look at the page before you carry on.');
   if (r.by === 'page') return text(`The page shows what you were waiting for${r.detail ? `: ${r.detail}` : ''}. The user has not said anything. Carry on.`);
   if (r.by === 'gone') return err(r.detail ?? 'The tab was closed while waiting.');

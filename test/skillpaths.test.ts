@@ -419,3 +419,35 @@ test('the dashboard: filter, sites across kinds, where it came from, zip names',
   assert.equal(skillSource({ origin: 'edited' }), 'edited by hand');
   assert.deepEqual(skillFilenames([{ name: 'A' }, { name: 'a' }, { name: 'B' }]), ['a.skill.md', 'a-2.skill.md', 'b.skill.md']);
 });
+
+// ---------- origin and walked, on every path ----------
+
+const BOOKKEEPING = `---
+usermods-skill: 1
+name: Pay
+description: Pays.
+version: 1.0.0
+match:
+  - "*://x.example.com/*"
+start: https://x.example.com/
+inputs: {}
+outputs: {}
+---
+
+\`\`\`steps
+- click: button "Pay"
+  at: { css: "#p" }
+\`\`\`
+`;
+
+test('origin and walked: only a skill recorded here starts walked and can keep an allowance', () => {
+  const made = skillFromSource(BOOKKEEPING, { origin: 'local', id: 'x' });
+  assert.deepEqual([made.origin, made.walked, made.allowedSteps], ['local', true, []]);
+  const stored = { ...made, allowedSteps: ['click button "pay"'] };
+  for (const origin of ['installed', 'imported', 'edited'] as const) {
+    const next = skillFromSource(BOOKKEEPING, { origin, existing: stored });
+    assert.deepEqual([next.origin, next.walked, next.allowedSteps], [origin, false, []], `${origin} starts over`);
+  }
+  const bumped = skillFromSource(BOOKKEEPING, { origin: 'local', existing: stored, keepTrust: true });
+  assert.deepEqual(bumped.allowedSteps, ['click button "pay"'], 'a version bump keeps what it had');
+});

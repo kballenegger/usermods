@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { activityFor, activityFromEvent, activityText, IDLE_ACTIVITY, STALL_MS } from '../lib/activity.ts';
-import { markInterrupted, nextRunRecord, parseRuns, pendingResumeText, pruneRuns, resumableRuns, withoutPending, withPending, type RunMap, type RunRecord } from '../lib/runstate.ts';
+import { markInterrupted, nextRunRecord, parseRuns, pendingResumeText, pruneRuns, resumableRuns, withRunSkill, withSkillStep, withoutPending, withPending, type RunMap, type RunRecord } from '../lib/runstate.ts';
 import { INTERRUPTED_TOOL_SUMMARY, looksUnfinished, reduceItems, settleInterrupted } from '../lib/transcript.ts';
 import type { ChatItem } from '../lib/types.ts';
 
@@ -185,4 +185,33 @@ test('a state change keeps the count of automatic resumes, so the bound holds ac
   assert.equal(nextRunRecord(prev, { state: 'running', tabId: 1 }, 10).autoResumes, 1);
   const fresh = nextRunRecord(undefined, { state: 'running', tabId: 7 }, 10);
   assert.deepEqual(fresh, { state: 'running', tabId: 7, startedAt: 10, updatedAt: 10 });
+});
+
+test('a skill’s record: its step moves, survives a stored round trip, and reaches the panel', () => {
+  const base: RunMap = { a: { state: 'running', tabId: 1, startedAt: 1, updatedAt: 1 } };
+  const withSkill = withRunSkill(base, 'a', { id: 's', name: 'File', step: 0, total: 9, key: 'k' }, 2);
+  assert.equal(withSkillStep(withSkill, 'a', 4, 3).a!.skill!.step, 4);
+  assert.equal(withSkillStep(base, 'a', 4), base, 'a record that is not a skill’s is left alone');
+  const stored = parseRuns(JSON.parse(JSON.stringify(withSkillStep(withSkill, 'a', 4, 3))));
+  assert.deepEqual(stored.a!.skill, { id: 's', name: 'File', step: 4, total: 9, key: 'k' });
+  const { runs } = markInterrupted(stored, () => false, 5);
+  assert.deepEqual(resumableRuns(runs).a!.skill, stored.a!.skill);
+});
+
+test('a malformed skill on a record reads as none, and the pending step on it still counts', () => {
+  const stored = parseRuns({ a: { state: 'interrupted', tabId: 1, startedAt: 1, updatedAt: 1, skill: { id: 's' }, pending: { kind: 'skill', label: 'x', at: 1 } } });
+  assert.equal(stored.a!.skill, undefined);
+  assert.equal(stored.a!.pending!.kind, 'skill');
+});
+
+test('a chat’s next message writes the record without the skill, and keeps what may have happened', () => {
+  const prev: RunRecord = { state: 'interrupted', tabId: 1, startedAt: 1, updatedAt: 1, pending: { kind: 'skill', label: 'x', at: 1 }, skill: { id: 's', name: 'S', step: 1, total: 2, key: 'k' } };
+  const next = nextRunRecord(prev, { state: 'running', tabId: 1 }, 9);
+  assert.equal(next.skill, undefined);
+  assert.equal(next.pending!.label, 'x');
+});
+
+test('the Resume block promises a question for a skill, and a look for a model', () => {
+  assert.match(pendingResumeText({ label: 'x' }, true), /ask you/);
+  assert.match(pendingResumeText({ label: 'x' }), /look at the page/);
 });

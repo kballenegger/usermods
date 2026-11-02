@@ -116,7 +116,11 @@ export function createShareController(deps: ShareDeps) {
   async function prepareSkillItem(req: StartShare): Promise<Skill> {
     const skill = (await deps.loadSkills!()).find((x) => x.id === req.modId);
     if (!skill) throw new Error('That skill no longer exists.');
-    if (req.source !== skill.source) await deps.saveSkill!(skillFromSource(req.source, { existing: skill, origin: skill.origin, keepTrust: true }));
+    // Trust is kept for a version bump and a gist's URLs, and for nothing that changes what the skill does.
+    if (req.source !== skill.source) {
+      const next = skillFromSource(req.source, { existing: skill, origin: skill.origin, keepTrust: true });
+      await deps.saveSkill!(JSON.stringify(next.steps) === JSON.stringify(skill.steps) ? next : skillFromSource(req.source, { existing: skill, origin: 'edited' }));
+    }
     return skill;
   }
 

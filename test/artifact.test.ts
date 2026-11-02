@@ -419,3 +419,11 @@ function baseMod(): Mod {
     updatedAt: 0,
   };
 }
+
+test('a draft skill: the block says so and carries the file, and a proposed mod replaces it', () => {
+  const skill = { ...createArtifact('c', { code: '---\nusermods-skill: 1\n---', name: 'File it', description: 'd', matches: ['*://x/*'], source: 'proposal' }), kind: 'skill' as const };
+  const block = draftBlock(skill);
+  assert.match(block, /\[Current draft skill v1 "File it"/);
+  assert.match(block, /usermods-skill: 1/);
+  assert.doesNotMatch(block, /propose the COMPLETE/);
+});

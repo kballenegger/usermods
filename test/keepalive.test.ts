@@ -404,3 +404,8 @@ test('the notes say what happened, in one sentence each', () => {
     assert.ok(s.length > 20 && s.length < 140, `${JSON.stringify(s)} is a sentence, not a code or a paragraph`);
   }
 });
+
+test('a skill’s run never picks itself up: its inputs and its pending step are the user’s', () => {
+  const rec = { state: 'interrupted' as const, tabId: 1, startedAt: 1, updatedAt: 1, skill: { id: 's', name: 'S', step: 2, total: 5, key: 'k' } };
+  assert.equal(shouldAutoResume({ record: rec, live: false, safari: true }), false);
+});

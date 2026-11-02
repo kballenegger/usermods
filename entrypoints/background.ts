@@ -12,8 +12,10 @@ import { dependenciesChanged, fetchText, previewFromText, previewFromUrl, repars
 import { UPDATED_MARK } from '@/lib/importreport';
 import { installPageUrl, isInstallableUrl, isUserScriptUrl, scriptIdentity, SKILL_MD_PATTERN, USER_JS_PATTERN, USER_JS_VIEW_PATTERN } from '@/lib/installurl';
 import { handleSkillsRpc, type SkillsRpc } from '@/lib/skillrpc';
+import { dropCarry, draftAsSkill, draftFromRun, keepAllowance, loadCarry, markWalked, saveCard, saveCarry } from '@/lib/skillcontroller';
+import { outputsNote, runSkill, stepsKey, type RunCarry } from '@/lib/skillrun';
 import { loadSkills, upsertSkill } from '@/lib/skillstore';
-import { skillFromSource } from '@/lib/skills';
+import { setSkillFields, skillFromSource, skillMatchesUrl, type Skill } from '@/lib/skills';
 import { addDismissal, BANNER_DISMISSED_KEY, bannerWorthShowing, installState, isDismissed, skillInstallState, type Detection } from '@/lib/banner';
 import type { BannerStateReply } from '@/lib/bannerclient';
 import { createShareController } from '@/lib/sharecontroller';
@@ -24,8 +26,8 @@ import { describeCallbackError, mapStack, mergeLateErrors, parseError, prepareRu
 import { watchDocument } from '@/lib/navwatch';
 import { shouldUpdate } from '@/lib/version';
 import { draftSourceFor, loadMods, matchPatternForUrl, modFromProposal, modFromSource, parseHeader, upsertMod, deleteMod, saveMods } from '@/lib/mods';
-import { addChatActions, appendTurn, archiveChat, bulkChats, countTurns, createChat, deleteChat, getChat, hostFromUrl, isArchived, listChats, loadItems, loadMessages, markTitleRefreshed, renameChat, saveItems, saveMessages, setChatArtifact, setChatModel, setChatThinking, setModelTitle, touchChat } from '@/lib/chats';
-import { loadRuns, markInterrupted, nextRunRecord, pruneRuns, resumableRuns, saveRuns, withoutPending, type RunMap, type RunRecord } from '@/lib/runstate';
+import { addChatActions, appendTurn, archiveChat, bulkChats, countTurns, createChat, deleteChat, getChat, hostFromUrl, isArchived, listChats, loadItems, loadMessages, markTitleRefreshed, renameChat, saveItems, saveMessages, setChatArtifact, setChatModel, setChatRanSkill, setChatThinking, setModelTitle, touchChat } from '@/lib/chats';
+import { loadRuns, markInterrupted, nextRunRecord, pruneRuns, resumableRuns, saveRuns, withRunSkill, withSkillStep, withoutPending, type RunMap, type RunRecord } from '@/lib/runstate';
 import { AUTO_RESUMED_TEXT, autoResumable, countAutoResume, holdExpired, KEEPALIVE_MAX_HOLD_MS, KEEPALIVE_PORT, TAB_CLOSED_TEXT } from '@/lib/keepalive';
 import { isTombstoned, withKey } from '@/lib/storagequeue';
 import { collectBlobs } from '@/lib/blobs';
@@ -40,9 +42,10 @@ import { VISION_FALLBACK_PANEL_NOTE, createVisionMemory, resolveImagesSetting, v
 import { MAX_EDGE, SCREENSHOT_CAPTURE_FORMAT, SCREENSHOT_QUALITY, fitWithin, parseDataUrl } from '@/lib/images';
 import { ACT_OFF, SAFARI_BUILD, SUBSCRIPTIONS_OFF, isSubscriptionProvider, unavailableProviderMessage } from '@/lib/buildflags';
 import { BAR_DONE, BAR_STOP } from '@/lib/pageui';
-import { pendingResumeNote } from '@/lib/agent/driver';
+import { hostOf } from '@/lib/agent/boundary';
+import { pendingResumeNote, type Driver } from '@/lib/agent/driver';
 import { noteBlock } from '@/lib/agent/note';
-import type { RunEnding } from '@/lib/agent/questions';
+import type { RunEnding, StepRow } from '@/lib/agent/questions';
 import { fromExtensionPage } from '@/lib/agent/senders';
 import { createDriveController, type DriveRpc } from '@/lib/drive';
 import { listFailureMessage, listWithFallback, modelsRequest, parseModelIds, type ModelListResult, type ModelListTarget } from '@/lib/modellist';
@@ -273,7 +276,10 @@ export default defineBackground(() => {
       if (req.type === 'resume') {
         // Nothing to do if this chat is already running: the button was pressed twice, or in two
         // panels. A second run over the same conversation is exactly what this must never start.
-        if (!sessions.isRunning(req.chatId)) void runChat(req.chatId, req.tabId, null);
+        if (!sessions.isRunning(req.chatId)) {
+          if (ACT_OFF) void runChat(req.chatId, req.tabId, null);
+          else void resumeRun(req.chatId, req.tabId);
+        }
         return;
       }
       if (req.type === 'abort') {
@@ -883,6 +889,9 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
                 handoff: (words: string, spec: WaitSpec | null, sig: AbortSignal, iteration?: number) => driver.handoff(words, spec, sig, iteration),
                 beforeScript: (description: string, code: string, sig: AbortSignal, iteration?: number) => driver.beforeScript(description, code, sig, iteration),
                 afterScript: () => driver.afterScript(),
+                recordWait: (spec: WaitSpec) => driver.recordWait(spec),
+                recordAsk: (words: string, spec: WaitSpec | null) => driver.recordAsk(words, spec),
+                recordLook: (selector: string, matched: number, links: boolean) => driver.recordLook(selector, matched, links),
                 changeNote: async (input: Record<string, unknown>) => {
                   const r = await notes.change(input);
                   if (r.ok) noted = r.note;
@@ -971,7 +980,8 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
         if (!decision.noop) {
           // Adopt, rather than replace: the versions this chat already held stay in the strip, so
           // a chat that opened the wrong mod is one rollback away from where it was.
-          artifact = artifact ? adoptMod(artifact, mod) : fromMod(chatId, mod);
+          // A draft skill cannot become a mod by adoption; a chat holds one draft, and this replaces it.
+          artifact = artifact && (ACT_OFF || artifact.kind !== 'skill') ? adoptMod(artifact, mod) : fromMod(chatId, mod);
           await saveArtifact(artifact);
           await setChatArtifact(chatId, artifact.id, artifact.versions.length);
           // The panel re-reads the artifact on this event, which is how the "Editing <name>" line
@@ -1071,6 +1081,127 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
     // It posts through this chat's own post(), so the rename lands on this chat and no other.
     if (succeeded && settings) void nameChat(chatId, settings, post);
   }
+}
+
+/** A Resume: a skill's run carries on through the skill, with no model. Anyone else's through the loop. */
+async function resumeRun(chatId: string, tabId: number): Promise<void> {
+  const rec = (await loadRuns().catch(() => ({}) as RunMap))[chatId];
+  if (!rec?.skill) return runChat(chatId, tabId, null);
+  const { skill: ran, pending } = rec;
+  const skill = ran.draft ? await draftAsSkill(chatId).catch(() => null) : ((await loadSkills()).find((s) => s.id === ran.id) ?? null);
+  // A file that changed under an interrupted run has other steps at those numbers.
+  if (!skill || stepsKey(skill.steps) !== ran.key) {
+    await clearRuns([chatId]);
+    await dropCarry(chatId);
+    postAgentEvent(chatId, { type: 'error', message: `“${ran.name}” has changed since this run stopped, so it cannot carry on. Start it again.` });
+    postAgentEvent(chatId, { type: 'status', phase: 'idle', detail: 'done' });
+    postAgentEvent(chatId, { type: 'done' });
+    return;
+  }
+  await runSkillChat(chatId, tabId, skill, await loadCarry(chatId), { from: ran.step, ...(pending ? { pending: pending.label } : {}), draft: ran.draft === true });
+}
+
+/**
+ * One run of a skill: no model and no conversation, the same session, Stop, bar and journal as a chat's
+ * run, and the rows and the card of a driving one. lib/skillrun.ts is what happens; this is where.
+ */
+async function runSkillChat(chatId: string, tabId: number, skill: Skill, carry: RunCarry, opts: { from?: number; pending?: string; draft?: boolean } = {}): Promise<void> {
+  const session = sessions.ensure(chatId, tabId);
+  session.running = true;
+  session.controller = new AbortController();
+  const signal = session.controller.signal;
+  const driver = drive!.driverFor(chatId, session.tabId);
+  const post = (e: AgentEventBody) => postAgentEvent(chatId, e.type === 'status' && e.phase !== 'idle' ? { ...e, driving: true } : e);
+  const release = holdWorker();
+  void loadSafariMode().then(() => acquireHold(session.tabId));
+  const key = stepsKey(skill.steps);
+  const toolId = crypto.randomUUID();
+  await setRun(chatId, { state: 'running', tabId: session.tabId });
+  await updateRuns((runs) => withRunSkill(runs, chatId, { id: skill.id, name: skill.name, step: opts.from ?? 0, total: skill.steps.length, key, ...(opts.draft ? { draft: true } : {}) }));
+  await saveCarry(chatId, carry).catch(() => {});
+  post({ type: 'status', phase: 'tool', tool: 'act', detail: `running ${skill.name}` });
+  const row = (index: number, step: StepRow) => post({ type: 'act_step', id: toolId, index, step });
+  // What the row and the card show. Numbers, and what the extension read: no input's value.
+  let rowsUsed = 0;
+  if (opts.from === undefined) {
+    const named = Object.keys(skill.inputs).filter((k) => carry.inputs[k]);
+    post({ type: 'note', text: `you ran ${skill.name} v${skill.version}${named.length ? ` · ${named.join(', ')}` : ''}` });
+  } else post({ type: 'note', text: `you resumed ${skill.name}` });
+  post({ type: 'tool_call', id: toolId, name: 'run_skill', input: { skill: skill.name } });
+  await touchChat(chatId, (await loadMessages(chatId)).length || opts.from !== undefined ? { url: await tabUrl(session.tabId) } : { title: skill.name, url: skill.start });
+  const hasNote = drive!.note(chatId);
+  let failure: string | null = null;
+  let result: Awaited<ReturnType<typeof runSkill>> | null = null;
+  try {
+    // Off its site, Run opens where it starts. That is the one navigation pressing Run asked for.
+    const here = await tabUrl(session.tabId);
+    const onSite = skillMatchesUrl(skill, here);
+    if (!skillMatchesUrl(skill, skill.start)) throw new Error('This skill starts outside its own sites, so it does not run.');
+    if (!onSite) {
+      await chrome.tabs.update(session.tabId, { url: skill.start });
+      await drive!.settled(session.tabId, signal);
+    }
+    await driver.startDriving(await tabUrl(session.tabId));
+    if (opts.from === undefined && !signal.aborted) rowsUsed = await goToStart(driver, skill, here, onSite, row, signal);
+    const cooked = rowsUsed;
+    result = await runSkill(
+      skill,
+      {
+        driver: { runStep: (s, o, sig) => driver.runStep(s, o, sig), ask: (q, sig) => driver.ask(q, sig), guard: (sig) => driver.guard(sig), announce: (b, a, sig) => driver.announce(b, a, sig), handoff: (t, spec, sig) => driver.handoff(t, spec, sig), didYourself: () => driver.didYourself() },
+        wait: (spec, sig) => waitInTab(session.tabId, spec, sig),
+        read: (s) => drive!.read(session.tabId, s),
+        atStep: (i) => updateRuns((runs) => withSkillStep(runs, chatId, i)),
+        pastStep: (i) => updateRuns((runs) => withSkillStep(withoutPending(runs, chatId), chatId, i)),
+        carry: (c) => saveCarry(chatId, c).catch(() => {}),
+        keepAllowance: (action) => keepAllowance(skill.id, action),
+        row: (i, r) => row(i + cooked, r),
+        note: (text) => post({ type: 'note', text }),
+        newId: () => crypto.randomUUID(),
+      },
+      { ...(opts.from !== undefined ? { from: opts.from } : {}), ...(opts.pending !== undefined ? { pending: opts.pending } : {}), carry },
+      signal,
+    );
+  } catch (e) {
+    failure = e instanceof Error ? e.message : String(e);
+  }
+  const summary = result ? `${result.ran} of ${skill.steps.length} steps` : (failure ?? 'stopped');
+  post({ type: 'tool_result', id: toolId, summary, isError: !!failure || result?.outcome.kind === 'refused' });
+  if (result?.outcome.kind === 'refused') post({ type: 'error', message: result.outcome.message });
+  else if (failure) post({ type: 'error', message: failure });
+  const card = await driver.finishSkill(signal.aborted ? 'stopped' : (result?.ending ?? 'model'), { name: skill.name, label: result?.label ?? `stopped · ${skill.name}` }).catch(() => null);
+  drive!.end(chatId);
+  if (card) {
+    post({ type: 'page_card', card: result?.outputs.length ? { ...card, outputs: result.outputs } : card });
+    if (card.total) await addChatActions(chatId, card.total).catch(() => {});
+    await setChatRanSkill(chatId, { name: skill.name, actions: card.total }).catch(() => {});
+  }
+  // What was read goes to the note of this chat and no other, so its model can be asked about it.
+  if (result?.outputs.length) await hasNote.change({ append: outputsNote(skill.name, result.outputs) }).catch(() => {});
+  if (!opts.draft && result?.outcome.kind === 'finished' && result.outcome.walked) await markWalked(skill.id, key).catch(() => {});
+  await clearRuns([chatId]);
+  await dropCarry(chatId);
+  release();
+  releaseHold(session.tabId);
+  session.running = false;
+  const next = session.queue.shift();
+  if (next && !signal.aborted) void runChat(chatId, session.tabId, next);
+  else {
+    post({ type: 'status', phase: 'idle', detail: 'done' });
+    post({ type: 'done' });
+    sessions.release(chatId);
+  }
+}
+
+/**
+ * A run from elsewhere on the site lands on `start` first, shown as a step. A file that begins with its
+ * own `go` does that itself, and a `start` ending in / means whichever page under it the run is on.
+ * Returns how many rows it used.
+ */
+async function goToStart(driver: Driver, skill: Skill, here: string, wasOnSite: boolean, row: (i: number, r: StepRow) => void, signal: AbortSignal): Promise<number> {
+  if (!wasOnSite || skill.steps[0]?.verb === 'go' || here === skill.start || (skill.start.endsWith('/') && here.startsWith(skill.start))) return 0;
+  const outcome = await driver.runStep({ do: 'go', text: skill.start }, { journalKind: 'skill', knownUrls: [skill.start], barStatus: `usermods is running ${skill.name}`, activity: `running ${skill.name}`, actions: [] }, signal);
+  if (outcome.kind === 'done') row(0, { state: 'done', text: outcome.words });
+  return outcome.kind === 'done' ? 1 : 0;
 }
 
 /**
@@ -1554,6 +1685,16 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
         await updates.check({ force: true, onlyId: id });
         return (await updates.summary())[id];
       },
+      async run(r) {
+        if (sessions.isRunning(r.chatId)) throw new Error('This chat is already running. Stop it first.');
+        const skill = r.draft ? await draftAsSkill(r.chatId) : (await loadSkills()).find((s) => s.id === r.skillId);
+        if (!skill) throw new Error('That skill no longer exists.');
+        if (r.allowSite) await drive!.allowSiteFor(r.chatId, hostOf(skillMatchesUrl(skill, await tabUrl(r.tabId)) ? await tabUrl(r.tabId) : skill.start), r.standing === true);
+        void runSkillChat(r.chatId, r.tabId, skill, { inputs: r.inputs, outputs: {} }, r.draft ? { draft: true } : {});
+      },
+      siteAllowed: async (chatId, host) => (chatId ? drive!.siteAllowed(chatId, host) : drive!.siteAllowed('', host)),
+      saveCard: (r) => saveCard(r.chatId, r.run, r.title),
+      draft: (r) => draftFromRun(r.chatId, r.run, r.decisions, { ...(r.replace ? { replace: true } : {}), today: new Date().toISOString().slice(0, 10) }),
     });
   }
   switch (req.type) {
@@ -1790,7 +1931,7 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
       if (!name || !v || name === v.name) return a;
       // A rename is a version like any other, so the strip shows when the draft was renamed and a
       // rollback can undo it. addVersion dedupes an identical one, so this cannot make an empty step.
-      const next = addVersion(a, { code: v.code, name, description: v.description, matches: v.matches, source: 'user-edit', untestedReason: a.untestedReason });
+      const next = addVersion(a, { code: !ACT_OFF && a.kind === 'skill' ? setSkillFields(v.code, { name }) : v.code, name, description: v.description, matches: v.matches, source: 'user-edit', untestedReason: a.untestedReason });
       await saveArtifact(next);
       await setChatArtifact(req.chatId, next.id, next.versions.length);
       return next;
@@ -1973,6 +2114,7 @@ async function saveArtifactAsMod(
   overwriteModId?: string,
 ): Promise<{ artifact: Artifact; mod: Mod; created: boolean; relinked: boolean } | { duplicate: { id: string; name: string } }> {
   const artifact = await requireArtifact(chatId);
+  if (!ACT_OFF && artifact.kind === 'skill') throw new Error('This draft is a skill.');
   const proposal = toProposal(artifact);
   if (!proposal) throw new Error('This draft has no versions to save.');
 

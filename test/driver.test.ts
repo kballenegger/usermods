@@ -606,3 +606,73 @@ test('a resume is told the step may have happened, by name, and to look first', 
   assert.match(note, /may or may not have happened/);
   assert.match(note, /Look at the page/);
 });
+
+// ---------- what a skill is made from ----------
+
+test('the journal holds what was read and where the value is, never the value', async () => {
+  const entries: Array<Record<string, unknown>> = [];
+  const w = world({ read: () => ({ ok: true, described: button('Merchant', { role: 'textbox', fingerprint: { role: 'textbox', name: 'Merchant', tag: 'input', css: '#m', landmark: 'form "F"' } }), signature: 'sig' }) });
+  w.deps.record = (e) => void entries.push(e as Record<string, unknown>);
+  await new Driver(w.deps).act({ steps: [{ do: 'fill', target: { selector: '#m' }, text: 'TYPED-VALUE' }], description: 'enter it' }, { toolId: 'tool-1', history: [] }, new AbortController().signal);
+  assert.equal(entries.length, 1);
+  const e = entries[0]!;
+  assert.equal(e.kind, 'act');
+  assert.equal(e.role, 'textbox');
+  assert.deepEqual(e.at, { css: '#m', in: 'form "F"' });
+  assert.equal(e.why, 'enter it');
+  assert.equal(e.toolId, 'tool-1');
+  assert.equal(e.stepIndex, 0);
+  assert.doesNotMatch(JSON.stringify(entries), /TYPED-VALUE/);
+});
+
+test('a declined step is journalled as dropped, and a run that has not touched the page records nothing', async () => {
+  const entries: Array<Record<string, unknown>> = [];
+  const w = world({ read: (s) => ({ ok: true, described: button(s.do === 'click' ? 'Delete' : 'Thing'), signature: 'sig' }), answers: [{ kind: 'decline' }] });
+  w.deps.record = (e) => void entries.push(e as Record<string, unknown>);
+  const d = new Driver(w.deps);
+  await d.recordLook('h1', 1, false);
+  assert.equal(entries.length, 0, 'a look before the first step is no part of a recording');
+  await d.act({ steps: [{ do: 'hover', target: { selector: '#x' } }, { do: 'click', target: { selector: '#d' } }], description: 'try' }, { toolId: 't', history: [] }, new AbortController().signal);
+  assert.deepEqual(entries.map((e) => e.kind), ['act', 'dropped']);
+  await d.recordLook('h1', 1, false);
+  assert.equal(entries.at(-1)!.kind, 'look');
+});
+
+test('the card offers SAVE AS SKILL for a run that acted, with the script note, and not for a run that did not', async () => {
+  const w = world();
+  const d = new Driver(w.deps);
+  assert.equal(await d.finish('model'), null);
+  const w2 = world();
+  const d2 = new Driver(w2.deps);
+  await d2.act({ steps: [{ do: 'click', target: { selector: '#x' } }], description: 'go' }, { toolId: 't', history: [] }, new AbortController().signal);
+  await d2.beforeScript('tidy', 'code', new AbortController().signal);
+  await d2.afterScript();
+  const card = await d2.finish('model');
+  assert.ok(card?.save?.run);
+  assert.equal(card!.save!.note, 'this run used scripts; only its 1 act step can be saved');
+});
+
+test('a walked step asks from the live read, with the skill’s words labelled, and nothing happens first', async () => {
+  const w = world({ answers: [{ kind: 'next' }] });
+  const d = new Driver(w.deps);
+  const outcome = await d.runStep({ do: 'click', target: { selector: 'Fine' } }, { skill: { name: 'S', n: 3, total: 7, says: 'do the thing' }, walk: { onRest: () => {} } }, new AbortController().signal);
+  assert.equal(outcome.kind, 'done');
+  const q = w.questions[0] as Extract<Question, { kind: 'walk' }>;
+  assert.equal(q.kind, 'walk');
+  assert.equal(q.headline, 'click button "Fine"');
+  assert.equal(q.skillSays, 'do the thing');
+  assert.ok(w.log.indexOf('ask:walk') < w.log.indexOf('perform:click'));
+});
+
+test('a lost answer clears the journal with the next step: a resume does not ask about what happened', async () => {
+  const cleared: Array<number | undefined> = [];
+  const w = world({ perform: async () => { throw new Error('the page went'); } });
+  w.deps.journalClear = async (n) => void cleared.push(n);
+  await new Driver(w.deps).runStep({ do: 'click', target: { selector: 'x' } }, { nextStep: 4 }, new AbortController().signal);
+  assert.deepEqual(cleared, [4]);
+  const failed = world({ perform: async () => ({ ok: false, code: 'hidden', message: 'no' }) as ActResult });
+  const after: Array<number | undefined> = [];
+  failed.deps.journalClear = async (n) => void after.push(n);
+  await new Driver(failed.deps).runStep({ do: 'click', target: { selector: 'x' } }, { nextStep: 4 }, new AbortController().signal);
+  assert.deepEqual(after, [undefined], 'a step that failed is still the step the run is on');
+});

@@ -219,7 +219,7 @@ export const AUTO_RESUMED_TEXT = 'Resumed after Safari paused the extension.';
  * been written down before it did.
  */
 export interface AutoResumeInput {
-  record: Pick<RunRecord, 'state'> & { autoResumes?: number; stoppedByUser?: boolean; pending?: RunRecord['pending'] };
+  record: Pick<RunRecord, 'state'> & { autoResumes?: number; stoppedByUser?: boolean; pending?: RunRecord['pending']; skill?: RunRecord['skill'] };
   /** Whether a session for this chat is live in THIS worker right now. */
   live: boolean;
   /** Whether this build should auto-resume at all. False on Chrome. */
@@ -258,6 +258,8 @@ export function shouldAutoResume({ record, live, safari }: AutoResumeInput): boo
   if (record.state !== 'interrupted') return false;
   if (record.stoppedByUser) return false;
   if (record.pending) return false;
+  // A skill's run holds values only the user can give again, and its pending step is the user's to answer.
+  if (record.skill) return false;
   return (record.autoResumes ?? 0) < MAX_AUTO_RESUMES;
 }
 

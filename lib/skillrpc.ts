@@ -1,11 +1,14 @@
 // The background's skills.* requests. What a page or a stranger's file can do is decided here and in
 // lib/skills.ts, not in the panel: every path to storage parses the text again and refuses what the
-// preview refuses. Run is not here: it comes with the runner.
+// preview refuses. The run itself is the background's, which owns the sessions; it arrives as a dep.
 import { ACT_OFF } from './buildflags';
 import { skillInstallState } from './banner';
 import { previewSkill, readSkillFacts, skillFromSource, type Skill, type SkillOrigin, type SkillPreview } from './skills';
+import { removeAllowance, saveDraft, type DraftResult } from './skillcontroller';
+import type { SaveCard, SaveDecisions } from './skillcompile';
 import { deleteSkills, loadSkills, upsertSkill } from './skillstore';
 import { fetchText } from './install';
+import type { Artifact } from './artifact';
 
 export type SkillsRpc =
   | { type: 'skills.list' }
@@ -19,7 +22,19 @@ export type SkillsRpc =
   /** Is this file already installed, by download URL or namespace + name? The install page asks. */
   | { type: 'skills.findInstalled'; source: string; url: string }
   /** The Update button: check now. It never installs; the review screen does that. */
-  | { type: 'skills.update'; id: string };
+  | { type: 'skills.update'; id: string }
+  /** RUN on the run card. `allowSite` when the card asked "operate this site?" too. With `draft`, the chat's draft. */
+  | { type: 'skills.run'; chatId: string; tabId: number; skillId?: string; draft?: boolean; inputs: Record<string, string>; allowSite?: boolean; standing?: boolean }
+  /** What the run card has to know before it can say what it asks. */
+  | { type: 'skills.runInfo'; chatId?: string; host: string }
+  /** SAVE AS SKILL: what the card asks about this run. */
+  | { type: 'skills.saveCard'; chatId: string; run: string; title?: string }
+  /** The card's answers, compiled into the chat's draft. `replace` says yes to losing a draft mod. */
+  | { type: 'skills.draft'; chatId: string; run: string; decisions: SaveDecisions; replace?: boolean }
+  /** SAVE on the draft: a skill made here. */
+  | { type: 'skills.saveDraft'; chatId: string }
+  /** Settings: stop allowing one step of one skill without asking. */
+  | { type: 'skills.allowance-remove'; id: string; action: string };
 
 export interface SkillsRpcResults {
   'skills.list': Skill[];
@@ -29,11 +44,21 @@ export interface SkillsRpcResults {
   'skills.install': Skill[];
   'skills.findInstalled': { skillId: string; version: string; newer: boolean } | null;
   'skills.update': { version: string; available?: string };
+  'skills.run': { ok: true };
+  'skills.runInfo': { siteAllowed: boolean };
+  'skills.saveCard': SaveCard;
+  'skills.draft': DraftResult;
+  'skills.saveDraft': { artifact: Artifact; skill: Skill };
+  'skills.allowance-remove': Skill[];
 }
 
 export interface SkillRpcDeps {
   /** One skill, forced, as the row's Update asks of the update controller. */
   checkNow(id: string): Promise<{ available?: string; error?: string } | undefined>;
+  run(req: Extract<SkillsRpc, { type: 'skills.run' }>): Promise<void>;
+  siteAllowed(chatId: string | undefined, host: string): Promise<boolean>;
+  saveCard(req: Extract<SkillsRpc, { type: 'skills.saveCard' }>): Promise<SaveCard>;
+  draft(req: Extract<SkillsRpc, { type: 'skills.draft' }>): Promise<DraftResult>;
 }
 
 export async function handleSkillsRpc(req: SkillsRpc, deps: SkillRpcDeps): Promise<unknown> {
@@ -67,5 +92,19 @@ export async function handleSkillsRpc(req: SkillsRpc, deps: SkillRpcDeps): Promi
       if (sum?.error && !sum.available) throw new Error(`Could not check “${skill.name}” for updates: ${sum.error}.`);
       return { version: skill.version, ...(sum?.available ? { available: sum.available } : {}) };
     }
+    case 'skills.run':
+      await deps.run(req);
+      return { ok: true };
+    case 'skills.runInfo':
+      return { siteAllowed: await deps.siteAllowed(req.chatId, req.host) };
+    case 'skills.saveCard':
+      return deps.saveCard(req);
+    case 'skills.draft':
+      return deps.draft(req);
+    case 'skills.saveDraft':
+      return saveDraft(req.chatId);
+    case 'skills.allowance-remove':
+      await removeAllowance(req.id, req.action);
+      return loadSkills();
   }
 }

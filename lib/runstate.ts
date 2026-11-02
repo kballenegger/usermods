@@ -53,6 +53,19 @@ export interface RunRecord {
   autoResumes?: number;
   /** The step in flight, if any. See PendingStep. */
   pending?: PendingStep;
+  /** This run is a skill's, with no model in it: a resume carries on through lib/skillrun.ts. */
+  skill?: RunSkill;
+}
+
+/** Which skill a run is, and which step it is on. `key` says whether the file is still the one it started on. */
+export interface RunSkill {
+  id: string;
+  name: string;
+  step: number;
+  total: number;
+  key: string;
+  /** A draft in the chat, which has no record to look up. */
+  draft?: boolean;
 }
 
 export type RunMap = Record<string, RunRecord>;
@@ -77,8 +90,22 @@ export interface PendingStep {
 }
 
 /** What the Resume block says when the record holds a pending step. */
-export function pendingResumeText(step: Pick<PendingStep, 'label'>): string {
-  return `The last action may or may not have happened: ${step.label}. usermods will look at the page before doing anything else.`;
+export function pendingResumeText(step: Pick<PendingStep, 'label'>, skill?: boolean): string {
+  return `The last action may or may not have happened: ${step.label}. ${skill ? 'usermods will ask you before going on.' : 'usermods will look at the page before doing anything else.'}`;
+}
+
+/** Say which skill this run is. */
+export function withRunSkill(runs: RunMap, chatId: string, skill: RunSkill, now: number = Date.now()): RunMap {
+  const prev = runs[chatId];
+  if (!prev) return runs;
+  return { ...runs, [chatId]: { ...prev, skill, updatedAt: now } };
+}
+
+/** Move a skill's run to this step. Nothing changes for a record that is not a skill's. */
+export function withSkillStep(runs: RunMap, chatId: string, step: number, now: number = Date.now()): RunMap {
+  const prev = runs[chatId];
+  if (!prev?.skill || prev.skill.step === step) return runs;
+  return { ...runs, [chatId]: { ...prev, skill: { ...prev.skill, step }, updatedAt: now } };
 }
 
 /** Write the step down, before it runs. */
@@ -128,6 +155,8 @@ export interface ResumableRun {
   autoResumed?: boolean;
   /** What may or may not have happened, for the Resume block to say. */
   pending?: PendingStep;
+  /** The run was a skill's. */
+  skill?: RunSkill;
 }
 
 /** What the panel shows when a run died with its worker. */
@@ -172,7 +201,7 @@ export function resumableRuns(runs: RunMap): Record<string, ResumableRun> {
   const out: Record<string, ResumableRun> = {};
   for (const [id, rec] of Object.entries(runs)) {
     if (rec.state === 'running') continue;
-    out[id] = { state: rec.state, ...(rec.error ? { error: rec.error } : {}), ...(rec.autoResumes ? { autoResumed: true } : {}), ...(rec.pending ? { pending: rec.pending } : {}) };
+    out[id] = { state: rec.state, ...(rec.error ? { error: rec.error } : {}), ...(rec.autoResumes ? { autoResumed: true } : {}), ...(rec.pending ? { pending: rec.pending } : {}), ...(rec.skill ? { skill: rec.skill } : {}) };
   }
   return out;
 }
@@ -191,6 +220,13 @@ function parsePending(raw: unknown): PendingStep | undefined {
   };
 }
 
+/** A stored skill reference. A malformed one reads as none: the run then resumes as a chat, which asks nothing of it. */
+function parseRunSkill(raw: unknown): RunSkill | undefined {
+  const r = raw as Partial<RunSkill> | null | undefined;
+  if (!r || typeof r.id !== 'string' || typeof r.step !== 'number' || typeof r.total !== 'number' || typeof r.key !== 'string') return undefined;
+  return { id: r.id, name: typeof r.name === 'string' ? r.name : '', step: r.step, total: r.total, key: r.key, ...(r.draft === true ? { draft: true } : {}) };
+}
+
 /** Whatever is stored under RUNS_KEY, with anything malformed dropped. */
 export function parseRuns(raw: unknown): RunMap {
   if (!raw || typeof raw !== 'object') return {};
@@ -199,6 +235,7 @@ export function parseRuns(raw: unknown): RunMap {
     const r = v as Partial<RunRecord> | null;
     if (!r || (r.state !== 'running' && r.state !== 'failed' && r.state !== 'interrupted')) continue;
     const pending = parsePending(r.pending);
+    const skill = parseRunSkill(r.skill);
     out[id] = {
       state: r.state,
       tabId: typeof r.tabId === 'number' ? r.tabId : -1,
@@ -213,6 +250,7 @@ export function parseRuns(raw: unknown): RunMap {
         ? { autoResumes: Math.floor(r.autoResumes) }
         : {}),
       ...(pending ? { pending } : {}),
+      ...(skill ? { skill } : {}),
     };
   }
   return out;

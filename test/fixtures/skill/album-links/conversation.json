@@ -1,0 +1,10 @@
+{
+  "prompt": "SKILLFLOW-ALBUM load the whole album and give me the download links for all the photos",
+  "done": "SKILLFLOW-ALBUM-DONE",
+  "steps": [
+    { "calls": [{ "name": "act", "args": { "description": "load every photo in the album", "steps": [{ "do": "click", "target": "#load", "repeat": 50 }] } }] },
+    { "calls": [{ "name": "wait_for", "args": { "idle": true, "quiet_ms": 300 } }] },
+    { "calls": [{ "name": "find_elements", "args": { "selector": "a.photo-download", "limit": 50 } }] },
+    { "text": "SKILLFLOW-ALBUM-DONE Here they are." }
+  ]
+}

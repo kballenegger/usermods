@@ -1,0 +1,55 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Kyoto</title>
+<body>
+<nav aria-label="Albums"><a href="/albums/">All albums</a></nav>
+<main aria-label="Album">
+  <h1>Kyoto 2026</h1>
+  <div id="photos"></div>
+  <p id="controls">
+    <button id="load" class="load-more" type="button">Load more</button>
+    <button id="delete" class="danger" type="button" data-wrong>Delete album</button>
+  </p>
+</main>
+<script>
+  // The variants of docs/specs/skills.md, section 9. What a step must never touch is marked data-wrong.
+  const v = window.__variant;
+  const by = (id) => document.getElementById(id);
+  let shown = 0;
+  const TOTAL = 9;
+  const more = () => {
+    for (let i = 0; i < 3 && shown < TOTAL; i++) {
+      shown++;
+      const a = document.createElement('a');
+      a.className = 'photo-download';
+      a.href = `/photos/${shown}.jpg`;
+      a.textContent = `Photo ${shown}`;
+      by('photos').append(a, ' ');
+    }
+    if (shown >= TOTAL) load.remove();
+  };
+  const load = by('load');
+  more();
+  load.addEventListener('click', () => setTimeout(more, 30));
+  if (v === 'renamed-class') { load.className = 'btn-secondary'; load.id = 'more-photos'; }
+  if (v === 'moved') {
+    const aside = document.createElement('aside');
+    aside.setAttribute('aria-label', 'Tools');
+    aside.append(load);
+    document.body.append(aside);
+  }
+  if (v === 'reordered') by('controls').prepend(by('delete'));
+  if (v === 'decoy') {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = 'Load more';
+    b.setAttribute('data-wrong', '');
+    by('controls').append(b);
+  }
+  if (v === 'renamed-button') {
+    // The classes swap: the selector still finds a button, and it is the other one.
+    load.remove();
+    by('delete').id = 'load'; by('load').className = 'load-more';
+  }
+  if (v === 'removed') load.remove();
+</script>

@@ -36,6 +36,12 @@ export type Question =
       firstOnSite: boolean;
       /** "Allow every one of these in this chat", when that is on offer. */
       every?: { label: string };
+      /** `step 9 of 9 of File an expense`, for a skill's step. */
+      stepOf?: string;
+      /** The skill's `why`, labelled as the skill's. Nothing decides anything from it. */
+      skillSays?: string;
+      /** Why it asks, from the extension's read: `it submits a form`. */
+      because?: string;
     }
   /** With "Ask before every step" on, a script asks too, shown as code. */
   | { kind: 'script'; id: string; description: string; code: string }
@@ -44,14 +50,36 @@ export type Question =
   /** The page left the site. `canContinue` only when the two hosts are siblings (lib/agent/boundary.ts). */
   | { kind: 'left-site'; id: string; from: string; to: string; canContinue: boolean }
   /** The page removed usermods' bar and it would not come back. */
-  | { kind: 'bar-removed'; id: string };
+  | { kind: 'bar-removed'; id: string }
+  /** A skill's first run: every step shown before it happens. The headline is the live read. */
+  | { kind: 'walk'; id: string; skill: string; n: number; total: number; headline: string; where?: string; skillSays?: string }
+  /** A skill's step whose target did not resolve. The run stops here until the user says. */
+  | { kind: 'skill-broken'; id: string; skill: string; n: number; total: number; message: string }
+  /** A resumed skill run with a step in flight when the worker died. Nothing replays it. */
+  | { kind: 'did-happen'; id: string; skill: string; n: number; total: number; label: string }
+  /** The run has done its 500 actions. */
+  | { kind: 'skill-ceiling'; id: string; skill: string; actions: number }
+  /** A step wants an input the run card left empty. */
+  | { kind: 'skill-input'; id: string; skill: string; n: number; label: string };
 
 export type Answer =
   | { kind: 'allow'; every?: boolean; standing?: boolean }
   | { kind: 'decline' }
   | { kind: 'done' }
   | { kind: 'back' }
-  | { kind: 'continue' };
+  | { kind: 'continue' }
+  /** A walked step: this one. `rest` is RUN THE REST WITHOUT ASKING. */
+  | { kind: 'next' }
+  | { kind: 'rest' }
+  /** A broken step: you did it by hand, or look again. */
+  | { kind: 'continue-from' }
+  | { kind: 'try-again' }
+  /** A pending step: it happened, or do it again, through the gate. */
+  | { kind: 'it-did' }
+  | { kind: 'do-again' }
+  /** Past a skill's ceiling. */
+  | { kind: 'carry-on' }
+  | { kind: 'input'; value: string };
 
 /** Whether this answer is one this question offered. Anything else is not an answer. */
 export function answerFits(q: Question, a: Answer): boolean {
@@ -68,6 +96,16 @@ export function answerFits(q: Question, a: Answer): boolean {
       return a.kind === 'back' || (a.kind === 'continue' && q.canContinue);
     case 'bar-removed':
       return a.kind === 'allow' && !a.every && !a.standing;
+    case 'walk':
+      return a.kind === 'next' || a.kind === 'rest';
+    case 'skill-broken':
+      return a.kind === 'continue-from' || a.kind === 'try-again';
+    case 'did-happen':
+      return a.kind === 'it-did' || a.kind === 'do-again';
+    case 'skill-ceiling':
+      return a.kind === 'carry-on';
+    case 'skill-input':
+      return a.kind === 'input' && typeof a.value === 'string';
   }
 }
 
@@ -86,6 +124,16 @@ export function questionActivity(q: Question): string {
       return `waiting for you · the page left ${q.from}`;
     case 'bar-removed':
       return 'waiting for you · the page removed usermods’ bar';
+    case 'walk':
+      return `walking through ${q.skill} · step ${q.n} of ${q.total}`;
+    case 'skill-broken':
+      return `stopped at ${q.n} of ${q.total} · ${q.skill}`;
+    case 'did-happen':
+      return `waiting for you · did this happen? ${q.label}`;
+    case 'skill-ceiling':
+      return `waiting for you · ${q.skill} has done ${q.actions} actions`;
+    case 'skill-input':
+      return `waiting for you · ${q.label}`;
   }
 }
 
@@ -192,10 +240,14 @@ export interface StepRow {
   state: 'running' | 'done' | 'declined' | 'failed' | 'stopped';
   /** The sentence on the row. */
   text: string;
+  /** A step that touched nothing: a skill's wait or read. It takes the dot, not the pointer. */
+  looked?: boolean;
   /** What it opens to. */
   detail?: {
     /** The model's description of the call, labelled as the model's. */
     modelSays?: string;
+    /** The skill's `why`, labelled as the skill's. */
+    skillSays?: string;
     /** The element as read: `button "Delete" · in form "Account" · submits a form`. */
     read?: string;
     /** The result in full: the same lines the model was told. */
@@ -260,6 +312,19 @@ export interface PageCard {
   scripted: boolean;
   /** How many things were done on the page, for the chat index. */
   total: number;
+  /** A model run that can become a skill: SAVE AS SKILL names this run in the chat's journal. */
+  save?: { run: string; note?: string };
+  /** What a skill's `read` steps collected. It stays on the device, on this card and in the chat's note. */
+  outputs?: CardOutput[];
+  /** The skill this card is the record of. */
+  skill?: string;
+}
+
+export interface CardOutput {
+  name: string;
+  label: string;
+  list: boolean;
+  values: string[];
 }
 
 export type RunEnding = 'model' | 'stopped' | 'ceiling';
@@ -276,6 +341,8 @@ export interface PageRecord {
   yourself: number;
   scripts: number;
   actions: string[];
+  /** A step ran through `act`, so there is something to save. */
+  acted?: boolean;
 }
 
 export const emptyRecord = (now: number): PageRecord => ({ startedAt: now, hosts: [], pages: [], clicks: 0, fields: 0, others: 0, allowed: 0, yourself: 0, scripts: 0, actions: [] });
@@ -291,7 +358,7 @@ export function recordStep(rec: PageRecord, step: Pick<ActStep, 'do'>, words: st
   if (step.do === 'click') counts.clicks += clicks ?? 1;
   else if (step.do === 'fill' || step.do === 'select' || step.do === 'check') counts.fields += 1;
   else counts.others += 1;
-  return { ...rec, ...counts, actions: [...rec.actions, words].slice(-CARD_LIST_MAX) };
+  return { ...rec, ...counts, acted: true, actions: [...rec.actions, words].slice(-CARD_LIST_MAX) };
 }
 
 /** A page visited, by address and host, once each. */
@@ -302,14 +369,14 @@ export function recordPage(rec: PageRecord, url: string, host: string): PageReco
   return next;
 }
 
-/** The card, or null when the run did nothing on the page. */
-export function pageCard(rec: PageRecord, ending: RunEnding, now: number): PageCard | null {
+/** The card, or null when the run did nothing on the page. A skill's run always has one. */
+export function pageCard(rec: PageRecord, ending: RunEnding, now: number, skill?: { name: string; label: string }): PageCard | null {
   const total = rec.clicks + rec.fields + rec.others;
-  if (!total) return null;
+  if (!total && !skill) return null;
   const seconds = Math.max(1, Math.round((now - rec.startedAt) / 1000));
   const took = seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, '0')}s`;
   const count = plural(total, 'action');
-  const label = ending === 'stopped' ? `stopped by you · ${count}` : ending === 'ceiling' ? `paused at 30 steps · ${count}` : `on the page · ${count}`;
+  const label = skill ? skill.label : ending === 'stopped' ? `stopped by you · ${count}` : ending === 'ceiling' ? `paused at 30 steps · ${count}` : `on the page · ${count}`;
   const parts = [
     ...(rec.clicks ? [plural(rec.clicks, 'click')] : []),
     ...(rec.fields ? [plural(rec.fields, 'field')] : []),
@@ -325,5 +392,6 @@ export function pageCard(rec: PageRecord, ending: RunEnding, now: number): PageC
     actions: rec.actions,
     scripted: rec.scripts > 0,
     total,
+    ...(skill ? { skill: skill.name } : {}),
   };
 }

@@ -24,6 +24,19 @@ export function upsertSkill(skill: Skill): Promise<Skill[]> {
   });
 }
 
+/** A change to the bookkeeping of one skill, on the record as it is now. */
+export function updateSkill(id: string, fn: (s: Skill) => Skill): Promise<void> {
+  return withKey(SKILLS_KEY, async () => {
+    const skills = await loadSkills();
+    const i = skills.findIndex((s) => s.id === id);
+    if (i < 0) return;
+    const next = fn(skills[i]!);
+    if (next === skills[i]) return;
+    skills[i] = next;
+    await chrome.storage.local.set({ [SKILLS_KEY]: skills });
+  });
+}
+
 export function deleteSkills(ids: string[]): Promise<Skill[]> {
   return withKey(SKILLS_KEY, async () => {
     const skills = (await loadSkills()).filter((s) => !ids.includes(s.id));

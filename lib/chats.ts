@@ -112,6 +112,8 @@ export interface Chat {
    * the end of a run by the background, from what the extension recorded, never from the model.
    */
   actions?: number;
+  /** The last skill run in this chat, for the dashboard's badge. Written by the same run's end. */
+  ranSkill?: { name: string; actions: number };
 }
 
 /** A chat's title source, defaulting for records written before the field existed. */
@@ -128,6 +130,8 @@ export const messagesKey = (id: string) => `chat:${id}:messages`;
 export const itemsKey = (id: string) => `chat:${id}:items`;
 /** The chat's scratchpad, the note tool's. See lib/agent/note.ts. */
 export const noteKey = (id: string) => `chat:${id}:note`;
+/** What a run did on the page, for SAVE AS SKILL. Never holds a value: see lib/skillcompile.ts. */
+export const journalKey = (id: string) => `chat:${id}:journal`;
 export { blobsKey };
 
 /**
@@ -141,7 +145,7 @@ export { blobsKey };
  */
 export function chatKeys(id: string): string[] {
   const keys = [messagesKey(id), itemsKey(id), blobsKey(id), artifactKey(id)];
-  return ACT_OFF ? keys : [...keys, noteKey(id)];
+  return ACT_OFF ? keys : [...keys, noteKey(id), journalKey(id)];
 }
 
 /** Hostname of a page URL, without "www.". Empty string for chrome:// and other non-http pages. */
@@ -334,6 +338,14 @@ export function addChatActions(id: string, count: number): Promise<void> {
   return patchChat(id, (chat) => {
     if (count <= 0) return false;
     chat.actions = (chat.actions ?? 0) + count;
+    return true;
+  });
+}
+
+/** The chat ran a skill: the badge's name, and what it did. */
+export function setChatRanSkill(id: string, ran: { name: string; actions: number }): Promise<void> {
+  return patchChat(id, (chat) => {
+    chat.ranSkill = ran;
     return true;
   });
 }

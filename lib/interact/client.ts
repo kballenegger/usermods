@@ -9,6 +9,7 @@
 import { describeElements } from '../inspect';
 import { BAR_DONE, BAR_STOP, barIsUp, clearOutline, flashTarget, holdOutline, removeBar, setBarHidden, showBar } from '../pageui';
 import { describeStep, runStep, type ActStep } from './actions';
+import { readOutput } from './read';
 import { createRegistry, type Registry } from './registry';
 import { queryEverywhere, resolveSelector, type TargetSpec } from './target';
 import { operableInventory } from './view';
@@ -26,9 +27,11 @@ export type InteractMessage =
   | { type: 'act'; id: string; step: ActStep; expect: string }
   | { type: 'act-cancel'; id: string }
   | { type: 'highlight'; target?: TargetSpec; mode: 'flash' | 'hold' | 'clear'; label?: string }
-  | { type: 'indicator'; state: IndicatorState };
+  | { type: 'indicator'; state: IndicatorState }
+  /** A skill's `read` step. */
+  | { type: 'read'; from: string; take: string; each?: boolean };
 
-const INTERACT_TYPES: ReadonlySet<string> = new Set<InteractMessage['type']>(['inventory', 'describe', 'act', 'act-cancel', 'highlight', 'indicator']);
+const INTERACT_TYPES: ReadonlySet<string> = new Set<InteractMessage['type']>(['inventory', 'describe', 'act', 'act-cancel', 'highlight', 'indicator', 'read']);
 
 export function isInteractMessage(msg: { type: string }): msg is InteractMessage {
   return INTERACT_TYPES.has(msg.type);
@@ -130,6 +133,9 @@ export function handleInteractMessage(msg: InteractMessage, sendResponse: (r: un
       sendResponse({ ok: true });
       return undefined;
     }
+    case 'read':
+      sendResponse(readOutput(msg));
+      return undefined;
     case 'indicator': {
       const state = msg.state;
       if ('hidden' in state) setBarHidden(state.hidden);

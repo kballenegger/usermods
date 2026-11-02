@@ -14,7 +14,8 @@ import { Driver, type DescribeReply, type DriverDeps } from './agent/driver';
 import { changeNote } from './agent/note';
 import type { WaitOutcome, WaitSpec } from './agent/wait';
 import { noteKey } from './chats';
-import { withPending, withoutPending, type PendingStep, type RunMap } from './runstate';
+import { withPending, withSkillStep, withoutPending, type PendingStep, type RunMap } from './runstate';
+import { appendJournal } from './skillcontroller';
 import { loadSettings } from './settings';
 import type { AgentEventBody, ContentRequest } from './types';
 
@@ -70,6 +71,14 @@ export interface DriveController {
   hidingBar<T>(tabId: number, capture: () => Promise<T>): Promise<T>;
   note(chatId: string): { read(): Promise<string>; change(input: Record<string, unknown>): Promise<ReturnType<typeof changeNote>> };
   forget(chatIds: string[]): Promise<void>;
+  /** The run card answered "operate this site?", so no question asks again. */
+  allowSiteFor(chatId: string, host: string, standing: boolean): Promise<void>;
+  /** Has this chat, or a standing allowance, got this site already? */
+  siteAllowed(chatId: string, host: string): Promise<boolean>;
+  /** A tab going somewhere: back when it has loaded, or after a limit. */
+  settled(tabId: number, signal: AbortSignal): Promise<void>;
+  /** A skill's `read`, in the tab. */
+  read(tabId: number, step: { from: string; take: string; each?: boolean }): Promise<{ ok: true; values: string[] } | { ok: false; message: string }>;
 }
 
 export function createDriveController(host: DriveHost): DriveController {
@@ -176,7 +185,8 @@ export function createDriveController(host: DriveHost): DriveController {
       settled: (signal) => settled(tabId, signal),
       wait: (spec, signal) => host.waitInTab(tabId, spec, signal),
       journalWrite: (step: Omit<PendingStep, 'at'>) => host.updateRuns((runs) => withPending(runs, chatId, step)),
-      journalClear: () => host.updateRuns((runs) => withoutPending(runs, chatId)),
+      journalClear: (nextStep) => host.updateRuns((runs) => (nextStep === undefined ? withoutPending(runs, chatId) : withSkillStep(withoutPending(runs, chatId), chatId, nextStep))),
+      record: (entry) => void appendJournal(chatId, entry).catch(() => {}),
       loadAllowances: held.load,
       allowSite: held.allowSite,
       allowAction: held.allowAction,
@@ -253,6 +263,11 @@ export function createDriveController(host: DriveHost): DriveController {
     async forget(chatIds) {
       await updateAllowances((s) => chatIds.reduce(forgetChat, s));
     },
+    allowSiteFor: (chatId, h, standing) => allowances(chatId).allowSite(h, standing),
+    siteAllowed: async (chatId, h) => (await allowances(chatId).load(h)).site,
+    settled,
+    read: (tabId, step) =>
+      host.sendToContent<{ ok: true; values: string[] } | { ok: false; message: string }>(tabId, { type: 'read', ...step }).catch((e: unknown) => ({ ok: false as const, message: `The page could not be reached: ${e instanceof Error ? e.message : String(e)}` })),
   };
 }
 

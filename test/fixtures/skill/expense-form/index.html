@@ -1,0 +1,45 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>New expense</title>
+<body>
+<header><nav aria-label="Expenses"><a href="/expenses">All expenses</a></nav></header>
+<main>
+  <h1>New expense</h1>
+  <form id="new-expense" aria-label="New expense" method="post" action="/expenses">
+    <p><label for="merchant">Merchant</label> <input id="merchant" name="merchant"></p>
+    <p><label for="amount">Amount</label> <input id="amount" name="amount"></p>
+    <p><label for="note">Note</label> <textarea id="note" name="note"></textarea></p>
+    <p><button id="submit" type="submit">Submit expense</button></p>
+  </form>
+</main>
+<script>
+  // The variants of docs/specs/skills.md, section 9. What a step must never touch is marked data-wrong.
+  const v = window.__variant;
+  const by = (id) => document.getElementById(id);
+  const form = by('new-expense');
+  if (v === 'renamed-class') {
+    by('merchant').id = 'm-field'; by('m-field').setAttribute('name', 'vendor_field');
+    document.querySelector('label[for=merchant]').htmlFor = 'm-field';
+    by('amount').id = 'a-field'; by('a-field').setAttribute('name', 'sum_field');
+    document.querySelector('label[for=amount]').htmlFor = 'a-field';
+    by('note').id = 'n-field'; by('n-field').setAttribute('name', 'memo_field');
+    document.querySelector('label[for=note]').htmlFor = 'n-field';
+  }
+  if (v === 'moved') {
+    const aside = document.createElement('section');
+    aside.setAttribute('aria-label', 'Details');
+    for (const id of ['merchant', 'amount', 'note']) aside.append(by(id).parentElement);
+    form.prepend(aside);
+  }
+  if (v === 'reordered') form.prepend(by('amount').parentElement);
+  if (v === 'decoy') {
+    const p = document.createElement('p');
+    p.innerHTML = '<label for="evil">Merchant</label> <input id="evil" name="evil" data-wrong>';
+    form.prepend(p);
+  }
+  if (v === 'renamed-button') {
+    document.querySelector('label[for=merchant]').textContent = 'Vendor';
+    by('merchant').setAttribute('data-wrong', '');
+  }
+  if (v === 'removed') by('merchant').parentElement.remove();
+</script>

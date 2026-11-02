@@ -25,13 +25,15 @@
 import { MAX_REPEAT, type ActResult, type ActStep } from '../interact/actions.ts';
 import type { BrokenTarget, Closest, TargetSpec } from '../interact/target';
 import type { Described } from '../interact/describe';
-import { isRef } from '../interact/registry.ts';
+import { isRef, toAt } from '../interact/registry.ts';
 import type { PendingStep } from '../runstate';
+import type { JournalEntry } from '../skillcompile';
+import type { SkillWait } from '../skills';
 import type { AgentEventBody, Msg } from '../types';
 import { hostOf, placeName, sharesSite, siteHosts } from './boundary.ts';
 import { decide, isWebPage, type GateAllowances, type GateDecision, type Verb } from './gate.ts';
 import { emptyRecord, pageCard, questionActivity, readWords, recordPage, recordStep, stepDone, stepInFlight, stepLabel, whereWords, type Answer, type PageCard, type PageRecord, type Question, type RunEnding, type StepRow } from './questions.ts';
-import { describeCondition, parseWaitInput, renderWaitResult, type WaitOutcome, type WaitSpec } from './wait.ts';
+import { describeCondition, parseWaitInput, renderWaitResult, type WaitCondition, type WaitOutcome, type WaitSpec } from './wait.ts';
 
 /** How many steps one `act` call may hold. */
 export const MAX_STEPS = 20;
@@ -145,7 +147,10 @@ export interface DriverDeps {
   settled(signal: AbortSignal): Promise<void>;
   wait(spec: WaitSpec, signal: AbortSignal): Promise<WaitOutcome>;
   journalWrite(step: Omit<PendingStep, 'at'>): Promise<void>;
-  journalClear(): Promise<void>;
+  /** With a skill's next step, written in one go: no moment says the step is over and the run is not past it. */
+  journalClear(nextStep?: number): Promise<void>;
+  /** What a run did, for SAVE AS SKILL. Holds no value a field was filled with. */
+  record?(entry: NewJournalEntry): void;
   loadAllowances(host: string): Promise<GateAllowances>;
   allowSite(host: string, standing: boolean): Promise<void>;
   allowAction(host: string, key: string): Promise<void>;
@@ -156,6 +161,27 @@ export interface DriverDeps {
   newId(): string;
   now(): number;
   sleep(ms: number, signal: AbortSignal): Promise<void>;
+}
+
+/** A journal entry before the background numbers it. */
+export type NewJournalEntry = JournalEntry extends infer E ? (E extends JournalEntry ? Omit<E, 'n'> : never) : never;
+
+/** A wait as a skill file writes it. */
+export function waitForFile(c: WaitCondition): SkillWait {
+  switch (c.kind) {
+    case 'selector':
+      return { selector: c.selector, state: c.state, ...(c.count !== 1 ? { count: c.count } : {}), ...(c.text ? { text: c.text } : {}) };
+    case 'text':
+      return { text: c.text, ...(c.gone ? { gone: true } : {}) };
+    case 'url':
+      return { url: c.regex ? `/${c.pattern}/` : c.pattern };
+    case 'load':
+      return { load: c.state };
+    case 'idle':
+      return { idle: true, quiet_ms: c.quietMs };
+    case 'ms':
+      return { ms: c.ms };
+  }
 }
 
 export interface ActContext {
@@ -175,19 +201,36 @@ export interface StepOptions {
   /** Told of every state the step passes through, for the transcript. */
   onRow?: (row: StepRow) => void;
   iteration?: number;
+  /** A skill's run says so on the bar and the line, where a model's says it is driving. */
+  barStatus?: string;
+  activity?: string;
+  /** A skill's step on the Allow card, and on the walk's. */
+  skill?: { name: string; n: number; total: number; says?: string };
+  /** Replaces the chat's "allow every" for this step: a skill's standing allowances are its own, or none. */
+  actions?: readonly string[];
+  /** Replaces "allow every one of these in this chat". Absent with `actions` set means it is not on offer. */
+  standing?: { label: string; keep(key: string): Promise<void> };
+  /** Walking: this step is shown first, unless the gate is asking anyway. */
+  walk?: { onRest(): void };
+  /** Written with the journal's clearing when the step has happened: where a resume carries on from. */
+  nextStep?: number;
 }
 
 export type StepOutcome =
   | { kind: 'done'; result: Extract<ActResult, { ok: true }>; described: Described; words: string; asked: boolean }
   /** The user said no. */
   | { kind: 'declined'; label: string }
-  /** On the never list, or off the site. */
-  | { kind: 'refused'; message: string; described?: Described }
+  /** On the never list, or off the site. `reason` is the gate's own words. */
+  | { kind: 'refused'; message: string; described?: Described; reason?: string }
   /** It could not be done. `broken` is set when the target did not resolve to one element. */
   | { kind: 'failed'; message: string; code: string; described?: Described; closest?: Closest[]; broken?: BrokenTarget['reason'] }
   | { kind: 'stopped' };
 
 const STOPPED: StepOutcome = { kind: 'stopped' };
+
+const DEFAULT_WAIT_MS = 5_000;
+
+type JournalBody = JournalEntry extends infer E ? (E extends JournalEntry ? Omit<E, 'n' | 'run' | 'url'> : never) : never;
 
 /** One run's operating of the page. Dropped with the run. */
 export class Driver {
@@ -202,11 +245,14 @@ export class Driver {
   private barStatus: { status: string; handoff?: boolean } | null = null;
   /** The bar has been put up, so the end of the run has something to take down. */
   private barRaised = false;
+  /** This run's name in the chat's journal. */
+  private readonly run: string;
   private readonly deps: DriverDeps;
 
   constructor(deps: DriverDeps) {
     this.deps = deps;
     this.record = emptyRecord(deps.now());
+    this.run = deps.newId();
   }
 
   get isDriving(): boolean {
@@ -266,6 +312,14 @@ export class Driver {
     return (this.hosts ?? []).includes(host);
   }
 
+  /** A skill drives from its first step, whatever kind of step that is: Stop and the boundary hold from there. */
+  async startDriving(pageUrl: string): Promise<void> {
+    await this.pinSite(pageUrl);
+    if (this.driving) return;
+    this.driving = true;
+    this.record = recordPage({ ...this.record, startedAt: this.deps.now() }, pageUrl, hostOf(pageUrl));
+  }
+
   /** Which site this run is on, fixed by where its first step is. */
   private async pinSite(pageUrl: string): Promise<void> {
     if (this.hosts) return;
@@ -310,6 +364,22 @@ export class Driver {
     return this.barStatus !== null;
   }
 
+  /** A question that is not about a step: a skill's stop, its ceiling, a resume. */
+  ask(q: Question, signal: AbortSignal): Promise<Answer | null> {
+    return this.askUser(q, signal);
+  }
+
+  /** A skill's own words on the bar and the line, for a step that goes round runStep. */
+  async announce(barStatus: string, activity: string, signal: AbortSignal): Promise<void> {
+    this.status('tool', activity);
+    await this.showBar({ status: barStatus }, signal);
+  }
+
+  /** What was done by hand: on the card as the user's, from the user's word for it. */
+  didYourself(): void {
+    this.record = { ...this.record, yourself: this.record.yourself + 1 };
+  }
+
   /** A question, with the line and the bar saying so. Null when the run stopped under it. */
   private async askUser(q: Question, signal: AbortSignal, iteration?: number): Promise<Answer | null> {
     const before = this.barStatus;
@@ -342,7 +412,8 @@ export class Driver {
     await this.pinSite(d.pageUrl);
 
     const askEveryStep = await this.deps.askEveryStep().catch(() => false);
-    const allowances = await this.deps.loadAllowances(host);
+    const held = await this.deps.loadAllowances(host);
+    const allowances = opts.actions ? { ...held, actions: [...opts.actions] } : held;
     const decision = decide(d, allowances, {
       verb: step.do,
       ...(step.do === 'press' && step.text ? { key: step.text } : {}),
@@ -353,7 +424,7 @@ export class Driver {
     });
     const label = stepLabel(step, d);
     if (decision.kind === 'deny') {
-      return { kind: 'refused', described: d, message: `Refused: ${decision.reason}. usermods does not do this; call wait_for with ask_user and say what the user should do.` };
+      return { kind: 'refused', described: d, reason: decision.reason, message: `Refused: ${decision.reason}. usermods does not do this; call wait_for with ask_user and say what the user should do.` };
     }
 
     let asked = false;
@@ -361,6 +432,19 @@ export class Driver {
       const answer = await this.confirm(step, d, label, host, decision, opts, askEveryStep, signal);
       if (!answer) return STOPPED;
       if (answer.kind === 'decline') return { kind: 'declined', label };
+      asked = true;
+    }
+    if (signal.aborted) return STOPPED;
+    // The walk: nothing asked about this step by name, so it is shown here, from the same read.
+    const namedIt = decision.kind === 'confirm' && (decision.reasons.length > 0 || opts.forceConfirm === true || askEveryStep);
+    if (opts.walk && opts.skill && !namedIt) {
+      if (step.target) await this.deps.outline(step.target).catch(() => {});
+      const where = whereWords(d);
+      const q: Question = { kind: 'walk', id: this.deps.newId(), skill: opts.skill.name, n: opts.skill.n, total: opts.skill.total, headline: label, ...(where ? { where } : {}), ...(opts.skill.says ? { skillSays: opts.skill.says } : {}) };
+      const answer = await this.askUser(q, signal, opts.iteration);
+      await this.deps.outline(null).catch(() => {});
+      if (!answer) return STOPPED;
+      if (answer.kind === 'rest') opts.walk.onRest();
       asked = true;
     }
     if (signal.aborted) return STOPPED;
@@ -372,13 +456,13 @@ export class Driver {
     this.steps++;
     const inFlight = stepInFlight(step, d);
     opts.onRow?.({ state: 'running', text: inFlight });
-    this.status('tool', `driving · ${inFlight}`, opts.iteration);
-    await this.showBar({ status: `usermods is driving this page · step ${this.steps} · ${label}` }, signal, opts.iteration);
+    this.status('tool', `${opts.activity ?? 'driving'} · ${inFlight}`, opts.iteration);
+    await this.showBar({ status: opts.barStatus ?? `usermods is driving this page · step ${this.steps} · ${label}` }, signal, opts.iteration);
     if (signal.aborted) return STOPPED;
 
     await this.deps.journalWrite({ kind: opts.journalKind ?? 'act', label }).catch(() => {});
     const result = await this.perform(step, read.signature, d, signal);
-    await this.deps.journalClear().catch(() => {});
+    await this.deps.journalClear(result.ok ? opts.nextStep : undefined).catch(() => {});
 
     if (!result.ok) {
       if (result.code === 'cancelled') return STOPPED;
@@ -409,7 +493,16 @@ export class Driver {
           ...(where ? { where } : {}),
           ...(opts.modelSays ? { modelSays: opts.modelSays } : {}),
           firstOnSite: decision.asksSite,
-          ...(decision.actionKey ? { every: { label: `allow every "${d.name || d.role}" in this chat` } } : {}),
+          ...(opts.skill
+            ? {
+                stepOf: `step ${opts.skill.n} of ${opts.skill.total} of ${opts.skill.name}`,
+                ...(opts.skill.says ? { skillSays: opts.skill.says } : {}),
+                ...(decision.reasons.length ? { because: decision.reasons.join(', ') } : {}),
+                ...(decision.actionKey && opts.standing ? { every: { label: opts.standing.label } } : {}),
+              }
+            : decision.actionKey
+              ? { every: { label: `allow every "${d.name || d.role}" in this chat` } }
+              : {}),
         };
     if (step.target) await this.deps.outline(step.target).catch(() => {});
     const answer = await this.askUser(q, signal, opts.iteration);
@@ -426,7 +519,10 @@ export class Driver {
     }
     if (q.kind === 'allow') {
       this.record = { ...this.record, allowed: this.record.allowed + 1 };
-      if (answer.every && decision.actionKey) {
+      if (answer.every && decision.actionKey && opts.standing) {
+        await opts.standing.keep(decision.actionKey);
+        this.deps.emit({ type: 'note', text: `you said not to ask again for this step: ${label}` });
+      } else if (answer.every && decision.actionKey) {
         await this.deps.allowAction(host, decision.actionKey);
         this.deps.emit({ type: 'note', text: `you ${q.every!.label}` });
       }
@@ -490,12 +586,15 @@ export class Driver {
         case 'done':
           row(i, { state: 'done', text: outcome.words, detail: { modelSays, read: readWords(outcome.described), result: outcome.result.text } });
           lines.push(outcome.result.text);
+          this.journalAct(step, outcome.described, call.description, ctx.toolId, i);
           continue;
         case 'declined':
+          this.note({ kind: 'dropped', label: outcome.label, consequential: true }, await this.deps.pageUrl().catch(() => ''));
           row(i, { state: 'declined', text: `not done · you declined: ${outcome.label}`, detail: { modelSays } });
           lines.push(`The user declined this step: ${outcome.label}. It did not happen.${rest} Do not try it another way, by script or otherwise, unless they ask. You may carry on with anything else, or tell them what is left.`);
           return { text: lines.join('\n'), isError: false };
         case 'refused':
+          this.note({ kind: 'dropped', label: step.do, consequential: true }, await this.deps.pageUrl().catch(() => ''));
           row(i, { state: 'failed', text: `refused · ${outcome.message.replace(/^Refused: /, '').split('.')[0]}`, detail: { modelSays, ...(outcome.described ? { read: readWords(outcome.described) } : {}), result: outcome.message } });
           lines.push(`${outcome.message}${rest}`);
           return { text: lines.join('\n'), isError: true };
@@ -515,8 +614,55 @@ export class Driver {
     if (!call.thenWait) return { text: lines.join('\n'), isError: false };
     const startedAt = this.deps.now();
     const outcome = await this.deps.wait(call.thenWait, signal);
+    if (outcome.matched) await this.recordWait(call.thenWait);
     const waited = renderWaitResult(call.thenWait, outcome);
     return { text: `${lines.join('\n')}\n\nthen_wait: ${waited.text}`, isError: !!outcome.failure, waitedMs: this.deps.now() - startedAt };
+  }
+
+  // ---------------------------------------------------------------------------
+  // What a skill is made from
+  // ---------------------------------------------------------------------------
+
+  /** Into the chat's journal, once this run has touched the page. What it looked at before that is not part of it. */
+  private note(entry: JournalBody, url: string): void {
+    if (this.driving) this.deps.record?.({ ...entry, run: this.run, url } as NewJournalEntry);
+  }
+
+  /** A step that happened, as the extension read it. The value stays in the conversation, and the entry says where. */
+  private journalAct(step: ActStep, d: Described, why: string, toolId: string, stepIndex: number): void {
+    const typed = step.do === 'fill' || step.do === 'select';
+    this.note(
+      {
+        kind: 'act',
+        verb: step.do,
+        role: step.do === 'go' ? '' : d.role,
+        name: step.do === 'go' ? '' : d.name,
+        at: step.do === 'go' ? {} : toAt(d.fingerprint),
+        ...(step.do === 'go' ? { to: d.go?.kind === 'url' ? d.go.href : (d.go?.kind ?? '') } : {}),
+        ...(step.do === 'press' ? { key: step.text ?? '' } : {}),
+        ...(step.do === 'check' && /^(false|off|no|uncheck|unticked?|0)$/i.test(step.text ?? '') ? { unchecked: true } : {}),
+        ...(step.repeat ? { repeat: step.repeat } : {}),
+        why,
+        ...(typed ? { toolId, stepIndex } : {}),
+      },
+      d.pageUrl,
+    );
+  }
+
+  /** wait_for and then_wait, when the condition held. */
+  async recordWait(spec: WaitSpec): Promise<void> {
+    if (this.driving) this.note({ kind: 'wait', condition: waitForFile(spec.condition), ...(spec.timeoutMs !== DEFAULT_WAIT_MS && spec.condition.kind !== 'ms' ? { timeoutMs: spec.timeoutMs } : {}) }, await this.deps.pageUrl().catch(() => ''));
+  }
+
+  /** A wait_for with ask_user, with the condition that ended it, if it had one. */
+  async recordAsk(text: string, spec: WaitSpec | null): Promise<void> {
+    const until = spec && spec.condition.kind !== 'ms' ? { until: waitForFile(spec.condition) } : {};
+    if (this.driving) this.note({ kind: 'ask', text: text.trim().slice(0, 300), ...until }, await this.deps.pageUrl().catch(() => ''));
+  }
+
+  /** A find_elements with a selector that matched, which SAVE AS SKILL can offer as an output. */
+  async recordLook(selector: string, matched: number, links: boolean): Promise<void> {
+    if (this.driving) this.note({ kind: 'look', selector, matched, links }, await this.deps.pageUrl().catch(() => ''));
   }
 
   // ---------------------------------------------------------------------------
@@ -581,6 +727,7 @@ export class Driver {
       this.deps.emit({ type: 'status', phase: 'tool', tool: 'run_script', detail: description.slice(0, 120), ...(iteration ? { iteration } : {}), ...(this.driving ? { driving: true } : {}) });
     }
     await this.deps.journalWrite({ kind: 'script', label: `run a script: ${description.slice(0, 120) || 'no description'}` }).catch(() => {});
+    this.note({ kind: 'script', label: description.slice(0, 120) }, await this.deps.pageUrl().catch(() => ''));
     return true;
   }
 
@@ -592,6 +739,17 @@ export class Driver {
   /** The run is over: the bar comes down, and what was recorded goes on a card if anything was. */
   async finish(ending: RunEnding): Promise<PageCard | null> {
     if (this.barRaised) await this.clearBar();
-    return pageCard(this.record, ending, this.deps.now());
+    const card = pageCard(this.record, ending, this.deps.now());
+    if (!card) return null;
+    const acts = this.record.clicks + this.record.fields + this.record.others;
+    // Anything the extension operated with `act` can be saved; what a script did cannot be seen.
+    if (!this.record.acted) return card;
+    return { ...card, save: { run: this.run, ...(this.record.scripts ? { note: `this run used scripts; only its ${acts} act step${acts === 1 ? '' : 's'} can be saved` } : {}) } };
+  }
+
+  /** A skill's run is over. Its card is the record of the skill, and there is always one. */
+  async finishSkill(ending: RunEnding, skill: { name: string; label: string }): Promise<PageCard | null> {
+    if (this.barRaised) await this.clearBar();
+    return pageCard(this.record, ending, this.deps.now(), skill);
   }
 }
