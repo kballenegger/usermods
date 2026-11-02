@@ -77,8 +77,8 @@ export function createUpdateController(deps: UpdateDeps) {
     return !ACT_OFF && deps.loadSkills ? [...mods, ...(await deps.loadSkills())] : mods;
   }
 
-  /** A skill's record has steps; a mod's never does. */
-  const isSkill = (item: Mod | Skill): item is Skill => !ACT_OFF && 'steps' in item;
+  /** A skill's record has steps; a mod's never does. Callers test ACT_OFF first, so it all folds away. */
+  const isSkill = (item: Mod | Skill): item is Skill => 'steps' in item;
 
   /** A skill's check: one file, which must still be a skill and must pass what an install would ask. */
   async function checkSkill(skill: Skill, urls: { check: string }, budget: { left: number }, now: number): Promise<void> {
@@ -95,7 +95,7 @@ export function createUpdateController(deps: UpdateDeps) {
     if (!urls) return;
     const now = Date.now();
     try {
-      if (isSkill(mod)) {
+      if (!ACT_OFF && isSkill(mod)) {
         await checkSkill(mod, urls, budget, now);
         return;
       }
@@ -168,7 +168,7 @@ export function createUpdateController(deps: UpdateDeps) {
     if (!mod) throw new Error('That mod no longer exists.');
     const offer = offeredUpdate(mod, map[modId]);
     const cached = offer ? ((await chrome.storage.local.get(reviewKey(modId, offer.hash)))[reviewKey(modId, offer.hash)] as UpdateReview | undefined) : undefined;
-    return { mod, ...(isSkill(mod) ? { skill: true as const } : {}), update: offer, review: cached ?? null, reviewer: await deps.modelAvailable() };
+    return { mod, ...(!ACT_OFF && isSkill(mod) ? { skill: true as const } : {}), update: offer, review: cached ?? null, reviewer: await deps.modelAvailable() };
   }
 
   async function skip(modId: string, version: string): Promise<void> {
@@ -182,8 +182,8 @@ export function createUpdateController(deps: UpdateDeps) {
     const offer = mod ? offeredUpdate(mod, map[modId]) : null;
     if (!mod || !offer) throw new Error('There is no update waiting for this mod.');
     if (offer.hash !== hash) throw new Error('The update changed since you opened it. Reload this page to review the new text.');
-    if (isSkill(mod)) await deps.installSkill!(mod, offer.source);
-    else await deps.install(mod, offer.source);
+    if (!ACT_OFF && isSkill(mod)) await deps.installSkill!(mod, offer.source);
+    else await deps.install(mod as Mod, offer.source);
     await writeRecord(modId, (r) => clearAvailable(r));
     return { version: offer.version };
   }
@@ -201,7 +201,7 @@ export function createUpdateController(deps: UpdateDeps) {
     const key = reviewKey(modId, hash);
     const cached = (await chrome.storage.local.get(key))[key] as UpdateReview | undefined;
     if (cached) return cached;
-    const prompt = (isSkill(mod) ? buildSkillReviewPrompt : buildReviewPrompt)({ name: mod.name, oldSource: mod.source, newSource: offer.source, nonce: crypto.randomUUID().replace(/-/g, '') });
+    const prompt = (!ACT_OFF && isSkill(mod) ? buildSkillReviewPrompt : buildReviewPrompt)({ name: mod.name, oldSource: mod.source, newSource: offer.source, nonce: crypto.randomUUID().replace(/-/g, '') });
     const { text, model } = await deps.complete(prompt.system, prompt.user);
     const parsed = parseReview(text);
     if (!parsed.ok) throw new Error(`${parsed.error} Try again, or review the diff yourself.`);

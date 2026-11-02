@@ -35,7 +35,8 @@ const FLAGGED = [
   'question_done',
   'keeping a note', // lib/agent/loop.ts
   'usermods-skill', // the format, lib/skills.ts, and the banner's detection
-  '.skill.md', // the redirect, the file name, the Export menu
+  '.skill.md', // the file name, the Export menu
+  'skill\\\\.md', // the redirect's pattern, as it sits in a built string
   'skills.list', // the RPCs, lib/skillrpc.ts
   'A skill has no network', // the preview's SENDS line
   'Install skill', // the install page's skill mode
