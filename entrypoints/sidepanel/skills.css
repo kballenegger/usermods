@@ -55,3 +55,28 @@
   font: 400 var(--fs-meta) / 1.5 var(--font-ui);
   color: var(--text-1);
 }
+
+.skill-card input[type='text'],
+.skill-card input[type='number'],
+.skill-card input[type='date'],
+.skill-card select {
+  width: 100%;
+}
+.skill-card-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+  margin: 0;
+  padding: var(--sp-2);
+  border: 1px solid var(--border-hair);
+}
+.skill-card-group legend {
+  padding: 0 var(--sp-1);
+  font: 400 var(--fs-label) / 1.35 var(--font-mono);
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+.skill-card-group .mono {
+  font-family: var(--font-mono);
+}

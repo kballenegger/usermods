@@ -22,7 +22,7 @@ interface Pending {
   downloadUrl?: string;
 }
 
-export function ModsView({ tabId, pageUrl, host, onEditInChat }: { tabId: number | null; pageUrl: string; host: string; onEditInChat: () => void }) {
+export function ModsView({ tabId, pageUrl, host, onEditInChat, onRunSkill }: { tabId: number | null; pageUrl: string; host: string; onEditInChat: () => void; onRunSkill?: (id: string) => void }) {
   const [mods, setMods] = useState<Mod[]>([]);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
@@ -191,6 +191,7 @@ export function ModsView({ tabId, pageUrl, host, onEditInChat }: { tabId: number
         .catch(fail);
     },
     onCopyLink: (url: string) => void copyText(url).then(() => setStatus('Copied the install link.'), fail),
+    onRun: (id: string) => onRunSkill?.(id),
     updates: updates.summary,
   };
 
@@ -270,9 +271,9 @@ export function ModsView({ tabId, pageUrl, host, onEditInChat }: { tabId: number
       {ACT_OFF ? null : (
         <>
           {skillsSplit!.here.length > 0 && <div className="label" style={{ marginBottom: 0 }}>Skills on this site · {skillsSplit!.here.length}</div>}
-          {skillsSplit!.here.length > 0 && <div className="list">{skillsSplit!.here.map((s) => <SkillCard key={s.id} skill={s} exportItems={skillShare!.items} {...skillProps} />)}</div>}
+          {skillsSplit!.here.length > 0 && <div className="list">{skillsSplit!.here.map((s) => <SkillCard key={s.id} skill={s} here exportItems={skillShare!.items} {...skillProps} />)}</div>}
           {skillsSplit!.elsewhere.length > 0 && <div className="label" style={{ marginBottom: 0 }}>Other skills · {skillsSplit!.elsewhere.length}</div>}
-          {skillsSplit!.elsewhere.length > 0 && <div className="list">{skillsSplit!.elsewhere.map((s) => <SkillCard key={s.id} skill={s} exportItems={skillShare!.items} {...skillProps} />)}</div>}
+          {skillsSplit!.elsewhere.length > 0 && <div className="list">{skillsSplit!.elsewhere.map((s) => <SkillCard key={s.id} skill={s} here={false} exportItems={skillShare!.items} {...skillProps} />)}</div>}
         </>
       )}
     </div>

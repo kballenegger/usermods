@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import type { Answer, PageCard, Question, StepRow, ToolEffect } from '@/lib/agent/questions';
 import { rpc } from '@/lib/rpc';
+import { outputCsv } from '@/lib/skillrun';
+import type { Skill } from '@/lib/skills';
+import { copyText } from './components/ExportMenu';
 import './operate.css';
 
 // Everything the panel draws for a run that operates the page: the questions, the touched rows, the
@@ -72,7 +75,10 @@ export function QuestionRow({ question: q, onAnswer, onStop }: QuestionRowProps)
           <p className="question-headline" data-testid="question-headline">
             {q.headline}
           </p>
+          {q.because && <p data-testid="question-because">{q.because}</p>}
           {q.where && <p className="question-where">{q.where}</p>}
+          {q.stepOf && <p className="question-where" data-testid="question-step-of">{q.stepOf}</p>}
+          {q.skillSays && <p data-testid="question-skill">the skill says: {q.skillSays}</p>}
           {q.modelSays && <p data-testid="question-model">the model says: {q.modelSays}</p>}
           {q.firstOnSite && <p>usermods has not operated {q.host} in this chat yet.</p>}
           {q.firstOnSite && notAgain(q.host)}
@@ -161,7 +167,112 @@ export function QuestionRow({ question: q, onAnswer, onStop }: QuestionRowProps)
           </div>
         </div>
       );
+    case 'walk':
+      return (
+        <div {...base} className="question ask" role="group" aria-label={`Step ${q.n} of ${q.total}`}>
+          <div className="question-head">Step {q.n} of {q.total}</div>
+          <p className="question-headline" data-testid="question-headline">
+            {q.headline}
+          </p>
+          {q.where && <p className="question-where">{q.where}</p>}
+          {q.skillSays && <p data-testid="question-skill">the skill says: {q.skillSays}</p>}
+          <div className="question-actions">
+            <button className="btn primary" data-action="question-next" onClick={() => onAnswer({ kind: 'next' })}>
+              Next
+            </button>
+            <button className="btn" data-action="question-rest" onClick={() => onAnswer({ kind: 'rest' })}>
+              Run the rest without asking
+            </button>
+            <button className="linklike" data-action="question-stop" onClick={onStop}>
+              Stop
+            </button>
+          </div>
+        </div>
+      );
+    case 'skill-broken': {
+      const last = q.n >= q.total;
+      return (
+        <div {...base} className="question warn" role="group" aria-label={`Stopped at ${q.n} of ${q.total}`}>
+          <div className="question-head">Stopped at {q.n} of {q.total}</div>
+          <p data-testid="question-message">{q.message}</p>
+          <p>You can do this step by hand and carry on, or look for it again if the page is still loading.</p>
+          <div className="question-actions">
+            <button className="btn primary" data-action="question-continue-from" onClick={() => onAnswer({ kind: 'continue-from' })}>
+              {last ? 'Finish, I did it' : `Continue from ${q.n + 1}`}
+            </button>
+            <button className="btn" data-action="question-try-again" onClick={() => onAnswer({ kind: 'try-again' })}>
+              Try again
+            </button>
+            <button className="linklike" data-action="question-stop" onClick={onStop}>
+              Stop
+            </button>
+          </div>
+        </div>
+      );
+    }
+    case 'did-happen': {
+      const last = q.n >= q.total;
+      return (
+        <div {...base} className="question warn" role="group" aria-label="Did this happen?">
+          <div className="question-head">Did this happen?</div>
+          <p className="question-headline" data-testid="question-headline">
+            {q.label}
+          </p>
+          <p>The run was cut off during this step, and usermods does not know how far it got.</p>
+          <div className="question-actions">
+            <button className="btn primary" data-action="question-it-did" onClick={() => onAnswer({ kind: 'it-did' })}>
+              {last ? 'It did, finish' : `It did, continue from ${q.n + 1}`}
+            </button>
+            <button className="btn" data-action="question-do-again" onClick={() => onAnswer({ kind: 'do-again' })}>
+              Do it again
+            </button>
+            <button className="linklike" data-action="question-stop" onClick={onStop}>
+              Stop
+            </button>
+          </div>
+        </div>
+      );
+    }
+    case 'skill-ceiling':
+      return (
+        <div {...base} className="question warn" role="group" aria-label="Paused">
+          <div className="question-head">Paused at {q.actions} actions</div>
+          <p>{q.skill} has done a lot on this page. It waits here until you say to go on.</p>
+          <div className="question-actions">
+            <button className="btn primary" data-action="question-carry-on" onClick={() => onAnswer({ kind: 'carry-on' })}>
+              Continue
+            </button>
+            <button className="linklike" data-action="question-stop" onClick={onStop}>
+              Stop
+            </button>
+          </div>
+        </div>
+      );
+    case 'skill-input':
+      return <InputQuestion question={q} onAnswer={onAnswer} onStop={onStop} />;
   }
+}
+
+/** An input a step reached without. What is typed goes into the run and nowhere else. */
+function InputQuestion({ question: q, onAnswer, onStop }: { question: Extract<Question, { kind: 'skill-input' }>; onAnswer: (a: Answer) => void; onStop: () => void }) {
+  const [value, setValue] = useState('');
+  return (
+    <div data-testid="question" data-question={q.kind} className="question ask" role="group" aria-label={`Step ${q.n} needs ${q.label}`}>
+      <div className="question-head">Step {q.n} needs this</div>
+      <label className="field">
+        <span>{q.label}</span>
+        <input type="text" data-testid="question-input" value={value} onChange={(e) => setValue(e.target.value)} />
+      </label>
+      <div className="question-actions">
+        <button className="btn primary" data-action="question-input" disabled={!value.trim()} onClick={() => onAnswer({ kind: 'input', value })}>
+          Go on
+        </button>
+        <button className="linklike" data-action="question-stop" onClick={onStop}>
+          Stop
+        </button>
+      </div>
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -176,9 +287,10 @@ function TouchedStep({ step, interrupted }: { step: StepRow; interrupted: boolea
   return (
     <details className={`tool touched is-${state}`} data-testid="touched" data-step-state={state}>
       <summary>
-        <PointerMark />
+        {step.looked ? <span className={`dot${state === 'failed' ? ' error' : ''}`} aria-hidden="true" /> : <PointerMark />}
         <span>{text}</span>
       </summary>
+      {d?.skillSays && <p className="touched-detail">the skill says: {d.skillSays}</p>}
       {d?.modelSays && <p className="touched-detail">the model says: {d.modelSays}</p>}
       {d?.read && <p className="touched-detail">read on the page: {d.read}</p>}
       {d?.result && <pre>{d.result}</pre>}
@@ -215,15 +327,63 @@ export function TouchedScript({ effect, code, summary, isError }: { effect: Tool
 // The card
 // ---------------------------------------------------------------------------
 
+/** What a skill's `read` steps collected, with the two ways to take it away. */
+function CardOutputs({ outputs }: { outputs: NonNullable<PageCard['outputs']> }) {
+  const [copied, setCopied] = useState('');
+  const copy = (what: string, text: string) => void copyText(text).then(() => setCopied(what), () => {});
+  return (
+    <div className="page-card-outputs" data-testid="page-card-outputs">
+      <div className="label">Outputs</div>
+      {outputs.map((o) => (
+        <div key={o.name} className="page-card-output" data-testid="page-card-output" data-output={o.name}>
+          <div className="page-card-line">
+            {o.label}
+            {o.list ? ` · ${o.values.length}` : `: ${o.values[0] ?? ''}`}
+          </div>
+          {o.list && (
+            <ol className="page-card-list" data-testid="page-card-output-values">
+              {o.values.slice(0, 20).map((v, i) => (
+                <li key={i}>{v}</li>
+              ))}
+              {o.values.length > 20 && <li>and {o.values.length - 20} more</li>}
+            </ol>
+          )}
+          <div className="row">
+            <button className="btn" data-action="output-copy" onClick={() => copy(`copy:${o.name}`, o.values.join('\n'))}>
+              {copied === `copy:${o.name}` ? 'Copied' : 'Copy'}
+            </button>
+            {o.list && (
+              <button className="btn" data-action="output-csv" onClick={() => copy(`csv:${o.name}`, outputCsv(o))}>
+                {copied === `csv:${o.name}` ? 'Copied' : 'Copy as CSV'}
+              </button>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** What the extension recorded of the run. It never says done: done is the model's claim. */
-export function PageCardRow({ card }: { card: PageCard }) {
+export function PageCardRow({ card, onSaveSkill }: { card: PageCard; onSaveSkill?: (run: string) => void }) {
   return (
     <div className="card page-card" data-testid="page-card">
       <div className="label">{card.label}</div>
       <div className="page-card-line">{card.where}</div>
-      <div className="page-card-line" data-testid="page-card-counts">
-        {card.counts}
-      </div>
+      {card.counts && (
+        <div className="page-card-line" data-testid="page-card-counts">
+          {card.counts}
+        </div>
+      )}
+      {card.outputs && <CardOutputs outputs={card.outputs} />}
+      {card.save && onSaveSkill && (
+        <div className="row">
+          <button className="btn" data-action="save-as-skill" onClick={() => onSaveSkill(card.save!.run)}>
+            Save as skill
+          </button>
+          {card.save.note && <span className="page-card-line">{card.save.note}</span>}
+        </div>
+      )}
       <details>
         <summary>▼ actions</summary>
         <ol className="page-card-list">
@@ -245,10 +405,14 @@ export function PageCardRow({ card }: { card: PageCard }) {
 /** Settings' section: the sites it may operate without asking first, and the slow, safe switch. */
 export function OperatingPages({ askEveryStep, onAskEveryStep }: { askEveryStep: boolean; onAskEveryStep: (on: boolean) => void }) {
   const [sites, setSites] = useState<string[] | null>(null);
+  const [skills, setSkills] = useState<Skill[]>([]);
   useEffect(() => {
     void rpc({ type: 'act.allowances' }).then((r) => setSites(r.sites), () => setSites([]));
+    void rpc({ type: 'skills.list' }).then(setSkills, () => {});
   }, []);
   const remove = (host: string) => void rpc({ type: 'act.allowance-remove', host }).then((r) => setSites(r.sites), () => {});
+  const removeStep = (id: string, action: string) => void rpc({ type: 'skills.allowance-remove', id, action }).then(setSkills, () => {});
+  const allowed = skills.flatMap((s) => s.allowedSteps.map((action) => ({ id: s.id, name: s.name, action })));
   return (
     <div className="operating-pages" data-testid="settings-operating">
       <div className="operating-heading">
@@ -271,6 +435,24 @@ export function OperatingPages({ askEveryStep, onAskEveryStep }: { askEveryStep:
             </li>
           ))}
         </ul>
+      )}
+      {allowed.length > 0 && (
+        <>
+          <div className="operating-heading">
+            Steps you allowed without asking
+            <span>From skills you made here. Editing or updating a skill clears its steps.</span>
+          </div>
+          <ul className="operating-list" data-testid="operating-steps">
+            {allowed.map((a) => (
+              <li key={`${a.id}:${a.action}`}>
+                <span className="operating-host">{a.name} · {a.action}</span>
+                <button type="button" className="linklike" data-action="operating-step-remove" aria-label={`Remove ${a.action} from ${a.name}`} onClick={() => removeStep(a.id, a.action)}>
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
       <label className="field">
         <span className="toggle" style={{ marginBottom: 'var(--sp-1)' }}>

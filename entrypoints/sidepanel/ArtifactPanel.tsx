@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { currentVersion, diffLines, lineCount, type Artifact } from '@/lib/artifact';
+import { ACT_OFF } from '@/lib/buildflags';
+import { DraftSteps } from './Skills';
 import './artifact.css';
 
 /**
@@ -94,7 +96,10 @@ export function ArtifactPanel({
 
   if (!current || !shown) return null;
 
-  const saveLabel = artifact.linkedModId ? 'Update mod' : 'Save';
+  /** A draft skill's version holds the whole file, and its panel says what it is in those words. */
+  const isSkill = !ACT_OFF && artifact.kind === 'skill';
+  const skillSize = ACT_OFF ? '' : `${(current.code.match(/^- /gm) ?? []).length} steps`;
+  const saveLabel = !ACT_OFF && isSkill ? (artifact.linkedSkillId ? 'Update skill' : 'Save') : artifact.linkedModId ? 'Update mod' : 'Save';
 
   function commitRename() {
     const name = (renaming ?? '').trim();
@@ -122,7 +127,7 @@ export function ArtifactPanel({
           {/* Each separator is named for the thing it precedes, so hiding that thing at a
               breakpoint hides its separator with it. Positional selectors could not do this:
               nth-of-type counts spans, and every part of this bar is a span. */}
-          <span className="artifact-kind">Draft</span>
+          <span className="artifact-kind">{ACT_OFF ? 'Draft' : isSkill ? 'Draft skill' : 'Draft'}</span>
           <span className="artifact-sep sep-name">·</span>
           <span className="artifact-name" title={current.name} data-testid="artifact-name">
             {current.name}
@@ -132,11 +137,11 @@ export function ArtifactPanel({
             v{current.n}
           </span>
           <span className="artifact-sep sep-size">·</span>
-          <span className="artifact-size">{lineCount(current.code)} lines</span>
+          <span className="artifact-size">{ACT_OFF ? `${lineCount(current.code)} lines` : isSkill ? skillSize : `${lineCount(current.code)} lines`}</span>
         </div>
         <div className="artifact-actions">
-          <button className="btn" onClick={() => void onTry()} disabled={!canTry} title="Run the current draft once on this page" data-testid="artifact-try">
-            Try
+          <button className="btn" onClick={() => void onTry()} disabled={!canTry} title={ACT_OFF ? 'Run the current draft once on this page' : isSkill ? 'Replay the draft on this page' : 'Run the current draft once on this page'} data-testid="artifact-try">
+            {ACT_OFF ? 'Try' : isSkill ? 'Run again' : 'Try'}
           </button>
           <button
             className="btn primary"
@@ -147,7 +152,9 @@ export function ArtifactPanel({
                 ? `Write this version over “${editingModName}”, the installed mod this chat is editing`
                 : artifact.linkedModId
                   ? 'Write this version over the mod this chat created'
-                  : 'Save this draft as a mod and enable it'
+                  : !ACT_OFF && isSkill
+                    ? 'Save this draft as a skill'
+                    : 'Save this draft as a mod and enable it'
             }
             data-testid="artifact-save"
           >
@@ -156,7 +163,7 @@ export function ArtifactPanel({
           {/* Export is the least-used of the three and the only one whose label can be a glyph
               without losing its meaning — a download arrow beside Try and Save reads as "get the
               file". Its accessible name and tooltip stay the full word. */}
-          <button className="btn artifact-export" onClick={onExport} title="Download the current version as a .user.js file" aria-label="Export the draft as a .user.js file" data-testid="artifact-export">
+          <button className="btn artifact-export" onClick={onExport} title={ACT_OFF ? 'Download the current version as a .user.js file' : isSkill ? 'Download the current version as a .skill.md file' : 'Download the current version as a .user.js file'} aria-label={ACT_OFF ? 'Export the draft as a .user.js file' : isSkill ? 'Export the draft as a .skill.md file' : 'Export the draft as a .user.js file'} data-testid="artifact-export">
             <span className="artifact-export-word">Export</span>
             <span className="artifact-export-glyph" aria-hidden="true">
               ↓
@@ -296,6 +303,7 @@ export function ArtifactPanel({
             </div>
           )}
 
+          {ACT_OFF ? null : isSkill ? <DraftSteps source={shown.code} /> : null}
           {showDiff ? (
             previous ? (
               hunks.length ? (

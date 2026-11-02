@@ -4,6 +4,8 @@ import { describeLeak, scanSkillForLeaks, type Leak } from '@/lib/leakscan';
 import { rpc } from '@/lib/rpc';
 import { prepareSkillShare } from '@/lib/share';
 import type { ShareEvent } from '@/lib/sharecontroller';
+import type { CardField, CardLook, SaveCard, SaveDecisions } from '@/lib/skillcompile';
+import { runSummary } from '@/lib/skillrun';
 import { FIRST_RUN_TEXT, SENDS_TEXT, makeItAnInput, previewSkill, skillFileName, skillHosts, skillMatchesUrl, type Skill, type SkillPreview } from '@/lib/skills';
 import { copyText } from './components/ExportMenu';
 import { MenuButton, type MenuItem } from './components/Menu';
@@ -355,21 +357,26 @@ export function useSkillShare({ onStatus, onError }: { onStatus: (s: string) => 
 // The Mods tab's row
 // ---------------------------------------------------------------------------
 
-/** A skill in the Mods tab. Where a mod has its switch a skill will have Run, with the runner. */
+/** A skill in the Mods tab. Where a mod has its switch a skill has Run. */
 export function SkillCard({
   skill,
   exportItems,
   onDelete,
   onUpdate,
   onCopyLink,
+  onRun,
   updates,
+  here,
 }: {
   skill: Skill;
   exportItems: (s: Skill) => MenuItem[];
   onDelete: (name: string, id: string) => void;
   onUpdate: (name: string, id: string) => void;
   onCopyLink: (url: string) => void;
+  onRun: (id: string) => void;
   updates: UpdateSummary;
+  /** It matches the page in front of the user. */
+  here: boolean;
 }) {
   const upd = updates[skill.id];
   const inputs = Object.values(skill.inputs).map((i) => i.label);
@@ -386,7 +393,7 @@ export function SkillCard({
         ))}
       </div>
       <div className="muted" style={{ fontSize: 'var(--fs-meta)' }} data-testid="skill-row-meta">
-        {plural(skill.steps.length, 'step')}{inputs.length ? ` · asks for ${inputs.join(', ')}` : ''}
+        {plural(skill.steps.length, 'step')}{inputs.length ? ` · asks for ${inputs.join(', ')}` : ''}{here ? '' : ` · runs on ${skillHosts(skill).join(', ')}`}
       </div>
       {upd?.available ? (
         <div className="mod-update-line" data-testid="skill-update-available">
@@ -413,6 +420,9 @@ export function SkillCard({
         <pre>{skill.source}</pre>
       </details>
       <div className="row">
+        <button className="btn primary" onClick={() => onRun(skill.id)} title={here ? `Run “${skill.name}” on this page` : `Open ${skillHosts(skill).join(', ')} and run “${skill.name}” there`} data-testid="skill-run-row" aria-label={`Run “${skill.name}”`}>
+          Run
+        </button>
         <span className="grow" />
         <MenuButton label={`Export “${skill.name}”`} title="Download, copy, or share this skill" className="btn" testId="skill-export" items={exportItems(skill)} menuLabel={`Export “${skill.name}”`} placement="down">
           Export ▾
@@ -427,6 +437,293 @@ export function SkillCard({
         </button>
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Starting a run
+// ---------------------------------------------------------------------------
+
+/** The card every run starts on: what it will do, what it needs, and RUN. Nothing starts without it. */
+export function SkillRunCard({
+  skill,
+  siteAllowed,
+  host,
+  starts,
+  busy,
+  onRun,
+  onCancel,
+}: {
+  skill: Skill;
+  /** This chat or a standing allowance already covers the site. If not, this card asks that too. */
+  siteAllowed: boolean;
+  host: string;
+  /** Where Run will open the tab first, when it is elsewhere. */
+  starts?: string;
+  busy: boolean;
+  onRun: (a: { inputs: Record<string, string>; standing: boolean }) => void;
+  onCancel: () => void;
+}) {
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [standing, setStanding] = useState(false);
+  const declared = Object.entries(skill.inputs);
+  const missing = declared.some(([k, i]) => !i.optional && !(values[k] ?? '').trim());
+  const set = (k: string, v: string) => setValues((prev) => ({ ...prev, [k]: v }));
+  return (
+    <form
+      className="question ask skill-card"
+      data-testid="skill-run-card"
+      aria-label={`Run ${skill.name}?`}
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!missing && !busy) onRun({ inputs: values, standing });
+      }}
+    >
+      <div className="question-head">Run {skill.name}?</div>
+      <p data-testid="skill-run-summary">{runSummary(skill, skillHosts(skill))}</p>
+      {starts && <p data-testid="skill-run-opens">Run opens {starts} in this tab first.</p>}
+      {declared.map(([k, i]) => (
+        <label key={k} className="field">
+          <span>
+            {i.label}
+            {i.optional ? ' · optional' : ''}
+          </span>
+          {i.kind === 'choice' && i.options?.length ? (
+            <select data-testid="skill-run-input" data-input={k} value={values[k] ?? ''} onChange={(e) => set(k, e.target.value)}>
+              <option value="">Choose…</option>
+              {i.options.map((o) => (
+                <option key={o} value={o}>{o}</option>
+              ))}
+            </select>
+          ) : (
+            <input type={i.kind === 'number' ? 'number' : i.kind === 'date' ? 'date' : 'text'} data-testid="skill-run-input" data-input={k} value={values[k] ?? ''} placeholder={i.example ?? ''} onChange={(e) => set(k, e.target.value)} />
+          )}
+        </label>
+      ))}
+      <p>usermods asks before anything it can tell sends, buys, deletes or unsubscribes.</p>
+      {!siteAllowed && (
+        <>
+          <p data-testid="skill-run-operate">
+            It will click and type on {host}, in this tab, while you watch. It never types a password, a code or a card number. Stop is always here.
+          </p>
+          <label className="question-check">
+            <input type="checkbox" data-testid="skill-run-standing" checked={standing} onChange={(e) => setStanding(e.target.checked)} />
+            Do not ask again on {host}
+          </label>
+        </>
+      )}
+      {!skill.walked && <p data-testid="skill-run-first">This is its first run here: each step is shown before it happens.</p>}
+      <div className="question-actions">
+        <button type="submit" className="btn primary" data-testid="skill-run" disabled={missing || busy}>
+          Run
+        </button>
+        <button type="button" className="linklike" data-testid="skill-run-cancel" onClick={onCancel}>
+          Not now
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/** Pick a skill to run: a panel in the chat column, in the shape of ModPicker. */
+export function SkillPicker({ skills, pageUrl, onPick, onCancel }: { skills: Skill[]; pageUrl: string; onPick: (s: Skill) => void; onCancel: () => void }) {
+  const { here, elsewhere } = skillsHere(skills, pageUrl);
+  const row = (s: Skill) => (
+    <button key={s.id} className="modpicker-row" data-testid="skill-pick" data-skill-id={s.id} onClick={() => onPick(s)} title={s.description}>
+      <span className="modpicker-name">{s.name}</span>
+      <span className="modpicker-where">{skillHosts(s).join(', ')}</span>
+    </button>
+  );
+  return (
+    <div
+      className="modpicker"
+      data-testid="skill-picker"
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') {
+          e.stopPropagation();
+          onCancel();
+        }
+      }}
+    >
+      <div className="row">
+        <span className="label grow">Run a skill</span>
+        <button className="linklike" onClick={onCancel} data-testid="skill-picker-cancel">
+          Cancel
+        </button>
+      </div>
+      {here.length > 0 && <div className="label modpicker-group">On this page · {here.length}</div>}
+      {here.map(row)}
+      {elsewhere.length > 0 && <div className="label modpicker-group">Other sites · {elsewhere.length}</div>}
+      {elsewhere.map(row)}
+    </div>
+  );
+}
+
+/** A draft's steps, as the preview lists them. The artifact panel shows the file under this. */
+export function DraftSteps({ source }: { source: string }) {
+  const steps = useMemo(() => previewSkill(source).steps, [source]);
+  return (
+    <ol className="skill-steps" data-testid="draft-steps">
+      {steps.map((s) => (
+        <li key={s.n}>
+          {s.line}
+          {s.reasons.length > 0 && <span className="warn"> ▲ {s.reasons.join(', ')}</span>}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Saving a run
+// ---------------------------------------------------------------------------
+
+type FieldAnswer = { as: 'input' | 'constant'; name: string; label: string; optional: boolean };
+type LookAnswer = { keep: boolean; name: string; label: string; take: string; list: boolean };
+
+/**
+ * SAVE AS SKILL's one question: which of the values typed change each time. Every typed value is shown
+ * and becomes an input unless the user says otherwise, so nothing typed lands in a file by default. What
+ * a value is goes no further than this card: the answer says input or constant, and the background reads
+ * a constant from the saved conversation itself.
+ */
+export function SaveSkillCard({
+  card,
+  busy,
+  error,
+  replaces,
+  onSubmit,
+  onCancel,
+}: {
+  card: SaveCard;
+  busy: boolean;
+  error?: string;
+  /** Saving would replace this draft mod, and the card has asked. */
+  replaces?: string;
+  onSubmit: (d: SaveDecisions, replace: boolean) => void;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState(card.name);
+  const [description, setDescription] = useState(card.description);
+  const [start, setStart] = useState(card.start);
+  const [fields, setFields] = useState<Record<number, FieldAnswer>>(() => Object.fromEntries(card.fields.map((f: CardField) => [f.n, { as: f.suggest, name: f.name, label: f.label, optional: false }])));
+  const [looks, setLooks] = useState<Record<number, LookAnswer>>(() => Object.fromEntries(card.looks.map((l: CardLook) => [l.n, { keep: l.suggest, name: l.name, label: l.name.replace(/_/g, ' '), take: l.take, list: l.matched !== 1 }])));
+  const setField = (n: number, patch: Partial<FieldAnswer>) => setFields((p) => ({ ...p, [n]: { ...p[n]!, ...patch } }));
+  const setLook = (n: number, patch: Partial<LookAnswer>) => setLooks((p) => ({ ...p, [n]: { ...p[n]!, ...patch } }));
+  const decisions = (): SaveDecisions => ({
+    name,
+    description,
+    start,
+    fields: Object.fromEntries(card.fields.map((f) => {
+      const a = fields[f.n]!;
+      return [f.n, a.as === 'constant' ? { as: 'constant' as const } : { as: 'input' as const, name: a.name, label: a.label, ...(a.optional ? { optional: true } : {}) }];
+    })),
+    outputs: Object.fromEntries(card.looks.filter((l) => looks[l.n]!.keep).map((l) => {
+      const a = looks[l.n]!;
+      return [l.n, { name: a.name, label: a.label, take: a.take, list: a.list }];
+    })),
+  });
+  return (
+    <form
+      className="question ask skill-card"
+      data-testid="save-card"
+      aria-label="Save as a skill"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!busy) onSubmit(decisions(), !!replaces);
+      }}
+    >
+      <div className="question-head">Save as a skill · {plural(card.steps, 'step')} on {card.host}</div>
+      {card.scriptNote && <p data-testid="save-script-note">{card.scriptNote}</p>}
+      <label className="field">
+        <span>Name</span>
+        <input type="text" data-testid="save-name" value={name} onChange={(e) => setName(e.target.value)} />
+      </label>
+      <label className="field">
+        <span>What it does</span>
+        <input type="text" data-testid="save-description" value={description} onChange={(e) => setDescription(e.target.value)} />
+      </label>
+      <label className="field">
+        <span>Starts at</span>
+        <input type="text" data-testid="save-start" value={start} onChange={(e) => setStart(e.target.value)} />
+      </label>
+      {card.fields.length > 0 && <p>Which of these change each time?</p>}
+      {card.fields.map((f) => {
+        const a = fields[f.n]!;
+        return (
+          <fieldset key={f.n} className="skill-card-group" data-testid="save-field" data-n={f.n} data-label={f.label}>
+            <legend>{f.label}</legend>
+            <p className="mono">{f.value || 'not kept in this chat'}</p>
+            <label className="field">
+              <span>Each run</span>
+              <select data-testid="save-as" value={a.as} onChange={(e) => setField(f.n, { as: e.target.value as FieldAnswer['as'] })}>
+                <option value="input">Ask for it (an input)</option>
+                <option value="constant" disabled={!f.value}>Always this value (a constant)</option>
+              </select>
+            </label>
+            {a.as === 'input' && (
+              <>
+                <label className="field">
+                  <span>Input’s name</span>
+                  <input type="text" data-testid="save-input-name" value={a.name} onChange={(e) => setField(f.n, { name: e.target.value })} />
+                </label>
+                <label className="question-check">
+                  <input type="checkbox" data-testid="save-input-optional" checked={a.optional} onChange={(e) => setField(f.n, { optional: e.target.checked })} />
+                  Optional
+                </label>
+              </>
+            )}
+          </fieldset>
+        );
+      })}
+      {card.looks.length > 0 && <p>What it read from the page, to keep as an output:</p>}
+      {card.looks.map((l) => {
+        const a = looks[l.n]!;
+        return (
+          <fieldset key={l.n} className="skill-card-group" data-testid="save-look" data-n={l.n} data-selector={l.selector}>
+            <legend className="mono">{l.selector}</legend>
+            <label className="question-check">
+              <input type="checkbox" data-testid="save-look-keep" checked={a.keep} onChange={(e) => setLook(l.n, { keep: e.target.checked })} />
+              Keep · {plural(l.matched, 'match').replace('matchs', 'matches')} when recorded
+            </label>
+            {a.keep && (
+              <>
+                <label className="field">
+                  <span>Output’s name</span>
+                  <input type="text" data-testid="save-look-name" value={a.name} onChange={(e) => setLook(l.n, { name: e.target.value })} />
+                </label>
+                <label className="field">
+                  <span>Label</span>
+                  <input type="text" data-testid="save-look-label" value={a.label} onChange={(e) => setLook(l.n, { label: e.target.value })} />
+                </label>
+                <label className="field">
+                  <span>Read</span>
+                  <select data-testid="save-look-take" value={a.take} onChange={(e) => setLook(l.n, { take: e.target.value })}>
+                    <option value="text">its text</option>
+                    <option value="href">its link</option>
+                    <option value="src">its image address</option>
+                  </select>
+                </label>
+                <label className="question-check">
+                  <input type="checkbox" data-testid="save-look-list" checked={a.list} onChange={(e) => setLook(l.n, { list: e.target.checked })} />
+                  Every match, as a list
+                </label>
+              </>
+            )}
+          </fieldset>
+        );
+      })}
+      {error && <div className="error" data-testid="save-error">{error}</div>}
+      {replaces && <p className="warn" data-testid="save-replaces">This replaces the chat’s draft mod “{replaces}”. A chat holds one draft.</p>}
+      <div className="question-actions">
+        <button type="submit" className="btn primary" data-testid="save-submit" disabled={busy || !name.trim() || !description.trim()}>
+          {replaces ? 'Replace it' : 'Make the draft'}
+        </button>
+        <button type="button" className="linklike" data-testid="save-cancel" onClick={onCancel}>
+          Not now
+        </button>
+      </div>
+    </form>
   );
 }
 

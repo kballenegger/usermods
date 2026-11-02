@@ -44,6 +44,16 @@ const FLAGGED = [
   'in the notes, ', // lib/leakscan.ts
   'mod-kind', // the dashboard's kind filter
   'Skills on this site', // the Mods tab's headings
+  'usermods is running', // the bar's words, lib/skillrun.ts
+  'Run a skill', // the + menu and the picker, entrypoints/sidepanel/Chat.tsx
+  'Save as skill', // the card, entrypoints/sidepanel/Operate.tsx
+  'Did this happen', // a pending step on resume
+  'Which of these change each time', // the save card
+  'Steps you allowed without asking', // Settings
+  'skills.saveDraft', // the draft's save
+  'Made with usermods', // lib/skillcompile.ts
+  'Run the rest without asking', // the walk
+  'run_skill', // the transcript row, entrypoints/background.ts
 ];
 
 function bundleText(dir) {

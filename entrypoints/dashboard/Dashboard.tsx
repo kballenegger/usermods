@@ -2,8 +2,10 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Chat } from '@/lib/chats';
 import { chatOpenUrl, HANDOFF_KEY, modOrigins, overview, type ChatHandoff } from '@/lib/dashboard';
 import { rpc } from '@/lib/rpc';
+import { ACT_OFF } from '@/lib/buildflags';
 import { isConnected } from '@/lib/connections';
 import type { Mod } from '@/lib/types';
+import { useSkillList } from '../sidepanel/Skills';
 import { useConnections } from '../sidepanel/useConnections';
 import { useUpdates } from '../sidepanel/useUpdates';
 import { SettingsView } from '../sidepanel/SettingsView';
@@ -160,6 +162,7 @@ export function Dashboard() {
   }
 
   const o = overview(mods, chats);
+  const skills = ACT_OFF ? [] : useSkillList();
   const connectedLabels = providers.state.list.filter((c) => isConnected(c, providers.signedIn)).map((c) => c.label);
 
   return (
@@ -176,6 +179,7 @@ export function Dashboard() {
 
         <div className="overview" data-testid="overview">
           <Stat n={`${o.modsEnabled}/${o.modsTotal}`} k="mods enabled" />
+          {ACT_OFF ? null : <Stat n={String(skills.length)} k="skills" />}
           <Stat n={String(o.chatsLive)} k="chats live" />
           <Stat n={String(o.chatsArchived)} k="chats archived" />
           <Stat n={String(o.sitesCustomised)} k="sites customised" />

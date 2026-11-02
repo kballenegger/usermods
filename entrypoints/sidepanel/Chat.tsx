@@ -29,6 +29,10 @@ import { INTERRUPTED_TEXT, RESUME_HINT, RESUME_LABEL, pendingResumeText, type Re
 import { ACT_OFF } from '@/lib/buildflags';
 import type { Answer, Question } from '@/lib/agent/questions';
 import { PageCardRow, QuestionRow, TouchedScript, TouchedSteps } from './Operate';
+import { SaveSkillCard, SkillPicker, SkillRunCard, useSkillList } from './Skills';
+import { hostOf } from '@/lib/agent/boundary';
+import { skillFileName, skillFromSource, skillHosts, skillMatchesUrl, type Skill } from '@/lib/skills';
+import type { SaveCard, SaveDecisions } from '@/lib/skillcompile';
 import { tombstone } from '@/lib/storagequeue';
 import { lastModel, modelRowText, reduceItems, repairRowGap, settleInterrupted, toolDotClass, toolDotState, toolRowTitle, unqueuedItem } from '@/lib/transcript';
 import type { AgentEvent, ChatItem, ContentEvent, ElementRef, Mod, ModProposal } from '@/lib/types';
@@ -73,7 +77,7 @@ const EMPTY_DRAFT: Draft = { text: '', refs: [], images: [] };
 /** Where the draft of a chat that does not exist yet lives. A chat id is a UUID, so this is safe. */
 const NEW_CHAT_DRAFT = 'new';
 
-export function Chat({ tabId, pageUrl, host: liveHost, onOpenSettings }: { tabId: number | null; pageUrl: string; host: string; onOpenSettings?: () => void }) {
+export function Chat({ tabId, pageUrl, host: liveHost, onOpenSettings, runRequest, onRunRequestTaken }: { tabId: number | null; pageUrl: string; host: string; onOpenSettings?: () => void; /** A Mods row's Run. */ runRequest?: string | null; onRunRequestTaken?: () => void }) {
   const [chats, setChats] = useState<ChatRecord[]>([]);
   const [chatId, setChatId] = useState<string | null>(null);
   const [items, setItems] = useState<ChatItem[]>([]);
@@ -108,6 +112,12 @@ export function Chat({ tabId, pageUrl, host: liveHost, onOpenSettings }: { tabId
   const [activities, setActivities] = useState<ReadonlyMap<string, ChatActivity>>(() => new Map());
   /** What each chat's run is waiting for the user to answer. One at a time, per chat. */
   const [questions, setQuestions] = useState<ReadonlyMap<string, Question>>(() => new Map());
+  /** Every skill, for the empty state's block and the picker. */
+  const skills = ACT_OFF ? [] : useSkillList();
+  /** The card a run starts on, for this panel's visible chat. */
+  const [runCard, setRunCard] = useState<{ skill: Skill; draft: boolean; siteAllowed: boolean } | null>(null);
+  const [pickingSkill, setPickingSkill] = useState(false);
+  const [saving, setSaving] = useState<{ card: SaveCard; error?: string; replaces?: string; busy: boolean } | null>(null);
   /**
    * Chats whose last run stopped short with its progress saved — the model request failed for good,
    * or the run died with the service worker — and can be carried on with Resume. Per chat, like
@@ -947,6 +957,100 @@ export function Chat({ tabId, pageUrl, host: liveHost, onOpenSettings }: { tabId
     }
   }
 
+  // ---- skills: the run card, with no model anywhere in it ----
+
+  // Each of these is a ternary on the flag so that a build without skills holds none of them: a
+  // function statement would stay in the bundle with nothing calling it.
+
+  /** The site a run happens on: this page's when it matches, otherwise the one it will open. */
+  const runHost = ACT_OFF ? (_skill: Skill) => '' : (skill: Skill): string => (skillMatchesUrl(skill, pageUrl) ? hostOf(pageUrl) : (skillHosts(skill)[0] ?? hostOf(skill.start)));
+
+  const openRunCard = ACT_OFF ? async (_skill: Skill, _draft?: boolean) => {} : async (skill: Skill, draft = false) => {
+    setPickingSkill(false);
+    const info = await rpc({ type: 'skills.runInfo', host: runHost(skill), ...(chatId ? { chatId } : {}) }).catch(() => ({ siteAllowed: false }));
+    setRunCard({ skill, draft, siteAllowed: info.siteAllowed });
+  };
+
+  /** RUN on the card. A chat holds the run, whichever host it ends up on, and the chat is made here if it has to be. */
+  const startRun = ACT_OFF ? async (_card: unknown, _answers: unknown) => {} : async (card: { skill: Skill; draft: boolean; siteAllowed: boolean }, answers: { inputs: Record<string, string>; standing: boolean }) => {
+    if (tabId == null) return;
+    setRunCard(null);
+    const onThisSite = skillMatchesUrl(card.skill, pageUrl);
+    const site = runHost(card.skill).replace(/^www\./, '');
+    let id = onThisSite ? chatId : null;
+    try {
+      if (!id) {
+        const chat = await rpc({ type: 'chats.create', host: site, model: selectionRef.current, thinking: thinkingRef.current });
+        id = chat.id;
+        setChats((prev) => [chat, ...prev]);
+        showChat(chat.id, []);
+        setLoaded(true);
+      }
+      connect();
+      markResumable(id, null);
+      setRunningChats((prev) => new Set(prev).add(id!));
+      const at = Date.now();
+      setActivities((prev) => withActivity(prev, id!, () => ({ phase: 'tool', tool: 'act', detail: `running ${card.skill.name}`, driving: true, startedAt: at, lastEventAt: at, queued: 0 })));
+      await rpc({
+        type: 'skills.run',
+        chatId: id,
+        tabId,
+        ...(card.draft ? { draft: true } : { skillId: card.skill.id }),
+        inputs: Object.fromEntries(Object.entries(answers.inputs).filter(([, v]) => v.trim())),
+        ...(card.siteAllowed ? {} : { allowSite: true, standing: answers.standing }),
+      });
+      void refreshChats();
+    } catch (e) {
+      updateItems((prev) => [...prev, { kind: 'error', text: `Could not run “${card.skill.name}”: ${e instanceof Error ? e.message : String(e)}` }]);
+      if (id) {
+        setRunningChats((prev) => withoutChat(prev, id!));
+        setActivities((prev) => withoutActivity(prev, id!));
+      }
+    }
+  };
+
+  /** SAVE AS SKILL on a run's card: its one question. */
+  const openSaveCard = ACT_OFF ? async (_run: string) => {} : async (run: string) => {
+    if (!chatId) return;
+    try {
+      const title = chats.find((c) => c.id === chatId)?.title;
+      setSaving({ card: await rpc({ type: 'skills.saveCard', chatId, run, ...(title ? { title } : {}) }), busy: false });
+    } catch (e) {
+      updateItems((prev) => [...prev, { kind: 'error', text: e instanceof Error ? e.message : String(e) }]);
+    }
+  };
+
+  const submitSaveCard = ACT_OFF ? async (_decisions: SaveDecisions, _replace: boolean) => {} : async (decisions: SaveDecisions, replace: boolean) => {
+    if (!chatId || !saving) return;
+    setSaving({ ...saving, busy: true });
+    try {
+      const r = await rpc({ type: 'skills.draft', chatId, run: saving.card.run, decisions, ...(replace ? { replace: true } : {}) });
+      if ('replaces' in r) setSaving({ ...saving, busy: false, replaces: r.replaces });
+      else if (!r.ok) setSaving({ ...saving, busy: false, error: r.errors.join('. ') });
+      else {
+        setSaving(null);
+        setArtifact(r.artifact);
+        setShownVersion(null);
+      }
+    } catch (e) {
+      setSaving({ ...saving, busy: false, error: e instanceof Error ? e.message : String(e) });
+    }
+  };
+
+  // A row's Run on the Mods tab lands here, once this chat view knows what it is showing.
+  if (!ACT_OFF) {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    useEffect(() => {
+      if (!runRequest || !loaded) return;
+      onRunRequestTaken?.();
+      void rpc({ type: 'skills.list' }).then((list) => {
+        const skill = list.find((s) => s.id === runRequest);
+        if (skill) void openRunCard(skill);
+      });
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [runRequest, loaded]);
+  }
+
   /** Stop the chat on screen. Only that chat: another tab's run is none of this button's business. */
   function abort() {
     if (!chatId) return;
@@ -1247,6 +1351,16 @@ export function Chat({ tabId, pageUrl, host: liveHost, onOpenSettings }: { tabId
    */
   async function saveArtifact(overwriteModId?: string) {
     if (!chatId || !artifact) return;
+    if (!ACT_OFF && artifact.kind === 'skill') {
+      try {
+        const r = await rpc({ type: 'skills.saveDraft', chatId });
+        setArtifact(r.artifact);
+        setArtifactNote(`Saved “${r.skill.name}”. It is on the Mods tab.`);
+      } catch (e) {
+        setArtifactNote(`Could not save it: ${e instanceof Error ? e.message : String(e)}`);
+      }
+      return;
+    }
     try {
       // NEW_MOD is "Keep both": it answers the duplicate question with "neither of the installed
       // ones", which the background reads as an instruction to go ahead and create. A plain
@@ -1339,16 +1453,26 @@ export function Chat({ tabId, pageUrl, host: liveHost, onOpenSettings }: { tabId
   async function tryArtifact() {
     if (!artifact) return;
     const v = artifact.versions.find((x) => x.n === artifact.current);
+    if (!ACT_OFF && artifact.kind === 'skill') {
+      // RUN AGAIN: the same card, on the draft as it stands. A draft is the user's own, so it does not walk.
+      try {
+        if (v) await openRunCard({ ...skillFromSource(v.code, { origin: 'local' }), walked: true }, true);
+      } catch (e) {
+        setArtifactNote(e instanceof Error ? e.message : String(e));
+      }
+      return;
+    }
     if (v) await tryProposal({ name: v.name, description: v.description, matches: v.matches, code: v.code });
   }
 
   /** Download the current version as a .user.js, header and all. */
   function exportArtifact() {
     if (!artifact) return;
-    const blob = new Blob([toSource(artifact)], { type: 'text/javascript' });
+    const isSkill = !ACT_OFF && artifact.kind === 'skill';
+    const blob = isSkill ? new Blob([artifact.versions.find((x) => x.n === artifact.current)?.code ?? ''], { type: 'text/markdown' }) : new Blob([toSource(artifact)], { type: 'text/javascript' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = exportFilename(artifact.name);
+    a.download = isSkill ? skillFileName(artifact.name) : exportFilename(artifact.name);
     a.click();
     URL.revokeObjectURL(a.href);
   }
@@ -1473,7 +1597,7 @@ export function Chat({ tabId, pageUrl, host: liveHost, onOpenSettings }: { tabId
     <div className="resume" data-testid="resume" data-resume-state={resumeState.state}>
       {ACT_OFF ? null : resumeState.pending ? (
         <span className="resume-hint" data-testid="resume-pending">
-          {pendingResumeText(resumeState.pending)}
+          {pendingResumeText(resumeState.pending, !!resumeState.skill)}
         </span>
       ) : null}
       <span className="resume-hint">{RESUME_HINT}</span>
@@ -1658,13 +1782,25 @@ export function Chat({ tabId, pageUrl, host: liveHost, onOpenSettings }: { tabId
             ))}
           </div>
         )}
+        {ACT_OFF ? null : loaded && items.length === 0 && !unsupported && skills.some((s) => skillMatchesUrl(s, pageUrl)) ? (
+          <div className="empty-mods" data-testid="empty-skills">
+            <div className="label">or run a skill on this site</div>
+            {skills
+              .filter((s) => skillMatchesUrl(s, pageUrl))
+              .map((s) => (
+                <button key={s.id} className="linklike" onClick={() => void openRunCard(s)} title={s.description} data-testid="empty-skill" data-skill-id={s.id}>
+                  Run {s.name}
+                </button>
+              ))}
+          </div>
+        ) : null}
         {items.map((it, i) => {
           // A phone folds a long run of tool rows into one line (see `folds` above).
           const fold = folds.get(i);
           if (fold === 'folded') return null;
           if (fold) return <StepsRow key={i} tools={fold.map((n) => items[n]).filter((t): t is ToolItem => t?.kind === 'tool')} />;
           if (!ACT_OFF) {
-            if (it.kind === 'page_card') return <PageCardRow key={i} card={it.card} />;
+            if (it.kind === 'page_card') return <PageCardRow key={i} card={it.card} onSaveSkill={(run: string) => void openSaveCard(run)} />;
           }
           switch (it.kind) {
             case 'user':
@@ -1802,6 +1938,7 @@ export function Chat({ tabId, pageUrl, host: liveHost, onOpenSettings }: { tabId
         <div ref={bottomRef} />
       </div>
       {pickingMod && !compact && <ModPicker mods={mods} pageUrl={pageUrl} onPick={(m) => void editMod(m)} onCancel={() => setPickingMod(false)} />}
+      {ACT_OFF ? null : pickingSkill && !compact ? <SkillPicker skills={skills} pageUrl={pageUrl} onPick={(s: Skill) => void openRunCard(s)} onCancel={() => setPickingSkill(false)} /> : null}
       {/* The save that stopped to ask. Neither button is destructive and neither is the default:
           updating rewrites a mod the user may not have meant, keeping both leaves two mods running
           on the same page, and only they know which they wanted. */}
@@ -1897,6 +2034,21 @@ export function Chat({ tabId, pageUrl, host: liveHost, onOpenSettings }: { tabId
           )}
         </div>
       )}
+      {ACT_OFF ? null : saving ? (
+        <SaveSkillCard key={saving.card.run} card={saving.card} busy={saving.busy} {...(saving.error ? { error: saving.error } : {})} {...(saving.replaces ? { replaces: saving.replaces } : {})} onSubmit={(d: SaveDecisions, replace: boolean) => void submitSaveCard(d, replace)} onCancel={() => setSaving(null)} />
+      ) : null}
+      {ACT_OFF ? null : runCard ? (
+        <SkillRunCard
+          key={runCard.skill.id}
+          skill={runCard.skill}
+          siteAllowed={runCard.siteAllowed}
+          host={runHost(runCard.skill)}
+          {...(skillMatchesUrl(runCard.skill, pageUrl) ? {} : { starts: runCard.skill.start })}
+          busy={!!chatId && runningChats.has(chatId) && skillMatchesUrl(runCard.skill, pageUrl)}
+          onRun={(a: { inputs: Record<string, string>; standing: boolean }) => void startRun(runCard, a)}
+          onCancel={() => setRunCard(null)}
+        />
+      ) : null}
       {/* A ternary, not `!ACT_OFF && chatId && …`: the bundler folds this shape before it splits chunks. */}
       {ACT_OFF ? null : chatId && questions.get(chatId) ? (
         // The one route an answer has: an RPC, which the background takes only from an extension page.
@@ -2075,6 +2227,18 @@ export function Chat({ tabId, pageUrl, host: liveHost, onOpenSettings }: { tabId
                   onSelect: newChat,
                   testId: 'menu-new-chat',
                 },
+                ...(ACT_OFF
+                  ? []
+                  : [
+                      {
+                        id: 'run-skill',
+                        label: 'Run a skill…',
+                        title: skills.length ? 'Pick one of your skills and run it' : 'No skills yet. Save one from a run, or install one on the Mods tab',
+                        disabled: !skills.length,
+                        onSelect: () => setPickingSkill((v) => !v),
+                        testId: 'menu-run-skill',
+                      },
+                    ]),
               ]}
             />
             <textarea
@@ -2307,6 +2471,19 @@ export function Chat({ tabId, pageUrl, host: liveHost, onOpenSettings }: { tabId
           />
         </Sheet>
       )}
+      {ACT_OFF ? null : compact && sheet === 'runskill' ? (
+        <Sheet title="Run a skill" onClose={closeSheet} returnFocus={addBtnRef} testId="sheet-runskill">
+          <SkillPicker
+            skills={skills}
+            pageUrl={pageUrl}
+            onPick={(s: Skill) => {
+              closeSheet();
+              void openRunCard(s);
+            }}
+            onCancel={closeSheet}
+          />
+        </Sheet>
+      ) : null}
       {compact && sheet === 'add' && (
         <Sheet title="Add" onClose={closeSheet} returnFocus={addBtnRef} testId="sheet-add">
           <div className="sheet-list">
@@ -2348,6 +2525,9 @@ export function Chat({ tabId, pageUrl, host: liveHost, onOpenSettings }: { tabId
                 newChat();
               }}
             />
+            {ACT_OFF ? null : (
+              <SheetRow label="Run a skill…" action="run-skill" testId="menu-run-skill" disabled={!skills.length} onClick={() => sheetDo({ type: 'open', sheet: 'runskill' })} />
+            )}
           </div>
         </Sheet>
       )}

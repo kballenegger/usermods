@@ -140,7 +140,12 @@ export function ChatsSection({ chats, loaded, onChanged }: { chats: Chat[]; load
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transcriptSearchKey(chats)]);
 
-  const matching = useMemo(() => searchChats(chats, query, transcripts), [chats, query, transcripts]);
+  /** All chats, or the ones that ran a skill. */
+  const [onlyRan, setOnlyRan] = useState(false);
+  const matching = useMemo(() => {
+    const found = searchChats(chats, query, transcripts);
+    return !ACT_OFF && onlyRan ? found.filter((c) => c.ranSkill) : found;
+  }, [chats, query, transcripts, onlyRan]);
   const groups = useMemo(() => groupChatsByHost(matching), [matching]);
   const selection = bulkTargets(selected, matching);
 
@@ -327,6 +332,12 @@ export function ChatsSection({ chats, loaded, onChanged }: { chats: Chat[]; load
           onChange={(e) => setRawQuery(e.target.value)}
           data-testid="chat-search"
         />
+        {ACT_OFF ? null : (
+          <select value={onlyRan ? 'ran' : 'all'} onChange={(e) => setOnlyRan(e.target.value === 'ran')} data-testid="chat-kind" aria-label="Which chats">
+            <option value="all">All chats</option>
+            <option value="ran">Ran a skill</option>
+          </select>
+        )}
         <span className="muted" data-testid="chat-count">
           {matching.length} of {chats.length} chat{chats.length === 1 ? '' : 's'} · {groups.length} site{groups.length === 1 ? '' : 's'}
         </span>
@@ -554,6 +565,11 @@ function ChatRow({
               editing · {chat.editingModName}
             </span>
           )}
+          {ACT_OFF ? null : chat.ranSkill ? (
+            <span className="badge" data-testid="chat-ran-skill" title="A skill ran in this chat.">
+              ran {chat.ranSkill.name} · {chat.ranSkill.actions} action{chat.ranSkill.actions === 1 ? '' : 's'}
+            </span>
+          ) : null}
           {ACT_OFF ? null : chat.actions ? (
             <span className="badge" data-testid="chat-actions" title="usermods operated the page in this chat. Open it to see what it did.">
               on the page · {chat.actions} action{chat.actions === 1 ? '' : 's'}

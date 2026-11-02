@@ -4,6 +4,10 @@ import type { Skill } from '@/lib/skills';
 
 export const SkillPreviewCard = (_props: unknown) => null;
 export const SkillCard = (_props: unknown) => null;
+export const SkillRunCard = (_props: unknown) => null;
+export const SaveSkillCard = (_props: unknown) => null;
+export const SkillPicker = (_props: unknown) => null;
+export const DraftSteps = (_props: unknown) => null;
 export const SkillsPanes = (_props: unknown) => null;
 export const useSkillList = (): Skill[] => [];
 export const useSkillShare = (_opts: unknown) => ({ items: () => [], prompt: null, notices: null });
