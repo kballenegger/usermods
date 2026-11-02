@@ -1,4 +1,5 @@
 import { defineConfig } from 'wxt';
+import { actEnabled } from './lib/buildflags';
 import { buildManifest, isSafariOnlyIcon } from './lib/manifest';
 
 /**
@@ -51,6 +52,8 @@ export default defineConfig({
       // Safari ships API-key providers only for now; see lib/buildflags.ts for why. A literal
       // define, so the bundler folds the flag and drops lib/oauth from that build too.
       __SAFARI_BUILD__: JSON.stringify(env.browser === 'safari'),
+      // Operating pages is compiled out of every store and Safari build; see ACT_OFF.
+      __ACT__: JSON.stringify(actEnabled(storeBuild, env.browser === 'safari')),
     },
   }),
   // Safari's own default in WXT is MV2. usermods is an MV3 extension throughout, with a service-worker
