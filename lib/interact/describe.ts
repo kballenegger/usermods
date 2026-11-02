@@ -69,7 +69,12 @@ export function sensitiveField(el: Element): SensitiveField | undefined {
   if (autocomplete.includes('current-password') || autocomplete.includes('new-password')) return 'password';
   if (autocomplete.includes('one-time-code')) return 'one-time code';
   if (autocomplete.some((a) => CARD_AUTOCOMPLETE.test(a))) return 'card';
-  const said = asWords([el.getAttribute('name'), el.getAttribute('id'), el.getAttribute('placeholder'), el.getAttribute('aria-label'), nameOf(el)].filter(Boolean).join(' '));
+  return sensitiveWords([el.getAttribute('name'), el.getAttribute('id'), el.getAttribute('placeholder'), el.getAttribute('aria-label'), nameOf(el)].filter(Boolean).join(' '));
+}
+
+/** Which never-list field these words describe, or nothing. A skill file's recorded name is read the same way. */
+export function sensitiveWords(text: string): SensitiveField | undefined {
+  const said = asWords(text);
   if (PASSWORD_WORDS.test(said)) return 'password';
   if (OTP_WORDS.test(said)) return 'one-time code';
   if (CARD_WORDS.test(said)) return 'card';
