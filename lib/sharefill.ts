@@ -28,6 +28,8 @@
 // Each is checked before the next is tried. If none took, the fallback is honest: the script goes
 // on the clipboard and the hint says to paste it and what to name the file.
 
+import { ACT_OFF } from './buildflags.ts';
+
 export interface FillRequest {
   target: 'gist' | 'greasyfork';
   mode: 'new' | 'update';
@@ -38,6 +40,8 @@ export interface FillRequest {
   previousVersion: string;
   /** Skip the editor (Chrome sets it from the page world first). */
   fieldsOnly?: boolean;
+  /** The text is a skill file, whose version is a front matter line. Only ever set with the flag on. */
+  skill?: boolean;
 }
 
 export type FillResult =
@@ -158,12 +162,13 @@ const norm = (s: string) => s.replace(/ /g, ' ').replace(/[ \t]+/g, ' ');
  * that was there before? Checks the first header lines, the new @version, and (on an update) that
  * the previous @version line is gone.
  */
-export function looksFilled(text: string, req: Pick<FillRequest, 'source' | 'version' | 'previousVersion'>): boolean {
+export function looksFilled(text: string, req: Pick<FillRequest, 'source' | 'version' | 'previousVersion' | 'skill'>): boolean {
   const t = norm(text);
   const firstLines = req.source.split('\n').map((l) => l.trim()).filter(Boolean).slice(0, 2);
   if (!firstLines.every((l) => t.includes(norm(l)))) return false;
-  if (req.version && !new RegExp(`@version\\s+${escapeRe(req.version)}(?![\\w.-])`).test(t)) return false;
-  if (req.previousVersion && req.previousVersion !== req.version && new RegExp(`@version\\s+${escapeRe(req.previousVersion)}(?![\\w.-])`).test(t)) return false;
+  const line = !ACT_OFF && req.skill ? String.raw`\bversion:\s+["']?` : String.raw`@version\s+`;
+  if (req.version && !new RegExp(`${line}${escapeRe(req.version)}(?![\\w.-])`).test(t)) return false;
+  if (req.previousVersion && req.previousVersion !== req.version && new RegExp(`${line}${escapeRe(req.previousVersion)}(?![\\w.-])`).test(t)) return false;
   return true;
 }
 

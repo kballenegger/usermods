@@ -7,6 +7,7 @@
 // decide. Keep it that way: the handoff rule in particular is the one piece of this feature the
 // browser tests cannot reach (a side panel cannot be opened by automation), so it lives here.
 import { isArchived, relativeTime, type Chat } from './chats.ts';
+import { skillFileName, skillHosts, type Skill } from './skills.ts';
 import type { Mod } from './types';
 
 // ---------------------------------------------------------------------------
@@ -484,5 +485,53 @@ export function exportFilenames(mods: Array<Pick<Mod, 'name'>>): string[] {
         return candidate;
       }
     }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Skills
+// ---------------------------------------------------------------------------
+
+/** Which kinds the Mods section lists. */
+export type KindFilter = 'all' | 'mods' | 'skills';
+
+/** filterMods for skills: the site and the words. A skill has no on and off to filter by. */
+export function filterSkills(skills: Skill[], f: Pick<ModFilter, 'site' | 'query'>): Skill[] {
+  const q = (f.query ?? '').trim().toLowerCase();
+  return skills.filter((s) => {
+    if (f.site && !skillHosts(s).includes(f.site)) return false;
+    if (!q) return true;
+    return s.name.toLowerCase().includes(q) || s.description.toLowerCase().includes(q) || s.matches.some((p) => p.toLowerCase().includes(q));
+  });
+}
+
+/** The site filter's options across both kinds. */
+export function siteOptions(mods: Mod[], skills: Skill[]): Array<{ host: string; count: number }> {
+  const counts = new Map(modSiteOptions(mods).map((o) => [o.host, o.count]));
+  for (const s of skills) for (const h of skillHosts(s)) counts.set(h, (counts.get(h) ?? 0) + 1);
+  return [...counts].map(([host, count]) => ({ host, count })).sort((a, b) => b.count - a.count || a.host.localeCompare(b.host));
+}
+
+/** Where a skill came from, in the row's few words. */
+export function skillSource(s: Pick<Skill, 'origin' | 'downloadUrl'>): string {
+  if (s.origin === 'edited') return 'edited by hand';
+  if (s.origin === 'imported') return 'imported';
+  if (s.origin === 'local') return 'recorded in chat';
+  try {
+    return new URL(s.downloadUrl ?? '').hostname;
+  } catch {
+    return 'installed';
+  }
+}
+
+/** File names for a skills zip, numbered where two would collide. */
+export function skillFilenames(skills: Array<Pick<Skill, 'name'>>): string[] {
+  const taken = new Set<string>();
+  return skills.map((s) => {
+    const base = skillFileName(s.name);
+    let name = base;
+    for (let i = 2; taken.has(name); i++) name = base.replace(/\.skill\.md$/, `-${i}.skill.md`);
+    taken.add(name);
+    return name;
   });
 }

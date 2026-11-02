@@ -8,30 +8,40 @@
 //
 // Nothing here makes a network request. Every byte that leaves goes out when the user presses the
 // site's own button, from the site's own page.
-import { SAFARI_BUILD } from './buildflags';
+import { ACT_OFF, SAFARI_BUILD } from './buildflags';
 import { reheaderFields } from './artifact';
 import { reparseEditedSource } from './install';
-import { HINTS, SHARE_SESSION_TTL_MS, gistRawUrl, pickGistFile, recordGist, recordGreasyFork, shareStep, type ShareSession, type ShareTarget } from './share';
+import { HINTS, SHARE_SESSION_TTL_MS, gistRawUrl, pickGistFile, recordGist, recordGreasyFork, recordSkillGist, shareStep, type ShareSession, type ShareTarget } from './share';
 import { setEditorInPage, type FillRequest, type FillResult } from './sharefill';
+import { setSkillFields, skillFromSource, type Skill } from './skills';
 import type { ContentRequest, Mod, ShareHintSpec } from './types';
 
 const SESSIONS_KEY = 'share:sessions';
 
 /** What the panel hears about, over runtime messaging. */
-export type ShareEvent =
+export type ShareEvent = (
   | { type: 'usermods:share-event'; kind: 'filled' | 'fallback' | 'signin'; modId: string; target: ShareTarget }
   | { type: 'usermods:share-event'; kind: 'recorded'; modId: string; target: ShareTarget; url: string; rawUrl?: string }
-  | { type: 'usermods:share-event'; kind: 'gist-missing'; modId: string; target: 'gist' };
+  | { type: 'usermods:share-event'; kind: 'gist-missing'; modId: string; target: 'gist' }
+) & {
+  /** `modId` names a skill. Absent in a build with ACT_OFF. */
+  skill?: true;
+};
 
 export interface ShareDeps {
   loadMods(): Promise<Mod[]>;
   /** Persist a changed mod (upsert + re-register). */
   saveMod(mod: Mod): Promise<void>;
+  /** The same for skills, in a build that has them. */
+  loadSkills?(): Promise<Skill[]>;
+  saveSkill?(skill: Skill): Promise<void>;
   sendToContent<T>(tabId: number, req: ContentRequest): Promise<T>;
 }
 
 export interface StartShare {
   modId: string;
+  /** `modId` names a skill, whose only way out is a gist. */
+  skill?: true;
   target: ShareTarget;
   mode: 'new' | 'update';
   source: string;
@@ -65,12 +75,19 @@ async function writeSessions(map: SessionMap): Promise<void> {
   }
 }
 
+/** The hints are about a script; on a skill's share the same words say so. */
+function skillWords(spec: ShareHintSpec): ShareHintSpec {
+  const say = (t: string) => t.replace(/\bscript\b/g, 'skill');
+  return { ...spec, text: say(spec.text), ...(spec.textNotCopied ? { textNotCopied: say(spec.textNotCopied) } : {}), ...(spec.copy ? { copyLabel: 'Copy skill' } : {}) };
+}
+
 export function createShareController(deps: ShareDeps) {
   /** Loads in flight per tab, so two 'complete' events for one load do not fill twice. */
   const busy = new Set<number>();
 
-  function notify(e: ShareEvent): void {
-    void Promise.resolve(chrome.runtime.sendMessage(e)).catch(() => {
+  function notify(e: ShareEvent, s?: ShareSession): void {
+    const message: ShareEvent = !ACT_OFF && s?.skill ? { ...e, skill: true } : e;
+    void Promise.resolve(chrome.runtime.sendMessage(message)).catch(() => {
       /* no panel open: the mod's own record is what the panel reads next time */
     });
   }
@@ -95,14 +112,28 @@ export function createShareController(deps: ShareDeps) {
     return s;
   }
 
+  /** A skill's half of `start`: the same save first, and a bump is not an edit of what it does. */
+  async function prepareSkillItem(req: StartShare): Promise<Skill> {
+    const skill = (await deps.loadSkills!()).find((x) => x.id === req.modId);
+    if (!skill) throw new Error('That skill no longer exists.');
+    if (req.source !== skill.source) await deps.saveSkill!(skillFromSource(req.source, { existing: skill, origin: skill.origin, keepTrust: true }));
+    return skill;
+  }
+
   async function start(req: StartShare): Promise<{ tabId: number }> {
-    const mods = await deps.loadMods();
-    const mod = mods.find((m) => m.id === req.modId);
-    if (!mod) throw new Error('That mod no longer exists.');
-    // What goes on the site is what the mod now is: the bumped version, the header lines the user
-    // agreed to add. Saved first, so the gist and the installed mod never disagree.
-    if (req.source !== mod.source) {
-      await deps.saveMod(reparseEditedSource(mod, req.source));
+    let mod: Mod | Skill;
+    if (!ACT_OFF && req.skill) {
+      mod = await prepareSkillItem(req);
+    } else {
+      const mods = await deps.loadMods();
+      const found = mods.find((m) => m.id === req.modId);
+      if (!found) throw new Error('That mod no longer exists.');
+      mod = found;
+      // What goes on the site is what the mod now is: the bumped version, the header lines the user
+      // agreed to add. Saved first, so the gist and the installed mod never disagree.
+      if (req.source !== found.source) {
+        await deps.saveMod(reparseEditedSource(found, req.source));
+      }
     }
     let tabId = req.tabId;
     if (tabId == null) {
@@ -116,6 +147,7 @@ export function createShareController(deps: ShareDeps) {
     const session: ShareSession = {
       tabId,
       modId: req.modId,
+      ...(!ACT_OFF && req.skill ? { skill: true as const } : {}),
       target: req.target,
       mode: req.mode,
       source: req.source,
@@ -141,7 +173,8 @@ export function createShareController(deps: ShareDeps) {
    */
   const pendingHints = new Map<number, ShareHintSpec>();
 
-  function hint(tabId: number, spec: ShareHintSpec): Promise<unknown> {
+  function hint(tabId: number, given: ShareHintSpec, s?: ShareSession): Promise<unknown> {
+    const spec = !ACT_OFF && s?.skill ? skillWords(given) : given;
     return deps.sendToContent(tabId, { type: 'share-hint', hint: spec }).catch(() => {
       pendingHints.set(tabId, spec);
       return undefined;
@@ -169,7 +202,7 @@ export function createShareController(deps: ShareDeps) {
 
   /** Put the script in the editor. Chrome first tries the editor's own API from the page world. */
   async function fill(tabId: number, s: ShareSession): Promise<FillResult> {
-    const req: FillRequest = { target: s.target, mode: s.mode, fileName: s.fileName, description: s.description, source: s.source, version: s.version, previousVersion: s.previousVersion };
+    const req: FillRequest = { target: s.target, mode: s.mode, fileName: s.fileName, description: s.description, source: s.source, version: s.version, previousVersion: s.previousVersion, ...(!ACT_OFF && s.skill ? { skill: true } : {}) };
     if (s.target === 'greasyfork' || SAFARI_BUILD) {
       // Safari: scripting.executeScript is for the bundled content script only (docs/safari.md), so
       // the whole fill happens in the isolated world.
@@ -210,7 +243,8 @@ export function createShareController(deps: ShareDeps) {
       const step = shareStep(s, url);
       const mods = await deps.loadMods();
       const mod = mods.find((m) => m.id === s.modId);
-      if (!mod) {
+      const skill = !ACT_OFF && s.skill ? (await deps.loadSkills!()).find((x) => x.id === s.modId) : undefined;
+      if (!mod && !skill) {
         await update(tabId, () => undefined);
         return;
       }
@@ -222,50 +256,58 @@ export function createShareController(deps: ShareDeps) {
           return;
         case 'signin':
           await update(tabId, (x) => (x ? { ...x, phase: 'signin' } : x));
-          await hint(tabId, { text: s.target === 'gist' ? HINTS.signInGitHub : HINTS.signInGreasyFork, anchor: 'none', testId: 'usermods-hint-signin' });
-          notify({ type: 'usermods:share-event', kind: 'signin', modId: s.modId, target: s.target });
+          await hint(tabId, { text: s.target === 'gist' ? HINTS.signInGitHub : HINTS.signInGreasyFork, anchor: 'none', testId: 'usermods-hint-signin' }, s);
+          notify({ type: 'usermods:share-event', kind: 'signin', modId: s.modId, target: s.target }, s);
           return;
         case 'fill': {
           const r = await fill(tabId, s).catch((e: unknown): FillResult => ({ state: 'missing', reason: e instanceof Error ? e.message : String(e) }));
           if (r.state === 'signin') {
             await update(tabId, (x) => (x ? { ...x, phase: 'signin' } : x));
-            await hint(tabId, { text: s.target === 'gist' ? HINTS.signInGitHub : HINTS.signInGreasyFork, anchor: 'none', testId: 'usermods-hint-signin' });
-            notify({ type: 'usermods:share-event', kind: 'signin', modId: s.modId, target: s.target });
+            await hint(tabId, { text: s.target === 'gist' ? HINTS.signInGitHub : HINTS.signInGreasyFork, anchor: 'none', testId: 'usermods-hint-signin' }, s);
+            notify({ type: 'usermods:share-event', kind: 'signin', modId: s.modId, target: s.target }, s);
             return;
           }
           if (r.state === 'notfound' && s.target === 'gist' && s.mode === 'update') {
             await update(tabId, (x) => (x ? { ...x, phase: 'notfound' } : x));
-            await hint(tabId, { text: HINTS.gistMissing, anchor: 'none', offerNewGist: true, testId: 'usermods-hint-missing' });
-            notify({ type: 'usermods:share-event', kind: 'gist-missing', modId: s.modId, target: 'gist' });
+            await hint(tabId, { text: HINTS.gistMissing, anchor: 'none', offerNewGist: true, testId: 'usermods-hint-missing' }, s);
+            notify({ type: 'usermods:share-event', kind: 'gist-missing', modId: s.modId, target: 'gist' }, s);
             return;
           }
           if (r.state === 'filled') {
             await update(tabId, (x) => (x ? { ...x, phase: 'filled' } : x));
-            await hint(tabId, filledHint(s, mod));
-            notify({ type: 'usermods:share-event', kind: 'filled', modId: s.modId, target: s.target });
+            await hint(tabId, filledHint(s, mod), s);
+            notify({ type: 'usermods:share-event', kind: 'filled', modId: s.modId, target: s.target }, s);
             return;
           }
           await update(tabId, (x) => (x ? { ...x, phase: 'fallback' } : x));
-          await hint(tabId, fallbackHint(s));
-          notify({ type: 'usermods:share-event', kind: 'fallback', modId: s.modId, target: s.target });
+          await hint(tabId, fallbackHint(s), s);
+          notify({ type: 'usermods:share-event', kind: 'fallback', modId: s.modId, target: s.target }, s);
           return;
         }
         case 'record-gist': {
           const listed = await deps.sendToContent<{ files: string[] }>(tabId, { type: 'share-files' }).catch(() => ({ files: [] as string[] }));
           const fileName = pickGistFile(listed.files, s.fileName) ?? s.fileName;
-          const next = recordGist(mod, { user: step.user, id: step.id, fileName });
-          await deps.saveMod(next);
+          let saved: { share?: Mod['share'] };
+          if (!ACT_OFF && skill) {
+            const next = recordSkillGist(skill, { user: step.user, id: step.id, fileName });
+            await deps.saveSkill!(next);
+            saved = next;
+          } else {
+            const next = recordGist(mod!, { user: step.user, id: step.id, fileName });
+            await deps.saveMod(next);
+            saved = next;
+          }
           await update(tabId, () => undefined);
-          await hint(tabId, { text: HINTS.savedGist, anchor: 'none', testId: 'usermods-hint-saved' });
-          notify({ type: 'usermods:share-event', kind: 'recorded', modId: s.modId, target: 'gist', url: next.share!.gist!.url, rawUrl: gistRawUrl(step.user, step.id, fileName) });
+          await hint(tabId, { text: HINTS.savedGist, anchor: 'none', testId: 'usermods-hint-saved' }, s);
+          notify({ type: 'usermods:share-event', kind: 'recorded', modId: s.modId, target: 'gist', url: saved.share!.gist!.url, rawUrl: gistRawUrl(step.user, step.id, fileName) }, s);
           return;
         }
         case 'record-greasyfork': {
-          const next = recordGreasyFork(mod, step.url);
+          const next = recordGreasyFork(mod!, step.url);
           await deps.saveMod(next);
           await update(tabId, () => undefined);
           await hint(tabId, { text: HINTS.savedGreasyFork, anchor: 'none', testId: 'usermods-hint-saved' });
-          notify({ type: 'usermods:share-event', kind: 'recorded', modId: s.modId, target: 'greasyfork', url: next.share?.greasyFork?.url ?? step.url });
+          notify({ type: 'usermods:share-event', kind: 'recorded', modId: s.modId, target: 'greasyfork', url: next.share?.greasyFork?.url ?? step.url }, s);
           return;
         }
       }
@@ -278,6 +320,17 @@ export function createShareController(deps: ShareDeps) {
   async function restartAsNewGist(tabId: number): Promise<void> {
     const s = await get(tabId);
     if (!s || s.target !== 'gist') return;
+    if (!ACT_OFF && s.skill) {
+      const skill = (await deps.loadSkills!()).find((x) => x.id === s.modId);
+      if (!skill) return;
+      const { gist: _gone, ...others } = skill.share ?? {};
+      const { share: _share, downloadUrl: _url, ...rest } = skill;
+      const clearedSkill: Skill = { ...rest, source: setSkillFields(skill.source, { updateURL: null, downloadURL: null }), ...(Object.keys(others).length ? { share: others } : {}), updatedAt: Date.now() };
+      await deps.saveSkill!(clearedSkill);
+      await update(tabId, () => undefined);
+      await start({ modId: s.modId, skill: true, target: 'gist', mode: 'new', source: clearedSkill.source, fileName: s.fileName, description: s.description, version: s.version, previousVersion: s.previousVersion, openUrl: 'https://gist.github.com/', tabId });
+      return;
+    }
     const mods = await deps.loadMods();
     const mod = mods.find((m) => m.id === s.modId);
     if (!mod) return;

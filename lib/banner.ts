@@ -8,9 +8,11 @@
 //
 // Written against the standard DOM so the same code is tested under node on saved copies of the
 // real pages (test/fixtures/pages, parsed with linkedom) and run in the browser.
+import { ACT_OFF } from './buildflags.ts';
 import { parseHeader } from './mods.ts';
 import { compareVersions } from './version.ts';
 import { latestGistRawUrl, parseGistRawUrl, parseGistUrl, parseGreasyForkScriptUrl } from './share.ts';
+import { looksLikeSkill, readSkillFacts, type Skill } from './skills.ts';
 import type { Mod } from './types';
 
 export type DetectionKind = 'gist' | 'github-blob' | 'raw' | 'greasyfork' | 'openuserjs';
@@ -23,6 +25,8 @@ export interface DetectedScript {
   installUrl: string;
   /** @downloadURL from the header, when the page showed it. */
   downloadUrl?: string;
+  /** This is a .skill.md file, not a script. Only ever set with the flag on. */
+  skill?: true;
 }
 
 export interface Detection {
@@ -48,6 +52,12 @@ const HEADER_LINES = 120;
 const HEADER_OPEN = /\/\/\s*==UserScript==/;
 const HEADER_CLOSE = /\/\/\s*==\/UserScript==/;
 
+/** A raw file's document type. A .skill.md can also be served as Markdown. */
+const isTextType = (contentType: string) => {
+  const t = contentType.toLowerCase();
+  return TEXT_TYPES.has(t) || (!ACT_OFF && t === 'text/markdown');
+};
+
 /** Would a page at this URL, with this document type, even be looked at? The cheap gate. */
 export function worthLooking(href: string, contentType: string): boolean {
   let host = '';
@@ -58,7 +68,7 @@ export function worthLooking(href: string, contentType: string): boolean {
   } catch {
     return false;
   }
-  return BANNER_HOSTS.includes(host) || TEXT_TYPES.has(contentType.toLowerCase());
+  return BANNER_HOSTS.includes(host) || isTextType(contentType);
 }
 
 function header(text: string): { name: string; namespace: string; version: string; downloadUrl?: string } | null {
@@ -66,6 +76,38 @@ function header(text: string): { name: string; namespace: string; version: strin
   const h = parseHeader(text);
   if (!h.name && !HEADER_CLOSE.test(text)) return null;
   return { name: h.name, namespace: h.raw['namespace']?.[0]?.trim() ?? '', version: h.version, ...(h.downloadUrl ? { downloadUrl: h.downloadUrl } : {}) };
+}
+
+/** A file's name without its .skill.md. */
+const skillStem = (file: string) => file.replace(/\.skill\.md$/i, '');
+
+/**
+ * GitHub renders a Markdown file's front matter as a two-column table, `<th>key</th><td>value</td>`
+ * per row, which is the only place a gist or blob page shows it: a Markdown file has no source lines.
+ * Read 2026-11-02 from a public gist holding a SKILL.md.
+ */
+function renderedFrontMatter(scope: Element | Document): Record<string, string> | null {
+  const table = scope.querySelector('.markdown-body table');
+  if (!table) return null;
+  const out: Record<string, string> = {};
+  for (const row of Array.from(table.querySelectorAll('tr'))) {
+    const key = row.querySelector('th')?.textContent?.trim();
+    const value = row.querySelector('td')?.textContent?.trim();
+    if (key && value !== undefined) out[key] = value;
+  }
+  return 'usermods-skill' in out ? out : null;
+}
+
+/** What a page shows of a skill: the source lines, or the rendered table. */
+function skillFromPage(scope: Element | Document, fileName: string, installUrl: string): DetectedScript {
+  const lines = Array.from(scope.querySelectorAll('.js-file-line, .blob-code-inner, .react-file-line')).map((l) => (l.textContent ?? '').replace(/\n$/, ''));
+  const facts = lines.length ? readSkillFacts(lines.slice(0, HEADER_LINES).join('\n')) : null;
+  const shown = renderedFrontMatter(scope);
+  const name = facts?.name || shown?.['name'] || skillStem(fileName);
+  const namespace = facts?.namespace ?? shown?.['namespace'] ?? '';
+  const version = facts?.version ?? shown?.['version'] ?? '';
+  const downloadUrl = facts?.downloadUrl ?? shown?.['downloadURL'];
+  return { name, namespace, version, installUrl, ...(downloadUrl ? { downloadUrl } : {}), skill: true };
 }
 
 function linesText(els: ArrayLike<Element>): string {
@@ -106,6 +148,11 @@ function detectGist(doc: Document, href: string): Detection | null {
   for (const a of Array.from(doc.querySelectorAll<HTMLAnchorElement>('a[href*="/raw/"]'))) {
     const abs = absolute(a.getAttribute('href') ?? '', href);
     const raw = parseGistRawUrl(abs);
+    if (!ACT_OFF && raw && raw.id === g.id && /\.skill\.md$/i.test(raw.fileName) && !seen.has(raw.fileName)) {
+      seen.add(raw.fileName);
+      scripts.push(skillFromPage(a.closest('.file') ?? doc, raw.fileName, latestGistRawUrl(abs) ?? abs));
+      continue;
+    }
     if (!raw || raw.id !== g.id || !/\.user\.js$/i.test(raw.fileName) || seen.has(raw.fileName)) continue;
     seen.add(raw.fileName);
     const file = a.closest('.file');
@@ -161,9 +208,11 @@ function detectBlob(doc: Document, href: string): Detection | null {
     return null;
   }
   const parts = u.pathname.split('/').filter(Boolean);
-  if (u.hostname !== 'github.com' || parts.length < 5 || parts[2] !== 'blob' || !/\.user\.js$/i.test(u.pathname)) return null;
+  const isSkillFile = !ACT_OFF && /\.skill\.md$/i.test(u.pathname);
+  if (u.hostname !== 'github.com' || parts.length < 5 || parts[2] !== 'blob' || (!isSkillFile && !/\.user\.js$/i.test(u.pathname))) return null;
   const rawButton = doc.querySelector<HTMLAnchorElement>('a[data-testid="raw-button"], a#raw-url');
   const installUrl = rawButton?.getAttribute('href') ? absolute(rawButton.getAttribute('href')!, href) : `https://github.com/${parts[0]}/${parts[1]}/raw/${parts.slice(3).join('/')}`;
+  if (isSkillFile) return skillBlob(doc, parts, installUrl);
   let text = linesText(doc.querySelectorAll('.react-file-line, .js-file-line'));
   if (!HEADER_OPEN.test(text)) {
     const ta = doc.querySelector<HTMLTextAreaElement>('#read-only-cursor-text-area');
@@ -186,13 +235,34 @@ function detectBlob(doc: Document, href: string): Detection | null {
   };
 }
 
+/** detectBlob for a .skill.md: the read-only text and the page's data before what is rendered. */
+function skillBlob(doc: Document, parts: string[], installUrl: string): Detection {
+  const file = decodeURIComponent(parts[parts.length - 1]!);
+  const ta = doc.querySelector<HTMLTextAreaElement>('#read-only-cursor-text-area');
+  let text = (ta?.value || ta?.textContent || '').slice(0, RAW_HEADER_BYTES);
+  if (!looksLikeSkill(text)) {
+    for (const s of Array.from(doc.querySelectorAll('script[data-target="react-app.embeddedData"]'))) {
+      const t = rawLinesHeader(s.textContent ?? '');
+      if (looksLikeSkill(t)) {
+        text = t;
+        break;
+      }
+    }
+  }
+  const facts = looksLikeSkill(text) ? readSkillFacts(text) : null;
+  const script = facts
+    ? { name: facts.name || skillStem(file), namespace: facts.namespace, version: facts.version, installUrl, ...(facts.downloadUrl ? { downloadUrl: facts.downloadUrl } : {}), skill: true as const }
+    : skillFromPage(doc, file, installUrl);
+  return { kind: 'github-blob', scripts: [script] };
+}
+
 /**
  * (c) A document that IS a script: a raw view the .user.js redirect did not catch (a `?raw` URL, a
  * paste site, a raw link without the .user.js suffix). Only a plain-text document is looked at, and
  * only its first 2 KB for the opening line.
  */
 function detectRaw(doc: Document, href: string, contentType: string): Detection | null {
-  if (!TEXT_TYPES.has(contentType.toLowerCase())) return null;
+  if (!isTextType(contentType)) return null;
   const body = doc.body;
   if (!body) return null;
   // Chrome and Safari render a text document as one <pre>. Its first text node is the file, and a
@@ -200,6 +270,10 @@ function detectRaw(doc: Document, href: string, contentType: string): Detection 
   const pre = body.querySelector('pre') ?? body;
   const first = pre.firstChild;
   const all = (first && first.nodeType === 3 ? (first as Text).data : pre.textContent) ?? '';
+  if (!ACT_OFF && looksLikeSkill(all)) {
+    const facts = readSkillFacts(all.slice(0, RAW_HEADER_BYTES));
+    return { kind: 'raw', scripts: [{ name: facts?.name || skillStem(lastSegment(href)) || 'Untitled skill', namespace: facts?.namespace ?? '', version: facts?.version ?? '', installUrl: href, ...(facts?.downloadUrl ? { downloadUrl: facts.downloadUrl } : {}), skill: true }] };
+  }
   if (!HEADER_OPEN.test(all.slice(0, RAW_SNIFF_BYTES))) return null;
   const h = header(all.slice(0, RAW_HEADER_BYTES));
   if (!h) return null;
@@ -323,6 +397,24 @@ export function installState(script: DetectedScript, mods: Array<Pick<Mod, 'id' 
 }
 
 /**
+ * installState for a skill, by the same rule: the URL when both sides have one, else name and
+ * namespace, both required. A skill is only ever compared with skills, so a mod of the same name and
+ * namespace is a different thing.
+ */
+export function skillInstallState(script: DetectedScript, skills: Array<Pick<Skill, 'id' | 'name' | 'version' | 'namespace' | 'downloadUrl'>>): InstallState {
+  const urls = new Set([script.installUrl, script.downloadUrl].filter((u): u is string => !!u).map(canonicalScriptUrl));
+  const found = skills.find((s) => {
+    if (s.downloadUrl && urls.has(canonicalScriptUrl(s.downloadUrl))) return true;
+    return !!script.namespace && !!script.name && s.namespace === script.namespace && s.name === script.name;
+  });
+  if (!found) return { kind: 'install' };
+  if (script.version && found.version && compareVersions(script.version, found.version) > 0) {
+    return { kind: 'update', modId: found.id, from: found.version, to: script.version };
+  }
+  return { kind: 'installed', modId: found.id, version: found.version };
+}
+
+/**
  * Should the banner show at all for this state? Everywhere but Greasy Fork and OpenUserJS it offers
  * Install; there, the site's own Install button already does that, so the banner only appears when
  * it has something the page does not say — an update, or that it is already installed.
@@ -364,5 +456,6 @@ export function bannerText(script: DetectedScript, state: InstallState): { messa
   const name = script.name || 'this userscript';
   if (state.kind === 'installed') return { message: `“${name}” is installed in usermods.`, action: null };
   if (state.kind === 'update') return { message: `usermods has “${name}” v${state.from}. This page has v${state.to}.`, action: `Update to v${state.to}` };
+  if (!ACT_OFF && script.skill) return { message: `usermods can install the skill “${name}”.`, action: 'Install' };
   return { message: `usermods can install “${name}”.`, action: 'Install' };
 }

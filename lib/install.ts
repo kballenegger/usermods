@@ -3,7 +3,9 @@
 // The .ts extension is load-bearing: the node test runner (--experimental-strip-types) resolves
 // these imports literally, and the pure decisions in this file are tested there. Vite resolves it
 // either way. lib/dashboard.ts imports lib/chats.ts the same way for the same reason.
+import { ACT_OFF } from './buildflags.ts';
 import { modFromSource, parseHeader, previewFromSource } from './mods.ts';
+import { looksLikeSkill, previewSkill, type SkillPreview } from './skills.ts';
 import type { Mod, ScriptPreview } from './types';
 
 const FETCH_TIMEOUT_MS = 15_000;
@@ -59,13 +61,26 @@ export function toBase64(bytes: Uint8Array): string {
   return btoa(s);
 }
 
-/** Download a script and describe it, without saving anything. */
-export async function previewFromUrl(url: string): Promise<ScriptPreview> {
+/** What an install page shows: a script, or in a build that operates pages, a skill. */
+export type InstallPreview = (ScriptPreview & { kind: 'mod' }) | (SkillPreview & { kind: 'skill' });
+
+/**
+ * Describe a text by what it is. A skill's front matter is the first thing in its file, where a
+ * userscript cannot have it, so it is asked first: a skill whose notes quote a ==UserScript== header
+ * is still a skill, with a skill's powers.
+ */
+export function previewFromText(source: string, downloadUrl?: string): InstallPreview {
+  if (!ACT_OFF && looksLikeSkill(source)) return { kind: 'skill', ...previewSkill(source, downloadUrl) };
+  return { kind: 'mod', ...previewFromSource(source, downloadUrl) };
+}
+
+/** Download a script or a skill and describe it, without saving anything. */
+export async function previewFromUrl(url: string): Promise<InstallPreview> {
   const source = await fetchText(url);
-  if (!/\/\/\s*==UserScript==/.test(source)) {
+  if ((ACT_OFF || !looksLikeSkill(source)) && !/\/\/\s*==UserScript==/.test(source)) {
     throw new Error(`That URL does not look like a userscript (no ==UserScript== header): ${url}`);
   }
-  return previewFromSource(source, url);
+  return previewFromText(source, url);
 }
 
 /**

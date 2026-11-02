@@ -3,14 +3,17 @@
 // Checks fetch; they never install. The only path that changes an installed mod is `apply`, which
 // the review screen calls when the user presses "Install update", and which installs exactly the
 // text that screen showed (matched by hash).
+import { ACT_OFF } from './buildflags';
 import { fetchBinary } from './install';
 import { parseHeader } from './mods';
 import { loadSettings } from './settings';
+import type { Skill } from './skills';
 import {
   CHECK_BYTE_BUDGET,
   CHECK_CONCURRENCY,
   UPDATES_KEY,
   buildReviewPrompt,
+  buildSkillReviewPrompt,
   checkUrls,
   clearAvailable,
   dueForCheck,
@@ -20,6 +23,7 @@ import {
   parseReview,
   recordCheck,
   reviewKey,
+  skillUpdateRefused,
   skipVersion,
   type UpdateMap,
   type UpdateRecord,
@@ -31,6 +35,9 @@ export interface UpdateDeps {
   loadMods(): Promise<Mod[]>;
   /** Install `source` over `mod`: same id, values and enabled flag; dependencies refetched. */
   install(mod: Mod, source: string): Promise<void>;
+  /** The same for skills, in a build that has them. Installing clears the walk and any allowance. */
+  loadSkills?(): Promise<Skill[]>;
+  installSkill?(skill: Skill, source: string): Promise<void>;
   /** One tool-free model call with the user's chosen model; throws with a readable reason. */
   complete(system: string, user: string): Promise<{ text: string; model: string }>;
   /** Is there a model to ask at all? The reason is shown on the disabled button. */
@@ -57,18 +64,41 @@ function quietReason(e: unknown): string {
   if (/HTTP (\d+)/.test(m)) return `could not check (${m.match(/HTTP \d+[^:]*/)?.[0] ?? 'HTTP error'})`;
   if (/Timed out/i.test(m)) return 'could not check (timed out)';
   if (/exceeds the 5 MB/i.test(m)) return 'could not check (too large)';
+  if (!ACT_OFF && /^(not a skill|it is refused)/.test(m)) return `could not check (${m})`;
   return 'could not check';
 }
 
 export function createUpdateController(deps: UpdateDeps) {
   let running: Promise<{ checked: number; offered: number }> | null = null;
 
+  /** Everything that can have an update: the mods, and in a build that has them, the skills. */
+  async function loadItems(): Promise<Array<Mod | Skill>> {
+    const mods = await deps.loadMods();
+    return !ACT_OFF && deps.loadSkills ? [...mods, ...(await deps.loadSkills())] : mods;
+  }
+
+  /** A skill's record has steps; a mod's never does. */
+  const isSkill = (item: Mod | Skill): item is Skill => !ACT_OFF && 'steps' in item;
+
+  /** A skill's check: one file, which must still be a skill and must pass what an install would ask. */
+  async function checkSkill(skill: Skill, urls: { check: string }, budget: { left: number }, now: number): Promise<void> {
+    const got = await fetchBinary(urls.check);
+    budget.left -= got.bytes.byteLength;
+    const refused = skillUpdateRefused(got.text);
+    if (refused) throw new Error(refused);
+    await writeRecord(skill.id, (r) => recordCheck(r, skill, { ok: true, source: got.text, url: urls.check }, now));
+  }
+
   /** Fetch one mod's newest version and record what it says. Never touches the mod. */
-  async function checkOne(mod: Mod, budget: { left: number }): Promise<void> {
+  async function checkOne(mod: Mod | Skill, budget: { left: number }): Promise<void> {
     const urls = checkUrls(mod);
     if (!urls) return;
     const now = Date.now();
     try {
+      if (isSkill(mod)) {
+        await checkSkill(mod, urls, budget, now);
+        return;
+      }
       let got = await fetchBinary(urls.check);
       budget.left -= got.bytes.byteLength;
       let source = got.text;
@@ -102,7 +132,7 @@ export function createUpdateController(deps: UpdateDeps) {
     if (running && !opts.onlyId) return running;
     const work = (async () => {
       if (!opts.force && (await loadSettings()).checkUpdates === false) return { checked: 0, offered: 0 };
-      const mods = await deps.loadMods();
+      const mods = await loadItems();
       const map = await readMap();
       const now = Date.now();
       const due = mods.filter((m) => (opts.onlyId ? m.id === opts.onlyId : true) && (opts.force ? !!checkUrls(m) : dueForCheck(m, map[m.id], now)));
@@ -121,7 +151,7 @@ export function createUpdateController(deps: UpdateDeps) {
 
   /** What the panel and dashboard rows need: no sources, just the offer and any quiet error. */
   async function summary(): Promise<Record<string, { available?: string; error?: string; lastChecked?: number }>> {
-    const [mods, map] = await Promise.all([deps.loadMods(), readMap()]);
+    const [mods, map] = await Promise.all([loadItems(), readMap()]);
     const out: Record<string, { available?: string; error?: string; lastChecked?: number }> = {};
     for (const m of mods) {
       const rec = map[m.id];
@@ -133,12 +163,12 @@ export function createUpdateController(deps: UpdateDeps) {
   }
 
   async function get(modId: string) {
-    const [mods, map] = await Promise.all([deps.loadMods(), readMap()]);
+    const [mods, map] = await Promise.all([loadItems(), readMap()]);
     const mod = mods.find((m) => m.id === modId);
     if (!mod) throw new Error('That mod no longer exists.');
     const offer = offeredUpdate(mod, map[modId]);
     const cached = offer ? ((await chrome.storage.local.get(reviewKey(modId, offer.hash)))[reviewKey(modId, offer.hash)] as UpdateReview | undefined) : undefined;
-    return { mod, update: offer, review: cached ?? null, reviewer: await deps.modelAvailable() };
+    return { mod, ...(isSkill(mod) ? { skill: true as const } : {}), update: offer, review: cached ?? null, reviewer: await deps.modelAvailable() };
   }
 
   async function skip(modId: string, version: string): Promise<void> {
@@ -147,12 +177,13 @@ export function createUpdateController(deps: UpdateDeps) {
 
   /** "Install update": exactly the text the screen showed, or nothing. */
   async function apply(modId: string, hash: string): Promise<{ version: string }> {
-    const [mods, map] = await Promise.all([deps.loadMods(), readMap()]);
+    const [mods, map] = await Promise.all([loadItems(), readMap()]);
     const mod = mods.find((m) => m.id === modId);
     const offer = mod ? offeredUpdate(mod, map[modId]) : null;
     if (!mod || !offer) throw new Error('There is no update waiting for this mod.');
     if (offer.hash !== hash) throw new Error('The update changed since you opened it. Reload this page to review the new text.');
-    await deps.install(mod, offer.source);
+    if (isSkill(mod)) await deps.installSkill!(mod, offer.source);
+    else await deps.install(mod, offer.source);
     await writeRecord(modId, (r) => clearAvailable(r));
     return { version: offer.version };
   }
@@ -163,14 +194,14 @@ export function createUpdateController(deps: UpdateDeps) {
    * closing the page does not lose the answer.
    */
   async function review(modId: string, hash: string): Promise<UpdateReview> {
-    const [mods, map] = await Promise.all([deps.loadMods(), readMap()]);
+    const [mods, map] = await Promise.all([loadItems(), readMap()]);
     const mod = mods.find((m) => m.id === modId);
     const offer = mod ? offeredUpdate(mod, map[modId]) : null;
     if (!mod || !offer || offer.hash !== hash) throw new Error('There is no such update to review.');
     const key = reviewKey(modId, hash);
     const cached = (await chrome.storage.local.get(key))[key] as UpdateReview | undefined;
     if (cached) return cached;
-    const prompt = buildReviewPrompt({ name: mod.name, oldSource: mod.source, newSource: offer.source, nonce: crypto.randomUUID().replace(/-/g, '') });
+    const prompt = (isSkill(mod) ? buildSkillReviewPrompt : buildReviewPrompt)({ name: mod.name, oldSource: mod.source, newSource: offer.source, nonce: crypto.randomUUID().replace(/-/g, '') });
     const { text, model } = await deps.complete(prompt.system, prompt.user);
     const parsed = parseReview(text);
     if (!parsed.ok) throw new Error(`${parsed.error} Try again, or review the diff yourself.`);

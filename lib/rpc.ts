@@ -6,7 +6,9 @@ import type { ThinkingLevel } from './thinking';
 import type { ResumableRun } from './runstate';
 import type { StartShare } from './sharecontroller';
 import type { AvailableUpdate, UpdateReview } from './updates';
-import type { AgentEvent, ChatItem, Mod, ScriptPreview, UserTurn } from './types';
+import type { InstallPreview } from './install';
+import type { SkillsRpc, SkillsRpcResults } from './skillrpc';
+import type { AgentEvent, ChatItem, Mod, UserTurn } from './types';
 
 export type OAuthKind = 'chatgpt' | 'xai';
 export type OAuthLoginState =
@@ -132,22 +134,26 @@ export type RpcRequest =
    */
   | { type: 'agent.attach' }
   /** Operating a page (lib/drive.ts): answering a question, and Settings' list. Only ever from an extension page. */
-  | import('./drive').DriveRpc;
+  | import('./drive').DriveRpc
+  /** Skills (lib/skillrpc.ts). Absent from a build with ACT_OFF. */
+  | SkillsRpc;
 
 /** Response shape per request type. Anything not listed here answers { ok: true }. */
-interface RpcResults {
+interface RpcResults extends SkillsRpcResults {
   'mods.list': Mod[];
   'mods.save': Mod[];
   'mods.delete': Mod[];
   'mods.toggle': Mod[];
   'mods.install': Mod[];
   'mods.saveSource': Mod[];
-  'mods.preview': ScriptPreview;
+  'mods.preview': InstallPreview;
   'mods.update': { updated: boolean; version: string; available?: string };
   'updates.check': { checked: number; offered: number };
   'updates.summary': Record<string, { available?: string; error?: string; lastChecked?: number }>;
   'updates.get': {
-    mod: Mod;
+    mod: Pick<Mod, 'id' | 'name' | 'version' | 'source'>;
+    /** `mod` is a skill's record: the screen reads its powers from the two step lists. */
+    skill?: true;
     update: AvailableUpdate | null;
     review: UpdateReview | null;
     reviewer: { ok: true; model: string } | { ok: false; reason: string };

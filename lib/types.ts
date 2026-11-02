@@ -526,6 +526,8 @@ export interface ShareHintSpec {
   /** Put this on the clipboard (and offer a Copy button); `text`/`textNotCopied` say which happened. */
   copy?: string;
   textNotCopied?: string;
+  /** The Copy button's word, when it is not a script being copied. */
+  copyLabel?: string;
   /** Offer "Share as a new gist" (a deleted gist's edit page). */
   offerNewGist?: boolean;
   testId?: string;

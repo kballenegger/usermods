@@ -8,6 +8,11 @@
 //
 // Pure and local: it reads the text and nothing else, makes no request, and does not try to decide
 // whether a key is live. It errs towards saying something; the user decides.
+//
+// A skill file gets three more rules (scanSkillForLeaks, docs/specs/skills.md section 4.4): a typed
+// value, a token in an address, and a secret in the notes.
+
+import { parseSkill } from './skills.ts';
 
 export type LeakKind =
   | 'openai-key'
@@ -20,7 +25,10 @@ export type LeakKind =
   | 'api-key'
   | 'private-ip'
   | 'private-host'
-  | 'localhost';
+  | 'localhost'
+  | 'typed-value'
+  | 'url-query'
+  | 'prose-secret';
 
 export interface Leak {
   kind: LeakKind;
@@ -30,6 +38,8 @@ export interface Leak {
   line: number;
   /** The match with its middle masked, so the warning itself does not display the secret. */
   preview: string;
+  /** A typed value's step, 0-based: what Make it an input rewrites. */
+  step?: number;
 }
 
 interface Rule {
@@ -144,4 +154,70 @@ export function scanForLeaks(source: string): Leak[] {
 /** One line for the panel: "Line 12: an OpenAI-style API key (sk-…) · sk-pro…9f2c". */
 export function describeLeak(l: Leak): string {
   return `Line ${l.line}: ${l.label} · ${l.preview}`;
+}
+
+// ---------------------------------------------------------------------------
+// A skill file
+// ---------------------------------------------------------------------------
+
+/** A query value worth asking about: long, and not just a word. */
+const QUERY_VALUE_MIN = 12;
+const PLAIN_WORD = /^[\p{L}-]+$/u;
+
+/** What only notes get looked at for: an address, a confirmation number, a long run of digits. */
+const PROSE_RULES: Array<{ label: string; re: RegExp }> = [
+  { label: 'an email address', re: /\b[\w.+-]+@[\w-]+(?:\.[\w-]+)*\.[a-z]{2,}\b/gi },
+  { label: 'what looks like a confirmation number', re: /\b[A-Z]{2,}[-_]?\d[\d-]{5,}\b/g },
+  { label: 'a long number', re: /\b\d{9,}\b/g },
+];
+
+function tokenInQuery(url: string): string | null {
+  let u: URL;
+  try {
+    u = new URL(url, 'https://skill.invalid/');
+  } catch {
+    return null;
+  }
+  for (const v of u.searchParams.values()) if (v.length >= QUERY_VALUE_MIN && !PLAIN_WORD.test(v)) return v;
+  return null;
+}
+
+/**
+ * Every likely leak in a .skill.md: the rules above over the whole file, with a finding in the notes
+ * reported as `prose-secret`, and the skill's own three. A file that does not parse gets the plain
+ * scan: it cannot be saved or shared anyway, and that scan needs nothing from its shape.
+ */
+export function scanSkillForLeaks(source: string): Leak[] {
+  const base = scanForLeaks(source);
+  const r = parseSkill(source);
+  if (!r.ok) return base;
+  const { skill, lines } = r;
+  const inProse = (line: number) => lines.prose.some(([a, b]) => line >= a && line <= b);
+  const out: Leak[] = base.map((l) => (inProse(l.line) ? { ...l, kind: 'prose-secret', label: `in the notes, ${l.label}` } : l));
+
+  skill.steps.forEach((s, i) => {
+    const line = lines.steps[i]!;
+    if ((s.verb === 'fill' || s.verb === 'select') && !/^\$[A-Za-z_]/.test(s.value)) {
+      out.push({ kind: 'typed-value', label: `a typed value in ${s.target}`, line, preview: mask(s.value), step: i });
+    }
+    if (s.verb === 'go') {
+      const token = tokenInQuery(s.to);
+      if (token) out.push({ kind: 'url-query', label: 'a token in an address', line, preview: mask(token) });
+    }
+  });
+  const startToken = tokenInQuery(skill.start);
+  if (startToken) out.push({ kind: 'url-query', label: 'a token in the start address', line: lines.front['start'] ?? 1, preview: mask(startToken) });
+
+  const text = source.split('\n');
+  for (const [a, b] of lines.prose) {
+    for (let n = a; n <= b; n++) {
+      const l = text[n - 1] ?? '';
+      for (const rule of PROSE_RULES) {
+        rule.re.lastIndex = 0;
+        const m = rule.re.exec(l);
+        if (m) out.push({ kind: 'prose-secret', label: `in the notes, ${rule.label}`, line: n, preview: mask(m[0]) });
+      }
+    }
+  }
+  return out.sort((x, y) => x.line - y.line);
 }

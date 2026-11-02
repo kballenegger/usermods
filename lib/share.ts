@@ -11,6 +11,7 @@
 // lib/install.ts.
 import { reheaderFields } from './artifact.ts';
 import { parseHeader } from './mods.ts';
+import { readSkillFacts, setSkillFields, skillFileName, type Skill } from './skills.ts';
 import type { Mod, ModShare } from './types';
 
 export type ShareTarget = 'gist' | 'greasyfork';
@@ -333,6 +334,38 @@ export function prepareShare(mod: Pick<Mod, 'name' | 'description' | 'source' | 
 }
 
 /**
+ * prepareShare for a skill: a gist is the only way out, because Greasy Fork is for scripts and a file
+ * that does nothing in Tampermonkey has no business there (docs/specs/skills.md, section 4.1). The
+ * version line moves through setSkillFields, so a hand-written file keeps its shape.
+ */
+export function prepareSkillShare(skill: Pick<Skill, 'name' | 'description' | 'source' | 'version' | 'share'>, opts: Pick<ShareOptions, 'forceNew'> = {}): PreparedShare {
+  const previousVersion = readSkillFacts(skill.source)?.version ?? skill.version;
+  const mode: ShareMode = skill.share?.gist && !opts.forceNew ? 'update' : 'new';
+  const version = mode === 'update' ? bumpPatch(previousVersion) : previousVersion || '1.0.0';
+  return {
+    target: 'gist',
+    mode,
+    source: version === previousVersion ? skill.source : setSkillFields(skill.source, { version }),
+    previousVersion,
+    version,
+    fileName: (mode === 'update' && skill.share?.gist?.fileName) || skillFileName(skill.name),
+    description: skill.description,
+    openUrl: mode === 'update' && skill.share?.gist ? gistEditUrl(skill.share.gist.user, skill.share.gist.id) : GIST_NEW_URL,
+    missing: [],
+  };
+}
+
+/** recordGist for a skill: the two URLs go into the front matter, and nothing is bumped. */
+export function recordSkillGist(skill: Skill, gist: { user: string; id: string; fileName: string }, at = Date.now()): Skill {
+  const rawUrl = gistRawUrl(gist.user, gist.id, gist.fileName);
+  const share: ModShare = {
+    ...skill.share,
+    gist: { url: gistPageUrl(gist.user, gist.id), user: gist.user, id: gist.id, fileName: gist.fileName, rawUrl, savedAt: at },
+  };
+  return { ...skill, source: setSkillFields(skill.source, { updateURL: rawUrl, downloadURL: rawUrl }), downloadUrl: rawUrl, share, updatedAt: at };
+}
+
+/**
  * What a created gist changes about the mod: the gist is remembered, and the header's
  * @updateURL/@downloadURL point at its always-latest raw URL, so the copy anyone installs from the
  * link — and this one, through Update — follows new versions. Nothing is bumped here.
@@ -367,7 +400,8 @@ export function recordGreasyFork(mod: Mod, url: string, at = Date.now()): Mod {
  * before pressing Create, which is why the page is asked rather than the name assumed.
  */
 export function pickGistFile(files: string[], wanted: string): string | null {
-  const scripts = files.filter((f) => /\.user\.js$/i.test(f));
+  const kind = /\.skill\.md$/i.test(wanted) ? /\.skill\.md$/i : /\.user\.js$/i;
+  const scripts = files.filter((f) => kind.test(f));
   if (scripts.includes(wanted)) return wanted;
   if (scripts.length) return scripts[0]!;
   return files.includes(wanted) ? wanted : null;
@@ -382,6 +416,8 @@ export type SharePhase = 'opening' | 'signin' | 'filled' | 'fallback' | 'notfoun
 export interface ShareSession {
   tabId: number;
   modId: string;
+  /** `modId` names a skill. Absent in a build with ACT_OFF, which has none. */
+  skill?: true;
   target: ShareTarget;
   mode: ShareMode;
   source: string;
