@@ -4,6 +4,8 @@
 
 **Vibe-code userscripts in place.** An open-source browser extension that lets you customize any website by chatting with the LLM of your choice.
 
+<p align="center"><a href="https://chromewebstore.google.com/detail/usermods/dhmdjekbeinhhnfhcgnkgdpgdafpboic"><img src="docs/store-button.svg" alt="Add to Chrome: free on the Chrome Web Store" width="590"></a></p>
+
 Open the side panel on any page, describe what you want changed, and usermods inspects the page, writes a userscript, tests it live, and hands it to you with *Try* and *Save* buttons. Saved mods run automatically on every matching page load. Export them as standard `.user.js` files, share them as a GitHub gist or on Greasy Fork from your own signed-in tab (usermods fills the form; you press the button), install ones from Greasy Fork or any page that offers one, or [migrate your whole Tampermonkey library in one file](docs/guide.md#migrating-from-tampermonkey).
 
 Userscripts, userstyles, usermods.
@@ -15,14 +17,14 @@ https://github.com/user-attachments/assets/b2102d80-e0ff-447f-a1c9-9c62583c4786
 ## Why
 
 - **Any backend.** Anthropic's API, OpenAI, OpenRouter, or anything OpenAI-compatible: Ollama, LM Studio, vLLM, mlx_lm. Your key, your machine, no account, no hosted service.
-- **Use the subscription you already pay for.** Sign in with ChatGPT (Plus, Pro, Team) or SuperGrok / X Premium+ straight from Settings. No API key, no local proxy, no per-token bill. (In the build from this repository; the Chrome Web Store version leaves sign-in out.)
+- **Use the subscription you already pay for.** Sign in with ChatGPT (Plus, Pro, Team) or SuperGrok / X Premium+ straight from Settings. No API key, no local proxy, no per-token bill. (In the build from this repository; the [Chrome Web Store version](https://chromewebstore.google.com/detail/usermods/dhmdjekbeinhhnfhcgnkgdpgdafpboic) leaves sign-in out.)
 - **The model actually sees the page.** It reads a pruned DOM, lists elements, reads computed styles, takes screenshots, and runs scripts to test its work before proposing anything.
 - **One-off tasks too.** "Scroll to the bottom, open every carousel, and give me download links for all the photos" runs as a script, no mod required.
 - **Portable.** Mods are plain userscripts with a `==UserScript==` header. Nothing proprietary. **MIT.**
 
 ## Status
 
-Early, and working end to end: chat, page inspection, live testing, propose, save, run on load, edit an installed mod in chat, import and export. A Chrome Web Store listing is on its way; the Safari build runs on Mac, iPhone and iPad. See [Roadmap](docs/roadmap.md).
+Early, and working end to end: chat, page inspection, live testing, propose, save, run on load, edit an installed mod in chat, import and export. Version 0.1.1 is live on the [Chrome Web Store](https://chromewebstore.google.com/detail/usermods/dhmdjekbeinhhnfhcgnkgdpgdafpboic); the Safari build runs on Mac, iPhone and iPad. See [Roadmap](docs/roadmap.md).
 
 ## Screenshots
 
@@ -71,6 +73,16 @@ More, including every screen in both themes and the iPhone build: **[docs/screen
 - **Drafts with versions** — each chat keeps one draft mod with a version strip, line diffs and an undoable roll back.
 - **Dashboard** — every chat and every mod across every site in a full tab, with search, bulk actions and a source editor.
 - **Safari** — the same extension on Mac, iPhone and iPad, subscription sign-in included.
+
+## Install from the Chrome Web Store
+
+Requires Chrome 135+.
+
+1. **[Add usermods to Chrome](https://chromewebstore.google.com/detail/usermods/dhmdjekbeinhhnfhcgnkgdpgdafpboic).**
+2. Open `chrome://extensions`, click **Details** on usermods, and turn on **Allow User Scripts**. Chrome requires this toggle for any extension that runs user scripts, including Tampermonkey.
+3. Click the usermods icon to open the side panel **on that tab**. Go to **Settings**, click a preset under **Add provider**, and paste a key (or a local server URL). It saves as you type. Back in **Chat**, the model is the chip in the chat bar.
+
+The store version has no subscription sign-in. To sign in with ChatGPT or SuperGrok instead of using a key, install from source.
 
 ## Install (from source)
 

@@ -14,7 +14,7 @@ All notable changes to usermods are recorded here. The format follows
 
 ## [0.1.1] — 2026-09-30
 
-The version resubmitted to the Chrome Web Store. 0.1.0 was submitted on 2026-09-22 and rejected the
+The version live on the [Chrome Web Store](https://chromewebstore.google.com/detail/usermods/dhmdjekbeinhhnfhcgnkgdpgdafpboic), where the listing is dated 2026-10-02. 0.1.0 was submitted on 2026-09-22 and rejected the
 same day for its listing text (keyword spam in the description), not for the package; everything
 merged since then ships here.
 
