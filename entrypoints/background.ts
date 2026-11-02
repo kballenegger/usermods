@@ -12,10 +12,11 @@ import { dependenciesChanged, fetchText, previewFromText, previewFromUrl, repars
 import { UPDATED_MARK } from '@/lib/importreport';
 import { installPageUrl, isInstallableUrl, isUserScriptUrl, scriptIdentity, SKILL_MD_PATTERN, USER_JS_PATTERN, USER_JS_VIEW_PATTERN } from '@/lib/installurl';
 import { handleSkillsRpc, type SkillsRpc } from '@/lib/skillrpc';
-import { dropCarry, draftAsSkill, draftFromRun, keepAllowance, loadCarry, markWalked, saveCard, saveCarry } from '@/lib/skillcontroller';
-import { outputsNote, runSkill, stepsKey, type RunCarry } from '@/lib/skillrun';
+import { dropCarry, draftAsSkill, draftFromRun, keepAllowance, loadCarry, markWalked, openSkillDraft, openedText, proposeSkill, saveCard, saveCarry } from '@/lib/skillcontroller';
+import { repairAllowed, runRepair } from '@/lib/skillrepair';
+import { outputsNote, runReport, runSkill, stepsKey, type RepairResult, type RunCarry, type RunResult as SkillRunResult } from '@/lib/skillrun';
 import { loadSkills, upsertSkill } from '@/lib/skillstore';
-import { atStart, setSkillFields, skillFromSource, skillMatchesUrl, type Skill } from '@/lib/skills';
+import { atStart, setSkillFields, skillFromSource, skillHosts, skillMatchesUrl, skillsBlock, type Skill, type SkillStep } from '@/lib/skills';
 import { addDismissal, BANNER_DISMISSED_KEY, bannerWorthShowing, installState, isDismissed, skillInstallState, type Detection } from '@/lib/banner';
 import type { BannerStateReply } from '@/lib/bannerclient';
 import { createShareController } from '@/lib/sharecontroller';
@@ -27,7 +28,7 @@ import { watchDocument } from '@/lib/navwatch';
 import { shouldUpdate } from '@/lib/version';
 import { draftSourceFor, loadMods, matchPatternForUrl, modFromProposal, modFromSource, parseHeader, upsertMod, deleteMod, saveMods } from '@/lib/mods';
 import { addChatActions, appendTurn, archiveChat, bulkChats, countTurns, createChat, deleteChat, getChat, hostFromUrl, isArchived, listChats, loadItems, loadMessages, markTitleRefreshed, renameChat, saveItems, saveMessages, setChatArtifact, setChatModel, setChatRanSkill, setChatThinking, setModelTitle, touchChat } from '@/lib/chats';
-import { loadRuns, markInterrupted, nextRunRecord, pruneRuns, resumableRuns, saveRuns, withRunSkill, withSkillStep, withoutPending, type RunMap, type RunRecord } from '@/lib/runstate';
+import { loadRuns, markInterrupted, nextRunRecord, pruneRuns, resumableRuns, saveRuns, withRunSkill, withSkillStep, withoutPending, withoutRunSkill, type RunMap, type RunRecord } from '@/lib/runstate';
 import { AUTO_RESUMED_TEXT, autoResumable, countAutoResume, holdExpired, KEEPALIVE_MAX_HOLD_MS, KEEPALIVE_PORT, TAB_CLOSED_TEXT } from '@/lib/keepalive';
 import { isTombstoned, withKey } from '@/lib/storagequeue';
 import { collectBlobs } from '@/lib/blobs';
@@ -45,7 +46,7 @@ import { BAR_DONE, BAR_STOP } from '@/lib/pageui';
 import { hostOf } from '@/lib/agent/boundary';
 import { pendingResumeNote, type Driver } from '@/lib/agent/driver';
 import { noteBlock } from '@/lib/agent/note';
-import type { RunEnding, StepRow } from '@/lib/agent/questions';
+import type { RepairOffer, RunEnding, StepRow } from '@/lib/agent/questions';
 import { fromExtensionPage } from '@/lib/agent/senders';
 import { createDriveController, type DriveRpc } from '@/lib/drive';
 import { listFailureMessage, listWithFallback, modelsRequest, parseModelIds, type ModelListResult, type ModelListTarget } from '@/lib/modellist';
@@ -867,6 +868,7 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
     // owed mid-sentence, and re-reading the whole mod list for every queued message would put a
     // storage read (and every mod's full source) on the hot path of a streaming reply.
     const installedMods = await loadMods().catch(() => [] as Mod[]);
+    const installedSkills = ACT_OFF ? [] : await loadSkills().catch(() => [] as Skill[]);
     const notes = drive ? drive.note(chatId) : null;
     let noted = notes ? await notes.read().catch(() => '') : '';
     await touchChat(chatId, history.length || !turn ? { url } : { title: turn.text, url });
@@ -882,6 +884,23 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
         testMod: (code, reload, sig) => testModInTab(session.tabId, code, reload, artifact, sig),
         ...(drive && driver && notes
           ? {
+              skills: {
+                propose: async (input: Record<string, unknown>, messages: readonly Msg[]) => {
+                  const r = await proposeSkill(chatId, input, messages);
+                  if (!r.ok) return r;
+                  artifact = r.artifact;
+                  return { ok: true as const, text: r.text, card: r.card };
+                },
+                open: async (skillId: string, replace: boolean) => {
+                  const skill = installedSkills.find((s) => s.id === skillId);
+                  if (!skill) return { ok: false as const, reason: `There is no skill with id ${skillId} on this page. The ids are in the "[Skills on this page]" list.` };
+                  const decision = openModDecision(draftStanding(artifact), { replace, alreadyLinked: artifact?.linkedSkillId === skill.id });
+                  if (!decision.ok) return { ok: false as const, reason: decision.reason.replace('opening a mod', 'opening a skill').replace('that mod', 'that skill').replace('open_mod', 'open_skill').replace('editing the installed mod', 'editing that skill') };
+                  if (!decision.noop) artifact = await openSkillDraft(chatId, skill);
+                  return { ok: true as const, text: openedText(skill, artifact!.current), version: artifact!.current };
+                },
+                run: (skillId: string, values: Record<string, string>, toolId: string, sig: AbortSignal) => runSkillForModel(chatId, session.tabId, driver, skillId, values, toolId, sig, post),
+              },
               screenshot: () => drive.hidingBar(session.tabId, envForTab(session.tabId).screenshot),
               operate: {
                 guard: (sig: AbortSignal, iteration?: number) => driver.guard(sig, iteration),
@@ -961,7 +980,9 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
       // Which mods already run on the page this turn is being sent from. Read fresh each time it is
       // asked for rather than captured once: open_mod links this chat to one of them mid-turn, and
       // the queued message that follows must see "THIS CHAT IS EDITING THIS ONE" against it.
-      installed: () => modsBlock(modsForUrl(installedMods, url, artifact?.linkedModId)),
+      installed: ACT_OFF
+        ? () => modsBlock(modsForUrl(installedMods, url, artifact?.linkedModId))
+        : () => [modsBlock(modsForUrl(installedMods, url, artifact?.linkedModId)), skillsBlock(installedSkills, url, artifact?.linkedSkillId)].filter(Boolean).join('\n'),
       onOpenMod: async (modId, replace) => {
         const mod = (await loadMods()).find((m) => m.id === modId);
         // The id came from a list this same worker wrote, so a miss means the mod was deleted
@@ -1114,72 +1135,10 @@ async function runSkillChat(chatId: string, tabId: number, skill: Skill, carry: 
   const post = (e: AgentEventBody) => postAgentEvent(chatId, e.type === 'status' && e.phase !== 'idle' ? { ...e, driving: true } : e);
   const release = holdWorker();
   void loadSafariMode().then(() => acquireHold(session.tabId));
-  const key = stepsKey(skill.steps);
-  const toolId = crypto.randomUUID();
   await setRun(chatId, { state: 'running', tabId: session.tabId });
-  await updateRuns((runs) => withRunSkill(runs, chatId, { id: skill.id, name: skill.name, step: opts.from ?? 0, total: skill.steps.length, key, ...(opts.draft ? { draft: true } : {}) }));
-  await saveCarry(chatId, carry).catch(() => {});
-  post({ type: 'status', phase: 'tool', tool: 'act', detail: `running ${skill.name}` });
-  const row = (index: number, step: StepRow) => post({ type: 'act_step', id: toolId, index, step });
-  // What the row and the card show. Numbers, and what the extension read: no input's value.
-  let rowsUsed = 0;
-  if (opts.from === undefined) {
-    const named = Object.keys(skill.inputs).filter((k) => carry.inputs[k]);
-    post({ type: 'note', text: `you ran ${skill.name} v${skill.version}${named.length ? ` · ${named.join(', ')}` : ''}` });
-  } else post({ type: 'note', text: `you resumed ${skill.name}` });
-  post({ type: 'tool_call', id: toolId, name: 'run_skill', input: { skill: skill.name } });
-  await touchChat(chatId, (await loadMessages(chatId)).length || opts.from !== undefined ? { url: await tabUrl(session.tabId) } : { title: skill.name, url: skill.start });
-  const hasNote = drive!.note(chatId);
-  let failure: string | null = null;
-  let result: Awaited<ReturnType<typeof runSkill>> | null = null;
-  try {
-    // Off its site, Run opens where it starts. That is the one navigation pressing Run asked for.
-    const here = await tabUrl(session.tabId);
-    const onSite = skillMatchesUrl(skill, here);
-    if (!skillMatchesUrl(skill, skill.start)) throw new Error('This skill starts outside its own sites, so it does not run.');
-    if (!onSite) {
-      await chrome.tabs.update(session.tabId, { url: skill.start });
-      await drive!.settled(session.tabId, signal);
-    }
-    await driver.startDriving(await tabUrl(session.tabId));
-    if (opts.from === undefined && !signal.aborted) rowsUsed = await goToStart(driver, skill, here, onSite, row, signal);
-    const cooked = rowsUsed;
-    result = await runSkill(
-      skill,
-      {
-        driver: { runStep: (s, o, sig) => driver.runStep(s, o, sig), ask: (q, sig) => driver.ask(q, sig), guard: (sig) => driver.guard(sig), announce: (b, a, sig) => driver.announce(b, a, sig), handoff: (t, spec, sig) => driver.handoff(t, spec, sig), didYourself: () => driver.didYourself() },
-        wait: (spec, sig) => waitInTab(session.tabId, spec, sig),
-        read: (s) => drive!.read(session.tabId, s),
-        atStep: (i) => updateRuns((runs) => withSkillStep(runs, chatId, i)),
-        pastStep: (i) => updateRuns((runs) => withSkillStep(withoutPending(runs, chatId), chatId, i)),
-        carry: (c) => saveCarry(chatId, c).catch(() => {}),
-        keepAllowance: (action) => keepAllowance(skill.id, action),
-        row: (i, r) => row(i + cooked, r),
-        note: (text) => post({ type: 'note', text }),
-        newId: () => crypto.randomUUID(),
-      },
-      { ...(opts.from !== undefined ? { from: opts.from } : {}), ...(opts.pending !== undefined ? { pending: opts.pending } : {}), carry },
-      signal,
-    );
-  } catch (e) {
-    failure = e instanceof Error ? e.message : String(e);
-  }
-  const summary = result ? `${result.ran} of ${skill.steps.length} steps` : (failure ?? 'stopped');
-  post({ type: 'tool_result', id: toolId, summary, isError: !!failure || result?.outcome.kind === 'refused' });
-  if (result?.outcome.kind === 'refused') post({ type: 'error', message: result.outcome.message });
-  else if (failure) post({ type: 'error', message: failure });
-  const card = await driver.finishSkill(signal.aborted ? 'stopped' : (result?.ending ?? 'model'), { name: skill.name, label: result?.label ?? `stopped · ${skill.name}` }).catch(() => null);
+  await carrySkill(chatId, session.tabId, driver, skill, carry, signal, post, crypto.randomUUID(), opts);
   drive!.end(chatId);
-  if (card) {
-    post({ type: 'page_card', card: result?.outputs.length ? { ...card, outputs: result.outputs } : card });
-    if (card.total) await addChatActions(chatId, card.total).catch(() => {});
-    await setChatRanSkill(chatId, { name: skill.name, actions: card.total }).catch(() => {});
-  }
-  // What was read goes to the note of this chat and no other, so its model can be asked about it.
-  if (result?.outputs.length) await hasNote.change({ append: outputsNote(skill.name, result.outputs) }).catch(() => {});
-  if (!opts.draft && result?.outcome.kind === 'finished' && result.outcome.walked) await markWalked(skill.id, key).catch(() => {});
   await clearRuns([chatId]);
-  await dropCarry(chatId);
   release();
   releaseHold(session.tabId);
   session.running = false;
@@ -1190,6 +1149,165 @@ async function runSkillChat(chatId: string, tabId: number, skill: Skill, carry: 
     post({ type: 'done' });
     sessions.release(chatId);
   }
+}
+
+/**
+ * A skill's run, inside whichever run holds the tab: the user's Run, or the model's run_skill. Everything
+ * from the journal to the card, and what became of it.
+ */
+async function carrySkill(chatId: string, tabId: number, driver: Driver, skill: Skill, carry: RunCarry, signal: AbortSignal, post: (e: AgentEventBody) => void, toolId: string, opts: { from?: number; pending?: string; draft?: boolean; byModel?: boolean }): Promise<SkillRunResult | null> {
+  const key = stepsKey(skill.steps);
+  await updateRuns((runs) => withRunSkill(runs, chatId, { id: skill.id, name: skill.name, step: opts.from ?? 0, total: skill.steps.length, key, ...(opts.draft ? { draft: true } : {}) }));
+  await saveCarry(chatId, carry).catch(() => {});
+  post({ type: 'status', phase: 'tool', tool: 'act', detail: `running ${skill.name}` });
+  const row = (index: number, step: StepRow) => post({ type: 'act_step', id: toolId, index, step });
+  // What the row and the card show. Numbers, and what the extension read: no input's value.
+  let rowsUsed = 0;
+  if (opts.from === undefined) {
+    const named = Object.keys(skill.inputs).filter((k) => carry.inputs[k]);
+    post({ type: 'note', text: `you ran ${skill.name} v${skill.version}${named.length ? ` · ${named.join(', ')}` : ''}` });
+  } else post({ type: 'note', text: `you resumed ${skill.name}` });
+  if (!opts.byModel) post({ type: 'tool_call', id: toolId, name: 'run_skill', input: { skill: skill.name } });
+  await touchChat(chatId, (await loadMessages(chatId)).length || opts.from !== undefined ? { url: await tabUrl(tabId) } : { title: skill.name, url: skill.start });
+  const hasNote = drive!.note(chatId);
+  let failure: string | null = null;
+  let result: SkillRunResult | null = null;
+  try {
+    // Off its site, Run opens where it starts. That is the one navigation pressing Run asked for.
+    const here = await tabUrl(tabId);
+    const onSite = skillMatchesUrl(skill, here);
+    if (!skillMatchesUrl(skill, skill.start)) throw new Error('This skill starts outside its own sites, so it does not run.');
+    if (!onSite) {
+      await chrome.tabs.update(tabId, { url: skill.start });
+      await drive!.settled(tabId, signal);
+    }
+    await driver.startDriving(await tabUrl(tabId));
+    if (opts.from === undefined && !signal.aborted) rowsUsed = await goToStart(driver, skill, here, onSite, row, signal);
+    const cooked = rowsUsed;
+    const repair = await repairFor(chatId, skill, opts.draft === true, tabId, driver, post, hasNote);
+    result = await runSkill(
+      skill,
+      {
+        driver: { runStep: (s, o, sig) => driver.runStep(s, o, sig), ask: (q, sig) => driver.ask(q, sig), guard: (sig) => driver.guard(sig), announce: (b, a, sig) => driver.announce(b, a, sig), handoff: (t, spec, sig) => driver.handoff(t, spec, sig), didYourself: () => driver.didYourself() },
+        wait: (spec, sig) => waitInTab(tabId, spec, sig),
+        read: (s) => drive!.read(tabId, s),
+        atStep: (i) => updateRuns((runs) => withSkillStep(runs, chatId, i)),
+        pastStep: (i) => updateRuns((runs) => withSkillStep(withoutPending(runs, chatId), chatId, i)),
+        carry: (c) => saveCarry(chatId, c).catch(() => {}),
+        keepAllowance: (action) => keepAllowance(skill.id, action),
+        row: (i, r) => row(i + cooked, r),
+        note: (text) => post({ type: 'note', text }),
+        newId: () => crypto.randomUUID(),
+        ...(repair ? { repair: (req, sig) => repair(skill, req, sig) } : {}),
+      },
+      { ...(opts.from !== undefined ? { from: opts.from } : {}), ...(opts.pending !== undefined ? { pending: opts.pending } : {}), carry },
+      signal,
+    );
+  } catch (e) {
+    failure = e instanceof Error ? e.message : String(e);
+  }
+  if (!opts.byModel) post({ type: 'tool_result', id: toolId, summary: result ? `${result.ran} of ${skill.steps.length} steps` : (failure ?? 'stopped'), isError: !!failure || result?.outcome.kind === 'refused' });
+  if (result?.outcome.kind === 'refused') post({ type: 'error', message: result.outcome.message });
+  else if (failure) post({ type: 'error', message: failure });
+  const card = await driver.finishSkill(signal.aborted ? 'stopped' : (result?.ending ?? 'model'), { name: skill.name, label: result?.label ?? `stopped · ${skill.name}` }).catch(() => null);
+  if (card) {
+    const offer: RepairOffer | null = result?.repaired.length ? { run: driver.runId, steps: result.repaired, skillId: skill.id, key, ...(opts.draft ? { draft: true } : {}) } : null;
+    post({ type: 'page_card', card: { ...card, ...(result?.outputs.length ? { outputs: result.outputs } : {}), ...(offer ? { repair: offer } : {}) } });
+    if (card.total) await addChatActions(chatId, card.total).catch(() => {});
+    await setChatRanSkill(chatId, { name: skill.name, actions: card.total }).catch(() => {});
+  }
+  // What was read goes to the note of this chat and no other, so its model can be asked about it.
+  if (result?.outputs.length) await hasNote.change({ append: outputsNote(skill.name, result.outputs) }).catch(() => {});
+  if (!opts.draft && result?.outcome.kind === 'finished' && result.outcome.walked) await markWalked(skill.id, key).catch(() => {});
+  await dropCarry(chatId);
+  return result;
+}
+
+/**
+ * Whether this skill's broken steps go to the model, and if so how. No model connected, or a setting or
+ * an origin that says no, and the run simply stops at them as it always could.
+ */
+async function repairFor(chatId: string, skill: Skill, draft: boolean, tabId: number, driver: Driver, post: (e: AgentEventBody) => void, notes: ReturnType<NonNullable<typeof drive>['note']>): Promise<((skill: Skill, req: { index: number; step: SkillStep; message: string; inputs: Readonly<Record<string, string>> }, signal: AbortSignal) => Promise<RepairResult>) | null> {
+  const trusted = draft ? !(await loadArtifact(chatId))?.foreign : skill.origin === 'local';
+  if (!repairAllowed((await loadSettings()).repairSkills, trusted)) return null;
+  const resolved = await resolveChatModel(chatId).catch(() => null);
+  if (!resolved) return null;
+  return async (file, req, signal) => {
+    post({ type: 'note', text: `repairing step ${req.index + 1} with ${resolved.selection.model}` });
+    const page = await envForTab(tabId)
+      .sendToContent<{ text?: string }>({ type: 'inventory', maxChars: 8000 })
+      .catch(() => ({ text: '' }));
+    return runRepair(
+      {
+        settings: resolved.settings,
+        provider: createProvider(resolved.settings, { memory: visionMemory, thinkingMemory }),
+        driver: { act: (call, ctx, sig, rules) => driver.act(call, ctx, sig, rules), guard: (sig, iteration) => driver.guard(sig, iteration), recordWait: (spec) => driver.recordWait(spec), recordLook: (s, m, l) => driver.recordLook(s, m, l), setRepairing: (i) => driver.setRepairing(i) },
+        env: envForTab(tabId),
+        emit: post,
+        changeNote: (input) => notes.change(input),
+        newId: () => crypto.randomUUID(),
+      },
+      { skill: { name: file.name, description: file.description }, index: req.index, total: file.steps.length, step: req.step, message: req.message, inventory: page.text ?? '', inputs: req.inputs },
+      signal,
+    );
+  };
+}
+
+/**
+ * run_skill: the card, in the panel, and only then the run, under its own driver so its rows and its
+ * card are its own. The model has nothing to answer the card with, and goes on waiting at this call.
+ */
+async function runSkillForModel(chatId: string, tabId: number, parent: Driver, skillId: string, values: Record<string, string>, toolId: string, signal: AbortSignal, post: (e: AgentEventBody) => void): Promise<{ text: string; isError: boolean }> {
+  const skill = (await loadSkills()).find((s) => s.id === skillId);
+  if (!skill) return { text: `There is no skill with id ${skillId}. The ids are in the "[Skills on this page]" list.`, isError: true };
+  const here = await tabUrl(tabId);
+  // A model stays on the site its run is on. Only the user's own Run opens somewhere else.
+  if (!skillMatchesUrl(skill, here)) return { text: `That skill runs on ${skillHosts(skill).join(', ')}, and this tab is on ${hostOf(here) || 'another page'}. Tell the user: they can run it from the Mods tab.`, isError: true };
+  const host = hostOf(here);
+  const siteAllowed = await drive!.siteAllowed(chatId, host);
+  // What the model suggested for what the file declares, and nothing else.
+  const suggested = Object.fromEntries(Object.entries(values).filter(([k]) => k in skill.inputs));
+  const answer = await parent.ask({ kind: 'run-skill', id: crypto.randomUUID(), skill, values: suggested, siteAllowed, host }, signal);
+  if (!answer) return { text: 'Stopped by the user.', isError: false };
+  if (answer.kind !== 'run') {
+    post({ type: 'note', text: `you did not run ${skill.name}` });
+    return { text: 'The user chose not to run it. Nothing ran. Do not do the same steps another way unless they ask.', isError: false };
+  }
+  if (!siteAllowed) await drive!.allowSiteFor(chatId, host, answer.standing === true);
+  const declared = Object.fromEntries(Object.entries(answer.inputs).filter(([k, v]) => k in skill.inputs && v.trim()));
+  const driver = drive!.driverFor(chatId, tabId);
+  try {
+    const result = await carrySkill(chatId, tabId, driver, skill, { inputs: declared, outputs: {} }, signal, post, toolId, { byModel: true });
+    return result ? runReport(skill, result) : { text: 'The run could not start.', isError: true };
+  } finally {
+    drive!.adopt(chatId, tabId, parent);
+    // The model's run carries on, and it is no longer a skill's to resume.
+    await updateRuns((runs) => withoutPending(withoutRunSkill(runs, chatId), chatId));
+  }
+}
+
+/** Edit in chat on a skill's row: the mods' decision about which chat, and the skill as its draft. */
+async function editSkillInChat(skillId: string, currentChatId: string | null, host: string, model: ModelSelection | null = null) {
+  const skill = (await loadSkills()).find((s) => s.id === skillId);
+  if (!skill) throw new Error('That skill no longer exists.');
+  const chats = await listChats();
+  const runsHere = skillMatchesUrl(skill, await activeUrl());
+  const current = currentChatId ? (chats.find((c) => c.id === currentChatId) ?? null) : null;
+  const currentCandidate = current ? { id: current.id, host: current.host, archived: isArchived(current), updatedAt: current.updatedAt, editingModId: current.editingModId, ...(await chatStanding(current.id)) } : null;
+  const plan = editModPlan(skillId, chats.map((c) => ({ id: c.id, host: c.host, archived: isArchived(c), updatedAt: c.updatedAt, editingModId: c.editingModId })), currentCandidate);
+  let chatId: string;
+  let created = false;
+  if (plan.action === 'reuse') {
+    chatId = plan.chatId;
+    if (plan.unarchive) await archiveChat(chatId, false);
+  } else if (plan.action === 'seed') chatId = plan.chatId;
+  else {
+    chatId = (await createChat((runsHere ? hostFromUrl(await activeUrl()) : hostFromUrl(skill.start)) || host, model)).id;
+    created = true;
+  }
+  const existing = await loadArtifact(chatId);
+  const artifact = plan.action === 'reuse' && existing?.linkedSkillId === skillId ? existing : await openSkillDraft(chatId, skill);
+  return { chatId, host: (await getChat(chatId))?.host ?? host, created, reused: plan.action === 'reuse', artifact, skill, runsHere };
 }
 
 /**
@@ -1695,6 +1813,7 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
       siteAllowed: async (chatId, host) => (chatId ? drive!.siteAllowed(chatId, host) : drive!.siteAllowed('', host)),
       saveCard: (r) => saveCard(r.chatId, r.run, r.title),
       draft: (r) => draftFromRun(r.chatId, r.run, r.decisions, { ...(r.replace ? { replace: true } : {}), today: new Date().toISOString().slice(0, 10) }),
+      edit: (r) => editSkillInChat(r.skillId, r.currentChatId ?? null, r.host, r.model ?? null),
     });
   }
   switch (req.type) {

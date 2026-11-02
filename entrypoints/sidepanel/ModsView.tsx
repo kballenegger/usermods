@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ACT_OFF } from '@/lib/buildflags';
+import type { Skill } from '@/lib/skills';
 import { summarizeImport } from '@/lib/importreport';
 import type { InstallPreview as AnyPreview } from '@/lib/install';
 import { rpc } from '@/lib/rpc';
@@ -192,6 +193,18 @@ export function ModsView({ tabId, pageUrl, host, onEditInChat, onRunSkill }: { t
     },
     onCopyLink: (url: string) => void copyText(url).then(() => setStatus('Copied the install link.'), fail),
     onRun: (id: string) => onRunSkill?.(id),
+    onEdit: (s: Skill) => {
+      setError('');
+      setStatus('');
+      void rpc({ type: 'skills.edit', skillId: s.id, host })
+        .then(async (r) => {
+          const handoff: ChatHandoff = { chatId: r.chatId, host: r.host, at: Date.now() };
+          await chrome.storage.session.set({ [HANDOFF_KEY]: handoff }).catch(() => {});
+          if (r.host && r.host !== host) setStatus(`“${s.name}” is for ${r.host}. Its chat is ready: open ${s.start} and the panel will land on it.`);
+          else onEditInChat();
+        })
+        .catch(fail);
+    },
     updates: updates.summary,
   };
 

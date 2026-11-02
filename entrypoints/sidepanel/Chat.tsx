@@ -27,9 +27,10 @@ import { ACCEPT_ATTR, MAX_IMAGES_PER_MESSAGE, capNote, emptyTextFor, type Attach
 import { rpc, type AgentPortRequest } from '@/lib/rpc';
 import { INTERRUPTED_TEXT, RESUME_HINT, RESUME_LABEL, pendingResumeText, type ResumableRun } from '@/lib/runstate';
 import { ACT_OFF } from '@/lib/buildflags';
-import type { Answer, Question } from '@/lib/agent/questions';
+import type { Answer, Question, RepairOffer } from '@/lib/agent/questions';
+import type { SkillsRpcResults } from '@/lib/skillrpc';
 import { PageCardRow, QuestionRow, TouchedScript, TouchedSteps } from './Operate';
-import { SaveSkillCard, SkillPicker, SkillRunCard, useSkillList } from './Skills';
+import { RepairCard, SaveSkillCard, SkillPicker, SkillProposalRow, SkillRunCard, useSkillList } from './Skills';
 import { hostOf } from '@/lib/agent/boundary';
 import { skillFileName, skillFromSource, skillHosts, skillMatchesUrl, type Skill } from '@/lib/skills';
 import type { SaveCard, SaveDecisions } from '@/lib/skillcompile';
@@ -118,6 +119,7 @@ export function Chat({ tabId, pageUrl, host: liveHost, onOpenSettings, runReques
   const [runCard, setRunCard] = useState<{ skill: Skill; draft: boolean; siteAllowed: boolean } | null>(null);
   const [pickingSkill, setPickingSkill] = useState(false);
   const [saving, setSaving] = useState<{ card: SaveCard; error?: string; replaces?: string; busy: boolean } | null>(null);
+  const [repairing, setRepairing] = useState<{ offer: RepairOffer; preview: Extract<SkillsRpcResults['skills.repairPreview'], { ok: true }>; busy: boolean } | null>(null);
   /**
    * Chats whose last run stopped short with its progress saved — the model request failed for good,
    * or the run died with the service worker — and can be carried on with Resume. Per chat, like
@@ -1037,6 +1039,30 @@ export function Chat({ tabId, pageUrl, host: liveHost, onOpenSettings, runReques
     }
   };
 
+  /** UPDATE SKILL WITH THE REPAIR: what the file would become, on a card, before anything is written. */
+  const openRepairCard = ACT_OFF ? async (_offer: RepairOffer) => {} : async (offer: RepairOffer) => {
+    if (!chatId) return;
+    const preview = await rpc({ type: 'skills.repairPreview', chatId, offer }).catch((e: unknown): { ok: false; error: string } => ({ ok: false, error: e instanceof Error ? e.message : String(e) }));
+    if (preview.ok) setRepairing({ offer, preview, busy: false });
+    else updateItems((prev) => [...prev, { kind: 'error', text: preview.error }]);
+  };
+
+  const applyRepair = ACT_OFF ? async () => {} : async () => {
+    if (!chatId || !repairing) return;
+    setRepairing({ ...repairing, busy: true });
+    try {
+      const r = await rpc({ type: 'skills.repairApply', chatId, offer: repairing.offer });
+      if (r.artifact) {
+        setArtifact(r.artifact);
+        setShownVersion(null);
+      }
+      updateItems((prev) => [...prev, { kind: 'note', text: `${r.name} is now v${r.version}, with the repair` }]);
+    } catch (e) {
+      updateItems((prev) => [...prev, { kind: 'error', text: e instanceof Error ? e.message : String(e) }]);
+    }
+    setRepairing(null);
+  };
+
   // A row's Run on the Mods tab lands here, once this chat view knows what it is showing.
   if (!ACT_OFF) {
     // eslint-disable-next-line react-hooks/rules-of-hooks
@@ -1800,7 +1826,8 @@ export function Chat({ tabId, pageUrl, host: liveHost, onOpenSettings, runReques
           if (fold === 'folded') return null;
           if (fold) return <StepsRow key={i} tools={fold.map((n) => items[n]).filter((t): t is ToolItem => t?.kind === 'tool')} />;
           if (!ACT_OFF) {
-            if (it.kind === 'page_card') return <PageCardRow key={i} card={it.card} onSaveSkill={(run: string) => void openSaveCard(run)} />;
+            if (it.kind === 'page_card') return <PageCardRow key={i} card={it.card} onSaveSkill={(run: string) => void openSaveCard(run)} onUpdateRepair={(offer: RepairOffer) => void openRepairCard(offer)} />;
+            if (it.kind === 'skill_proposal') return <SkillProposalRow key={i} card={it.card} saved={artifact?.savedVersion === it.card.version} canRun={tabId != null} onRunAgain={() => void tryArtifact()} onSave={() => void saveArtifact()} />;
           }
           switch (it.kind) {
             case 'user':
@@ -2037,6 +2064,7 @@ export function Chat({ tabId, pageUrl, host: liveHost, onOpenSettings, runReques
       {ACT_OFF ? null : saving ? (
         <SaveSkillCard key={saving.card.run} card={saving.card} busy={saving.busy} {...(saving.error ? { error: saving.error } : {})} {...(saving.replaces ? { replaces: saving.replaces } : {})} onSubmit={(d: SaveDecisions, replace: boolean) => void submitSaveCard(d, replace)} onCancel={() => setSaving(null)} />
       ) : null}
+      {ACT_OFF ? null : repairing ? <RepairCard preview={repairing.preview} busy={repairing.busy} onApply={() => void applyRepair()} onCancel={() => setRepairing(null)} /> : null}
       {ACT_OFF ? null : runCard ? (
         <SkillRunCard
           key={runCard.skill.id}
@@ -2050,7 +2078,14 @@ export function Chat({ tabId, pageUrl, host: liveHost, onOpenSettings, runReques
         />
       ) : null}
       {/* A ternary, not `!ACT_OFF && chatId && …`: the bundler folds this shape before it splits chunks. */}
-      {ACT_OFF ? null : chatId && questions.get(chatId) ? (
+      {ACT_OFF ? null : chatId && questions.get(chatId)?.kind === 'run-skill' ? (
+        // The model asked for this run, and this card is the only thing that can start it.
+        (() => {
+          const q = questions.get(chatId) as Extract<Question, { kind: 'run-skill' }>;
+          const answer = (a: Answer) => void rpc({ type: 'act.answer', chatId, questionId: q.id, answer: a }).catch(() => {});
+          return <SkillRunCard key={q.id} skill={q.skill} siteAllowed={q.siteAllowed} host={q.host} busy={false} suggested={q.values} onRun={(a: { inputs: Record<string, string>; standing: boolean }) => answer({ kind: 'run', inputs: Object.fromEntries(Object.entries(a.inputs).filter(([, v]) => v.trim())), ...(a.standing ? { standing: true } : {}) })} onCancel={() => answer({ kind: 'decline' })} />;
+        })()
+      ) : chatId && questions.get(chatId) ? (
         // The one route an answer has: an RPC, which the background takes only from an extension page.
         <QuestionRow question={questions.get(chatId)!} onAnswer={(answer: Answer) => void rpc({ type: 'act.answer', chatId, questionId: questions.get(chatId)!.id, answer }).catch(() => {})} onStop={abort} />
       ) : null}

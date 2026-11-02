@@ -4,7 +4,9 @@ import { describeLeak, scanSkillForLeaks, type Leak } from '@/lib/leakscan';
 import { rpc } from '@/lib/rpc';
 import { prepareSkillShare } from '@/lib/share';
 import type { ShareEvent } from '@/lib/sharecontroller';
+import type { SkillProposalCard } from '@/lib/agent/questions';
 import type { CardField, CardLook, SaveCard, SaveDecisions } from '@/lib/skillcompile';
+import type { SkillsRpcResults } from '@/lib/skillrpc';
 import { inputsInOrder, runSummary } from '@/lib/skillrun';
 import { FIRST_RUN_TEXT, SENDS_TEXT, makeItAnInput, previewSkill, skillFileName, skillHosts, skillMatchesUrl, type Skill, type SkillPreview } from '@/lib/skills';
 import { copyText } from './components/ExportMenu';
@@ -365,6 +367,7 @@ export function SkillCard({
   onUpdate,
   onCopyLink,
   onRun,
+  onEdit,
   updates,
   here,
 }: {
@@ -374,6 +377,7 @@ export function SkillCard({
   onUpdate: (name: string, id: string) => void;
   onCopyLink: (url: string) => void;
   onRun: (id: string) => void;
+  onEdit: (skill: Skill) => void;
   updates: UpdateSummary;
   /** It matches the page in front of the user. */
   here: boolean;
@@ -423,6 +427,9 @@ export function SkillCard({
         <button className="btn primary" onClick={() => onRun(skill.id)} title={here ? `Run “${skill.name}” on this page` : `Open ${skillHosts(skill).join(', ')} and run “${skill.name}” there`} data-testid="skill-run-row" aria-label={`Run “${skill.name}”`}>
           Run
         </button>
+        <button className="btn" onClick={() => onEdit(skill)} title="Open this skill as a chat’s draft" data-testid="skill-edit" aria-label={`Edit “${skill.name}” in chat`}>
+          Edit in chat
+        </button>
         <span className="grow" />
         <MenuButton label={`Export “${skill.name}”`} title="Download, copy, or share this skill" className="btn" testId="skill-export" items={exportItems(skill)} menuLabel={`Export “${skill.name}”`} placement="down">
           Export ▾
@@ -451,10 +458,13 @@ export function SkillRunCard({
   host,
   starts,
   busy,
+  suggested,
   onRun,
   onCancel,
 }: {
   skill: Skill;
+  /** The model asked for this run, with these values. They are the user's to change. */
+  suggested?: Record<string, string>;
   /** This chat or a standing allowance already covers the site. If not, this card asks that too. */
   siteAllowed: boolean;
   host: string;
@@ -464,7 +474,7 @@ export function SkillRunCard({
   onRun: (a: { inputs: Record<string, string>; standing: boolean }) => void;
   onCancel: () => void;
 }) {
-  const [values, setValues] = useState<Record<string, string>>({});
+  const [values, setValues] = useState<Record<string, string>>(suggested ?? {});
   const [standing, setStanding] = useState(false);
   const declared = inputsInOrder(skill);
   const missing = declared.some(([k, i]) => !i.optional && !(values[k] ?? '').trim());
@@ -473,6 +483,7 @@ export function SkillRunCard({
     <form
       className="question ask skill-card"
       data-testid="skill-run-card"
+      {...(suggested ? { 'data-asked-by': 'model' } : {})}
       aria-label={`Run ${skill.name}?`}
       onSubmit={(e) => {
         e.preventDefault();
@@ -500,6 +511,7 @@ export function SkillRunCard({
           )}
         </label>
       ))}
+      {suggested && <p data-testid="skill-run-model">the model wants to run this with the values above</p>}
       <p>usermods asks before anything it can tell sends, buys, deletes or unsubscribes.</p>
       {!siteAllowed && (
         <>
@@ -555,6 +567,63 @@ export function SkillPicker({ skills, pageUrl, onPick, onCancel }: { skills: Ski
       {here.map(row)}
       {elsewhere.length > 0 && <div className="label modpicker-group">Other sites · {elsewhere.length}</div>}
       {elsewhere.map(row)}
+    </div>
+  );
+}
+
+/**
+ * PROPOSED SKILL: the hero card, as a mod's. Every fact on it is the extension's. RUN AGAIN and SAVE are the
+ * draft panel's own, on the draft as it stands.
+ */
+export function SkillProposalRow({ card, saved, canRun, onRunAgain, onSave }: { card: SkillProposalCard; saved: boolean; canRun: boolean; onRunAgain: () => void; onSave: () => void }) {
+  return (
+    <div className="card hero" data-testid="skill-proposal-card" data-card-state={saved ? 'saved' : 'unsaved'}>
+      <div>
+        <div className="label">
+          proposed skill<span className="card-version" data-testid="card-version"> · v{card.version}</span>
+          {saved ? <span className="card-saved" data-testid="card-saved"> · saved</span> : null}
+        </div>
+        <h4>{card.name}</h4>
+      </div>
+      {card.description && <div className="desc">{card.description}</div>}
+      <div className="label tested" data-testid="skill-proposal-facts">
+        {card.wordsOnly ? `${plural(card.steps, 'step')} on ${card.host} · no step changed` : `recorded from ${plural(card.steps, 'step')} on ${card.host} · tested in this chat`}
+      </div>
+      {card.inputs.length > 0 && <div className="desc" data-testid="skill-proposal-inputs">asks for {card.inputs.join(', ')}</div>}
+      {card.note && <div className="desc">{card.note}</div>}
+      <div className="row">
+        <button className="btn" onClick={onRunAgain} disabled={!canRun} data-testid="skill-proposal-run">
+          Run again
+        </button>
+        <button className="btn primary" onClick={onSave} disabled={saved} data-testid="skill-proposal-save">
+          {saved ? 'Saved' : 'Save'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** UPDATE SKILL WITH THE REPAIR: what the file would become, read before it is written. */
+export function RepairCard({ preview, busy, onApply, onCancel }: { preview: Extract<SkillsRpcResults['skills.repairPreview'], { ok: true }>; busy: boolean; onApply: () => void; onCancel: () => void }) {
+  return (
+    <div className="question ask skill-card" data-testid="repair-card" role="group" aria-label={`Update ${preview.name} with the repair`}>
+      <div className="question-head">Update {preview.name} with the repair?</div>
+      <p data-testid="repair-version">v{preview.from} becomes v{preview.to}. What the model did replaces the broken step, and the next run asks about it as it would any step.</p>
+      {preview.notes.map((n) => (
+        <p key={n} data-testid="repair-note">{n}</p>
+      ))}
+      <details className="question-code">
+        <summary>▼ the file’s diff</summary>
+        <pre data-testid="repair-diff">{preview.diff}</pre>
+      </details>
+      <div className="question-actions">
+        <button className="btn primary" data-testid="repair-apply" disabled={busy} onClick={onApply}>
+          Update skill
+        </button>
+        <button className="linklike" data-testid="repair-cancel" onClick={onCancel}>
+          Not now
+        </button>
+      </div>
     </div>
   );
 }
@@ -737,9 +806,11 @@ export function SkillsPanes({
   filter,
   onStatus,
   onError,
+  onEdit,
 }: {
   skills: Skill[];
   filter: ModFilter;
+  onEdit?: (skill: Skill) => void;
   onStatus: (s: string) => void;
   onError: (e: unknown) => void;
 }) {
@@ -869,6 +940,11 @@ export function SkillsPanes({
                   </div>
                 </div>
                 <div className="actions">
+                  {onEdit && (
+                    <button className="pill" onClick={() => onEdit(s)} data-testid="skill-edit">
+                      Edit in chat
+                    </button>
+                  )}
                   <MenuButton label={`Export “${s.name}”`} title="Download, copy, or share this skill" className="pill" testId="skill-export" items={share.items(s)} placement="down">
                     Export ▾
                   </MenuButton>

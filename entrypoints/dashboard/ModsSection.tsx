@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ACT_OFF } from '@/lib/buildflags';
+import type { Skill } from '@/lib/skills';
 import {
   bulkTargets,
   editorSync,
@@ -32,6 +33,7 @@ export function ModsSection({
   origins = new Map(),
   onOpenChat,
   onEditMod,
+  onEditSkill,
 }: {
   mods: Mod[];
   loaded: boolean;
@@ -41,6 +43,7 @@ export function ModsSection({
   onOpenChat?: (chat: Chat) => void;
   /** Open this mod in a chat on its own page, with the side panel pointed at it. */
   onEditMod?: (mod: Mod) => void;
+  onEditSkill?: (skill: Skill) => void;
 }) {
   const [filter, setFilter] = useState<ModFilter>({ site: '', enabled: 'all', query: '' });
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -250,7 +253,7 @@ export function ModsSection({
         </div>
       </div>
 
-      {!ACT_OFF && kind !== 'mods' && <SkillsPanes skills={skills} filter={filter} onStatus={say} onError={fail} />}
+      {!ACT_OFF && kind !== 'mods' && <SkillsPanes skills={skills} filter={filter} onStatus={say} onError={fail} {...(onEditSkill ? { onEdit: onEditSkill } : {})} />}
     </>
   );
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import type { Answer, PageCard, Question, StepRow, ToolEffect } from '@/lib/agent/questions';
+import type { Answer, PageCard, Question, RepairOffer, StepRow, ToolEffect } from '@/lib/agent/questions';
+import type { RepairSetting } from '@/lib/types';
 import { rpc } from '@/lib/rpc';
 import { outputCsv } from '@/lib/skillrun';
 import type { Skill } from '@/lib/skills';
@@ -250,6 +251,9 @@ export function QuestionRow({ question: q, onAnswer, onStop }: QuestionRowProps)
       );
     case 'skill-input':
       return <InputQuestion question={q} onAnswer={onAnswer} onStop={onStop} />;
+    case 'run-skill':
+      // The run card, which the chat column draws itself.
+      return null;
   }
 }
 
@@ -365,7 +369,7 @@ function CardOutputs({ outputs }: { outputs: NonNullable<PageCard['outputs']> })
 }
 
 /** What the extension recorded of the run. It never says done: done is the model's claim. */
-export function PageCardRow({ card, onSaveSkill }: { card: PageCard; onSaveSkill?: (run: string) => void }) {
+export function PageCardRow({ card, onSaveSkill, onUpdateRepair }: { card: PageCard; onSaveSkill?: (run: string) => void; onUpdateRepair?: (offer: RepairOffer) => void }) {
   return (
     <div className="card page-card" data-testid="page-card">
       <div className="label">{card.label}</div>
@@ -382,6 +386,13 @@ export function PageCardRow({ card, onSaveSkill }: { card: PageCard; onSaveSkill
             Save as skill
           </button>
           {card.save.note && <span className="page-card-line">{card.save.note}</span>}
+        </div>
+      )}
+      {card.repair && onUpdateRepair && (
+        <div className="row">
+          <button className="btn" data-action="update-with-repair" onClick={() => onUpdateRepair(card.repair!)}>
+            Update skill with the repair
+          </button>
         </div>
       )}
       <details>
@@ -403,7 +414,7 @@ export function PageCardRow({ card, onSaveSkill }: { card: PageCard; onSaveSkill
 // ---------------------------------------------------------------------------
 
 /** Settings' section: the sites it may operate without asking first, and the slow, safe switch. */
-export function OperatingPages({ askEveryStep, onAskEveryStep }: { askEveryStep: boolean; onAskEveryStep: (on: boolean) => void }) {
+export function OperatingPages({ askEveryStep, onAskEveryStep, repair, onRepair }: { askEveryStep: boolean; onAskEveryStep: (on: boolean) => void; repair: RepairSetting; onRepair: (r: RepairSetting) => void }) {
   const [sites, setSites] = useState<string[] | null>(null);
   const [skills, setSkills] = useState<Skill[]>([]);
   useEffect(() => {
@@ -460,6 +471,18 @@ export function OperatingPages({ askEveryStep, onAskEveryStep }: { askEveryStep:
           Ask before every step
         </span>
         <span>Every click, every field and every script waits for you. Slow, and the safest setting for a model you do not trust.</span>
+      </label>
+      <label className="field">
+        <span className="operating-label">Repair broken steps with the model</span>
+        <select data-testid="setting-repair" value={repair} onChange={(e) => onRepair(e.target.value as RepairSetting)}>
+          <option value="never">never</option>
+          <option value="here">skills made here</option>
+          <option value="every">every skill</option>
+        </select>
+        <span>
+          When a skill cannot find a step's target, the model you connected is shown that step's notes and asked to do it; every action it takes is confirmed. For a skill you installed, its notes
+          were written by someone else.
+        </span>
       </label>
     </div>
   );

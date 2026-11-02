@@ -8,6 +8,8 @@ export const SkillRunCard = (_props: unknown) => null;
 export const SaveSkillCard = (_props: unknown) => null;
 export const SkillPicker = (_props: unknown) => null;
 export const DraftSteps = (_props: unknown) => null;
+export const SkillProposalRow = (_props: unknown) => null;
+export const RepairCard = (_props: unknown) => null;
 export const SkillsPanes = (_props: unknown) => null;
 export const useSkillList = (): Skill[] => [];
 export const useSkillShare = (_opts: unknown) => ({ items: () => [], prompt: null, notices: null });

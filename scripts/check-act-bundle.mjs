@@ -54,6 +54,18 @@ const FLAGGED = [
   'Made with usermods', // lib/skillcompile.ts
   'Run the rest without asking', // the walk
   'run_skill', // the transcript row, entrypoints/background.ts
+  'propose_skill', // the tools and the prompt, lib/agent/tools.ts
+  'open_skill',
+  'You cannot write steps', // the prompt's sentence, lib/agent/prompt.ts
+  'tool calls. Reply', // a bounded loop's refusal, lib/agent/loop.ts
+  'repairing one broken step', // lib/skillrepair.ts
+  'skills.repairApply', // the RPC
+  'skills.edit',
+  'Update skill with the repair', // the card, Operate.tsx
+  'Repair broken steps with the model', // Settings
+  'skill_proposal', // the event and the row
+  'proposed skill', // the hero card, Skills.tsx
+  'not available during a repair', // lib/agent/driver.ts
 ];
 
 function bundleText(dir) {
