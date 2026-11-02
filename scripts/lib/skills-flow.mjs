@@ -551,7 +551,8 @@ export async function skillsFlow({ launch, openPanel, openSite, waitForComposer,
     check(/forms\.example\.com[\s\S]*elsewhere\.example\.org/.test(await question('left-site').textContent()), 'the question names both', await question('left-site').textContent());
     check(!(await action('question-continue').count()), 'and another site is not one button away');
     await action('question-stop').click();
-    await panel.locator('[data-testid="page-card"]', { hasText: 'Redirected' }).last().waitFor({ timeout: 30_000 });
+    // As with the sibling, the panel follows the page once the run lets go.
+    await waitFor(() => panel.evaluate(async () => JSON.stringify(await chrome.storage.local.get(null)).includes('stopped by you · Redirected')), 'the run stopped where it paused');
     log('skills: d4 OK (a start on a sibling is on the site, and one that redirects away pauses before any step)');
 
     // Same-named siblings told apart only by position: a stop, on every run, so never the wrong one.
