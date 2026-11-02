@@ -200,6 +200,20 @@ export function planStep(step: SkillStep, inputs: Readonly<Record<string, string
   }
 }
 
+/**
+ * The inputs in the order the steps reach them. A stored record's map comes back sorted by key
+ * (chrome.storage does that), and a card asking Amount before Merchant reads wrong.
+ */
+export function inputsInOrder(skill: Pick<Skill, 'steps' | 'inputs'>): Array<[string, SkillInput]> {
+  const seen = new Set<string>();
+  for (const s of skill.steps) {
+    const value = s.verb === 'fill' || s.verb === 'select' ? s.value : '';
+    if (isInputRef(value) && value.slice(1) in skill.inputs) seen.add(value.slice(1));
+  }
+  for (const k of Object.keys(skill.inputs)) seen.add(k);
+  return [...seen].map((k) => [k, skill.inputs[k]!]);
+}
+
 /** The run card's line, computed from the steps as the preview's is. Nothing in it comes from the prose. */
 export function runSummary(skill: Pick<Skill, 'steps' | 'matches'>, hosts: readonly string[]): string {
   const count = (v: SkillStep['verb']) => skill.steps.filter((s) => s.verb === v).length;

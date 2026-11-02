@@ -5,7 +5,7 @@ import { rpc } from '@/lib/rpc';
 import { prepareSkillShare } from '@/lib/share';
 import type { ShareEvent } from '@/lib/sharecontroller';
 import type { CardField, CardLook, SaveCard, SaveDecisions } from '@/lib/skillcompile';
-import { runSummary } from '@/lib/skillrun';
+import { inputsInOrder, runSummary } from '@/lib/skillrun';
 import { FIRST_RUN_TEXT, SENDS_TEXT, makeItAnInput, previewSkill, skillFileName, skillHosts, skillMatchesUrl, type Skill, type SkillPreview } from '@/lib/skills';
 import { copyText } from './components/ExportMenu';
 import { MenuButton, type MenuItem } from './components/Menu';
@@ -466,7 +466,7 @@ export function SkillRunCard({
 }) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [standing, setStanding] = useState(false);
-  const declared = Object.entries(skill.inputs);
+  const declared = inputsInOrder(skill);
   const missing = declared.some(([k, i]) => !i.optional && !(values[k] ?? '').trim());
   const set = (k: string, v: string) => setValues((prev) => ({ ...prev, [k]: v }));
   return (

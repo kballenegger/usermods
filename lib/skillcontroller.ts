@@ -8,7 +8,7 @@ import { addVersion, createArtifact, currentVersion, loadArtifact, saveArtifact,
 import { journalKey, loadMessages, setChatArtifact } from './chats';
 import { MAX_JOURNAL, compileRecording, recordingOf, saveCardFor, valueIn, type JournalEntry, type SaveCard, type SaveDecisions } from './skillcompile';
 import { holdsAllowances, stepsKey, type RunCarry } from './skillrun';
-import { parseSkill, skillFromSource, type Skill } from './skills';
+import { parseSkill, previewSkill, skillFromSource, type Skill } from './skills';
 import { loadSkills, updateSkill, upsertSkill } from './skillstore';
 import { withKey } from './storagequeue';
 import type { NewJournalEntry } from './agent/driver';
@@ -51,6 +51,9 @@ export async function draftFromRun(chatId: string, run: string, decisions: SaveD
   const messages = await loadMessages(chatId);
   const compiled = compileRecording(recording, decisions, { today: opts.today, valueOf: (toolId, stepIndex) => valueIn(messages, toolId, stepIndex) });
   if (!compiled.ok) return compiled;
+  // The card's own answers can make a file the preview refuses: a name with a space in an input's.
+  const preview = previewSkill(compiled.source);
+  if (!preview.ok) return { ok: false, errors: preview.refusals.map((r) => r.message) };
   const version = { code: compiled.source, name: compiled.skill.name, description: compiled.skill.description, matches: compiled.skill.matches, source: 'proposal' as const };
   const artifact: Artifact = existing && isSkillDraft(existing) ? addVersion(existing, version) : { ...createArtifact(chatId, version), kind: 'skill' };
   await saveArtifact(artifact);

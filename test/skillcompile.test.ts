@@ -214,3 +214,11 @@ test('the recording is a run from its first act: what it looked at first, and ot
   assert.deepEqual(recordingOf(list, RUN).map((e) => e.n), [2, 4]);
   assert.deepEqual(recordingOf(list, 'none'), []);
 });
+
+test('a start that is no address, or on another site than the recording, is an error', () => {
+  const rec = [entry(1, 'https://x.example.com/', { kind: 'act', verb: 'click', role: 'button', name: 'A', at: { css: '#a' } })];
+  const with_ = (start: string) => compileRecording(rec, { name: 'x', description: 'y', start, fields: {}, outputs: {} }, opts());
+  assert.ok(!with_('not a url').ok);
+  assert.ok(!with_('https://evil.test/').ok);
+  assert.ok(with_('https://x.example.com/').ok);
+});

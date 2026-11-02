@@ -9,7 +9,7 @@ import { Driver, type DescribeReply, type DriverDeps } from '../lib/agent/driver
 import { answerFits, type Answer, type Question } from '../lib/agent/questions.ts';
 import type { ActResult, ActStep } from '../lib/interact/actions.ts';
 import type { Described } from '../lib/interact/describe.ts';
-import { MAX_RUN_ACTIONS, STANDING_LABEL, initialRun, next, outputCsv, outputsNote, planStep, runSkill, runSummary, stepsKey, type RunCarry, type SkillRunDeps } from '../lib/skillrun.ts';
+import { MAX_RUN_ACTIONS, STANDING_LABEL, initialRun, inputsInOrder, next, outputCsv, outputsNote, planStep, runSkill, runSummary, stepsKey, type RunCarry, type SkillRunDeps } from '../lib/skillrun.ts';
 import { skillFromSource, type Skill, type SkillStep } from '../lib/skills.ts';
 import type { AgentEventBody } from '../lib/types.ts';
 
@@ -443,4 +443,10 @@ test('an answer a skill’s question did not offer is no answer', () => {
   assert.ok(!answerFits(allow, { kind: 'allow', every: true }), 'no every on offer, so none taken');
   assert.ok(answerFits({ kind: 'skill-input', id: 'q', skill: 's', n: 1, label: 'l' }, { kind: 'input', value: 'v' }));
   assert.ok(!answerFits({ kind: 'skill-ceiling', id: 'q', skill: 's', actions: 500 }, { kind: 'next' }));
+});
+
+test('the card asks for inputs in the order the steps use them, whatever order storage kept the map in', () => {
+  const skill = asLocal('- fill: $merchant\n  into: textbox "M"\n  at: { css: "#m" }\n- fill: $amount\n  into: textbox "A"\n  at: { css: "#a" }', 'inputs:\n  merchant: { label: M }\n  amount: { label: A }\noutputs: {}');
+  const sorted = { ...skill, inputs: { amount: skill.inputs.amount!, merchant: skill.inputs.merchant! } };
+  assert.deepEqual(inputsInOrder(sorted).map(([k]) => k), ['merchant', 'amount']);
 });

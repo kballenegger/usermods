@@ -234,9 +234,11 @@ export function compileRecording(recording: readonly JournalEntry[], d: SaveDeci
   const firstPage = recording[0]?.url ?? '';
   const start = d.start?.trim() || startOf(recording);
   if (!recording.some((e) => e.kind === 'act')) errors.push('this run did nothing on the page to save');
+  const host = hostOf(start);
+  if (!host || !/^https?:/.test(start)) errors.push(`${start || 'that'} is not an address a skill can start at`);
+  else if (new URL(start).hostname !== new URL(firstPage || start).hostname) errors.push(`a skill starts on the site it was recorded on, ${hostOf(firstPage)}`);
   if (errors.length) return { ok: false, errors };
 
-  const host = hostOf(start);
   const match = `*://${new URL(start).hostname}/*`;
   const on = { matches: [match] };
   const inputs: Record<string, SkillInput> = {};
