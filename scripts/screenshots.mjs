@@ -3023,6 +3023,8 @@ async function dashboardFlow({ capture = false } = {}) {
 
     // --- 1. Chats are grouped by host, newest site first, with per-group counts.
     const groups = page.locator('[data-testid="hostgroup"]');
+    // The list arrives over an RPC: under load the first count can land before it does.
+    await groups.nth(1).waitFor({ timeout: 15_000 }).catch(() => {});
     if ((await groups.count()) !== 2) fail(`expected 2 host groups, got ${await groups.count()}`);
     const hosts = await groups.evaluateAll((els) => els.map((e) => e.dataset.host));
     if (hosts[0] !== 'en.wikipedia.org') fail(`the most recently used site was not first (order: ${hosts.join(', ')})`);
