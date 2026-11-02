@@ -48,7 +48,8 @@ export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   outDirTemplate,
   vite: (env) => ({
-    // A flag-off build holds none of the panel's operating UI: `./Operate` is a set of empty stubs there.
+    // A flag-off build holds none of the panel's operating or skills UI: `./Operate` and `./Skills`
+    // are sets of empty stubs there.
     plugins: actEnabled(storeBuild, env.browser === 'safari')
       ? []
       : [
@@ -56,7 +57,9 @@ export default defineConfig({
             name: 'usermods:leave-out-operate',
             enforce: 'pre' as const,
             resolveId(source: string) {
-              return /(^|\/)Operate$/.test(source) ? path.resolve(process.cwd(), 'entrypoints/sidepanel/operate-off.ts') : null;
+              if (/(^|\/)Operate$/.test(source)) return path.resolve(process.cwd(), 'entrypoints/sidepanel/operate-off.ts');
+              if (/(^|\/)Skills$/.test(source)) return path.resolve(process.cwd(), 'entrypoints/sidepanel/skills-off.ts');
+              return null;
             },
           },
         ],

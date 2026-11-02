@@ -8,10 +8,13 @@ import { checkCode, composeTest, engineRunsModOn, inPageWorld, patternsForPage, 
 import type { TestRun } from '@/lib/exec/adapter';
 import type { PersistReport, TestModResult } from '@/lib/agent/testmod';
 import { checkConnect, connectOf } from '@/lib/connect';
-import { dependenciesChanged, fetchText, previewFromUrl, reparseEditedSource, resolveDependencies, toBase64 } from '@/lib/install';
+import { dependenciesChanged, fetchText, previewFromText, previewFromUrl, reparseEditedSource, resolveDependencies, toBase64 } from '@/lib/install';
 import { UPDATED_MARK } from '@/lib/importreport';
-import { installPageUrl, isInstallableUrl, isUserScriptUrl, scriptIdentity, USER_JS_PATTERN, USER_JS_VIEW_PATTERN } from '@/lib/installurl';
-import { addDismissal, BANNER_DISMISSED_KEY, bannerWorthShowing, installState, isDismissed, type Detection } from '@/lib/banner';
+import { installPageUrl, isInstallableUrl, isUserScriptUrl, scriptIdentity, SKILL_MD_PATTERN, USER_JS_PATTERN, USER_JS_VIEW_PATTERN } from '@/lib/installurl';
+import { handleSkillsRpc, type SkillsRpc } from '@/lib/skillrpc';
+import { loadSkills, upsertSkill } from '@/lib/skillstore';
+import { skillFromSource } from '@/lib/skills';
+import { addDismissal, BANNER_DISMISSED_KEY, bannerWorthShowing, installState, isDismissed, skillInstallState, type Detection } from '@/lib/banner';
 import type { BannerStateReply } from '@/lib/bannerclient';
 import { createShareController } from '@/lib/sharecontroller';
 import { createUpdateController } from '@/lib/updatecontroller';
@@ -20,7 +23,7 @@ import { resyncPlan } from '@/lib/resync';
 import { describeCallbackError, mapStack, mergeLateErrors, parseError, prepareRunScript, renderLateErrors, renderRunResult, type DomEffect, type LateError, type RawCallbackError, type RunResult, type RunSource } from '@/lib/runscript';
 import { watchDocument } from '@/lib/navwatch';
 import { shouldUpdate } from '@/lib/version';
-import { draftSourceFor, loadMods, matchPatternForUrl, modFromProposal, modFromSource, parseHeader, previewFromSource, upsertMod, deleteMod, saveMods } from '@/lib/mods';
+import { draftSourceFor, loadMods, matchPatternForUrl, modFromProposal, modFromSource, parseHeader, upsertMod, deleteMod, saveMods } from '@/lib/mods';
 import { addChatActions, appendTurn, archiveChat, bulkChats, countTurns, createChat, deleteChat, getChat, hostFromUrl, isArchived, listChats, loadItems, loadMessages, markTitleRefreshed, renameChat, saveItems, saveMessages, setChatArtifact, setChatModel, setChatThinking, setModelTitle, touchChat } from '@/lib/chats';
 import { loadRuns, markInterrupted, nextRunRecord, pruneRuns, resumableRuns, saveRuns, withoutPending, type RunMap, type RunRecord } from '@/lib/runstate';
 import { AUTO_RESUMED_TEXT, autoResumable, countAutoResume, holdExpired, KEEPALIVE_MAX_HOLD_MS, KEEPALIVE_PORT, TAB_CLOSED_TEXT } from '@/lib/keepalive';
@@ -1175,11 +1178,13 @@ async function bootstrap() {
 const USER_JS_RULE_ID = 1;
 /** Lets a code host's HTML view of a .user.js file (a GitHub blob page) load as itself. */
 const USER_JS_VIEW_RULE_ID = 2;
+/** The same redirect for a .skill.md, in a build that has skills. The view rule above covers it too. */
+const SKILL_MD_RULE_ID = 3;
 
 async function installUserJsRedirect(): Promise<void> {
   const target = chrome.runtime.getURL('install.html');
   await chrome.declarativeNetRequest.updateDynamicRules({
-    removeRuleIds: [USER_JS_RULE_ID, USER_JS_VIEW_RULE_ID],
+    removeRuleIds: ACT_OFF ? [USER_JS_RULE_ID, USER_JS_VIEW_RULE_ID] : [USER_JS_RULE_ID, USER_JS_VIEW_RULE_ID, SKILL_MD_RULE_ID],
     addRules: [
       {
         id: USER_JS_RULE_ID,
@@ -1201,6 +1206,20 @@ async function installUserJsRedirect(): Promise<void> {
           resourceTypes: ['main_frame'],
         },
       },
+      ...(ACT_OFF
+        ? []
+        : [
+            {
+              id: SKILL_MD_RULE_ID,
+              priority: 1,
+              action: { type: 'redirect' as const, redirect: { regexSubstitution: `${target}#\\0` } },
+              condition: {
+                regexFilter: SKILL_MD_PATTERN,
+                isUrlFilterCaseSensitive: false,
+                resourceTypes: ['main_frame' as const],
+              },
+            },
+          ]),
     ],
   });
 }
@@ -1391,6 +1410,15 @@ const updates = createUpdateController({
     await upsertMod(fresh);
     await syncRegistrations();
   },
+  ...(ACT_OFF
+    ? {}
+    : {
+        loadSkills,
+        async installSkill(skill, source) {
+          // An update is new steps nobody has seen: the walk and any allowance start over.
+          await upsertSkill(skillFromSource(source, { existing: skill, origin: 'installed', ...(skill.downloadUrl ? { downloadUrl: skill.downloadUrl } : {}) }));
+        },
+      }),
   async modelAvailable() {
     const r = await reviewSettings().catch((e: unknown) => ({ ok: false as const, reason: e instanceof Error ? e.message : String(e) }));
     return r.ok ? { ok: true, model: r.model } : { ok: false, reason: r.reason };
@@ -1427,6 +1455,14 @@ const share = createShareController({
     await upsertMod(mod);
     await syncRegistrations();
   },
+  ...(ACT_OFF
+    ? {}
+    : {
+        loadSkills,
+        async saveSkill(skill) {
+          await upsertSkill(skill);
+        },
+      }),
   sendToContent,
 });
 
@@ -1441,6 +1477,7 @@ function cleanDetection(d: unknown): Detection | null {
     version: str(s?.version, 100),
     installUrl: str(s?.installUrl),
     ...(s?.downloadUrl ? { downloadUrl: str(s.downloadUrl) } : {}),
+    ...(!ACT_OFF && s?.skill === true ? { skill: true as const } : {}),
   }));
   const gist = x.gist && typeof x.gist.id === 'string' ? { user: str(x.gist.user, 100), id: str(x.gist.id, 64) } : undefined;
   return { kind: x.kind as Detection['kind'], scripts, ...(gist ? { gist } : {}) };
@@ -1479,8 +1516,10 @@ async function handlePageMessage(msg: { type?: string } & Record<string, unknown
       const mods = await loadMods();
       // The user's own shared gist is theirs; offering to install it back is a nag.
       if (detection.gist && mods.some((m) => m.share?.gist?.id === detection.gist!.id)) return quiet;
+      const skills = ACT_OFF ? [] : await loadSkills();
+      if (!ACT_OFF && detection.gist && skills.some((m) => m.share?.gist?.id === detection.gist!.id)) return quiet;
       const states = detection.scripts.map((s) => {
-        const st = installState(s, mods);
+        const st = !ACT_OFF && s.skill ? skillInstallState(s, skills) : installState(s, mods);
         return bannerWorthShowing(detection.kind, st) ? st : null;
       });
       return { show: states.some(Boolean), states } satisfies BannerStateReply;
@@ -1509,6 +1548,14 @@ async function handlePageMessage(msg: { type?: string } & Record<string, unknown
 
 async function handleRpc(req: RpcRequest): Promise<unknown> {
   if (!ACT_OFF && req.type.startsWith('act.')) return drive!.rpc(req as DriveRpc);
+  if (!ACT_OFF && req.type.startsWith('skills.')) {
+    return handleSkillsRpc(req as SkillsRpc, {
+      async checkNow(id) {
+        await updates.check({ force: true, onlyId: id });
+        return (await updates.summary())[id];
+      },
+    });
+  }
   switch (req.type) {
     case 'mods.list':
       return loadMods();
@@ -1534,7 +1581,7 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
       return mods;
     }
     case 'mods.preview':
-      return 'url' in req ? previewFromUrl(req.url) : previewFromSource(req.source);
+      return 'url' in req ? previewFromUrl(req.url) : previewFromText(req.source);
     case 'mods.install': {
       // replaceId: the install page updating a script that is already installed (it found it with
       // mods.findInstalled and said so on its button) — same mod, same id, values and enabled flag.

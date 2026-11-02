@@ -34,6 +34,15 @@ const FLAGGED = [
   'act_step',
   'question_done',
   'keeping a note', // lib/agent/loop.ts
+  'usermods-skill', // the format, lib/skills.ts, and the banner's detection
+  '.skill.md', // the redirect, the file name, the Export menu
+  'skills.list', // the RPCs, lib/skillrpc.ts
+  'A skill has no network', // the preview's SENDS line
+  'Install skill', // the install page's skill mode
+  'You review updates to browser automations', // lib/updates.ts
+  'in the notes, ', // lib/leakscan.ts
+  'mod-kind', // the dashboard's kind filter
+  'Skills on this site', // the Mods tab's headings
 ];
 
 function bundleText(dir) {

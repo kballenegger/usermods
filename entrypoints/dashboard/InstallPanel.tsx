@@ -1,7 +1,10 @@
 import { useState } from 'react';
+import { ACT_OFF } from '@/lib/buildflags';
 import { summarizeImport } from '@/lib/importreport';
+import type { InstallPreview as AnyPreview } from '@/lib/install';
 import { rpc } from '@/lib/rpc';
 import type { ScriptPreview } from '@/lib/types';
+import { SkillPreviewCard } from '../sidepanel/Skills';
 import { InstallPreview } from '../sidepanel/components/InstallPreview';
 import { TampermonkeyCard } from '../sidepanel/components/TampermonkeyCard';
 
@@ -25,7 +28,7 @@ export function InstallPanel({
 }) {
   const [url, setUrl] = useState('');
   const [busy, setBusy] = useState(false);
-  const [pending, setPending] = useState<{ preview: ScriptPreview; downloadUrl?: string } | null>(null);
+  const [pending, setPending] = useState<{ preview: AnyPreview; downloadUrl?: string } | null>(null);
   const [installError, setInstallError] = useState('');
 
   async function preview(req: { url: string } | { source: string }) {
@@ -45,6 +48,14 @@ export function InstallPanel({
     setBusy(true);
     setInstallError('');
     try {
+      if (!ACT_OFF && pending.preview.kind === 'skill') {
+        await rpc({ type: 'skills.install', source: pending.preview.source, origin: pending.downloadUrl ? 'installed' : 'imported', ...(pending.downloadUrl ? { downloadUrl: pending.downloadUrl } : {}) });
+        onStatus(`Installed the skill “${pending.preview.name}”.`);
+        setPending(null);
+        setUrl('');
+        setBusy(false);
+        return;
+      }
       await rpc({
         type: 'mods.install',
         source: pending.preview.source,
@@ -64,7 +75,7 @@ export function InstallPanel({
   function importFile() {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.js,.user.js,text/javascript';
+    input.accept = ACT_OFF ? '.js,.user.js,text/javascript' : '.js,.user.js,.md,.skill.md,text/javascript,text/markdown';
     input.onchange = () => {
       const f = input.files?.[0];
       if (f) void f.text().then((source) => preview({ source }));
@@ -90,20 +101,23 @@ export function InstallPanel({
           </button>
         </div>
         <div className="row">
-          <span className="muted grow">Or import a .user.js file from disk.</span>
+          <span className="muted grow">{ACT_OFF ? 'Or import a .user.js file from disk.' : 'Or import a .user.js or .skill.md file from disk.'}</span>
           <button className="btn" onClick={importFile}>Import file</button>
         </div>
       </div>
 
-      {pending && (
-        <InstallPreview
-          preview={pending.preview}
-          busy={busy}
-          error={installError}
-          onInstall={() => void confirmInstall()}
-          onCancel={() => setPending(null)}
-        />
-      )}
+      {pending &&
+        (!ACT_OFF && pending.preview.kind === 'skill' ? (
+          <SkillPreviewCard preview={pending.preview} busy={busy} error={installError} onInstall={() => void confirmInstall()} onCancel={() => setPending(null)} />
+        ) : (
+          <InstallPreview
+            preview={pending.preview as ScriptPreview}
+            busy={busy}
+            error={installError}
+            onInstall={() => void confirmInstall()}
+            onCancel={() => setPending(null)}
+          />
+        ))}
 
       <TampermonkeyCard
         onImported={(r) => {
