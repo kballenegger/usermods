@@ -10,6 +10,7 @@
 // The .ts extensions on the value imports are load-bearing, for the node test runner; see
 // lib/install.ts.
 import { reheaderFields } from './artifact.ts';
+import { ACT_OFF } from './buildflags.ts';
 import { parseHeader } from './mods.ts';
 import { readSkillFacts, setSkillFields, skillFileName, type Skill } from './skills.ts';
 import type { Mod, ModShare } from './types';
@@ -400,7 +401,7 @@ export function recordGreasyFork(mod: Mod, url: string, at = Date.now()): Mod {
  * before pressing Create, which is why the page is asked rather than the name assumed.
  */
 export function pickGistFile(files: string[], wanted: string): string | null {
-  const kind = /\.skill\.md$/i.test(wanted) ? /\.skill\.md$/i : /\.user\.js$/i;
+  const kind = !ACT_OFF && /\.skill\.md$/i.test(wanted) ? /\.skill\.md$/i : /\.user\.js$/i;
   const scripts = files.filter((f) => kind.test(f));
   if (scripts.includes(wanted)) return wanted;
   if (scripts.length) return scripts[0]!;

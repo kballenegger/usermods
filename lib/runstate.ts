@@ -24,6 +24,8 @@
 //
 // The pure half of this is tested in test/runstate.test.ts; the storage half is three lines.
 
+import { ACT_OFF } from './buildflags.ts';
+
 export const RUNS_KEY = 'runs';
 
 export type RunState = 'running' | 'failed' | 'interrupted';
@@ -210,7 +212,7 @@ export function resumableRuns(runs: RunMap): Record<string, ResumableRun> {
   const out: Record<string, ResumableRun> = {};
   for (const [id, rec] of Object.entries(runs)) {
     if (rec.state === 'running') continue;
-    out[id] = { state: rec.state, ...(rec.error ? { error: rec.error } : {}), ...(rec.autoResumes ? { autoResumed: true } : {}), ...(rec.pending ? { pending: rec.pending } : {}), ...(rec.skill ? { skill: rec.skill } : {}) };
+    out[id] = { state: rec.state, ...(rec.error ? { error: rec.error } : {}), ...(rec.autoResumes ? { autoResumed: true } : {}), ...(rec.pending ? { pending: rec.pending } : {}), ...(!ACT_OFF && rec.skill ? { skill: rec.skill } : {}) };
   }
   return out;
 }
@@ -223,7 +225,7 @@ function parsePending(raw: unknown): PendingStep | undefined {
   if (raw === undefined || raw === null) return undefined;
   const p = raw as Partial<PendingStep>;
   return {
-    kind: p.kind === 'script' || p.kind === 'skill' || p.kind === 'skill-start' || p.kind === 'skill-repair' ? p.kind : 'act',
+    kind: p.kind === 'script' || (!ACT_OFF && (p.kind === 'skill' || p.kind === 'skill-start' || p.kind === 'skill-repair')) ? p.kind : 'act',
     label: typeof p.label === 'string' && p.label ? p.label : 'an action',
     at: typeof p.at === 'number' && Number.isFinite(p.at) ? p.at : 0,
   };
@@ -244,7 +246,7 @@ export function parseRuns(raw: unknown): RunMap {
     const r = v as Partial<RunRecord> | null;
     if (!r || (r.state !== 'running' && r.state !== 'failed' && r.state !== 'interrupted')) continue;
     const pending = parsePending(r.pending);
-    const skill = parseRunSkill(r.skill);
+    const skill = ACT_OFF ? undefined : parseRunSkill(r.skill);
     out[id] = {
       state: r.state,
       tabId: typeof r.tabId === 'number' ? r.tabId : -1,

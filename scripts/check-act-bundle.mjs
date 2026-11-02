@@ -37,6 +37,9 @@ const FLAGGED = [
   'usermods-skill', // the format, lib/skills.ts, and the banner's detection
   '.skill.md', // the file name, the Export menu
   'skill\\\\.md', // the redirect's pattern, as it sits in a built string
+  '\\.skill\\.md', // the same as a regex literal: pickGistFile's, lib/share.ts
+  'skill-start', // what a pending step was, lib/runstate.ts
+  'skill-repair',
   'skills.list', // the RPCs, lib/skillrpc.ts
   'A skill has no network', // the preview's SENDS line
   'Install skill', // the install page's skill mode

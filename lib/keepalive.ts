@@ -70,6 +70,7 @@
 
 // Type-only, so this module stays importable by the node test runner, which resolves no
 // extensionless relative specifiers.
+import { ACT_OFF } from './buildflags.ts';
 import type { RunMap, RunRecord } from './runstate';
 
 /**
@@ -259,7 +260,7 @@ export function shouldAutoResume({ record, live, safari }: AutoResumeInput): boo
   if (record.stoppedByUser) return false;
   if (record.pending) return false;
   // A skill's run holds values only the user can give again, and its pending step is the user's to answer.
-  if (record.skill) return false;
+  if (!ACT_OFF && record.skill) return false;
   return (record.autoResumes ?? 0) < MAX_AUTO_RESUMES;
 }
 
