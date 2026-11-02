@@ -89,6 +89,10 @@ const QUIET = [
   '',
 ].join('\n');
 
+const SKILL_SOURCE = fs.readFileSync(path.join(process.cwd(), 'test/fixtures/skillfiles/unsubscribe.skill.md'), 'utf8');
+// A skill with a value typed into it, as a hand edit or a recording could keep: the leak check's case.
+const SKILL_LEAKY = SKILL_SOURCE.replace('name: Unsubscribe from the weekly digest', 'name: Leaky skill').replace('- go: /account/settings', '- fill: acct-0042-private\n  into: textbox "Account"\n  at: { css: "#account" }');
+
 function mod(source, over = {}) {
   const now = Date.now();
   const name = source.match(/@name\s+(.+)/)[1].trim();
@@ -415,9 +419,208 @@ export async function shareFlow({ launch, openPanel, openSite, log, outDir, capt
       log('14-export-menu-dashboard.png');
     }
     await dash.close();
+
+    await shareSkill({ b, panel, gist, USER, launch, fail, stored: async (id) => (await panel.evaluate(async () => (await chrome.storage.local.get('skills')).skills ?? [])).find((s) => s.id === id) });
     log('share flow OK');
   } finally {
     await b.close();
+  }
+}
+
+/**
+ * A skill down the same road: no Greasy Fork item, the leak check with Make it an input, a gist filled
+ * and pointed at, its two URLs in the front matter, Update gist; then a second profile that opens the
+ * raw link and is redirected to the install page, previews it, installs it, and has the banner say so.
+ */
+async function shareSkill({ b, panel, gist, USER, launch, fail, stored }) {
+  const install = (source) => panel.evaluate(async (src) => {
+    const r = await chrome.runtime.sendMessage({ type: 'skills.install', source: src, origin: 'imported' });
+    if (!r?.ok) throw new Error(r?.error ?? 'no answer');
+    return r.data;
+  }, source);
+  await install(SKILL_SOURCE);
+  await install(SKILL_LEAKY);
+  const row = (name) => panel.locator('[data-testid="skill-row"]', { has: panel.locator('h4', { hasText: name }) });
+  await row('Unsubscribe').waitFor({ timeout: 10_000 });
+  const skills = await panel.evaluate(async () => (await chrome.storage.local.get('skills')).skills ?? []);
+  const id = skills.find((s) => s.name.startsWith('Unsubscribe')).id;
+  const leakyId = skills.find((s) => s.name === 'Leaky skill').id;
+  const heading = await panel.locator('.label', { hasText: 'Other skills' }).textContent();
+  if (!heading.includes('2')) fail(`the Mods tab's heading reads ${heading}`);
+
+  // The menu: three ways out. Greasy Fork is not one of them.
+  async function menu(name, item) {
+    await row(name).locator('[data-testid="skill-export"]').click();
+    const it = panel.locator(`[data-testid="skill-export-menu"] [data-testid="${item}"]`);
+    await it.waitFor({ timeout: 5000 });
+    return it;
+  }
+  await row('Unsubscribe').locator('[data-testid="skill-export"]').click();
+  const items = (await panel.locator('[data-testid="skill-export-menu"] [role="menuitem"]').allTextContents()).map((t) => t.trim());
+  if (items.join(' | ') !== 'Download .skill.md | Copy to clipboard | Share as Gist') fail(`the skill's Export menu reads ${JSON.stringify(items)}`);
+  await panel.keyboard.press('Escape');
+
+  // The leak check holds a typed value; Make it an input rewrites the step; nothing opened meanwhile.
+  const pagesBefore = b.ctx.pages().length;
+  await (await menu('Leaky skill', 'export-gist')).click();
+  const prompt = panel.locator('[data-testid="skill-share-prompt"]');
+  await prompt.waitFor({ timeout: 5000 });
+  const leaks = await panel.locator('[data-testid="skill-share-leaks"]').textContent();
+  if (!/a typed value in textbox "Account"/.test(leaks)) fail(`the leak list reads ${JSON.stringify(leaks)}`);
+  if (leaks.includes('acct-0042-private')) fail('the leak list prints the value whole');
+  if (b.ctx.pages().length !== pagesBefore) fail('a tab opened before the leak check was answered');
+  await panel.locator('[data-testid="skill-make-input"]').click();
+  await panel.locator('[data-testid="skill-share-anyway"]', { hasText: 'Continue' }).waitFor({ timeout: 10_000 });
+  const rewritten = await stored(leakyId);
+  if (rewritten.source.includes('acct-0042-private')) fail('the value is still in the file');
+  if (!rewritten.source.includes('fill: $account') || !rewritten.inputs.account) fail(`the rewrite left:\n${rewritten.source}`);
+  if (rewritten.origin !== 'edited') fail(`a rewritten skill is ${rewritten.origin}`);
+  await panel.locator('[data-testid="skill-share-cancel"]').click();
+
+  // Share as Gist: filled, pointed at, and not pressed.
+  const posts = gist.posts;
+  const open = async (name) => {
+    const it = await menu(name, 'export-gist');
+    const [tab] = await Promise.all([b.ctx.waitForEvent('page', { timeout: 15_000 }), it.click()]);
+    await tab.waitForURL((u) => u.href !== 'about:blank', { timeout: 15_000 });
+    await tab.waitForLoadState('domcontentloaded');
+    return tab;
+  };
+  let tab = await open('Unsubscribe');
+  const filledText = await hintText(tab, 'usermods-hint-filled');
+  if (!filledText?.includes('Your skill is filled in.')) fail(`the skill's hint read ${JSON.stringify(filledText)}`);
+  const filled = await tab.evaluate(() => ({ name: document.querySelector('.js-gist-filename').value, code: document.querySelector('.CodeMirror').CodeMirror.getValue() }));
+  if (filled.name !== 'unsubscribe-from-the-weekly-digest.skill.md') fail(`the file name was ${filled.name}`);
+  if (filled.code !== SKILL_SOURCE) fail('the editor does not hold the skill, exactly');
+  if (gist.posts !== posts) fail('something submitted the gist form');
+  await tab.locator('button', { hasText: 'Create secret gist' }).click();
+  await hintText(tab, 'usermods-hint-saved');
+  const gistId = [...gist.gists.keys()].find((k) => gist.gists.get(k).files[0]?.name.endsWith('.skill.md'));
+  const raw = `https://gist.githubusercontent.com/${USER}/${gistId}/raw/unsubscribe-from-the-weekly-digest.skill.md`;
+  const after = await until('the gist to be recorded on the skill', async () => {
+    const s = await stored(id);
+    return s?.share?.gist ? s : null;
+  });
+  if (after.share.gist.rawUrl !== raw || after.downloadUrl !== raw) fail(`recorded ${JSON.stringify(after.share.gist)}`);
+  if (!after.source.includes(`updateURL: ${raw}`) || !after.source.includes(`downloadURL: ${raw}`)) fail(`the front matter lacks its URLs:\n${after.source}`);
+  if (after.version !== '1.0.2') fail('the first share bumped the version');
+  await panel.locator('[data-testid="skill-install-link"]', { hasText: raw }).waitFor({ timeout: 10_000 });
+  await row('Unsubscribe').locator('[data-testid="skill-row-link"]', { hasText: raw }).waitFor({ timeout: 10_000 });
+  // The user's own gist is theirs: no banner on it.
+  await tab.waitForTimeout(800);
+  if (await tab.locator('[data-usermods="banner"]').count()) fail('the install banner nags on the skill’s own gist');
+  await tab.close();
+
+  // Update gist: the edit page, the bumped version, filled without the editor API.
+  gist.variant = 'noapi';
+  tab = await open('Unsubscribe');
+  if (!tab.url().endsWith(`/${USER}/${gistId}/edit`)) fail(`Update gist opened ${tab.url()}`);
+  const updText = await hintText(tab, 'usermods-hint-filled');
+  if (!updText?.includes('Version 1.0.3 is filled in')) fail(`the update hint read ${JSON.stringify(updText)}`);
+  const code = await tab.evaluate(() => document.querySelector('textarea.js-blob-contents').value);
+  if (!/^version: 1\.0\.3$/m.test(code) || /^version: 1\.0\.2$/m.test(code)) fail(`the edit page holds:\n${code}`);
+  if ((await stored(id)).version !== '1.0.3') fail('the skill was not saved at 1.0.3');
+  await tab.locator('button', { hasText: 'Update secret gist' }).click();
+  await hintText(tab, 'usermods-hint-saved');
+  gist.variant = 'default';
+  await tab.close();
+
+  const published = gist.gists.get(gistId).files[0];
+
+  // The dashboard: a kind filter, skill rows, the source editor with what the parser says, and the
+  // install panel taking both kinds.
+  const dash = await b.ctx.newPage();
+  await dash.setViewportSize({ width: 1280, height: 900 });
+  await dash.goto(`chrome-extension://${b.extId}/dashboard.html#mods`);
+  const dashRow = dash.locator('[data-testid="skill-row"]', { hasText: 'Unsubscribe from the weekly digest' });
+  await dashRow.waitFor({ timeout: 10_000 });
+  await dash.locator('[data-testid="mod-kind"]').selectOption('skills');
+  if (await dash.locator('[data-testid="mod-row"]').count()) fail('the Skills filter still lists mods');
+  await dash.locator('[data-testid="mod-kind"]').selectOption('mods');
+  await dashRow.waitFor({ state: 'detached', timeout: 5000 });
+  await dash.locator('[data-testid="mod-kind"]').selectOption('all');
+  const meta = await dashRow.locator('[data-testid="skill-row-meta"]').textContent();
+  if (!meta.includes('news.example.com') || !meta.includes('7 steps') || !meta.includes('first run pending')) fail(`the dashboard's row reads ${meta}`);
+  await dashRow.locator('[data-testid="skill-export"]').click();
+  const dashItems = (await dash.locator('[data-testid="skill-export-menu"] [role="menuitem"]').allTextContents()).map((t) => t.trim());
+  if (dashItems.join(' | ') !== 'Download .skill.md | Copy to clipboard | Update gist') fail(`the dashboard's skill menu reads ${JSON.stringify(dashItems)}`);
+  await dash.keyboard.press('Escape');
+  await dashRow.locator('.title').click();
+  const area = dash.locator('[data-testid="skill-editor-source"]');
+  await area.waitFor({ timeout: 5000 });
+  const good = await area.inputValue();
+  // Off the site: refused, on its line, and the save is off, with the text kept.
+  await area.fill(good.replace('- go: /account/settings', '- go: https://evil.test/'));
+  await dash.locator('[data-testid="skill-editor-refusal"]', { hasText: 'a skill stays on its site' }).waitFor({ timeout: 5000 });
+  if (await dash.locator('[data-testid="skill-editor-save"]').isEnabled()) fail('a refused edit can be saved');
+  // A warning is only a warning, and a saved hand edit costs the skill its origin.
+  await area.fill(good.replace('- wait: { text: Preferences saved }', '- wait: { ms: 1500 }'));
+  await dash.locator('[data-testid="skill-editor-warning"]', { hasText: 'waits a fixed 1.5 s' }).waitFor({ timeout: 5000 });
+  await dash.locator('[data-testid="skill-editor-save"]').click();
+  const edited = await until('the edit to be saved', async () => {
+    const x = await stored(id);
+    return x?.source.includes('ms: 1500') ? x : null;
+  });
+  if (edited.origin !== 'edited' || edited.walked !== false) fail(`after a hand edit: ${edited.origin}, walked ${edited.walked}`);
+  // Import file takes a .skill.md, through the same preview.
+  const [chooser] = await Promise.all([dash.waitForEvent('filechooser', { timeout: 5000 }), dash.locator('button', { hasText: 'Import file' }).click()]);
+  await chooser.setFiles(path.join(process.cwd(), 'test/fixtures/skillfiles/album-links.skill.md'));
+  await dash.locator('[data-testid="skill-preview-name"]', { hasText: 'Album download links' }).waitFor({ timeout: 10_000 });
+  await dash.locator('[data-testid="skill-install"]').click();
+  const imported = await until('the import to land', async () => (await panel.evaluate(async () => (await chrome.storage.local.get('skills')).skills ?? [])).find((x) => x.name === 'Album download links'));
+  if (imported.origin !== 'imported' || imported.downloadUrl) fail(`imported as ${imported.origin}, from ${imported.downloadUrl}`);
+  await dash.close();
+
+  // The Mods tab at the panel's narrowest.
+  await panel.setViewportSize({ width: 360, height: 780 });
+  await row('Album download links').waitFor({ timeout: 10_000 });
+  if (await panel.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)) fail('the Mods tab overflows at 360px with skills in it');
+  if (process.env.SKILL_SHOT_DIR) await panel.screenshot({ path: path.join(process.env.SKILL_SHOT_DIR, 'skills-tab-360.png') });
+
+  // A second profile, which has never seen this skill, follows the raw link.
+  const b2 = await launch('light', { args: OFFLINE_HOSTS });
+  try {
+    for (const host of ['https://github.com/**', 'https://gist.github.com/**']) await b2.ctx.route(host, (r) => r.fulfill(html('<title>Not found</title>', 404)));
+    await b2.ctx.route(`https://gist.github.com/${USER}/${gistId}`, (r) => r.fulfill(html(gistViewPage({ user: USER, id: gistId, files: [published] }))));
+    await b2.ctx.route('https://gist.githubusercontent.com/**', (r) => r.fulfill({ status: 200, contentType: 'text/plain; charset=utf-8', body: published.content }));
+    const page = await b2.ctx.newPage();
+    await page.setViewportSize({ width: 860, height: 1000 });
+
+    // On the gist's page the banner offers it by name.
+    await page.goto(`https://gist.github.com/${USER}/${gistId}`);
+    const bannerText = () => page.locator('[data-usermods="banner"] [data-testid="usermods-banner-text"]').first().textContent({ timeout: 10_000 });
+    const offered = await bannerText();
+    if (offered !== 'usermods can install the skill “Unsubscribe from the weekly digest”.') fail(`the gist banner read ${JSON.stringify(offered)}`);
+
+    // Probe S-c: the redirect catches the raw .skill.md, as it does a .user.js.
+    await page.goto(raw).catch(() => {});
+    await page.waitForURL(/install\.html#/, { timeout: 10_000 });
+    if (!page.url().endsWith(`install.html#${raw}`)) fail(`the raw link landed on ${page.url()}`);
+    const preview = page.locator('[data-testid="skill-preview"]');
+    await preview.waitFor({ timeout: 15_000 });
+    if ((await page.locator('h2').textContent()) !== 'Install skill') fail('the page is not in skill mode');
+    const does = await page.locator('[data-testid="skill-does"]').textContent();
+    if (does !== '7 steps · 2 clicks · 1 navigation · 1 untick · 2 waits · 1 read') fail(`WHAT IT DOES reads ${does}`);
+    if (!(await page.locator('[data-testid="skill-asks"]').textContent()).includes('submits a form')) fail('ASKS YOU does not name the submit');
+    if (!(await page.locator('[data-testid="skill-sends"]').textContent()).includes('A skill has no network and runs no code.')) fail('SENDS is not the fixed text');
+    if ((await page.locator('[data-testid="skill-steps"] li').count()) !== 7) fail('the step list is not all there');
+    if (await b2.ctx.serviceWorkers()[0].evaluate(async () => ((await chrome.storage.local.get('skills')).skills ?? []).length)) fail('previewing installed something');
+    if (process.env.SKILL_SHOT_DIR) await page.screenshot({ path: path.join(process.env.SKILL_SHOT_DIR, 'skill-install.png'), fullPage: true });
+    await page.setViewportSize({ width: 360, height: 780 });
+    if (await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)) fail('the preview overflows at 360px');
+    if (process.env.SKILL_SHOT_DIR) await page.screenshot({ path: path.join(process.env.SKILL_SHOT_DIR, 'skill-install-360.png'), fullPage: true });
+    await page.setViewportSize({ width: 860, height: 1000 });
+    await page.locator('[data-testid="skill-install"]').click();
+    await page.locator('.card.hero', { hasText: 'Installed' }).waitFor({ timeout: 10_000 });
+    const installed = (await b2.ctx.serviceWorkers()[0].evaluate(async () => (await chrome.storage.local.get('skills')).skills ?? []))[0];
+    if (installed?.origin !== 'installed' || installed.downloadUrl !== raw || installed.walked !== false || installed.version !== '1.0.3') fail(`installed as ${JSON.stringify(installed).slice(0, 300)}`);
+
+    // And the banner now says so, on the same gist.
+    await page.goto(`https://gist.github.com/${USER}/${gistId}`);
+    await page.locator('[data-usermods="banner"] [data-testid="usermods-banner-status"]', { hasText: 'Installed ✓' }).waitFor({ timeout: 10_000 });
+    if (await page.locator('[data-usermods="banner"] [data-testid="usermods-banner-action"]').count()) fail('an installed skill still offers Install');
+  } finally {
+    await b2.close();
   }
 }
 
@@ -538,6 +741,30 @@ export async function bannerFlow({ launch, log, outDir, capture = false }) {
     await page.goto(RAW_LATEST).catch(() => {});
     await page.waitForURL(/install\.html#/, { timeout: 10_000 });
     if (!page.url().endsWith(`install.html#${RAW_LATEST}`)) fail(`the gist raw URL landed on ${page.url()}`);
+
+    // A skill: on a gist, on a plain-text page, and on a blob page the redirect leaves alone.
+    const SKILL_GIST = 'https://gist.github.com/ada/3b1fa00000000000000000000000abcd';
+    const SKILL_PASTE = 'https://paste.example.com/raw/skill';
+    const SKILL_BLOB = 'https://github.com/ada/skills/blob/main/unsubscribe.skill.md';
+    await b.ctx.route(SKILL_GIST, (r) => r.fulfill(html(fixture('gist-skill.html'))));
+    await b.ctx.route(SKILL_PASTE, (r) => r.fulfill({ status: 200, contentType: 'text/plain; charset=utf-8', body: SKILL_SOURCE }));
+    await b.ctx.route(SKILL_BLOB, (r) => r.fulfill(html(`<a id="raw-url" href="/ada/skills/raw/main/unsubscribe.skill.md">Raw</a>${fixture('gist-skill.html')}`)));
+    const NAME = 'Unsubscribe from the weekly digest';
+    for (const url of [SKILL_GIST, SKILL_PASTE, SKILL_BLOB]) {
+      await page.goto(url);
+      if (page.url() !== url) fail(`${url} was redirected to ${page.url()}`);
+      if ((await bannerText()) !== `usermods can install the skill “${NAME}”.`) fail(`the banner on ${url} read ${JSON.stringify(await bannerText())}`);
+    }
+    // Installed: matched by namespace and name here, since none of these pages shows a download URL.
+    const installed = await ext.evaluate((source) => chrome.runtime.sendMessage({ type: 'skills.install', source, origin: 'imported' }), SKILL_SOURCE);
+    if (!installed?.ok) fail(`could not seed the skill: ${JSON.stringify(installed)}`);
+    await page.goto(SKILL_GIST);
+    await page.locator('[data-usermods="banner"] [data-testid="usermods-banner-status"]', { hasText: 'Installed ✓' }).waitFor({ timeout: 10_000 });
+    // A skill is a skill: the same name and namespace on a mod is not it.
+    await ext.evaluate(async () => chrome.storage.local.set({ skills: [] }));
+    await setMods([mod(`// ==UserScript==\n// @name         ${NAME}\n// @namespace    ada\n// @version      1.0.2\n// @match        *://*.example.com/*\n// ==/UserScript==\n`)]);
+    await page.goto(SKILL_GIST);
+    if ((await bannerText()) !== `usermods can install the skill “${NAME}”.`) fail('a mod of the same name passed for the installed skill');
     log('banner flow OK');
   } finally {
     await b.close();

@@ -475,7 +475,7 @@ What stays:
 | Copy | The whole source | The whole file |
 | Share as Gist | Opens `gist.github.com`, fills name, description and file, points at the site's button; the user presses it; the gist is remembered and `@updateURL`/`@downloadURL` point at the sha-less raw URL | The same controller, the same fill, the same hint words with "script" read as "skill"; `updateURL`/`downloadURL` written into the front matter by `reheaderFields`' YAML sibling. A gist renders the Markdown, so the gist page is the human preview |
 | Update gist | Bumps the patch version, fills the edit page | Same, `bumpPatch` on `version` |
-| The install link | `https://gist.githubusercontent.com/<you>/<id>/raw/<slug>.user.js` | `…/raw/<slug>.skill.md`. GitHub serves it as `text/plain` `[inferred]`, which is what the raw detection reads |
+| The install link | `https://gist.githubusercontent.com/<you>/<id>/raw/<slug>.user.js` | `…/raw/<slug>.skill.md`. GitHub serves it as `text/plain` (probe S-b, [§9](#9-evaluation)), which is what the raw detection reads |
 
 The leak check runs first, as it does today, extended in [§4.4](#44-the-leak-check).
 
@@ -1222,6 +1222,22 @@ goes through the extension's own code.
 | S-a | Does a synthetic click on `<a download>` start a download with no user activation, on Chrome and on Safari? | Whether `export-invoices` ends in a click or an `ask` |
 | S-b | What does GitHub serve a `.skill.md` raw link as, and does the gist page render it? | [§4.1](#41-greasy-fork-is-out-the-gist-and-the-raw-link-are-in) |
 | S-c | Does Chrome's `declarativeNetRequest` redirect fire for a `.skill.md` navigation from a gist raw URL the same way it does for `.user.js`? | [§4.2](#42-installing-from-a-raw-link) |
+
+**S-b, measured 2026-11-02** against existing public gists, read only, none created. A gist's raw
+`.md`, with and without a revision sha, is served `200` as `content-type: text/plain; charset=utf-8`,
+with `x-content-type-options: nosniff`, `access-control-allow-origin: *` and
+`content-security-policy: default-src 'none'; style-src 'unsafe-inline'; sandbox`. So §4.1's
+`text/plain` holds. The gist page does render Markdown: it has no source lines (`.js-file-line`
+count 0), a Raw link pinned to a revision, and an `article.markdown-body` that shows front matter as a
+two-column table, `<tr><th>key</th><td>value</td></tr>`, read from a public gist holding a `SKILL.md`.
+That table is what `lib/banner.ts` reads the name and version from on a gist page; a saved shape is
+`test/fixtures/pages/gist-skill.html`. A list or a flow map in the front matter was not observed there.
+
+**S-c, measured 2026-11-02** in the share smoke flow, on Chromium through the built extension: the
+third dynamic rule redirects a navigation to `https://gist.githubusercontent.com/<user>/<id>/raw/<slug>.skill.md`
+to `install.html#<that URL>`, the same fragment a `.user.js` lands on. The address is a fixture route,
+and the rule fires before the request, so this measures the rule and not GitHub. A GitHub blob page of a
+`.skill.md` is left alone by the existing allow rule and gets the banner. Chromium only: Safari is phase 10.
 | S-d | Can a content script read a WebMCP tool's `consequentialHint`, and call it? | The `call` step, later |
 
 ## 10. Open questions

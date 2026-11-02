@@ -1248,8 +1248,8 @@ const FALLBACK = {
 // the review system prompt. Answered with a fixed JSON review that names the new @connect host, so
 // the updates flow can see findings rendered; recorded as script 'review' so the flow can check
 // what was sent (the two sources, nothing from a page).
-const updateServed = { source: '', fetches: 0 };
-const REVIEW_SYSTEM = /you review updates to browser userscripts/i;
+const updateServed = { source: '', fetches: 0, skill: '' };
+const REVIEW_SYSTEM = /you review updates to browser (userscripts|automations)/i;
 export const REVIEW_REPLY = JSON.stringify({
   verdict: 'review carefully',
   summary: 'The new version starts sending data to a host the old one never contacted.',
@@ -2024,8 +2024,12 @@ const server = http.createServer(async (req, res) => {
   // daily throttle.
   if (url.pathname === '/__updates' && req.method === 'POST') {
     const body = JSON.parse(await readBody(req));
-    updateServed.source = String(body.source ?? '');
-    updateServed.fetches = 0;
+    if (body.skill !== undefined) {
+      updateServed.skill = String(body.skill);
+    } else {
+      updateServed.source = String(body.source ?? '');
+      updateServed.fetches = 0;
+    }
     res.writeHead(200, { 'content-type': 'application/json' });
     res.end('{"ok":true}');
     return;
@@ -2033,6 +2037,11 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname === '/__updates' && req.method === 'GET') {
     res.writeHead(200, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ fetches: updateServed.fetches }));
+    return;
+  }
+  if (url.pathname === '/__updates/unsub.skill.md') {
+    res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', 'access-control-allow-origin': '*' });
+    res.end(updateServed.skill);
     return;
   }
   if (url.pathname === '/__updates/tidy.user.js' || url.pathname === '/__updates/tidy.meta.js') {

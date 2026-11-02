@@ -133,6 +133,19 @@ export function gistViewPage({ user, id, sha = 'a'.repeat(40), files }) {
   const body = files
     .map((f) => {
       const anchor = `file-${f.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}`;
+      // Markdown is rendered, with no source lines, and its front matter becomes a table: read from a
+      // real gist holding a SKILL.md on 2026-11-02, as test/fixtures/pages/gist-skill.html keeps it.
+      if (/\.md$/i.test(f.name)) {
+        // A form post turns line ends into CRLF.
+        const front = (f.content.replace(/\r\n/g, '\n').match(/^---\n([\s\S]*?)\n---\n/) ?? [])[1] ?? '';
+        const rows = front
+          .split('\n')
+          .map((l) => l.match(/^([\w-]+): (.+)$/))
+          .filter(Boolean)
+          .map((m) => `<tr><th>${esc(m[1])}</th><td>${esc(m[2])}</td></tr>`)
+          .join('');
+        return `<div id="${anchor}" class="file my-2"><div class="file-header"><div class="file-actions"><a href="/${user}/${id}/raw/${sha}/${encodeURIComponent(f.name)}" class="Button">Raw</a></div><div class="file-info"><strong class="gist-blob-name">${esc(f.name)}</strong></div></div><div class="Box-body readme blob"><article class="markdown-body entry-content"><markdown-accessiblity-table><table><tbody>${rows}</tbody></table></markdown-accessiblity-table></article></div></div>`;
+      }
       const lines = f.content
         .split('\n')
         .map((l, i) => `<tr><td id="${anchor}-L${i + 1}" class="blob-num js-line-number" data-line-number="${i + 1}"></td><td class="blob-code blob-code-inner js-file-line">${esc(l)}</td></tr>`)
