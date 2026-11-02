@@ -18,7 +18,7 @@
 import type { Verb } from './agent/gate';
 import { formatRoleName } from './interact/name.ts';
 import type { AtMap } from './interact/target';
-import { serialiseSkill, skillMatchesUrl, type ParsedSkill, type SkillInput, type SkillOutput, type SkillStep, type SkillWait } from './skills.ts';
+import { atStart, serialiseSkill, skillMatchesUrl, type ParsedSkill, type SkillInput, type SkillOutput, type SkillStep, type SkillWait } from './skills.ts';
 import type { Msg } from './types';
 
 /** How many entries one chat keeps. A run this long has outgrown a skill anyway. */
@@ -262,7 +262,7 @@ export function compileRecording(recording: readonly JournalEntry[], d: SaveDeci
   const startsWithGo = first?.kind === 'act' && first.verb === 'go';
   // A `start` the user widened to a prefix of the page means "wherever under here you are", so there
   // is no first navigation to write. Otherwise a run lands on the page the recording started on.
-  const widened = start.endsWith('/') && firstPage !== start && firstPage.startsWith(start);
+  const widened = firstPage !== start && atStart(start, firstPage);
   if (!startsWithGo && !widened) steps.push({ verb: 'go', to: onSitePath(start), why: 'start where the recording started' });
 
   for (const e of recording) {

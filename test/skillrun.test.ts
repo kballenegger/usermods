@@ -10,7 +10,7 @@ import { answerFits, type Answer, type Question } from '../lib/agent/questions.t
 import type { ActResult, ActStep } from '../lib/interact/actions.ts';
 import type { Described } from '../lib/interact/describe.ts';
 import { MAX_RUN_ACTIONS, STANDING_LABEL, initialRun, inputsInOrder, next, outputCsv, outputsNote, planStep, runSkill, runSummary, stepsKey, type RunCarry, type SkillRunDeps } from '../lib/skillrun.ts';
-import { skillFromSource, type Skill, type SkillStep } from '../lib/skills.ts';
+import { atStart, skillFromSource, type Skill, type SkillStep } from '../lib/skills.ts';
 import type { AgentEventBody } from '../lib/types.ts';
 
 const PAGE = 'https://forms.example.com/';
@@ -449,4 +449,12 @@ test('the card asks for inputs in the order the steps use them, whatever order s
   const skill = asLocal('- fill: $merchant\n  into: textbox "M"\n  at: { css: "#m" }\n- fill: $amount\n  into: textbox "A"\n  at: { css: "#a" }', 'inputs:\n  merchant: { label: M }\n  amount: { label: A }\noutputs: {}');
   const sorted = { ...skill, inputs: { amount: skill.inputs.amount!, merchant: skill.inputs.merchant! } };
   assert.deepEqual(inputsInOrder(sorted).map(([k]) => k), ['merchant', 'amount']);
+});
+
+test('a start ending in a path and a slash covers the pages under it; a site’s root does not', () => {
+  assert.ok(atStart('https://p.example.com/albums/', 'https://p.example.com/albums/kyoto'));
+  assert.ok(atStart('https://p.example.com/albums/new', 'https://p.example.com/albums/new'));
+  assert.ok(!atStart('https://p.example.com/albums/new', 'https://p.example.com/albums/new/x'));
+  assert.ok(!atStart('https://p.example.com/', 'https://p.example.com/other'));
+  assert.ok(atStart('https://p.example.com/', 'https://p.example.com/'));
 });

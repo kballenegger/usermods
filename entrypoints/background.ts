@@ -15,7 +15,7 @@ import { handleSkillsRpc, type SkillsRpc } from '@/lib/skillrpc';
 import { dropCarry, draftAsSkill, draftFromRun, keepAllowance, loadCarry, markWalked, saveCard, saveCarry } from '@/lib/skillcontroller';
 import { outputsNote, runSkill, stepsKey, type RunCarry } from '@/lib/skillrun';
 import { loadSkills, upsertSkill } from '@/lib/skillstore';
-import { setSkillFields, skillFromSource, skillMatchesUrl, type Skill } from '@/lib/skills';
+import { atStart, setSkillFields, skillFromSource, skillMatchesUrl, type Skill } from '@/lib/skills';
 import { addDismissal, BANNER_DISMISSED_KEY, bannerWorthShowing, installState, isDismissed, skillInstallState, type Detection } from '@/lib/banner';
 import type { BannerStateReply } from '@/lib/bannerclient';
 import { createShareController } from '@/lib/sharecontroller';
@@ -1198,7 +1198,7 @@ async function runSkillChat(chatId: string, tabId: number, skill: Skill, carry: 
  * Returns how many rows it used.
  */
 async function goToStart(driver: Driver, skill: Skill, here: string, wasOnSite: boolean, row: (i: number, r: StepRow) => void, signal: AbortSignal): Promise<number> {
-  if (!wasOnSite || skill.steps[0]?.verb === 'go' || here === skill.start || (skill.start.endsWith('/') && here.startsWith(skill.start))) return 0;
+  if (!wasOnSite || skill.steps[0]?.verb === 'go' || atStart(skill.start, here)) return 0;
   const outcome = await driver.runStep({ do: 'go', text: skill.start }, { journalKind: 'skill', knownUrls: [skill.start], barStatus: `usermods is running ${skill.name}`, activity: `running ${skill.name}`, actions: [] }, signal);
   if (outcome.kind === 'done') row(0, { state: 'done', text: outcome.words });
   return outcome.kind === 'done' ? 1 : 0;

@@ -31,7 +31,7 @@ export const OFFLINE_HOSTS = [
  * wrapped so an https tab opens blank and is then sent to its URL, by which time Playwright is
  * attached and the route answers. The product code is untouched.
  */
-async function holdExtensionTabs(ctx) {
+export async function holdExtensionTabs(ctx) {
   let [sw] = ctx.serviceWorkers();
   if (!sw) sw = await ctx.waitForEvent('serviceworker', { timeout: 20_000 });
   await sw.evaluate(() => {

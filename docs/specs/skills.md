@@ -1222,6 +1222,7 @@ goes through the extension's own code.
 | S-a | Does a synthetic click on `<a download>` start a download with no user activation, on Chrome and on Safari? | Whether `export-invoices` ends in a click or an `ask` |
 | S-b | What does GitHub serve a `.skill.md` raw link as, and does the gist page render it? | [§4.1](#41-greasy-fork-is-out-the-gist-and-the-raw-link-are-in) |
 | S-c | Does Chrome's `declarativeNetRequest` redirect fire for a `.skill.md` navigation from a gist raw URL the same way it does for `.user.js`? | [§4.2](#42-installing-from-a-raw-link) |
+| S-d | Can a content script read a WebMCP tool's `consequentialHint`, and call it? | The `call` step, later |
 
 **S-b, measured 2026-11-02** against existing public gists, read only, none created. A gist's raw
 `.md`, with and without a revision sha, is served `200` as `content-type: text/plain; charset=utf-8`,
@@ -1238,7 +1239,51 @@ third dynamic rule redirects a navigation to `https://gist.githubusercontent.com
 to `install.html#<that URL>`, the same fragment a `.user.js` lands on. The address is a fixture route,
 and the rule fires before the request, so this measures the rule and not GitHub. A GitHub blob page of a
 `.skill.md` is left alone by the existing allow rule and gets the banner. Chromium only: Safari is phase 10.
-| S-d | Can a content script read a WebMCP tool's `consequentialHint`, and call it? | The `call` step, later |
+
+**S-a, measured 2026-11-02** in the skills smoke flow, Chromium only, through the built extension: a
+replayed `click` on `<a download href="/invoices.csv">`, a synthetic click with no user activation,
+raises the browser's download (Playwright's `download` event fires once per run). So `export-invoices`
+ends in a click and not in an `ask`, on Chromium. Safari is not measured: skills phase 10 decides it there.
+
+### The stability matrix
+
+Measured 2026-11-02 by `npm run smoke:skills`, through the built extension on Chromium, with no model
+behind any replay. `resolved` is steps reached out of the total; `stopped` says the run stopped at a step
+and asked; `wrong element` is every event the page counted on what the variant marks must not be
+touched, so it is measured by the page and not by the runner. The flow also clicks such an element on
+purpose, answering the question yes, to show the count can read something other than 0.
+
+| Fixture | Variant | Resolved | Stopped | Wrong element |
+|---|---|---|---|---|
+| expense-form | renamed-class | 6/6 | 0 | 0 |
+| expense-form | moved | 6/6 | 0 | 0 |
+| expense-form | reordered | 6/6 | 0 | 0 |
+| expense-form | decoy | 1/6 | 1 | 0 |
+| expense-form | renamed-button | 1/6 | 1 | 0 |
+| expense-form | removed | 1/6 | 1 | 0 |
+| export-invoices | renamed-class | 4/6 | 1 | 0 |
+| export-invoices | moved | 6/6 | 0 | 0 |
+| export-invoices | reordered | 6/6 | 0 | 0 |
+| export-invoices | decoy | 1/6 | 1 | 0 |
+| export-invoices | renamed-button | 1/6 | 1 | 0 |
+| export-invoices | removed | 1/6 | 1 | 0 |
+| album-links | renamed-class | 3/3 | 0 | 0 |
+| album-links | moved | 3/3 | 0 | 0 |
+| album-links | reordered | 3/3 | 0 | 0 |
+| album-links | decoy | 0/3 | 1 | 0 |
+| album-links | renamed-button | 0/3 | 1 | 0 |
+| album-links | removed | 0/3 | 1 | 0 |
+
+The one stop that is a cost and not a catch is `export-invoices` on `renamed-class`: two links read
+"Download CSV", and with the selector gone only their order tells them apart. Order is what `reordered`
+changes, and a name check cannot see that, so **position never binds a target**: `nth` is recorded and
+read, and two same-named siblings with no durable selector stop on every run, an unchanged page
+included. That is the price of wrong element 0, paid in a skill that has to be run by hand at that step,
+and the flow holds it down (a hand-written step with only an ordinal stops, `2 elements match`). A real
+site with a row of same-named buttons and no ids is the case to watch in phase 8's own-use exit.
+
+The variants are set on the fixture server's state and not by a query flag as the table above says,
+because a skill's own `go` drops a query.
 
 ## 10. Open questions
 

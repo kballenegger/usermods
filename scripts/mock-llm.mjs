@@ -59,7 +59,10 @@
 // capture scripts mask that line (HIDE_UNTESTED_LINE in scripts/screenshots.mjs). The asserting
 // flows do not mask it — they assert it is visible.
 
+import fs from 'node:fs';
 import http from 'node:http';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // ---------------------------------------------------------------------------
 // Scripted conversations
@@ -932,6 +935,11 @@ export const ACT = {
 
 const actStep = (description, steps, extra = {}) => ({ calls: [{ name: 'act', args: { description, steps } }], ...extra });
 const actScript = (name, conv, steps, extra = {}) => ({ name, match: new RegExp(conv.prompt, 'i'), steps, ...extra });
+
+// The three examples of docs/specs/skills.md, section 7: each fixture holds the conversation that does its task.
+const skillConversation = (name) => JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), `../test/fixtures/skill/${name}/conversation.json`), 'utf8'));
+export const SKILLS = { expense: skillConversation('expense-form'), invoices: skillConversation('export-invoices'), album: skillConversation('album-links') };
+SCRIPTS.unshift(...Object.entries(SKILLS).map(([k, c]) => ({ name: `skill-${k}`, match: new RegExp(c.prompt.split(' ')[0]), steps: c.steps })));
 
 SCRIPTS.unshift(
   actScript('act-form', ACT.form, [

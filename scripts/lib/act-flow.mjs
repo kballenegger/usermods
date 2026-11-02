@@ -78,7 +78,7 @@ async function startSite() {
 }
 
 /** What the bar says and where its buttons are, through the debugger, since its root is closed. */
-async function readBar(ctx, page) {
+export async function readBar(ctx, page) {
   const cdp = await ctx.newCDPSession(page);
   try {
     const { root } = await cdp.send('DOM.getDocument', { depth: -1, pierce: true });

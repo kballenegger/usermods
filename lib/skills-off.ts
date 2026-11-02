@@ -20,3 +20,4 @@ export const isHistoryGo = () => false;
 export const parseTarget = none;
 export const resolveGo = none;
 export const summariseSteps = () => '';
+export const atStart = () => false;

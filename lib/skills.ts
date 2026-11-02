@@ -763,6 +763,19 @@ export function resolveGo(to: string, start: string): string | null {
   }
 }
 
+/**
+ * Is a run on this page already where it starts? On `start` itself, or anywhere under a `start` that
+ * ends in a path and a slash, which means "whichever album you are on". A site's root is a page, not a prefix.
+ */
+export function atStart(start: string, url: string): boolean {
+  if (url === start) return true;
+  try {
+    return start.endsWith('/') && new URL(start).pathname !== '/' && url.startsWith(start);
+  } catch {
+    return false;
+  }
+}
+
 export const isHistoryGo = (to: string) => to === 'back' || to === 'forward' || to === 'reload';
 
 /** A two-letter country's second level that sells to anyone: `a.co.uk` and `b.co.uk` are not one site. */
