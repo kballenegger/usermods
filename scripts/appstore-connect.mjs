@@ -465,7 +465,8 @@ async function submit() {
   }
 
   const open = await api('GET', `/v1/reviewSubmissions?filter[app]=${a.id}&filter[platform]=IOS&filter[state]=READY_FOR_REVIEW,WAITING_FOR_REVIEW,IN_REVIEW,UNRESOLVED_ISSUES&limit=5`);
-  let submission = (open.json.data ?? []).find((s) => s.attributes.state === 'READY_FOR_REVIEW');
+  // A rejected submission stays open as UNRESOLVED_ISSUES and has to be resubmitted, not replaced.
+  let submission = (open.json.data ?? []).find((s) => /READY_FOR_REVIEW|UNRESOLVED_ISSUES/.test(s.attributes.state));
   if ((open.json.data ?? []).some((s) => /WAITING_FOR_REVIEW|IN_REVIEW/.test(s.attributes.state))) {
     fail('a submission is already waiting for or in review');
   }
@@ -475,7 +476,14 @@ async function submit() {
     });
     submission = made.data;
   }
-  const items = await api('GET', `/v1/reviewSubmissions/${submission.id}/items`);
+  const items = await api('GET', `/v1/reviewSubmissions/${submission.id}/items?include=appStoreVersion`);
+  for (const item of items.json.data ?? []) {
+    if (item.attributes.state === 'REJECTED') {
+      await must('PATCH', `/v1/reviewSubmissionItems/${item.id}`, {
+        data: { type: 'reviewSubmissionItems', id: item.id, attributes: { resolved: true } },
+      });
+    }
+  }
   const hasVersion = (items.json.data ?? []).some((i) => i.relationships?.appStoreVersion?.data?.id === ver.id);
   if (!hasVersion) {
     await must('POST', '/v1/reviewSubmissionItems', {
