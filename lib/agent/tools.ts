@@ -77,6 +77,10 @@ function withActing(base: ToolDef[]): ToolDef[] {
         inputSchema: { ...t.inputSchema, properties: { ...schema.properties, operable: { type: 'boolean', description: 'List what can be operated, with refs, under the selector or on the whole page. Needs no text.' } } },
       };
     }
+    if (t.name === 'propose_mod') {
+      const schema = t.inputSchema as { properties: Record<string, unknown> };
+      return { ...t, inputSchema: { ...t.inputSchema, properties: { ...schema.properties, replace: { type: 'boolean', description: 'Only after a refusal: take the place of a draft skill with unsaved changes. Ask the user first.' } } } };
+    }
     if (t.name === 'wait_for') {
       const schema = t.inputSchema as { properties: Record<string, unknown> };
       return {

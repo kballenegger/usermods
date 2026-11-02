@@ -2072,7 +2072,7 @@ export function Chat({ tabId, pageUrl, host: liveHost, onOpenSettings, runReques
           siteAllowed={runCard.siteAllowed}
           host={runHost(runCard.skill)}
           {...(skillMatchesUrl(runCard.skill, pageUrl) ? {} : { starts: runCard.skill.start })}
-          busy={!!chatId && runningChats.has(chatId) && skillMatchesUrl(runCard.skill, pageUrl)}
+          busy={busy}
           onRun={(a: { inputs: Record<string, string>; standing: boolean }) => void startRun(runCard, a)}
           onCancel={() => setRunCard(null)}
         />

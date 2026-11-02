@@ -90,6 +90,8 @@ export interface AgentEnv {
 
 /** See AgentEnv.skills. */
 export interface SkillsEnv {
+  /** Why propose_mod may not take the place of the chat's draft yet, or null. */
+  beforeMod(replace: boolean): string | null;
   propose(input: Record<string, unknown>, history: readonly Msg[]): Promise<{ ok: true; text: string; card: SkillProposalCard } | { ok: false; reason: string }>;
   open(skillId: string, replace: boolean): Promise<{ ok: true; text: string; version: number | null } | { ok: false; reason: string }>;
   /** Shows the run card and waits. There is no parameter that starts a run without it. */
@@ -930,6 +932,10 @@ async function executeTool(
       }
       case 'propose_mod': {
         const p = input as Partial<ModProposal> & { untested_reason?: unknown };
+        if (!ACT_OFF && env.skills) {
+          const refusal = env.skills.beforeMod(input.replace === true);
+          if (refusal) return err(refusal);
+        }
         if (!p.name || !p.code || !Array.isArray(p.matches) || !p.matches.length) return err('name, code and at least one match pattern are required');
         const untestedReason = typeof p.untested_reason === 'string' && p.untested_reason.trim() ? p.untested_reason.trim() : undefined;
         const problem = checkProposal({ code: p.code, matches: p.matches, untestedReason }, ctx);

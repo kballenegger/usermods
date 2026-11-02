@@ -36,7 +36,7 @@ import { QUOTA_PANEL_NOTE, bytesInUse, quotaWarningNote, shouldWarn } from '@/li
 import { CONTEXT_LIMITS_KEY, effectiveBudget, limitKey, loadContextLimits, rememberLimit, saveContextLimits } from '@/lib/contextlimits';
 import { reduceItems } from '@/lib/transcript';
 import { addVersion, adoptMod, createArtifact, currentVersion, detachFromMod, draftBlock, fromMod, loadArtifact, recordProposal, rollbackTo, saveArtifact, toProposal, toSource, type Artifact } from '@/lib/artifact';
-import { draftStanding, duplicateOf, editModPlan, likelyUrlFor, modsBlock, modsForUrl, openModDecision, runsOnPage } from '@/lib/modmatch';
+import { draftStanding, duplicateOf, editModPlan, likelyUrlFor, modOverSkillRefusal, modsBlock, modsForUrl, openModDecision, runsOnPage } from '@/lib/modmatch';
 import { buildTitleInput, completedTurns, sanitizeTitle, titleDecision, TITLE_SYSTEM_PROMPT } from '@/lib/title';
 import { createProvider } from '@/lib/providers';
 import { VISION_FALLBACK_PANEL_NOTE, createVisionMemory, resolveImagesSetting, visionKeyFor } from '@/lib/providers/vision';
@@ -885,6 +885,7 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
         ...(drive && driver && notes
           ? {
               skills: {
+                beforeMod: (replace: boolean) => modOverSkillRefusal(artifact, replace),
                 propose: async (input: Record<string, unknown>, messages: readonly Msg[]) => {
                   const r = await proposeSkill(chatId, input, messages);
                   if (!r.ok) return r;
@@ -1030,11 +1031,13 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
         };
       },
       onProposal: async (proposal) => {
+        // In place of a draft skill, the chat is no longer editing that skill.
+        const overSkill = !ACT_OFF && artifact?.kind === 'skill';
         artifact = await recordProposal(chatId, proposal);
         // The index carries only the flag, so the dashboard can badge a chat without reading every
         // artifact. It is written through setChatArtifact rather than touchChat, because proposing
         // is not activity the switcher should reorder on.
-        await setChatArtifact(chatId, artifact.id, artifact.versions.length);
+        await setChatArtifact(chatId, artifact.id, artifact.versions.length, overSkill ? null : undefined);
         return artifact.current;
       },
     });
@@ -1106,20 +1109,37 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
 
 /** A Resume: a skill's run carries on through the skill, with no model. Anyone else's through the loop. */
 async function resumeRun(chatId: string, tabId: number): Promise<void> {
+  // Before the first await, so two presses of Resume cannot both get past it and do the same step twice.
+  if (!sessions.claim(chatId, tabId)) return;
   const rec = (await loadRuns().catch(() => ({}) as RunMap))[chatId];
   if (!rec?.skill) return runChat(chatId, tabId, null);
   const { skill: ran, pending } = rec;
-  const skill = ran.draft ? await draftAsSkill(chatId).catch(() => null) : ((await loadSkills()).find((s) => s.id === ran.id) ?? null);
+  const skill = ran.draft ? await draftAsSkill(chatId).catch(() => null) : ((await loadSkills().catch(() => [] as Skill[])).find((s) => s.id === ran.id) ?? null);
+  const giveUp = (message: string) => {
+    postAgentEvent(chatId, { type: 'error', message });
+    postAgentEvent(chatId, { type: 'status', phase: 'idle', detail: 'done' });
+    postAgentEvent(chatId, { type: 'done' });
+    letGoOf(chatId, tabId);
+  };
   // A file that changed under an interrupted run has other steps at those numbers.
   if (!skill || stepsKey(skill.steps) !== ran.key) {
     await clearRuns([chatId]);
     await dropCarry(chatId);
-    postAgentEvent(chatId, { type: 'error', message: `“${ran.name}” has changed since this run stopped, so it cannot carry on. Start it again.` });
-    postAgentEvent(chatId, { type: 'status', phase: 'idle', detail: 'done' });
-    postAgentEvent(chatId, { type: 'done' });
+    giveUp(`“${ran.name}” has changed since this run stopped, so it cannot carry on. Start it again.`);
+    return;
+  }
+  // The record stays: it can be resumed once that run is over.
+  if (sessions.runningOnTab(tabId, chatId)) {
+    giveUp('Another chat is running on this tab. Stop it, then resume this one.');
     return;
   }
   await runSkillChat(chatId, tabId, skill, await loadCarry(chatId), { from: ran.step, ...(pending ? { pending: pending.label, pendingKind: pending.kind } : {}), draft: ran.draft === true });
+}
+
+/** A claim that will not become a run. A message that queued behind it is not left waiting. */
+function letGoOf(chatId: string, tabId: number): void {
+  const next = sessions.unclaim(chatId);
+  if (next) void runChat(chatId, tabId, next);
 }
 
 /**
@@ -1811,10 +1831,18 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
         return (await updates.summary())[id];
       },
       async run(r) {
-        if (sessions.isRunning(r.chatId)) throw new Error('This chat is already running. Stop it first.');
-        const skill = r.draft ? await draftAsSkill(r.chatId) : (await loadSkills()).find((s) => s.id === r.skillId);
-        if (!skill) throw new Error('That skill no longer exists.');
-        if (r.allowSite) await drive!.allowSiteFor(r.chatId, hostOf(skillMatchesUrl(skill, await tabUrl(r.tabId)) ? await tabUrl(r.tabId) : skill.start), r.standing === true);
+        // A skill's run takes the page, and Run off its site opens another: not from under a run on this tab.
+        if (sessions.runningOnTab(r.tabId, r.chatId)) throw new Error('Another chat is running on this tab. Stop it first.');
+        if (!sessions.claim(r.chatId, r.tabId)) throw new Error('This chat is already running. Stop it first.');
+        let skill: Skill | undefined;
+        try {
+          skill = r.draft ? await draftAsSkill(r.chatId) : (await loadSkills()).find((s) => s.id === r.skillId);
+          if (!skill) throw new Error('That skill no longer exists.');
+          if (r.allowSite) await drive!.allowSiteFor(r.chatId, hostOf(skillMatchesUrl(skill, await tabUrl(r.tabId)) ? await tabUrl(r.tabId) : skill.start), r.standing === true);
+        } catch (e) {
+          letGoOf(r.chatId, r.tabId);
+          throw e;
+        }
         void runSkillChat(r.chatId, r.tabId, skill, { inputs: r.inputs, outputs: {} }, r.draft ? { draft: true } : {});
       },
       siteAllowed: async (chatId, host) => (chatId ? drive!.siteAllowed(chatId, host) : drive!.siteAllowed('', host)),

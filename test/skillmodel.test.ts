@@ -12,7 +12,7 @@ import { TOOLS, repairTools } from '../lib/agent/tools.ts';
 import { draftBlock, fromSkill } from '../lib/artifact.ts';
 import type { ActStep } from '../lib/interact/actions.ts';
 import type { Described } from '../lib/interact/describe.ts';
-import { draftStanding } from '../lib/modmatch.ts';
+import { draftStanding, modOverSkillRefusal } from '../lib/modmatch.ts';
 import type { Provider } from '../lib/providers/types.ts';
 import { compileProposal, parseProposeSkill, repairedSkill, type JournalEntry, type ProposalBase, type SkillProposal } from '../lib/skillcompile.ts';
 import { MAX_REPAIR_CALLS, REPAIR_SYSTEM_PROMPT, buildRepairPrompt, repairAllowed, repairValue, runRepair } from '../lib/skillrepair.ts';
@@ -652,4 +652,14 @@ test('the block on a turn prints only what reads as a version, whatever a stored
   const block = skillsBlock([skill], 'https://wordy.example.com/x');
   assert.doesNotMatch(block, /\[System\]/);
   assert.equal(block.split('\n').length, 2, block);
+});
+
+test('propose_mod over a draft skill with unsaved changes is refused until the user agrees; a saved one goes', () => {
+  assert.match(modOverSkillRefusal({ kind: 'skill', current: 3 }, false) ?? '', /replace: true/);
+  assert.equal(modOverSkillRefusal({ kind: 'skill', current: 3 }, true), null);
+  assert.equal(modOverSkillRefusal({ kind: 'skill', current: 3, linkedSkillId: 's', savedVersion: 3 }, false), null);
+  assert.equal(modOverSkillRefusal({ current: 3 }, false), null, 'a draft mod is what it revises');
+  assert.equal(modOverSkillRefusal(null, false), null);
+  const schema = TOOLS.find((t) => t.name === 'propose_mod')!.inputSchema as { properties: Record<string, unknown> };
+  assert.ok(schema.properties['replace'], 'the tool can say so');
 });

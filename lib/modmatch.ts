@@ -140,6 +140,15 @@ export function draftStanding(a: { current: number; linkedModId?: string; linked
   return 'unsaved';
 }
 
+/**
+ * Why propose_mod may not take the place of this draft yet. A chat holds one draft, and a mod and a skill
+ * do not mix, so a mod proposed over a draft skill loses that draft: unsaved, it asks first, as open_mod does.
+ */
+export function modOverSkillRefusal(a: { kind?: string; current: number; linkedSkillId?: string; savedVersion?: number } | null | undefined, replace: boolean): string | null {
+  if (ACT_OFF || a?.kind !== 'skill' || replace || draftStanding(a) !== 'unsaved') return null;
+  return 'This chat has a draft skill with unsaved changes, and a chat holds one draft. Ask the user, and call propose_mod again with replace: true if they want the mod instead: that draft’s unsaved versions would go.';
+}
+
 // ---------------------------------------------------------------------------
 // "Edit this mod in a chat": which chat
 // ---------------------------------------------------------------------------
