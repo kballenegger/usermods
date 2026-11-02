@@ -383,6 +383,8 @@ export async function skillsFlow({ launch, openPanel, openSite, waitForComposer,
         if (!st.running[chat.id] && !q) break;
         await sleep(60);
       }
+      // A run holds its tab until it has wound down, and the next variant is on the same one.
+      await waitFor(async () => !(await rpc(panel, { type: 'agent.attach' })).running[chat.id], 'the run to let go of its tab');
       await sleep(150);
       const wrong = Number(await page.evaluate(() => sessionStorage.__wrong || 0).catch(() => 0));
       matrix.push({ fixture, variant, resolved, total, stopped, wrong });
