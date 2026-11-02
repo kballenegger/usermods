@@ -473,7 +473,7 @@ export function OperatingPages({ askEveryStep, onAskEveryStep, repair, onRepair 
         <span>Every click, every field and every script waits for you. Slow, and the safest setting for a model you do not trust.</span>
       </label>
       <label className="field">
-        <span className="operating-label">Repair broken steps with the model</span>
+        <span>Repair broken steps with the model</span>
         <select data-testid="setting-repair" value={repair} onChange={(e) => onRepair(e.target.value as RepairSetting)}>
           <option value="never">never</option>
           <option value="here">skills made here</option>

@@ -152,6 +152,12 @@ test('a re-proposal with no new step changes only words: no step moves, and the 
   assert.ok(previewSkill(r.source).ok);
 });
 
+test('a re-proposal of words cannot quote anything this chat typed either', () => {
+  const r = compileProposal([fill(1), click(2)], proposal({ name: 'For me@example.com' }), base(), opts({ t1: 'me@example.com' }));
+  assert.equal(r.ok, false);
+  assert.match(!r.ok ? r.error : '', /a value never goes in a skill/);
+});
+
 test('a re-proposal cannot name steps it has not got, or rename what is not there', () => {
   const steps = compileProposal([fill(1), click(2)], proposal({ afterStep: 1 }), base(), opts());
   assert.equal(steps.ok, false);
@@ -461,6 +467,7 @@ test('a repair: every act asks, even one the chat allowed, and offers no way to 
     assert.equal(q.kind === 'allow' && q.modelSays, 'do the step');
   }
   assert.equal(log.questions[0]!.kind === 'allow' && log.questions[0]!.headline, 'click button "Delete account"', 'the headline is the live read');
+  assert.equal(log.questions[0]!.kind === 'allow' && log.questions[0]!.stepOf, 'repairing step 5 of 5 of Save the form');
 });
 
 test('a repair: a decline ends it at once, and no further request goes to the model', async () => {

@@ -232,7 +232,7 @@ export interface StepOptions {
   barStatus?: string;
   activity?: string;
   /** A skill's step on the Allow card, and on the walk's. */
-  skill?: { name: string; n: number; total: number; says?: string };
+  skill?: { name: string; n: number; total: number; says?: string; repairing?: boolean };
   /** Replaces the chat's "allow every" for this step: a skill's standing allowances are its own, or none. */
   actions?: readonly string[];
   /** Replaces "allow every one of these in this chat". Absent with `actions` set means it is not on offer. */
@@ -534,7 +534,7 @@ export class Driver {
           firstOnSite: decision.asksSite,
           ...(opts.skill
             ? {
-                stepOf: `step ${opts.skill.n} of ${opts.skill.total} of ${opts.skill.name}`,
+                stepOf: `${opts.skill.repairing ? 'repairing ' : ''}step ${opts.skill.n} of ${opts.skill.total} of ${opts.skill.name}`,
                 ...(opts.skill.says ? { skillSays: opts.skill.says } : {}),
                 ...(decision.reasons.length ? { because: decision.reasons.join(', ') } : {}),
                 ...(decision.actionKey && opts.standing ? { every: { label: opts.standing.label } } : {}),
@@ -629,7 +629,7 @@ export class Driver {
       const step: ActStep = typedAs ? { ...asked, text: typedAs.text } : asked;
       if (step.do === 'go') known ??= knownUrls(ctx.history, await this.deps.pageUrl().catch(() => ''));
       const repairing: StepOptions = repair
-        ? { forceConfirm: true, actions: [], journalKind: 'skill', skill: { name: repair.name, n: repair.index + 1, total: repair.total }, barStatus: `usermods is repairing ${repair.name} · step ${repair.index + 1}`, activity: `repairing ${repair.name} · step ${repair.index + 1}` }
+        ? { forceConfirm: true, actions: [], journalKind: 'skill', skill: { name: repair.name, n: repair.index + 1, total: repair.total, repairing: true }, barStatus: `usermods is repairing ${repair.name} · step ${repair.index + 1}`, activity: `repairing ${repair.name} · step ${repair.index + 1}` }
         : {};
       const outcome = await this.runStep(step, { ...repairing, modelSays, ...(known ? { knownUrls: known } : {}), ...(ctx.iteration ? { iteration: ctx.iteration } : {}), onRow: (r) => row(i, { ...r, detail: { modelSays } }) }, signal);
       const left = call.steps.length - i - 1;

@@ -572,7 +572,9 @@ export function compileProposal(entries: readonly JournalEntry[], p: SkillPropos
       if (!compiled.ok) return refuse(compiled.errors.join('. '));
       next = { ...compiled.skill };
     } else {
-      const quoted = quotesInput(entries, { name: '', description: '', fields: {}, outputs: {} }, opts.valueOf, p);
+      // No decision is being made about them, so anything this chat typed counts.
+      const fields = Object.fromEntries(entries.filter(typesValue).map((e) => [e.n, { as: 'input' as const, name: '', label: '' }]));
+      const quoted = quotesInput(entries, { name: '', description: '', fields, outputs: {} }, opts.valueOf, p);
       if (quoted) return refuse(quoted);
     }
     const renamed = withRenames(withWords(next, p.name, p.description), p.renames);

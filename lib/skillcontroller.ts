@@ -82,7 +82,7 @@ export async function proposeSkill(chatId: string, input: Record<string, unknown
   const existing = await loadArtifact(chatId);
   if (existing && !isSkillDraft(existing) && input.replace !== true) {
     const decision = openModDecision(draftStanding(existing));
-    if (!decision.ok) return { ok: false, reason: `This chat has a draft mod with unsaved changes, “${existing.name}”, and a chat holds one draft. Ask the user, and call propose_skill again with replace: true if they want the skill instead. Its versions stay in the panel’s history.` };
+    if (!decision.ok) return { ok: false, reason: `This chat has a draft mod with unsaved changes, “${existing.name}”, and a chat holds one draft. Ask the user, and call propose_skill again with replace: true if they want the skill instead: that draft’s unsaved versions would go.` };
   }
   const draft = existing && isSkillDraft(existing) ? currentVersion(existing) : undefined;
   const parsedDraft = draft ? parseSkill(draft.code) : null;
@@ -100,7 +100,8 @@ export async function proposeSkill(chatId: string, input: Record<string, unknown
   const { recording: _was, ...rest } = made;
   const artifact: Artifact = { ...rest, journalFloor: compiled.floor, ...(compiled.recording ? { recording: compiled.recording } : {}) };
   await saveArtifact(artifact);
-  await setChatArtifact(chatId, artifact.id, artifact.versions.length);
+  // In place of a draft mod, the chat is no longer editing that mod.
+  await setChatArtifact(chatId, artifact.id, artifact.versions.length, existing && !isSkillDraft(existing) ? null : undefined);
   const card: SkillProposalCard = {
     name: compiled.skill.name,
     description: artifact.foreign ? '' : compiled.skill.description,
