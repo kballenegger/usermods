@@ -18,7 +18,7 @@
 
 // The .ts extension: see lib/agent/tools.ts. node's test runner loads this file directly.
 import { liveProbe, type Probe } from '../inspect.ts';
-import { selectorFor } from '../snapshot.ts';
+import { durabilityOf, selectorFor } from '../snapshot.ts';
 import { formatRoleName, landmarkOf, nameOf, roleOf, sameName } from './name.ts';
 import { closestMatches, closestNote, operableElements, queryEverywhere, resolveSelector, resolveText, type AtMap, type BrokenTarget, type ResolveDeps, type RoleName, type TargetResult, type TargetSpec } from './target.ts';
 
@@ -135,13 +135,17 @@ function brokenFingerprint(fp: Fingerprint, reason: BrokenTarget['reason'], matc
 
 /**
  * Find a recorded element on the live page, strictly: exactly one connected, visible element with
- * the recorded role and name.
+ * the recorded role and name, and nothing about the page that makes that one a guess.
  *
- * The selector goes first, and among its hits those that also read right. A selector that finds only
- * elements reading differently is not yet the end, because a positional selector can drift onto a
- * neighbour while the real control has moved; so role and name are then searched on their own, and
- * only if that finds nothing is it the distinct `changed` result. `in` and `nth` tell several apart
- * and never turn a wrong name into a right one.
+ * One element reading right, anywhere, binds: that is a renamed class and a moved control. A selector
+ * that finds only elements reading differently is `changed` when role and name are nowhere else,
+ * because a positional selector can drift onto a neighbour while the real control has moved.
+ *
+ * Several reading right is where a replay can land on the wrong thing, and a wrong element is worse
+ * than a stop. A second one inside the recorded landmark is a decoy, or a page that has changed, and
+ * stops whatever the selector says. A durable selector tells apart siblings the recording saw as
+ * several. Position never does: `nth` is written down and read, but two same-named siblings that swap
+ * are the failure no name check can see, so an ordinal alone stops. See docs/specs/skills.md, section 9.
  */
 export function resolveFingerprint(fp: Fingerprint, deps: ResolveDeps = {}): TargetResult {
   const probe = deps.probe ?? liveProbe;
@@ -155,20 +159,28 @@ export function resolveFingerprint(fp: Fingerprint, deps: ResolveDeps = {}): Tar
     }
   }
   const reads = (el: Element) => roleOf(el) === fp.role && sameName(nameOf(el), fp.name);
-  let hits = bySelector.filter(reads);
-  if (!hits.length) hits = sameRoleAndName(fp, probe, doc);
-  if (!hits.length && bySelector.length) {
+  const hits = bySelector.filter(reads);
+  const alike = [...new Set([...hits, ...sameRoleAndName(fp, probe, doc)])];
+  if (!alike.length && bySelector.length) {
     const first = bySelector[0]!;
     return brokenFingerprint(fp, 'changed', bySelector.length, deps, { role: roleOf(first), name: nameOf(first) });
   }
-  if (!hits.length) return brokenFingerprint(fp, 'none', 0, deps);
-  if (hits.length > 1 && fp.landmark) {
-    const inPlace = hits.filter((el) => landmarkOf(el) === fp.landmark);
-    if (inPlace.length) hits = inPlace;
+  if (!alike.length) return brokenFingerprint(fp, 'none', 0, deps);
+  if (alike.length === 1) return { kind: 'found', el: alike[0]! };
+
+  const inPlace = fp.landmark ? alike.filter((el) => landmarkOf(el) === fp.landmark) : alike;
+  const durableHit = hits.length === 1 && durabilityOf(fp.css!).kind === 'stable' ? hits[0]! : null;
+  if (fp.nth !== undefined) {
+    // The recording saw several here, and kept a selector that tells them apart, or it did not.
+    if (durableHit) return { kind: 'found', el: durableHit };
+    return brokenFingerprint(fp, 'several', alike.length, deps);
   }
-  if (hits.length > 1 && fp.nth !== undefined && hits[fp.nth]) hits = [hits[fp.nth]!];
-  if (hits.length !== 1) return brokenFingerprint(fp, 'several', hits.length, deps);
-  return { kind: 'found', el: hits[0]! };
+  // The recording saw one in its landmark. Two there now is not the page it was recorded on.
+  if (inPlace.length > 1) return brokenFingerprint(fp, 'several', inPlace.length, deps);
+  // One in place with others elsewhere binds only if the selector agrees; one moved binds only on a durable selector.
+  if (inPlace.length === 1 && hits.length === 1 && hits[0] === inPlace[0]) return { kind: 'found', el: inPlace[0]! };
+  if (!inPlace.length && durableHit) return { kind: 'found', el: durableHit };
+  return brokenFingerprint(fp, 'several', alike.length, deps);
 }
 
 // ---------------------------------------------------------------------------

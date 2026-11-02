@@ -18,6 +18,8 @@ import { formatRoleName, isOperable, landmarkOf, nameOf, parseRoleName, roleOf, 
 import { createRegistry, fingerprintOf, fromAt, isRef, refPrefix, resolveFingerprint, stableSelector, toAt, type Registry } from '../lib/interact/registry.ts';
 import { closestMatches, formatClosest, queryEverywhere, resolveSelector, resolveText, type TargetResult } from '../lib/interact/target.ts';
 import { operableInventory } from '../lib/interact/view.ts';
+import { READ_LIMIT, readOutput } from '../lib/interact/read.ts';
+import { MAX_READ_ITEMS } from '../lib/skills.ts';
 
 Object.assign(globalThis, { CSS: { escape: (s: string) => s.replace(/[^\w-]/g, (c) => `\\${c}`) } });
 
@@ -282,14 +284,54 @@ test('a fingerprint serialises to the at map and back', () => {
   assert.deepEqual(fromAt({ css: 3 as unknown as string, nth: -1 }, 'button', 'x'), { role: 'button', name: 'x', tag: '' }, 'a hand-edited file loses the part that is malformed');
 });
 
-test('nth is recorded when several read the same, and picks the right one back', () => {
+test('nth is recorded when several read the same, and position alone never picks one back', () => {
   load('<body><table aria-label="T"><tr><td><button class="u">Unsubscribe</button></td></tr><tr><td><button class="u">Unsubscribe</button></td></tr></table></body>');
   const second = document.querySelectorAll('button')[1]!;
   const fp = fingerprintOf(second, { probe, withNth: true });
   assert.equal(fp.nth, 1);
-  assert.equal(found(resolveFingerprint(fromAt(toAt(fp), fp.role, fp.name), { probe })), second);
+  assert.equal(broken(resolveFingerprint(fromAt(toAt(fp), fp.role, fp.name), { probe })).reason, 'several', 'siblings that swap are invisible to a name check, so an ordinal stops');
   const withoutNth = fromAt({ css: 'button.u' }, 'button', 'Unsubscribe');
   assert.equal(broken(resolveFingerprint(withoutNth, { probe })).reason, 'several');
+});
+
+test('a durable selector tells same-named siblings apart, wherever they have moved to', () => {
+  load('<body><main aria-label="M"><a id="all" href="/a">CSV</a><a id="month" href="/m">CSV</a></main></body>');
+  const month = document.getElementById('month')!;
+  const fp = fingerprintOf(month, { probe, withNth: true });
+  assert.equal(fp.css, '#month');
+  assert.equal(fp.nth, 1);
+  assert.equal(found(resolveFingerprint(fromAt(toAt(fp), fp.role, fp.name), { probe })), month);
+  // Swapped: the ordinal now points at the other one, and the selector still reads right.
+  month.parentElement!.prepend(month);
+  assert.equal(found(resolveFingerprint(fromAt(toAt(fp), fp.role, fp.name), { probe })), month);
+});
+
+test('a second element with the recorded name inside the landmark stops, whatever the selector says', () => {
+  load('<body><form aria-label="F"><button id="s">Save</button><button>Save</button></form></body>');
+  const r = broken(resolveFingerprint(fromAt({ css: '#s', in: 'form "F"' }, 'button', 'Save'), { probe }));
+  assert.equal(r.reason, 'several');
+  assert.equal(r.matches, 2);
+});
+
+test('the same name in another landmark does not stop a selector that agrees with the recorded place', () => {
+  load('<body><form aria-label="F"><button id="s">Save</button></form><nav aria-label="N"><button>Save</button></nav></body>');
+  assert.equal(found(resolveFingerprint(fromAt({ css: '#s', in: 'form "F"' }, 'button', 'Save'), { probe })), document.getElementById('s'));
+});
+
+test('a control that moved binds on a durable selector and stops without one', () => {
+  load('<body><form aria-label="Other"><button id="s">Save</button></form><nav aria-label="N"><button>Save</button></nav></body>');
+  assert.equal(found(resolveFingerprint(fromAt({ css: '#s', in: 'form "F"' }, 'button', 'Save'), { probe })), document.getElementById('s'));
+  assert.equal(broken(resolveFingerprint(fromAt({ css: '#gone', in: 'form "F"' }, 'button', 'Save'), { probe })).reason, 'several');
+});
+
+test('a decoy left in the recorded place stops when the selector has lost the real one', () => {
+  load('<body><form aria-label="F"><button class="decoy">Save</button></form><nav aria-label="N"><button>Save</button></nav></body>');
+  assert.equal(broken(resolveFingerprint(fromAt({ css: '#s', in: 'form "F"' }, 'button', 'Save'), { probe })).reason, 'several');
+});
+
+test('one element reading right binds with its class renamed or its landmark gone', () => {
+  load('<body><aside aria-label="Elsewhere"><button class="new">Save</button></aside></body>');
+  assert.equal(found(resolveFingerprint(fromAt({ css: 'button.old', in: 'form "F"' }, 'button', 'Save'), { probe })), document.querySelector('button.new'));
 });
 
 test('the replay binds on role and name when the selector still reads right', () => {
@@ -932,4 +974,32 @@ test('a broken target carries its closest matches through act', async () => {
   }
   const read = describeStep(step, d);
   assert.equal(read.ok, false);
+});
+
+// ---------- a skill's read ----------
+
+test('a read takes text, a link or an attribute, one or each, and tells a selector that finds nothing', () => {
+  load('<body><ul><li class="n">  INV  1 </li><li class="n">INV 2</li></ul><a class="p" href="/a.jpg" data-id="7">A</a></body>');
+  assert.deepEqual(readOutput({ from: 'li.n', take: 'text', each: true }), { ok: true, values: ['INV 1', 'INV 2'] });
+  assert.deepEqual(readOutput({ from: 'li.n', take: 'text' }), { ok: true, values: ['INV 1'] });
+  assert.deepEqual(readOutput({ from: 'a.p', take: 'data-id', each: true }), { ok: true, values: ['7'] });
+  const none = readOutput({ from: '.gone', take: 'text' });
+  assert.ok(!none.ok);
+  assert.match(none.message, /could not find/);
+});
+
+test('a read never takes what a field holds: not by asking for it, and not from a field on the never list', () => {
+  load('<body><input id="n" value="typed"><input id="p" type="password" value="hunter2" data-x="hunter2"><input id="q" type="text" aria-label="One-time code" data-x="123456"></body>');
+  assert.ok(!readOutput({ from: '#n', take: 'value' }).ok);
+  assert.ok(!readOutput({ from: '#n', take: 'VALUE' }).ok);
+  assert.ok(!readOutput({ from: '#p', take: 'data-x' }).ok, 'a password field gives nothing, whatever is asked of it');
+  assert.ok(!readOutput({ from: '#q', take: 'data-x' }).ok);
+});
+
+test('a read stops at its limit, the number the file format promises', () => {
+  load(`<body>${Array.from({ length: READ_LIMIT + 3 }, (_, i) => `<i class="x">${i}</i>`).join('')}</body>`);
+  const r = readOutput({ from: 'i.x', take: 'text', each: true });
+  assert.ok(r.ok);
+  assert.equal(r.values.length, READ_LIMIT);
+  assert.equal(READ_LIMIT, MAX_READ_ITEMS);
 });
