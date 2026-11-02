@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { activityFor, activityFromEvent, activityText, IDLE_ACTIVITY, STALL_MS } from '../lib/activity.ts';
-import { markInterrupted, parseRuns, pruneRuns, resumableRuns, type RunMap } from '../lib/runstate.ts';
+import { markInterrupted, nextRunRecord, parseRuns, pruneRuns, resumableRuns, withoutPending, withPending, type RunMap, type RunRecord } from '../lib/runstate.ts';
 import { INTERRUPTED_TOOL_SUMMARY, looksUnfinished, reduceItems, settleInterrupted } from '../lib/transcript.ts';
 import type { ChatItem } from '../lib/types.ts';
 
@@ -134,4 +134,51 @@ test('the retry notice arrives on a status event and the next ordinary status cl
   a = activityFromEvent(a, { type: 'status', phase: 'model', detail: 'continuing' }, 5000);
   assert.equal(a.retry, undefined);
   assert.equal(activityText(activityFor({ phase: a.phase, detail: a.detail, elapsed: 5000, sinceLastEvent: 0 })!), 'continuing · 5s');
+});
+
+// ---------- the pending step ----------
+
+test('a pending step is written before the step and cleared with its result', () => {
+  const runs: RunMap = { c: { state: 'running', tabId: 1, startedAt: 1, updatedAt: 1 } };
+  const during = withPending(runs, 'c', { kind: 'act', label: 'click button "Place order"' }, 50);
+  assert.deepEqual(during.c!.pending, { kind: 'act', label: 'click button "Place order"', at: 50 });
+  assert.equal(runs.c!.pending, undefined, 'the map handed in is untouched');
+  const after = withoutPending(during, 'c', 60);
+  assert.equal(after.c!.pending, undefined);
+  assert.equal(after.c!.updatedAt, 60);
+  assert.equal(withoutPending(after, 'c'), after, 'nothing to clear, nothing to write');
+  const none: RunMap = {};
+  assert.equal(withPending(none, 'gone', { kind: 'act', label: 'x' }), none, 'a chat with no record has nothing to write on');
+});
+
+test('a pending step survives everything that can happen to the record before someone answers it', () => {
+  const pending = { kind: 'act' as const, label: 'click button "Place order"', at: 5 };
+  const rec: RunRecord = { state: 'running', tabId: 1, startedAt: 1, updatedAt: 1, pending };
+  // The worker died over it.
+  const { runs } = markInterrupted({ c: rec }, () => false, 9);
+  assert.deepEqual(runs.c!.pending, pending);
+  // Stored and read back.
+  assert.deepEqual(parseRuns(JSON.parse(JSON.stringify(runs))).c!.pending, pending);
+  // The panel is told what may have happened.
+  assert.deepEqual(resumableRuns(runs).c!.pending, pending);
+  // A state change on top of it: Resume writes 'running', and a provider failure writes 'failed'.
+  assert.deepEqual(nextRunRecord(runs.c, { state: 'running', tabId: 1 }, 10).pending, pending);
+  assert.deepEqual(nextRunRecord(runs.c, { state: 'failed', tabId: 1, error: 'no' }, 10).pending, pending);
+});
+
+test('a stored pending step that cannot be read still counts as one', () => {
+  const runs = parseRuns({ a: { state: 'interrupted', pending: 'junk' }, b: { state: 'interrupted', pending: { kind: 'nope' } }, c: { state: 'interrupted', pending: null }, d: { state: 'interrupted' } });
+  assert.deepEqual(runs.a!.pending, { kind: 'act', label: 'an action', at: 0 });
+  assert.deepEqual(runs.b!.pending, { kind: 'act', label: 'an action', at: 0 });
+  assert.equal(runs.c!.pending, undefined);
+  assert.equal(runs.d!.pending, undefined);
+});
+
+test('a state change keeps the count of automatic resumes, so the bound holds across a restart', () => {
+  // Resuming writes 'running' over the record, and a count lost there would let the same run pick
+  // itself up again every time it died.
+  const prev: RunRecord = { state: 'interrupted', tabId: 1, startedAt: 1, updatedAt: 1, autoResumes: 1 };
+  assert.equal(nextRunRecord(prev, { state: 'running', tabId: 1 }, 10).autoResumes, 1);
+  const fresh = nextRunRecord(undefined, { state: 'running', tabId: 7 }, 10);
+  assert.deepEqual(fresh, { state: 'running', tabId: 7, startedAt: 10, updatedAt: 10 });
 });

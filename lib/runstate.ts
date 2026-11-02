@@ -51,9 +51,66 @@ export interface RunRecord {
    * to know it is about to do this for the second time.
    */
   autoResumes?: number;
+  /** The step in flight, if any. See PendingStep. */
+  pending?: PendingStep;
 }
 
 export type RunMap = Record<string, RunRecord>;
+
+/**
+ * A step that may or may not have happened: an action or a script, written down before it runs and
+ * cleared with its result.
+ *
+ * A checkpoint is written after a step's result is in. If the worker dies between the two, the resumed
+ * conversation has no trace of the step, the model does it again, and for a submit that is a double
+ * submit. So this is the journal of the one step in flight, and the rule that goes with it is that
+ * nothing replays it: a resume tells the model it may have happened and to look first, a skill's run
+ * card asks the user, and Safari's automatic resume does not fire at all (lib/keepalive.ts).
+ *
+ * `label` is what the extension read ("click button \"Place order\""). It never holds what a field
+ * was filled with.
+ */
+export interface PendingStep {
+  kind: 'act' | 'script' | 'skill';
+  label: string;
+  at: number;
+}
+
+/** What a resume says when the record holds a pending step. */
+export const PENDING_RESUME_NOTE = 'The last action may or may not have happened. Look at the page before doing anything else.';
+
+/** Write the step down, before it runs. */
+export function withPending(runs: RunMap, chatId: string, step: Omit<PendingStep, 'at'>, now: number = Date.now()): RunMap {
+  const prev = runs[chatId];
+  if (!prev) return runs;
+  return { ...runs, [chatId]: { ...prev, pending: { ...step, at: now }, updatedAt: now } };
+}
+
+/** Clear it, with its result. Returns the same map when there was nothing to clear. */
+export function withoutPending(runs: RunMap, chatId: string, now: number = Date.now()): RunMap {
+  const prev = runs[chatId];
+  if (!prev?.pending) return runs;
+  const { pending: _pending, ...rest } = prev;
+  return { ...runs, [chatId]: { ...rest, updatedAt: now } };
+}
+
+/**
+ * The record a state change leaves. The pending step and the count of automatic resumes outlive it:
+ * a run that fails or restarts has not answered whether the step happened, and a resumed run writes
+ * 'running' over the record that says it has already had its one automatic pickup.
+ */
+export function nextRunRecord(prev: RunRecord | undefined, patch: Pick<RunRecord, 'state' | 'tabId'> & { error?: string }, now: number = Date.now()): RunRecord {
+  const startedAt = patch.state === 'running' || !prev ? now : prev.startedAt;
+  return {
+    state: patch.state,
+    tabId: patch.tabId,
+    startedAt,
+    updatedAt: now,
+    ...(patch.error ? { error: patch.error } : {}),
+    ...(prev?.pending ? { pending: prev.pending } : {}),
+    ...(prev?.autoResumes ? { autoResumes: prev.autoResumes } : {}),
+  };
+}
 
 /** What the panel needs to offer Resume for a chat. */
 export interface ResumableRun {
@@ -67,6 +124,8 @@ export interface ResumableRun {
    * its one automatic attempt is spent.
    */
   autoResumed?: boolean;
+  /** What may or may not have happened, for the Resume block to say. */
+  pending?: PendingStep;
 }
 
 /** What the panel shows when a run died with its worker. */
@@ -111,9 +170,23 @@ export function resumableRuns(runs: RunMap): Record<string, ResumableRun> {
   const out: Record<string, ResumableRun> = {};
   for (const [id, rec] of Object.entries(runs)) {
     if (rec.state === 'running') continue;
-    out[id] = { state: rec.state, ...(rec.error ? { error: rec.error } : {}), ...(rec.autoResumes ? { autoResumed: true } : {}) };
+    out[id] = { state: rec.state, ...(rec.error ? { error: rec.error } : {}), ...(rec.autoResumes ? { autoResumed: true } : {}), ...(rec.pending ? { pending: rec.pending } : {}) };
   }
   return out;
+}
+
+/**
+ * A stored pending step. Anything present but unreadable still counts as a step in flight, because
+ * reading it as "none" would be the unsafe direction: it would let a resume replay it.
+ */
+function parsePending(raw: unknown): PendingStep | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  const p = raw as Partial<PendingStep>;
+  return {
+    kind: p.kind === 'script' || p.kind === 'skill' ? p.kind : 'act',
+    label: typeof p.label === 'string' && p.label ? p.label : 'an action',
+    at: typeof p.at === 'number' && Number.isFinite(p.at) ? p.at : 0,
+  };
 }
 
 /** Whatever is stored under RUNS_KEY, with anything malformed dropped. */
@@ -123,6 +196,7 @@ export function parseRuns(raw: unknown): RunMap {
   for (const [id, v] of Object.entries(raw as Record<string, unknown>)) {
     const r = v as Partial<RunRecord> | null;
     if (!r || (r.state !== 'running' && r.state !== 'failed' && r.state !== 'interrupted')) continue;
+    const pending = parsePending(r.pending);
     out[id] = {
       state: r.state,
       tabId: typeof r.tabId === 'number' ? r.tabId : -1,
@@ -136,6 +210,7 @@ export function parseRuns(raw: unknown): RunMap {
       ...(typeof r.autoResumes === 'number' && Number.isFinite(r.autoResumes) && r.autoResumes > 0
         ? { autoResumes: Math.floor(r.autoResumes) }
         : {}),
+      ...(pending ? { pending } : {}),
     };
   }
   return out;

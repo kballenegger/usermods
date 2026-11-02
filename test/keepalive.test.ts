@@ -34,7 +34,7 @@ import {
 } from '../lib/keepalive.ts';
 import { createHolder } from '../lib/keepalive-holder.ts';
 import type { RunMap, RunRecord } from '../lib/runstate.ts';
-import { parseRuns, resumableRuns } from '../lib/runstate.ts';
+import { markInterrupted, nextRunRecord, parseRuns, resumableRuns } from '../lib/runstate.ts';
 
 // ---------- which tabs need a port ----------
 
@@ -300,6 +300,28 @@ test('a chat that is running right now is never resumed — the double-run guard
   // The one thing this must never do: run the same conversation twice against the same chat.
   assert.equal(shouldAutoResume({ record: rec(), live: true, safari: true }), false);
   assert.equal(shouldAutoResume({ record: rec({ state: 'running' }), live: true, safari: true }), false);
+});
+
+test('a pending step is never replayed: the auto-resume does not fire over one, of any kind', () => {
+  // The whole path, from the record the worker left to the list the background walks: this is what
+  // autoResumeInterrupted in entrypoints/background.ts reads.
+  for (const kind of ['act', 'script', 'skill'] as const) {
+    const pending = { kind, label: 'click button "Place order"', at: 1 };
+    assert.equal(shouldAutoResume({ record: rec({ pending }), live: false, safari: true }), false, kind);
+    const { runs } = markInterrupted({ a: { state: 'running', tabId: 1, startedAt: 1, updatedAt: 1, pending }, b: { state: 'running', tabId: 2, startedAt: 2, updatedAt: 2 } }, () => false);
+    assert.deepEqual(autoResumable(parseRuns(JSON.parse(JSON.stringify(runs))), () => false, true), ['b'], 'the run with nothing pending still comes back');
+  }
+});
+
+test('the bound holds across the write a resume makes: a second death gets no second pickup', () => {
+  const dead = { state: 'interrupted' as const, tabId: 1, startedAt: 1, updatedAt: 1 };
+  let runs: RunMap = { c: dead };
+  assert.deepEqual(autoResumable(runs, () => false, true), ['c']);
+  runs = countAutoResume(runs, 'c');
+  // The resumed run writes 'running' over the record, then the worker dies again.
+  runs = { c: nextRunRecord(runs.c, { state: 'running', tabId: 1 }) };
+  runs = markInterrupted(runs, () => false).runs;
+  assert.deepEqual(autoResumable(runs, () => false, true), []);
 });
 
 test('Stop means stop: a run the user ended is never resumed', () => {
