@@ -11,7 +11,7 @@
 import { diffText } from './artifact.ts';
 import { ACT_OFF } from './buildflags.ts';
 import { parseHeader, worldFor, type Header } from './mods.ts';
-import { looksLikeSkill, parseSkill, previewSkill, readSkillFacts, recordedReasons, stepLine, type SkillStep } from './skills.ts';
+import { isInputRef, looksLikeSkill, parseSkill, previewSkill, readSkillFacts, recordedReasons, stepLine, type SkillStep } from './skills.ts';
 import { compareVersions } from './version.ts';
 import type { Mod } from './types';
 
@@ -293,7 +293,7 @@ export function skillPowersDiff(oldSource: string, newSource: string): SkillPowe
   const oldSteps = a?.steps ?? [];
   const newSteps = b?.steps ?? [];
   const constantsOf = (steps: SkillStep[]) =>
-    steps.flatMap((s) => ((s.verb === 'fill' || s.verb === 'select') && !s.value.startsWith('$') ? [`${s.target}: ${s.value}`] : []));
+    steps.flatMap((s) => ((s.verb === 'fill' || s.verb === 'select') && !isInputRef(s.value) ? [`${s.target}: ${s.value}`] : []));
 
   const common = commonSteps(oldSteps.map(stepMeaning), newSteps.map(stepMeaning));
   const keptOld = new Set(common.map(([i]) => i));

@@ -4,6 +4,7 @@
 const none = () => null;
 
 export const looksLikeSkill = () => false;
+export const isInputRef = () => false;
 export const readSkillFacts = none;
 export const parseSkill = () => ({ ok: false as const, errors: [] });
 export const previewSkill = none;

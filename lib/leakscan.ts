@@ -12,7 +12,7 @@
 // A skill file gets three more rules (scanSkillForLeaks, docs/specs/skills.md section 4.4): a typed
 // value, a token in an address, and a secret in the notes.
 
-import { parseSkill } from './skills.ts';
+import { isInputRef, parseSkill } from './skills.ts';
 
 export type LeakKind =
   | 'openai-key'
@@ -197,7 +197,7 @@ export function scanSkillForLeaks(source: string): Leak[] {
 
   skill.steps.forEach((s, i) => {
     const line = lines.steps[i]!;
-    if ((s.verb === 'fill' || s.verb === 'select') && !/^\$[A-Za-z_]/.test(s.value)) {
+    if ((s.verb === 'fill' || s.verb === 'select') && !isInputRef(s.value)) {
       out.push({ kind: 'typed-value', label: `a typed value in ${s.target}`, line, preview: mask(s.value), step: i });
     }
     if (s.verb === 'go') {

@@ -276,8 +276,8 @@ export function useSkillShare({ onStatus, onError }: { onStatus: (s: string) => 
         <>
           <div className="error">▲ This skill looks like it contains something private:</div>
           <ul className="share-leaks" data-testid="skill-share-leaks">
-            {pending.leaks.slice(0, 8).map((l) => (
-              <li key={`${l.kind}:${l.line}`} className="mono">
+            {pending.leaks.slice(0, 8).map((l, i) => (
+              <li key={`${l.kind}:${l.line}:${i}`} className="mono">
                 {describeLeak(l)}
                 {l.kind === 'typed-value' && (
                   <>

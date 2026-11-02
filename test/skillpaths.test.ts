@@ -53,6 +53,14 @@ test('a literal select is a typed-value too; an input reference is not', () => {
   assert.equal(refs.filter((l) => l.kind === 'typed-value').length, 0);
 });
 
+test('a literal that merely starts with $ is still a typed value', () => {
+  for (const literal of ['$my secret value', '$5.00']) {
+    const src = withSteps(`- fill: "${literal}"\n  into: textbox "A"\n  at: { css: "#a" }`);
+    assert.ok(scanSkillForLeaks(src).some((l) => l.kind === 'typed-value'), literal);
+    assert.deepEqual(skillPowersDiff(EXPENSE, src).constants.added, [`textbox "A": ${literal}`]);
+  }
+});
+
 test('Make it an input ends the finding', () => {
   const src = withSteps('- fill: my account number\n  into: textbox "Account"\n  at: { css: "#a" }');
   const leak = scanSkillForLeaks(src).find((l) => l.kind === 'typed-value')!;

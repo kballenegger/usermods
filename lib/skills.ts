@@ -236,6 +236,9 @@ const STEP_KEYS: Record<SkillVerb, ReadonlySet<string>> = {
 
 const isMap = (v: unknown): v is YamlMap => v !== null && typeof v === 'object' && !Array.isArray(v);
 
+/** Is this value a reference to an input, `$name`, rather than a literal? `$5.00` and `$a b` are literals. */
+export const isInputRef = (value: string) => REFERENCE.test(value);
+
 /** Read a target line into its role and name. Null if it is not `role "name"` or a bare role. */
 export function parseTarget(target: string): { role: string; name: string } | null {
   const m = TARGET.exec(target);
