@@ -550,7 +550,9 @@ function withRenames(skill: ParsedSkill, renames: SkillProposal['renames']): { o
  * With no new step since the last proposal, there must be a draft, and only its words, inputs and outputs
  * change. With new ones, they become the file, or with `after_step` go into it at that point.
  */
-export function compileProposal(entries: readonly JournalEntry[], p: SkillProposal, base: ProposalBase | null, opts: CompileOptions): ProposalResult {
+export function compileProposal(journal: readonly JournalEntry[], p: SkillProposal, base: ProposalBase | null, opts: CompileOptions): ProposalResult {
+  // What a repair did is that skill's, and only Update skill with the repair may use it.
+  const entries = journal.filter((e) => e.repairOf === undefined);
   const floor = base?.floor ?? 0;
   const since = entries.filter((e) => e.n > floor);
   const highest = entries.at(-1)?.n ?? floor;

@@ -138,6 +138,13 @@ test('propose_skill: by default it takes the latest run with a step in it, from 
   assert.ok(r.source.includes('"New"'));
 });
 
+test('propose_skill: what a repair did is not a step it can propose', () => {
+  const r = compileProposal([click(1, 'Repaired', { repairOf: 2, run: 'skill-run' })], proposal(), null, opts());
+  assert.equal(r.ok, false);
+  const named = compileProposal([click(1, 'Repaired', { repairOf: 2, run: 'skill-run' }), click(2, 'Mine')], proposal({ fromStep: 1 }), null, opts());
+  assert.equal(named.ok, false, 'not by naming it either');
+});
+
 const base = (over: Partial<ProposalBase> = {}): ProposalBase => ({ skill: parsed(), floor: 2, linked: false, ...over });
 
 test('a re-proposal with no new step changes only words: no step moves, and the version goes up', () => {
