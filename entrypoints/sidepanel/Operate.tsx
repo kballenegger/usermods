@@ -1,25 +1,13 @@
 import { useEffect, useState } from 'react';
 import type { Answer, PageCard, Question, StepRow, ToolEffect } from '@/lib/agent/questions';
 import { rpc } from '@/lib/rpc';
-import styles from './operate.css?inline';
+import './operate.css';
 
 // Everything the panel draws for a run that operates the page: the questions, the touched rows, the
 // card and the Settings section. See docs/specs/browser-use.md, sections 5.4, 5.5 and 5.7.
 //
-// Every use of this file sits behind ACT_OFF, so a build with the flag off has neither this code nor
-// its styles. That is why the styles are inlined and added by the components themselves: a plain CSS
-// import is a side effect, and the bundler keeps one even when nothing can reach the file it is in.
-
-const STYLE_ID = 'usermods-operate-styles';
-
-/** Once per page, however many of these components are drawn. */
-function useStyles() {
-  if (document.getElementById(STYLE_ID)) return;
-  const el = document.createElement('style');
-  el.id = STYLE_ID;
-  el.textContent = styles;
-  document.head.append(el);
-}
+// A build with ACT_OFF has neither this code nor its styles: there, wxt.config.ts resolves this file to
+// operate-off.ts.
 
 /** The pointer mark: a touched row's, in place of the dot. `currentColor`, so it takes the row's state. */
 export function PointerMark() {
@@ -46,7 +34,6 @@ export interface QuestionRowProps {
  * appear only where they are labelled as the model's, or as what it is asking you to do.
  */
 export function QuestionRow({ question: q, onAnswer, onStop }: QuestionRowProps) {
-  useStyles();
   const [standing, setStanding] = useState(false);
   // A new question starts unticked: the answer to the last site is not the answer to this one.
   useEffect(() => setStanding(false), [q.id]);
@@ -201,7 +188,6 @@ function TouchedStep({ step, interrupted }: { step: StepRow; interrupted: boolea
 
 /** Every step of one `act` call, each its own row. Finished calls cannot have one still running. */
 export function TouchedSteps({ steps, finished }: { steps: StepRow[]; finished: boolean }) {
-  useStyles();
   return (
     <>
       {steps.map((step, i) => (
@@ -213,7 +199,6 @@ export function TouchedSteps({ steps, finished }: { steps: StepRow[]; finished: 
 
 /** A script or a test that changed the page. Whether it did is decided from its result. */
 export function TouchedScript({ effect, code, summary, isError }: { effect: ToolEffect; code?: string; summary?: string; isError?: boolean }) {
-  useStyles();
   return (
     <details className={`tool touched${isError ? ' is-failed' : ''}`} data-testid="touched" data-step-state={isError ? 'failed' : 'done'}>
       <summary>
@@ -232,7 +217,6 @@ export function TouchedScript({ effect, code, summary, isError }: { effect: Tool
 
 /** What the extension recorded of the run. It never says done: done is the model's claim. */
 export function PageCardRow({ card }: { card: PageCard }) {
-  useStyles();
   return (
     <div className="card page-card" data-testid="page-card">
       <div className="label">{card.label}</div>
@@ -260,7 +244,6 @@ export function PageCardRow({ card }: { card: PageCard }) {
 
 /** Settings' section: the sites it may operate without asking first, and the slow, safe switch. */
 export function OperatingPages({ askEveryStep, onAskEveryStep }: { askEveryStep: boolean; onAskEveryStep: (on: boolean) => void }) {
-  useStyles();
   const [sites, setSites] = useState<string[] | null>(null);
   useEffect(() => {
     void rpc({ type: 'act.allowances' }).then((r) => setSites(r.sites), () => setSites([]));

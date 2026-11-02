@@ -38,7 +38,11 @@ export function TranscriptPreview({ items, artifact }: { items: ChatItem[]; arti
       {artifact && <ArtifactPreview artifact={artifact} />}
       {!items.length && <div className="prev-note">This chat has no stored transcript.</div>}
       {items.map((it, i) => {
-        if (!ACT_OFF && it.kind === 'page_card') return <PageCardRow key={i} card={it.card} />;
+        if (!ACT_OFF) {
+          if (it.kind === 'page_card') return <PageCardRow key={i} card={it.card} />;
+          if (it.kind === 'tool' && it.steps?.length) return <TouchedSteps key={i} steps={it.steps} finished={it.summary !== undefined} />;
+          if (it.kind === 'tool' && it.effect) return <TouchedScript key={i} effect={it.effect} {...(typeof it.input.code === 'string' ? { code: it.input.code } : {})} {...(it.summary ? { summary: it.summary } : {})} isError={!!it.isError} />;
+        }
         switch (it.kind) {
           case 'user':
             return (
@@ -86,8 +90,6 @@ export function TranscriptPreview({ items, artifact }: { items: ChatItem[]; arti
             ) : null;
           }
           case 'tool':
-            if (!ACT_OFF && it.steps?.length) return <TouchedSteps key={i} steps={it.steps} finished={it.summary !== undefined} />;
-            if (!ACT_OFF && it.effect) return <TouchedScript key={i} effect={it.effect} {...(typeof it.input.code === 'string' ? { code: it.input.code } : {})} {...(it.summary ? { summary: it.summary } : {})} isError={!!it.isError} />;
             return (
               <details key={i} className={`prev-tool${it.isError ? ' is-error' : ''}`}>
                 <summary>

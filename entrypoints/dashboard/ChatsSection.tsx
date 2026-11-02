@@ -554,11 +554,11 @@ function ChatRow({
               editing · {chat.editingModName}
             </span>
           )}
-          {!ACT_OFF && !!chat.actions && (
+          {ACT_OFF ? null : chat.actions ? (
             <span className="badge" data-testid="chat-actions" title="usermods operated the page in this chat. Open it to see what it did.">
               on the page · {chat.actions} action{chat.actions === 1 ? '' : 's'}
             </span>
-          )}
+          ) : null}
           {archived && <span className="badge" data-testid="chat-archived">archived</span>}
         </div>
       </div>

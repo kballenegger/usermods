@@ -205,7 +205,7 @@ export function SettingsView({ onReviewNotice }: { onReviewNotice?: () => void }
         </span>
       </label>
 
-      {!ACT_OFF && <OperatingPages askEveryStep={s.askEveryStep === true} onAskEveryStep={(askEveryStep) => update({ askEveryStep })} />}
+      {ACT_OFF ? null : <OperatingPages askEveryStep={s.askEveryStep === true} onAskEveryStep={(askEveryStep) => update({ askEveryStep })} />}
 
       {/*
         The theme is applied the moment it is picked, so the choice is visible while you make it;

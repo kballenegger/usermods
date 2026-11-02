@@ -1471,11 +1471,11 @@ export function Chat({ tabId, pageUrl, host: liveHost, onOpenSettings }: { tabId
    */
   const resumeBlock = resumeState ? (
     <div className="resume" data-testid="resume" data-resume-state={resumeState.state}>
-      {!ACT_OFF && resumeState.pending && (
+      {ACT_OFF ? null : resumeState.pending ? (
         <span className="resume-hint" data-testid="resume-pending">
           {pendingResumeText(resumeState.pending)}
         </span>
-      )}
+      ) : null}
       <span className="resume-hint">{RESUME_HINT}</span>
       <button className="btn primary" data-action="resume" onClick={resume} disabled={tabId == null || unsupported}>
         {RESUME_LABEL}
@@ -1663,7 +1663,9 @@ export function Chat({ tabId, pageUrl, host: liveHost, onOpenSettings }: { tabId
           const fold = folds.get(i);
           if (fold === 'folded') return null;
           if (fold) return <StepsRow key={i} tools={fold.map((n) => items[n]).filter((t): t is ToolItem => t?.kind === 'tool')} />;
-          if (!ACT_OFF && it.kind === 'page_card') return <PageCardRow key={i} card={it.card} />;
+          if (!ACT_OFF) {
+            if (it.kind === 'page_card') return <PageCardRow key={i} card={it.card} />;
+          }
           switch (it.kind) {
             case 'user':
               return (
@@ -1895,10 +1897,11 @@ export function Chat({ tabId, pageUrl, host: liveHost, onOpenSettings }: { tabId
           )}
         </div>
       )}
-      {!ACT_OFF && chatId && questions.get(chatId) && (
+      {/* A ternary, not `!ACT_OFF && chatId && …`: the bundler folds this shape before it splits chunks. */}
+      {ACT_OFF ? null : chatId && questions.get(chatId) ? (
         // The one route an answer has: an RPC, which the background takes only from an extension page.
         <QuestionRow question={questions.get(chatId)!} onAnswer={(answer: Answer) => void rpc({ type: 'act.answer', chatId, questionId: questions.get(chatId)!.id, answer }).catch(() => {})} onStop={abort} />
-      )}
+      ) : null}
       <Activity
         phase={activity.phase}
         tool={activity.tool}
@@ -2507,8 +2510,10 @@ type ToolItem = Extract<ChatItem, { kind: 'tool' }>;
  * dot, not the coral one: the page did not do the thing, which is a result, not a failure.
  */
 function ToolRow({ item }: { item: ToolItem }) {
-  if (!ACT_OFF && item.steps?.length) return <TouchedSteps steps={item.steps} finished={item.summary !== undefined} />;
-  if (!ACT_OFF && item.effect) return <TouchedScript effect={item.effect} {...(typeof item.input.code === 'string' ? { code: item.input.code } : {})} {...(item.summary ? { summary: item.summary } : {})} isError={!!item.isError} />;
+  if (!ACT_OFF) {
+    if (item.steps?.length) return <TouchedSteps steps={item.steps} finished={item.summary !== undefined} />;
+    if (item.effect) return <TouchedScript effect={item.effect} {...(typeof item.input.code === 'string' ? { code: item.input.code } : {})} {...(item.summary ? { summary: item.summary } : {})} isError={!!item.isError} />;
+  }
   return (
     <details className={`tool${item.isError ? ' error' : ''}`}>
       <summary>
