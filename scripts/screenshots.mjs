@@ -5294,7 +5294,7 @@ async function composerFlow() {
       };
     });
     if (menuA11y.haspopup !== 'menu' || menuA11y.expanded !== 'true' || !menuA11y.controls || menuA11y.role !== 'menu') fail(`the "+" button is not a menu button: ${JSON.stringify(menuA11y)}`);
-    if (JSON.stringify(menuA11y.items) !== JSON.stringify(['Point at element', 'Attach image', 'New chat'])) fail(`the "+" menu offers ${JSON.stringify(menuA11y.items)}`);
+    if (JSON.stringify(menuA11y.items) !== JSON.stringify(['Point at element', 'Attach image', 'New chat', 'Run a skill…'])) fail(`the "+" menu offers ${JSON.stringify(menuA11y.items)}`);
     if (!menuA11y.focusedFirst) fail('opening the "+" menu from the keyboard did not focus its first item');
     await panel.keyboard.press('ArrowDown');
     if ((await panel.evaluate(() => document.activeElement?.getAttribute('data-testid'))) !== 'menu-attach') fail('ArrowDown did not move to Attach image');

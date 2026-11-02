@@ -2692,6 +2692,8 @@ type ToolItem = Extract<ChatItem, { kind: 'tool' }>;
 function ToolRow({ item }: { item: ToolItem }) {
   if (!ACT_OFF) {
     if (item.steps?.length) return <TouchedSteps steps={item.steps} finished={item.summary !== undefined} />;
+    // A skill's run is its steps. Before the first one there is nothing to say that the line is not saying.
+    if (item.name === 'run_skill') return null;
     if (item.effect) return <TouchedScript effect={item.effect} {...(typeof item.input.code === 'string' ? { code: item.input.code } : {})} {...(item.summary ? { summary: item.summary } : {})} isError={!!item.isError} />;
   }
   return (
