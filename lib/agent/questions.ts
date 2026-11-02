@@ -236,7 +236,7 @@ export function stepDone(step: Pick<ActStep, 'do' | 'text'>, d: Described, resul
     case 'fill':
       return `filled ${named(d)}`;
     case 'select':
-      return `chose "${clip((step.text ?? '').trim(), 60)}" in ${named(d)}${arrow}`;
+      return `chose an option in ${named(d)}${arrow}`;
     case 'check':
       return `${/^(false|off|no|uncheck|unticked?|0)$/i.test(step.text ?? '') ? 'unticked' : 'ticked'} ${named(d)}${arrow}`;
     case 'press':

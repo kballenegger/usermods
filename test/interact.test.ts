@@ -767,7 +767,7 @@ test('select chooses by label or value, says which, and refuses a custom list', 
   assert.ok(r.ok);
   assert.equal(s.value, 'exp');
   assert.deepEqual(seen, ['change']);
-  assert.match(r.ok ? r.text : '', /^Chose "Express" in combobox "Delivery"/);
+  assert.match(r.ok ? r.text : '', /^Chose an option in combobox "Delivery"/);
   r = await act({ target: { ref: reg.refFor(s) }, do: 'select', text: 'std' }, deps(reg));
   assert.equal(s.value, 'std');
   r = await act({ target: { ref: reg.refFor(s) }, do: 'select', text: 'nope' }, deps(reg));
@@ -1002,4 +1002,27 @@ test('a read stops at its limit, the number the file format promises', () => {
   assert.ok(r.ok);
   assert.equal(r.values.length, READ_LIMIT);
   assert.equal(READ_LIMIT, MAX_READ_ITEMS);
+});
+
+test('check will not press what cannot be ticked: on a submit button it would be a click under another name', async () => {
+  load('<body><form id="f"><button id="b" type="submit">Sign in</button></form></body>');
+  const reg = createRegistry(1, { probe });
+  const b = document.getElementById('b')!;
+  let clicks = 0;
+  b.addEventListener('click', () => void clicks++);
+  const r = await act({ target: { ref: reg.refFor(b) }, do: 'check' }, deps(reg));
+  assert.equal(!r.ok && r.code, 'unsupported');
+  assert.equal(clicks, 0);
+});
+
+test('a choice is not echoed: an input\'s value goes no further than the list', async () => {
+  load(`<body><select id="s" aria-label="Plan"><option>Secret plan</option><option>Other</option></select></body>`);
+  const reg = createRegistry(1, { probe });
+  const el = document.getElementById('s')!;
+  const good = await act({ target: { ref: reg.refFor(el) }, do: 'select', text: 'Secret plan' }, deps(reg));
+  assert.ok(good.ok);
+  assert.doesNotMatch(good.text, /Secret plan/);
+  const bad = await act({ target: { ref: reg.refFor(el) }, do: 'select', text: 'typed by the user' }, deps(reg));
+  assert.ok(!bad.ok);
+  assert.doesNotMatch(bad.message, /typed by the user/);
 });

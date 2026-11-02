@@ -300,3 +300,9 @@ test('storage: answers in quick succession both land, through a fake store', asy
   await updateAllowances((s) => s, store);
   assert.equal(writes, 3, 'nothing changed, nothing written');
 });
+
+test('check is a press: it cannot submit a form holding a password either', () => {
+  const d = { role: 'button', name: 'Sign in', tag: 'button', pageUrl: 'https://a.test/', submits: true, form: { method: 'get', holds: 'password' }, fingerprint: { role: 'button', name: 'Sign in', tag: 'button' } } as unknown as Described;
+  assert.match(neverReason(d, 'check') ?? '', /submits a form holding a password/);
+  assert.equal(decide(d, { site: true, actions: [] }, { verb: 'check' }).kind, 'deny');
+});

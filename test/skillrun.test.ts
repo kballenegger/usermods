@@ -649,3 +649,11 @@ test('only a question that offered it takes an empty answer', () => {
   assert.equal(answerFits(base, { kind: 'input', value: 'x' }), true);
   assert.equal(answerFits({ ...base, optional: true }, { kind: 'input', value: '' }), true);
 });
+
+test('what was chosen for an input is on no row, no card and no record', async () => {
+  const skill = asLocal('- select: $plan\n  into: combobox "Plan"\n  at: { css: "#p" }', 'inputs: { plan: { label: Plan } }\noutputs: {}');
+  const h = harness();
+  await go(skill, h, { carry: { inputs: { plan: 'a secret plan' }, outputs: {} } });
+  assert.equal(h.performed[0]?.text, 'a secret plan');
+  assert.doesNotMatch(JSON.stringify([h.rows, h.events, h.notes, h.log]), /secret plan/);
+});

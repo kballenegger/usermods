@@ -91,7 +91,7 @@ export function neverReason(d: Described, verb: Verb, key?: string): string | nu
   if (d.link && schemeOf(d.link.href) !== null && /^(chrome|chrome-extension|moz-extension|safari-web-extension|edge|about|devtools|view-source):$/.test(schemeOf(d.link.href)!)) return 'it opens a browser or extension page';
   if (d.field && (verb === 'fill' || verb === 'select' || (verb === 'press' && typesText(key)))) return `it types into a ${d.field} field`;
   const holds = d.form?.holds;
-  if (holds && ((verb === 'click' && d.submits) || (verb === 'press' && (isEnter(key) || (isSpace(key) && d.submits))))) return `it submits a form holding a ${holds} field`;
+  if (holds && (((verb === 'click' || verb === 'check') && d.submits) || (verb === 'press' && (isEnter(key) || (isSpace(key) && d.submits))))) return `it submits a form holding a ${holds} field`;
   return null;
 }
 

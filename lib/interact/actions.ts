@@ -18,7 +18,7 @@
 // DOM only, with what needs layout or frames behind ActionDeps, so node tests drive it.
 
 // The .ts extension: see lib/agent/tools.ts. node's test runner loads this file directly.
-import { neverReason, type Verb } from '../agent/gate.ts';
+import { CHECKABLE_ROLES, neverReason, type Verb } from '../agent/gate.ts';
 import { describeNode, liveProbe, parentOf, type Probe } from '../inspect.ts';
 import { paste, selectAll, setFieldValue, settle } from '../sharefill.ts';
 import { normalizeText } from '../waitdom.ts';
@@ -301,7 +301,7 @@ function doSelect(el: Element, label: string, text: string): { ok: true; chose: 
   const want = normalizeText(text);
   const hits = options.filter((o) => normalizeText(o.textContent ?? '') === want);
   const picked = hits.length ? hits : options.filter((o) => o.getAttribute('value') === text);
-  if (picked.length !== 1) return { ok: false, code: 'unsupported', message: `${label} has ${picked.length ? 'several options' : 'no option'} reading "${text}"` };
+  if (picked.length !== 1) return { ok: false, code: 'unsupported', message: `${label} has ${picked.length ? 'several options' : 'no option'} reading what was asked for` };
   const option = picked[0]!;
   if (option.hasAttribute('disabled')) return { ok: false, code: 'disabled', message: `That option in ${label} is disabled` };
   (option as HTMLOptionElement).selected = true;
@@ -494,9 +494,12 @@ export async function runStep(step: ActStep, expect: string, deps: ActionDeps): 
     case 'select': {
       const r = doSelect(el, label, step.text ?? '');
       if (!r.ok) return fail(r);
-      return finish({ words: `Chose "${r.chose}" in ${label}${refNote}.` });
+      // Not which: during a skill's repair it is the user's input, and the model is not told that.
+      return finish({ words: `Chose an option in ${label}${refNote}.` });
     }
     case 'check': {
+      // It presses the element, so anywhere else it is a click nothing asked about as one.
+      if (!CHECKABLE_ROLES.has(described.role)) return fail({ code: 'unsupported', message: `${label} is not something that can be ticked` });
       const want = !WANTS_OFF.test(step.text ?? '');
       if (isChecked(el) !== want) pressWithPointer(el, can.point);
       if (isChecked(el) !== want) return fail({ code: 'readback', message: `${label} did not change` });
