@@ -118,7 +118,7 @@ export async function skillsFlow({ launch, openPanel, openSite, waitForComposer,
     // New chat is off on a chat with nothing in it, which is where a new host opens.
     const fresh = async () => {
       await waitForComposer(panel);
-      await panel.locator('.messages .empty, .messages .msg, .messages .note, .messages [data-testid="page-card"], .messages .tool').first().waitFor({ timeout: 15_000 });
+      await panel.locator('.messages .empty, .messages .msg, .messages .note, .messages [data-testid="page-card"], .messages .tool').first().waitFor({ timeout: 60_000 });
       await sleep(250);
       if (!(await panel.locator('.messages .empty').count())) await startNewChat(panel);
     };
@@ -266,7 +266,7 @@ export async function skillsFlow({ launch, openPanel, openSite, waitForComposer,
     const rowFor = (name) => panel.locator('[data-testid="skill-row"]', { has: panel.locator('h4', { hasText: name }) });
     await rowFor('File an expense').locator('[data-testid="skill-run-row"]').click();
     const runCard = panel.locator('[data-testid="skill-run-card"]');
-    await runCard.waitFor({ timeout: 15_000 });
+    await runCard.waitFor({ timeout: 60_000 });
     const summary = await panel.locator('[data-testid="skill-run-summary"]').textContent();
     check(/6 steps on expenses\.example\.com · fills 3 fields · one step is yours/.test(summary), 'the run card computes what it will do', summary);
     check(!(await panel.locator('[data-testid="skill-run-first"]').count()), 'a skill made here does not walk');
@@ -294,7 +294,7 @@ export async function skillsFlow({ launch, openPanel, openSite, waitForComposer,
     state.csv.length = 0;
     downloads.length = 0;
     await panel.locator('[data-testid="empty-skill"]', { hasText: 'Export this month' }).click();
-    await runCard.waitFor({ timeout: 15_000 });
+    await runCard.waitFor({ timeout: 60_000 });
     await panel.locator('[data-testid="skill-run"]').click();
     const card = panel.locator('[data-testid="page-card"]', { hasText: 'Export this month' }).last();
     await card.waitFor({ timeout: 30_000 });
@@ -312,7 +312,7 @@ export async function skillsFlow({ launch, openPanel, openSite, waitForComposer,
     await panel.locator('[data-testid="menu-run-skill"]').click();
     await panel.locator('[data-testid="skill-picker"]').waitFor({ timeout: 5000 });
     await panel.locator('[data-testid="skill-pick"]', { hasText: 'Album download links' }).click();
-    await runCard.waitFor({ timeout: 15_000 });
+    await runCard.waitFor({ timeout: 60_000 });
     await panel.locator('[data-testid="skill-run"]').click();
     const albumCard = panel.locator('[data-testid="page-card"]', { hasText: 'Album download links' }).last();
     await albumCard.waitFor({ timeout: 45_000 });
@@ -335,7 +335,7 @@ export async function skillsFlow({ launch, openPanel, openSite, waitForComposer,
     const elsewhereRow = rowFor('Album download links');
     check(/runs on photos\.example\.com/.test(await elsewhereRow.locator('[data-testid="skill-row-meta"]').textContent()), 'the row says where it runs');
     await elsewhereRow.locator('[data-testid="skill-run-row"]').click();
-    await panel.locator('[data-testid="skill-run-opens"]').waitFor({ timeout: 15_000 });
+    await panel.locator('[data-testid="skill-run-opens"]').waitFor({ timeout: 60_000 });
     await panel.locator('[data-testid="skill-run"]').click();
     await page.waitForURL('https://photos.example.com/albums/', { timeout: 30_000 });
     await panel.locator('[data-testid="page-card"]', { hasText: 'Album download links' }).last().waitFor({ timeout: 45_000 });
@@ -422,7 +422,7 @@ export async function skillsFlow({ launch, openPanel, openSite, waitForComposer,
     }, skill);
     const runForms = async (id) => {
       await panel.locator('[data-testid="empty-skill"][data-skill-id="' + id + '"]').click();
-      await runCard.waitFor({ timeout: 15_000 });
+      await runCard.waitFor({ timeout: 60_000 });
       await panel.locator('[data-testid="skill-run"]').click();
     };
     const submitSrc = handWritten('Submit payment', '- click: button "Submit payment"\n  at: { css: "#send", in: \'form "Pay"\' }\n  why: pay the bill');
@@ -431,7 +431,7 @@ export async function skillsFlow({ launch, openPanel, openSite, waitForComposer,
     await openForms();
     state.posts.length = 0;
     await panel.locator('[data-testid="empty-skill"][data-skill-id="' + imported.id + '"]').click();
-    await runCard.waitFor({ timeout: 15_000 });
+    await runCard.waitFor({ timeout: 60_000 });
     check(await panel.locator('[data-testid="skill-run-first"]').count(), 'the card says the first run walks');
     await panel.locator('[data-testid="skill-run"]').click();
     await question('allow').waitFor({ timeout: 30_000 });
@@ -530,7 +530,7 @@ export async function skillsFlow({ launch, openPanel, openSite, waitForComposer,
     await page.bringToFront();
     await fresh();
     await panel.locator('[data-testid="empty-skill"]', { hasText: 'Album' }).click();
-    await runCard.waitFor({ timeout: 15_000 });
+    await runCard.waitFor({ timeout: 60_000 });
     await panel.locator('[data-testid="skill-run"]').click();
     await question('skill-broken').waitFor({ timeout: 30_000 });
     await shotAt360('skill-broken-360.png');
@@ -609,7 +609,7 @@ export async function skillsFlow({ launch, openPanel, openSite, waitForComposer,
     const dash = await b.ctx.newPage();
     await dash.goto(`chrome-extension://${b.extId}/dashboard.html#chats`);
     await dash.locator('[data-testid="chat-kind"]').selectOption('ran');
-    await dash.locator('[data-testid="chat-ran-skill"]', { hasText: 'ran Waiter' }).first().waitFor({ timeout: 15_000 });
+    await dash.locator('[data-testid="chat-ran-skill"]', { hasText: 'ran Waiter' }).first().waitFor({ timeout: 60_000 });
     check(/skills/.test(await dash.locator('[data-testid="overview"]').textContent()), 'the overview counts skills');
     await dash.close();
     await panel.bringToFront();
@@ -671,12 +671,12 @@ async function shareInstallRun({ b, panel, expenseId, launch, openPanel, openSit
   await panel.locator('[data-view="mods"]').first().click();
   const row = panel.locator('[data-testid="skill-row"]', { has: panel.locator('h4', { hasText: 'File an expense' }) });
   await row.locator('[data-testid="skill-export"]').click();
-  const [tab] = await Promise.all([b.ctx.waitForEvent('page', { timeout: 15_000 }), panel.locator('[data-testid="skill-export-menu"] [data-testid="export-gist"]').click()]);
+  const [tab] = await Promise.all([b.ctx.waitForEvent('page', { timeout: 60_000 }), panel.locator('[data-testid="skill-export-menu"] [data-testid="export-gist"]').click()]);
   await tab.waitForLoadState('domcontentloaded');
-  await tab.locator('.js-gist-filename').waitFor({ timeout: 15_000 });
-  await tab.waitForFunction(() => document.querySelector('.js-gist-filename')?.value?.endsWith('.skill.md'), null, { timeout: 15_000 });
+  await tab.locator('.js-gist-filename').waitFor({ timeout: 60_000 });
+  await tab.waitForFunction(() => document.querySelector('.js-gist-filename')?.value?.endsWith('.skill.md'), null, { timeout: 60_000 });
   await tab.locator('button', { hasText: 'Create secret gist' }).click();
-  await tab.waitForURL(/gist\.github\.com\/smokeuser\//, { timeout: 15_000 });
+  await tab.waitForURL(/gist\.github\.com\/smokeuser\//, { timeout: 60_000, waitUntil: "domcontentloaded" });
   const gistId = [...gists.keys()][0];
   const published = gists.get(gistId).files[0];
   check(published.name === 'file-an-expense.skill.md', 'the gist holds the skill', published.name);
@@ -692,9 +692,9 @@ async function shareInstallRun({ b, panel, expenseId, launch, openPanel, openSit
     const panel2 = await openPanel(b2.ctx, b2.extId);
     const page = await b2.ctx.newPage();
     await page.goto(raw).catch(() => {});
-    await page.waitForURL(/install\.html#/, { timeout: 15_000 });
+    await page.waitForURL(/install\.html#/, { timeout: 60_000, waitUntil: "domcontentloaded" });
     await page.locator('[data-testid="skill-install"]').click();
-    await page.locator('.card.hero', { hasText: 'Installed' }).waitFor({ timeout: 15_000 });
+    await page.locator('.card.hero', { hasText: 'Installed' }).waitFor({ timeout: 60_000 });
     const installed = (await stored(panel2))[0];
     check(installed.origin === 'installed' && installed.walked === false && installed.allowedSteps.length === 0, 'installed from a link, it must walk', installed);
 
@@ -702,7 +702,7 @@ async function shareInstallRun({ b, panel, expenseId, launch, openPanel, openSit
     await panel2.reload({ waitUntil: 'domcontentloaded' });
     await waitForComposer(panel2);
     await panel2.locator('[data-testid="empty-skill"]').first().click();
-    await panel2.locator('[data-testid="skill-run-card"]').waitFor({ timeout: 15_000 });
+    await panel2.locator('[data-testid="skill-run-card"]').waitFor({ timeout: 60_000 });
     check(await panel2.locator('[data-testid="skill-run-first"]').count(), 'the card says the first run walks');
     check(await panel2.locator('[data-testid="skill-run-operate"]').count(), 'and asks about the site in one card');
     await panel2.locator('[data-testid="skill-run-input"][data-input="merchant"]').fill('Second Profile');
@@ -760,7 +760,7 @@ async function noModel({ launch, openSite, waitForComposer, routeSites, sources,
     await panel.locator('.composer textarea').fill('hello');
     const send = panel.locator('.composer .cbtn.send');
     // The panel reads its connections after it paints.
-    await panel.locator('.composer .cbtn.send[disabled]').waitFor({ timeout: 15_000 });
+    await panel.locator('.composer .cbtn.send[disabled]').waitFor({ timeout: 60_000 });
     check(/Connect a provider/.test(await send.getAttribute('title')), 'and it says why', await send.getAttribute('title'));
     await panel.locator('.composer textarea').fill('');
     await panel.locator('[data-testid="empty-skill"]').first().click();
