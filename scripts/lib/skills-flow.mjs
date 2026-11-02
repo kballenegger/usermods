@@ -526,8 +526,11 @@ export async function skillsFlow({ launch, openPanel, openSite, waitForComposer,
     await page.bringToFront();
     await fresh();
     await runForms('sibling');
-    await panel.locator('[data-testid="page-card"]', { hasText: 'Sibling' }).last().waitFor({ timeout: 30_000 });
-    check(page.url() === forms, 'it went to a start on a sibling host', page.url());
+    await page.waitForURL(forms, { timeout: 30_000 });
+    // Its card is in the chat it ran in. The panel follows the page's host once the run lets go, so it is read from storage.
+    const siblingFinished = async () => panel.evaluate(async () => JSON.stringify(await chrome.storage.local.get(null)).includes('on the page · Sibling'));
+    for (let i = 0; i < 60 && !(await siblingFinished()); i++) await sleep(500);
+    check(await siblingFinished(), 'and every step was reached there', await panel.locator('.chat').textContent().catch(() => ''));
 
     // A start that redirects off its match: the run is pinned to `start`, so it pauses before any step.
     await force({ ...imported, id: 'redirected', name: 'Redirected', origin: 'local', walked: true, start: `${forms}redirect`, steps: [{ verb: 'wait', condition: { ms: 50 } }] });
