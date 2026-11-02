@@ -28,9 +28,15 @@ lists what is unmet.
   bounded sub-run: four tools, eight tool calls, no `go`, no script, every action asked, and a stranger's
   words fenced with a nonce. **Update skill with the repair** offers what it did as a patch version.
 
+### Fixed
+
+- iOS: the app crashed on launch on iOS 27 when built with the iOS 27 SDK, because it had no scene
+  manifest. It now adopts the UIScene lifecycle. `safari-xcode.mjs launch-check` starts the Release
+  build on an iPhone and an iPad simulator, and `archive` will not proceed without it.
+
 ## [0.1.1] — 2026-09-30
 
-The version resubmitted to the Chrome Web Store. 0.1.0 was submitted on 2026-09-22 and rejected the
+The version live on the [Chrome Web Store](https://chromewebstore.google.com/detail/usermods/dhmdjekbeinhhnfhcgnkgdpgdafpboic), where the listing is dated 2026-10-02. 0.1.0 was submitted on 2026-09-22 and rejected the
 same day for its listing text (keyword spam in the description), not for the package; everything
 merged since then ships here.
 

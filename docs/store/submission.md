@@ -11,9 +11,11 @@
   OpenRouter, Ollama, LM Studio, vLLM, mlx_lm). Nothing else was cited. The notice went to the
   publisher's mailbox and was not seen for a week, so until 2026-09-30 this file said "pending
   review".
-- **2026-09-30: 0.1.1 prepared for resubmission. Not yet uploaded or submitted.** What changed is
-  under [What the resubmission changes](#what-the-resubmission-changes); what to do in the dashboard
-  is under [Resubmitting](#resubmitting).
+- **2026-09-30: 0.1.1 resubmitted.** What changed is under
+  [What the resubmission changes](#what-the-resubmission-changes); the dashboard steps are under
+  [Resubmitting](#resubmitting).
+- **0.1.1 is live: [the listing](https://chromewebstore.google.com/detail/usermods/dhmdjekbeinhhnfhcgnkgdpgdafpboic), dated 2026-10-02.** It was found live on 2026-11-02. The
+  publisher mailbox holds no approval notice, so check the listing rather than waiting for mail.
 - Automatic publication is **off**: an approved item waits for Publish to be pressed.
 
 Things the dashboard turned out to do differently from Google's docs, learned on the first
@@ -137,7 +139,8 @@ Before pressing Submit:
       dashboard links to it there.
 
 After submitting, watch the publisher mailbox: the rejection arrived there within a day and sat
-unread. When the item is approved and published, tag the release (`v0.1.1`).
+unread. Approval may send nothing: 0.1.1 went live with no mail, so check the listing as well. When
+the item is approved and published, tag the release (`v0.1.1`).
 
 ---
 
@@ -236,4 +239,4 @@ field, so the explanation is never read.)
 Expect a slower than average review: `<all_urls>`, `userScripts` and a broad content script are
 three of the things that route an item to manual review. Do not upload anything while a review is
 pending, because that restarts it. Once it is approved and published, tag the release and revoke
-the reviewer key.
+the reviewer key, unless another store's review still uses it: the App Store notes use the same one.

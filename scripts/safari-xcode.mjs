@@ -11,9 +11,13 @@
 //   node scripts/safari-xcode.mjs simulator           build, boot a simulator, install, launch
 //   node scripts/safari-xcode.mjs mac                 build the Mac app, check it, say what is next
 //   node scripts/safari-xcode.mjs mac --launch        the same, then open it
+//   node scripts/safari-xcode.mjs launch-check        Release build on an iPhone and an iPad
+//                                                     simulator on the newest runtime; fails if
+//                                                     it crashes or draws nothing
 //   node scripts/safari-xcode.mjs archive --team ABCDE12345
-//                                                     stage, archive for iOS devices, export an
-//                                                     App Store .ipa, check what is inside it
+//                                                     stage, launch-check, archive for iOS devices,
+//                                                     export an App Store .ipa, check what is
+//                                                     inside it
 //   node scripts/safari-xcode.mjs archive --team ABCDE12345 --upload
 //                                                     the same, then upload it to App Store
 //                                                     Connect through the Xcode account on
@@ -51,6 +55,8 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import os from 'node:os';
+import { decodePNG } from './lib/png.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const projectDir = path.join(root, 'safari');
@@ -176,6 +182,8 @@ function doctor() {
     ios = [];
   }
   console.log(`iOS simulator runtimes  ${ios.length ? ios.map((r) => r.version).join(', ') : 'none installed'}`);
+  const sdkVersion = iosSdkVersion(xcodeEnv(dir));
+  console.log(`iOS SDK                 ${sdkVersion ?? 'none'}  (launch-check and archive need a runtime of at least this major)`);
 
   const sdks = capture(path.join(dir, 'usr', 'bin', 'xcodebuild'), ['-showsdks'], { env: xcodeEnv(dir) }) ?? '';
   const macSdk = sdks.split('\n').map((l) => l.match(/-sdk (macosx[\d.]+)/)?.[1]).filter(Boolean).at(-1);
@@ -548,6 +556,154 @@ function mac({ configuration, bundleId, team, launch }) {
 }
 
 // ---------------------------------------------------------------------------
+// Launch check
+// ---------------------------------------------------------------------------
+//
+// 0.1.1 (1) was rejected for crashing on launch: it had no scene manifest, and UIKit traps for that
+// on iOS 27 (see "Scene lifecycle" in docs/safari.md). Every check the archive ran passed, because
+// they all read the bundle and none of them ever started it. The app's own simulator runs passed
+// too, because this Mac had only iOS 26 runtimes, where the same condition is a console message. So
+// this starts the app, and the two rules below are the part that matters:
+//
+//   1. The runtime has to be at least as new as the SDK. A check on an older system proves nothing
+//      about what App Review runs, so a missing runtime is a failure rather than a skip.
+//   2. Both an iPhone and an iPad, because App Review picks and the app declares both.
+//
+// It builds for the simulator: an archive is a device binary and a simulator will not run one. Same
+// sources, same Release configuration, same SDK, which is what a launch decision depends on.
+
+const LAUNCH_SETTLE_MS = 5000;
+const CRASH_REPORT_WAIT_MS = 30000;
+const crashReportDir = path.join(os.homedir(), 'Library', 'Logs', 'DiagnosticReports');
+
+const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+
+function iosSdkVersion(env) {
+  return capture('/usr/bin/xcrun', ['--sdk', 'iphonesimulator', '--show-sdk-version'], { env });
+}
+
+/** The plain iPhone and the plain iPad on the newest runtime, or a failure that says what to install. */
+function launchCheckDevices(env) {
+  const sdk = iosSdkVersion(env);
+  if (!sdk) fail('no iOS simulator SDK in this Xcode');
+  const all = availableSimulators(env);
+  const newest = all[0];
+  const major = Number(sdk.split('.')[0]);
+  if (!newest || newest.version[0] < major) {
+    fail(
+      `the newest iOS simulator runtime here is ${newest ? newest.version.join('.') : 'none'}, older than the iOS ${sdk} SDK this builds with`,
+      'A launch on an older system proves nothing about this build. Install one: xcodebuild -downloadPlatform iOS',
+    );
+  }
+  const onNewest = all.filter((d) => d.runtime === newest.runtime);
+  return [/^iPhone/, /^iPad/].map((idiom) => {
+    const plain = onNewest
+      .filter((d) => idiom.test(d.name))
+      .sort((a, b) => a.name.length - b.name.length || a.name.localeCompare(b.name))[0];
+    if (!plain) {
+      fail(
+        `no ${idiom.source.slice(1)} simulator on iOS ${newest.version.join('.')}`,
+        `Create one: xcrun simctl create 'usermods ${idiom.source.slice(1)}' <device type> ${newest.runtime}`,
+      );
+    }
+    return plain;
+  });
+}
+
+/** The crash report's exception and its top frames, which is what anyone reading the failure needs. */
+function describeCrash(file) {
+  const text = fs.readFileSync(file, 'utf8');
+  const report = JSON.parse(text.slice(text.indexOf('\n') + 1));
+  const thread = report.threads[report.faultingThread];
+  const frames = thread.frames.slice(0, 6).map((f) => {
+    const image = report.usedImages[f.imageIndex]?.name ?? '?';
+    return `${image}  ${f.symbol ?? `+${f.imageOffset}`}`;
+  });
+  return [`${report.exception?.type} ${report.exception?.signal ?? ''}`.trim(), ...frames];
+}
+
+/**
+ * Did the one screen actually draw? A scene delegate UIKit cannot find is not a crash, it is a black
+ * window, so staying alive is not enough. The heading and the step numbers are the only lime on the
+ * screen (Brand.lime in App/ViewController.swift); the channels are loose because the screenshot
+ * goes through the simulator's colour space.
+ */
+function drewTheScreen(png) {
+  const { width, height, px } = decodePNG(png);
+  let lime = 0;
+  for (let i = 0; i < width * height * 4; i += 4) {
+    if (px[i] > 140 && px[i + 1] > 220 && px[i + 2] < 110) lime++;
+  }
+  return lime >= 200;
+}
+
+/** Start it on one simulator. Returns what went wrong, or null. */
+function launchOn(device, app, id, shotDir, env) {
+  const label = `${device.name} (iOS ${device.version.join('.')})`;
+  const wasBooted = device.state === 'Booted';
+  if (!wasBooted) run('/usr/bin/xcrun', ['simctl', 'bootstatus', device.udid, '-b'], { env, stdio: 'ignore' });
+  try {
+    // A clean install, so nothing a previous version left behind can make this pass.
+    spawnSync('/usr/bin/xcrun', ['simctl', 'uninstall', device.udid, id], { env, stdio: 'ignore' });
+    run('/usr/bin/xcrun', ['simctl', 'install', device.udid, app], { env });
+
+    const started = Date.now();
+    // simctl reports success for an app that is about to die, so its exit status says little; the
+    // pid it prints is what the rest of this watches.
+    const launched = spawnSync('/usr/bin/xcrun', ['simctl', 'launch', device.udid, id], { encoding: 'utf8', env });
+    const pid = Number(/: (\d+)\s*$/.exec(launched.stdout ?? '')?.[1]);
+    sleep(LAUNCH_SETTLE_MS);
+
+    let alive = false;
+    try {
+      if (pid) alive = process.kill(pid, 0);
+    } catch {
+      alive = false;
+    }
+    if (!alive) {
+      // ReportCrash writes a moment after the process goes, so give it time before saying nothing.
+      let report;
+      for (let waited = 0; !report && waited < CRASH_REPORT_WAIT_MS; waited += 1000) {
+        report = fs
+          .readdirSync(crashReportDir)
+          .filter((f) => f.startsWith('usermods') && f.endsWith('.ips'))
+          .map((f) => path.join(crashReportDir, f))
+          .find((f) => fs.statSync(f).mtimeMs >= started - 1000);
+        if (!report) sleep(1000);
+      }
+      const detail = report ? [...describeCrash(report), report] : ['exited with no crash report'];
+      return `${label}: did not stay running\n    ${detail.join('\n    ')}`;
+    }
+
+    const shot = path.join(shotDir, `${device.name.replace(/[^\w-]+/g, '-')}.png`);
+    run('/usr/bin/xcrun', ['simctl', 'io', device.udid, 'screenshot', shot], { env, stdio: 'ignore' });
+    if (!drewTheScreen(shot)) return `${label}: running, but nothing drawn\n    see ${shot}`;
+    console.log(`launch-check  ${label}: running after ${LAUNCH_SETTLE_MS / 1000}s, screen drawn  ${path.relative(root, shot)}`);
+    return null;
+  } finally {
+    spawnSync('/usr/bin/xcrun', ['simctl', 'terminate', device.udid, id], { env, stdio: 'ignore' });
+    if (!wasBooted) spawnSync('/usr/bin/xcrun', ['simctl', 'shutdown', device.udid], { env, stdio: 'ignore' });
+  }
+}
+
+function launchCheck({ bundleId }) {
+  const env = xcodeEnv(requireXcode());
+  // Before the build, so a machine that cannot run the check finds out in a second, not a minute.
+  const devices = launchCheckDevices(env);
+  xcodebuild({ sdk: 'iphonesimulator', configuration: 'Release', bundleId });
+  const app = productPath('Release', 'iphonesimulator');
+  if (!fs.existsSync(app)) fail(`the build produced no app at ${app}`);
+
+  const shotDir = path.join(root, '.output', 'safari-launch-check');
+  fs.rmSync(shotDir, { recursive: true, force: true });
+  fs.mkdirSync(shotDir, { recursive: true });
+  const problems = devices
+    .map((device) => launchOn(device, app, bundleId ?? 'com.kballenegger.usermods', shotDir, env))
+    .filter(Boolean);
+  if (problems.length) fail(`the app does not launch\n  ${problems.join('\n  ')}`);
+}
+
+// ---------------------------------------------------------------------------
 // App Store: archive, export, upload
 // ---------------------------------------------------------------------------
 
@@ -605,6 +761,10 @@ function archive({ bundleId, team, upload, buildNumber }) {
   const xcodebuildBin = path.join(developerDir, 'usr', 'bin', 'xcodebuild');
   const env = xcodeEnv(developerDir);
   fs.mkdirSync(archiveDir, { recursive: true });
+
+  // Before anything is signed or sent. No flag skips it: this is the one check here that would have
+  // stopped 0.1.1 (1), and --upload comes through this same function.
+  launchCheck({ bundleId });
 
   const overrides = [`DEVELOPMENT_TEAM=${team}`, 'CODE_SIGN_STYLE=Automatic'];
   if (bundleId) overrides.push(`USERMODS_BUNDLE_ID=${bundleId}`);
@@ -745,10 +905,14 @@ switch (command) {
     if (!has('no-stage')) stage({ build: !has('no-build') });
     mac({ configuration, bundleId, team, launch: has('launch') });
     break;
+  case 'launch-check':
+    if (!has('no-stage')) stage({ build: !has('no-build') });
+    launchCheck({ bundleId });
+    break;
   case 'archive':
     if (!has('no-stage')) stage({ build: !has('no-build') });
     archive({ bundleId, team, upload: has('upload'), buildNumber: flag('build') });
     break;
   default:
-    fail(`unknown command "${command}"`, 'Try: doctor, stage, build, simulator, mac, archive');
+    fail(`unknown command "${command}"`, 'Try: doctor, stage, build, simulator, mac, launch-check, archive');
 }

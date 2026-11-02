@@ -1,5 +1,7 @@
 # Roadmap
 
+<p align="center"><a href="https://chromewebstore.google.com/detail/usermods/dhmdjekbeinhhnfhcgnkgdpgdafpboic"><img src="store-button.svg" alt="Add to Chrome: free on the Chrome Web Store" width="590"></a></p>
+
 What is not built yet, in no particular order. Shipped work is in
 [CHANGELOG.md](../CHANGELOG.md); what already works is the [README](../README.md).
 
