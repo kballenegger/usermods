@@ -749,6 +749,8 @@ async function shareInstallRun({ b, panel, expenseId, launch, openPanel, openSit
     check(await panel2.locator('[data-testid="skill-run-operate"]').count(), 'and asks about the site in one card');
     await panel2.locator('[data-testid="skill-run-input"][data-input="merchant"]').fill('Second Profile');
     await panel2.locator('[data-testid="skill-run-input"][data-input="amount"]').fill('3');
+    // Filled, because a step skipped by `when` is one the walk did not show, and it would not count.
+    await panel2.locator('[data-testid="skill-run-input"][data-input="note"]').fill('Walked');
     await panel2.locator('[data-testid="skill-run"]').click();
     const q = (kind) => panel2.locator(`[data-testid="question"][data-question="${kind}"]`);
     // Every step is shown before it happens.
@@ -756,12 +758,12 @@ async function shareInstallRun({ b, panel, expenseId, launch, openPanel, openSit
     check(/Step 1 of 6/.test(await q('walk').textContent()), 'the walk starts at step 1', await q('walk').textContent());
     check(!(await panel2.locator('[data-testid="question-standing"]').count()), 'nothing asks about the site again');
     await panel2.locator('[data-action="question-next"]').click();
-    for (const headline of ['textbox "Merchant"', 'textbox "Amount"']) {
+    for (const headline of ['textbox "Merchant"', 'textbox "Amount"', 'textbox "Note"']) {
       await q('walk').filter({ hasText: headline }).waitFor({ timeout: 30_000 });
       if (headline.includes('Merchant')) check((await site.inputValue('#merchant')) === '', 'nothing is typed before NEXT');
       await panel2.locator('[data-action="question-next"]').click();
     }
-    // Note is empty: skipped. The wait, then Your turn.
+    // The wait, then Your turn.
     await q('walk').filter({ hasText: 'wait' }).waitFor({ timeout: 30_000 });
     await panel2.locator('[data-action="question-rest"]').click();
     await q('handoff').waitFor({ timeout: 30_000 });
