@@ -28,6 +28,8 @@
 // Each is checked before the next is tried. If none took, the fallback is honest: the script goes
 // on the clipboard and the hint says to paste it and what to name the file.
 
+import { ACT_OFF } from './buildflags.ts';
+
 export interface FillRequest {
   target: 'gist' | 'greasyfork';
   mode: 'new' | 'update';
@@ -38,6 +40,8 @@ export interface FillRequest {
   previousVersion: string;
   /** Skip the editor (Chrome sets it from the page world first). */
   fieldsOnly?: boolean;
+  /** The text is a skill file, whose version is a front matter line. Only ever set with the flag on. */
+  skill?: boolean;
 }
 
 export type FillResult =
@@ -112,7 +116,8 @@ export function looksNotFound(doc: Document): boolean {
  * tracks the value (React, GitHub's own behaviours) sees a change rather than a stale value.
  */
 export function setFieldValue(el: HTMLInputElement | HTMLTextAreaElement, value: string): void {
-  const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+  // By tag rather than instanceof: an element in a same-origin frame is another realm's instance.
+  const proto = el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
   const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
   if (setter) setter.call(el, value);
   else el.value = value;
@@ -157,12 +162,13 @@ const norm = (s: string) => s.replace(/ /g, ' ').replace(/[ \t]+/g, ' ');
  * that was there before? Checks the first header lines, the new @version, and (on an update) that
  * the previous @version line is gone.
  */
-export function looksFilled(text: string, req: Pick<FillRequest, 'source' | 'version' | 'previousVersion'>): boolean {
+export function looksFilled(text: string, req: Pick<FillRequest, 'source' | 'version' | 'previousVersion' | 'skill'>): boolean {
   const t = norm(text);
   const firstLines = req.source.split('\n').map((l) => l.trim()).filter(Boolean).slice(0, 2);
   if (!firstLines.every((l) => t.includes(norm(l)))) return false;
-  if (req.version && !new RegExp(`@version\\s+${escapeRe(req.version)}(?![\\w.-])`).test(t)) return false;
-  if (req.previousVersion && req.previousVersion !== req.version && new RegExp(`@version\\s+${escapeRe(req.previousVersion)}(?![\\w.-])`).test(t)) return false;
+  const line = !ACT_OFF && req.skill ? String.raw`\bversion:\s+["']?` : String.raw`@version\s+`;
+  if (req.version && !new RegExp(`${line}${escapeRe(req.version)}(?![\\w.-])`).test(t)) return false;
+  if (req.previousVersion && req.previousVersion !== req.version && new RegExp(`${line}${escapeRe(req.previousVersion)}(?![\\w.-])`).test(t)) return false;
   return true;
 }
 
@@ -172,7 +178,7 @@ function escapeRe(s: string): string {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function settle(check: () => boolean, ms = 900): Promise<boolean> {
+export async function settle(check: () => boolean, ms = 900): Promise<boolean> {
   const end = Date.now() + ms;
   while (Date.now() < end) {
     if (check()) return true;
@@ -182,17 +188,17 @@ async function settle(check: () => boolean, ms = 900): Promise<boolean> {
 }
 
 /** Select everything in a code editor the way its user would: its own Select All binding. */
-function selectAll(input: HTMLElement): void {
+export function selectAll(input: HTMLElement): void {
   input.focus();
   const mac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
   const init: KeyboardEventInit & { keyCode?: number; which?: number } = { key: 'a', code: 'KeyA', keyCode: 65, which: 65, bubbles: true, cancelable: true, metaKey: mac, ctrlKey: !mac };
   input.dispatchEvent(new KeyboardEvent('keydown', init));
   input.dispatchEvent(new KeyboardEvent('keyup', init));
   // A plain textarea (or a contenteditable the editor maps a DOM selection from) also takes this.
-  if (input instanceof HTMLTextAreaElement) input.select();
+  if (input.tagName === 'TEXTAREA') (input as HTMLTextAreaElement).select();
 }
 
-function paste(input: HTMLElement, text: string): boolean {
+export function paste(input: HTMLElement, text: string): boolean {
   try {
     const dt = new DataTransfer();
     dt.setData('text/plain', text);

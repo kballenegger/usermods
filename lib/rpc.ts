@@ -6,7 +6,9 @@ import type { ThinkingLevel } from './thinking';
 import type { ResumableRun } from './runstate';
 import type { StartShare } from './sharecontroller';
 import type { AvailableUpdate, UpdateReview } from './updates';
-import type { AgentEvent, ChatItem, Mod, ScriptPreview, UserTurn } from './types';
+import type { InstallPreview } from './install';
+import type { SkillsRpc, SkillsRpcResults } from './skillrpc';
+import type { AgentEvent, ChatItem, Mod, UserTurn } from './types';
 
 export type OAuthKind = 'chatgpt' | 'xai';
 export type OAuthLoginState =
@@ -130,22 +132,28 @@ export type RpcRequest =
    * after the background has written out any transcript it was keeping while no panel was open, so
    * the panel can read storage afterwards and trust it.
    */
-  | { type: 'agent.attach' };
+  | { type: 'agent.attach' }
+  /** Operating a page (lib/drive.ts): answering a question, and Settings' list. Only ever from an extension page. */
+  | import('./drive').DriveRpc
+  /** Skills (lib/skillrpc.ts). Absent from a build with ACT_OFF. */
+  | SkillsRpc;
 
 /** Response shape per request type. Anything not listed here answers { ok: true }. */
-interface RpcResults {
+interface RpcResults extends SkillsRpcResults {
   'mods.list': Mod[];
   'mods.save': Mod[];
   'mods.delete': Mod[];
   'mods.toggle': Mod[];
   'mods.install': Mod[];
   'mods.saveSource': Mod[];
-  'mods.preview': ScriptPreview;
+  'mods.preview': InstallPreview;
   'mods.update': { updated: boolean; version: string; available?: string };
   'updates.check': { checked: number; offered: number };
   'updates.summary': Record<string, { available?: string; error?: string; lastChecked?: number }>;
   'updates.get': {
-    mod: Mod;
+    mod: Pick<Mod, 'id' | 'name' | 'version' | 'source'>;
+    /** `mod` is a skill's record: the screen reads its powers from the two step lists. */
+    skill?: true;
     update: AvailableUpdate | null;
     review: UpdateReview | null;
     reviewer: { ok: true; model: string } | { ok: false; reason: string };
@@ -192,12 +200,17 @@ interface RpcResults {
     likelyUrl: string;
   };
   'agent.attach': AgentAttachState;
+  'act.answer': { ok: boolean };
+  'act.allowances': { sites: string[] };
+  'act.allowance-remove': { sites: string[] };
 }
 
 /** See 'agent.attach'. `status` is the last status event the run posted, if it has posted one. */
 export interface AgentAttachState {
   running: Record<string, { startedAt: number; status?: Extract<AgentEvent, { type: 'status' }> }>;
   resumable: Record<string, ResumableRun>;
+  /** The question each chat's run is waiting on. Absent in a build with ACT_OFF. */
+  questions?: Record<string, import('./agent/questions').Question>;
 }
 
 export type RpcResponse<T extends RpcRequest['type']> = T extends keyof RpcResults ? RpcResults[T] : { ok: true };

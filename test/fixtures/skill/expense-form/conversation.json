@@ -1,0 +1,13 @@
+{
+  "prompt": "SKILLFLOW-EXPENSE fill this in for lunch at Blue Bottle, 42 dollars, and let me press submit",
+  "done": "SKILLFLOW-EXPENSE-DONE",
+  "steps": [
+    { "calls": [{ "name": "find_elements", "args": { "selector": "form", "limit": 1 } }] },
+    { "text": "Filling it in.", "calls": [{ "name": "act", "args": { "description": "enter the merchant name", "steps": [{ "do": "fill", "target": "#merchant", "text": "Blue Bottle" }] } }] },
+    { "calls": [{ "name": "act", "args": { "description": "enter the amount", "steps": [{ "do": "fill", "target": "#amount", "text": "42.00" }] } }] },
+    { "calls": [{ "name": "act", "args": { "description": "enter the note, if any", "steps": [{ "do": "fill", "target": "#note", "text": "team lunch" }] } }] },
+    { "calls": [{ "name": "wait_for", "args": { "selector": "button[type=submit]", "state": "visible" } }] },
+    { "calls": [{ "name": "wait_for", "args": { "ask_user": "Check the form and press Submit.", "text": "Expense filed" } }] },
+    { "text": "SKILLFLOW-EXPENSE-DONE It is filed." }
+  ]
+}

@@ -4,7 +4,7 @@
 //   npm test
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { SAFARI_BUILD, STORE_BUILD, SUBSCRIPTIONS_OFF, isSubscriptionProvider, providerAvailable, unavailableProviderMessage } from '../lib/buildflags.ts';
+import { ACT_OFF, SAFARI_BUILD, STORE_BUILD, SUBSCRIPTIONS_OFF, actEnabled, isSubscriptionProvider, providerAvailable, unavailableProviderMessage } from '../lib/buildflags.ts';
 
 // What a store build does with a subscription connection saved by the GitHub build — keeps it,
 // marks it unavailable, leaves it out of the picker — is tested with the rest of the connection
@@ -122,4 +122,20 @@ test('no message tells the user the Safari build simply lacks the feature', () =
       assert.doesNotMatch(unavailableProviderMessage(kind, safari), /\byet\b/);
     }
   }
+});
+
+// ---------------------------------------------------------------------------
+// Operating pages: on only where neither axis says otherwise
+// ---------------------------------------------------------------------------
+
+test('ACT_OFF reads as a normal build where __ACT__ was never defined', () => {
+  assert.equal(ACT_OFF, false);
+});
+
+test('the build matrix: acting is on only in a build that is neither store nor Safari', () => {
+  // wxt.config.ts sets the define from this same function, so the matrix below is the rule itself.
+  assert.equal(actEnabled(false, false), true, 'npm run build (chrome)');
+  assert.equal(actEnabled(true, false), false, 'npm run build:store (chrome + store)');
+  assert.equal(actEnabled(false, true), false, 'npm run build:safari (safari)');
+  assert.equal(actEnabled(true, true), false, 'npm run build:safari:store (safari + store)');
 });

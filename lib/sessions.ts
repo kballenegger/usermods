@@ -41,6 +41,34 @@ export class SessionMap {
   }
 
   /**
+   * Take this chat for a run, before anything is awaited. A run that has to read storage first would
+   * otherwise leave a window in which a second press finds it not running, and two runs would do the same
+   * step on one tab. Null when it is taken already. unclaim lets go if it never starts.
+   */
+  claim(chatId: string, tabId: number): Session | null {
+    if (this.isRunning(chatId)) return null;
+    const session = this.ensure(chatId, tabId);
+    session.running = true;
+    return session;
+  }
+
+  /** The run that claimed this will not happen. Hands back a message that queued behind it, if one did. */
+  unclaim(chatId: string): UserTurn | undefined {
+    const session = this.sessions.get(chatId);
+    if (!session) return undefined;
+    session.running = false;
+    const next = session.queue.shift();
+    if (!next) this.release(chatId);
+    return next;
+  }
+
+  /** Is another chat's run holding this tab? A skill's run takes the page, so it does not share one. */
+  runningOnTab(tabId: number, otherThan: string): boolean {
+    for (const [id, s] of this.sessions) if (id !== otherThan && s.running && s.tabId === tabId) return true;
+    return false;
+  }
+
+  /**
    * Decide what a 'send' does for this chat: start a run now, or queue behind the one in flight.
    * Returns the session either way so the caller can start the run it was told to start.
    */

@@ -1,14 +1,17 @@
 // Every value import below carries its .ts extension, as lib/transcript.ts explains: `npm test`
 // runs this file through node --experimental-strip-types (test/loop.test.ts drives the whole loop
 // against a fake provider), and node's ESM resolver does not guess extensions or directory indexes.
+import { ACT_OFF } from '../buildflags.ts';
 import { imageNote } from '../images.ts';
 import { createProvider } from '../providers/index.ts';
 import { ATTACHMENT_DROPPED_PANEL_NOTE } from '../providers/vision.ts';
 import type { Provider } from '../providers/types';
 import { renderRunResult, type RunResult } from '../runscript.ts';
-import { DEFAULT_CONTEXT_BUDGET, type AgentEventBody, type ModProposal, type Msg, type Part, type Settings, type UserTurn } from '../types.ts';
+import { DEFAULT_CONTEXT_BUDGET, type AgentEventBody, type ModProposal, type Msg, type Part, type Settings, type ToolDef, type UserTurn } from '../types.ts';
 import { MAX_ITERATIONS, NO_READS, countReads, readBudgetNudge, wrapUpNudge, type ReadCall } from './budget.ts';
 import { compact, estimateTokens, needsCompaction } from './compact.ts';
+import { parseActInput, type ActCall, type ActContext } from './driver.ts';
+import { scriptEffect, type SkillProposalCard, type ToolEffect } from './questions.ts';
 import { SYSTEM_PROMPT } from './prompt.ts';
 import { checkProposal, testedAs, testedNote, type ProposalContext } from './propose.ts';
 import { isContextLengthError, withRetry, type RetryDeps, type RetryPolicy } from './retry.ts';
@@ -76,6 +79,48 @@ export interface AgentEnv {
    * reports the tool unavailable.
    */
   testMod?(code: string, reload: boolean, signal: AbortSignal): Promise<TestModResult>;
+  /**
+   * Operating the page: the background's Driver (lib/agent/driver.ts) and the chat's note. Absent in
+   * a build with ACT_OFF, where the tools that need it do not exist either.
+   */
+  operate?: OperateEnv;
+  /** A chat's skills: the three tools. The background owns the journal, the draft and the run card. */
+  skills?: SkillsEnv;
+}
+
+/** See AgentEnv.skills. */
+export interface SkillsEnv {
+  /** Why propose_mod may not take the place of the chat's draft yet, or null. */
+  beforeMod(replace: boolean): string | null;
+  propose(input: Record<string, unknown>, history: readonly Msg[]): Promise<{ ok: true; text: string; card: SkillProposalCard } | { ok: false; reason: string }>;
+  open(skillId: string, replace: boolean): Promise<{ ok: true; text: string; version: number | null } | { ok: false; reason: string }>;
+  /** Shows the run card and waits. There is no parameter that starts a run without it. */
+  run(skillId: string, inputs: Record<string, string>, toolId: string, signal: AbortSignal): Promise<{ text: string; isError: boolean }>;
+}
+
+/** A loop that can do only this: a repair's. Anything else it calls is refused without running. */
+export interface AgentBounds {
+  system: string;
+  tools: ToolDef[];
+  maxCalls: number;
+}
+
+/** See AgentEnv.operate. */
+export interface OperateEnv {
+  /** The pauses of a driving run: the tab left, the site left. Called before each tool call. */
+  guard(signal: AbortSignal, iteration?: number): Promise<void>;
+  act(call: ActCall, ctx: ActContext, signal: AbortSignal): Promise<{ text: string; isError: boolean; waitedMs?: number }>;
+  /** wait_for with ask_user. */
+  handoff(text: string, spec: WaitSpec | null, signal: AbortSignal, iteration?: number): Promise<{ by: 'user' | 'page' | 'stopped' | 'gone'; detail?: string }>;
+  /** False when the user declined it. Writes the journal entry the result clears. */
+  beforeScript(description: string, code: string, signal: AbortSignal, iteration?: number): Promise<boolean>;
+  afterScript(): Promise<void>;
+  /** What a run did besides its steps, for SAVE AS SKILL. */
+  recordWait(spec: WaitSpec): Promise<void>;
+  recordAsk(text: string, spec: WaitSpec | null): Promise<void>;
+  /** Answers with the journal's number for it, which the model is told. */
+  recordLook(selector: string, matched: number, links: boolean): Promise<number | undefined | void>;
+  changeNote(input: Record<string, unknown>): Promise<{ ok: true; text: string } | { ok: false; error: string }>;
 }
 
 export interface AgentInput {
@@ -125,6 +170,17 @@ export interface AgentInput {
    * against the v1 the turn started on.
    */
   draft?: () => string;
+  /**
+   * The chat's note, rendered as the block that rides on each user turn beside the draft
+   * (lib/agent/note.ts noteBlock). A function because the note tool changes it mid-turn.
+   */
+  note?: () => string;
+  /**
+   * What a resumed run has to be told first: a step was cut off and may have happened
+   * (lib/agent/driver.ts pendingResumeNote). It goes on the end of the conversation, so the model
+   * reads it before it decides anything, and nothing runs the step again on its behalf.
+   */
+  resumeNote?: string;
   /**
    * The mods already installed on the page this turn is being sent from, rendered as the block the
    * model reads to decide whether a request belongs with one of them (lib/modmatch.ts modsBlock).
@@ -178,6 +234,8 @@ export interface AgentInput {
   canSeeImages?: () => boolean;
   /** The retry policy and its clock, for the model request (lib/agent/retry.ts). */
   retry?: { policy?: RetryPolicy; deps?: Partial<RetryDeps> };
+  /** See AgentBounds. */
+  bounds?: AgentBounds;
 }
 
 /**
@@ -193,6 +251,8 @@ export interface AgentInput {
 export interface RunOutcome {
   messages: Msg[];
   failure?: { message: string };
+  /** A bounded run used every tool call it had, and asked for more. */
+  spent?: boolean;
 }
 
 /**
@@ -326,9 +386,12 @@ export async function runAgent(input: AgentInput): Promise<RunOutcome> {
   const { settings, env, emit, signal } = input;
   const provider = input.provider ?? createProvider(settings);
   const messages: Msg[] = [...input.history];
-  const draft = () => input.draft?.() ?? '';
+  // The note travels where the draft does, on the turn and re-sent on every one.
+  const draft = () => [input.draft?.() ?? '', ACT_OFF ? '' : (input.note?.() ?? '')].filter(Boolean).join('\n');
   const installed = () => input.installed?.() ?? '';
   const checkpoint = () => Promise.resolve(input.onCheckpoint?.(trimUnanswered(messages))).catch(() => {});
+  const bounds = ACT_OFF ? undefined : input.bounds;
+  let spent = false;
 
   /**
    * Say so, in the transcript, when a picture the user attached will not reach the model.
@@ -359,6 +422,11 @@ export async function runAgent(input: AgentInput): Promise<RunOutcome> {
     if (kept !== messages) messages.splice(0, messages.length, ...kept);
     if (messages[messages.length - 1]?.role === 'assistant') messages.push({ role: 'user', content: [{ type: 'text', text: RESUME_NUDGE }] });
   }
+  if (!ACT_OFF && input.resumeNote) {
+    const last = messages[messages.length - 1];
+    if (last?.role === 'user') last.content = [...last.content, { type: 'text', text: input.resumeNote }];
+    else messages.push({ role: 'user', content: [{ type: 'text', text: input.resumeNote }] });
+  }
   // The turn is safe before the first request is made: a run that dies waiting for its first byte
   // still has the user's message in the saved conversation, so Resume needs nothing resent.
   await checkpoint();
@@ -370,6 +438,7 @@ export async function runAgent(input: AgentInput): Promise<RunOutcome> {
     // completed so far go back to the caller either way, which is the whole point.
     if (!signal.aborted) return { messages: trimUnanswered(messages), failure: { message: e instanceof Error ? e.message : String(e) } };
   }
+  if (!ACT_OFF && spent) return { messages: trimUnanswered(messages), spent };
   return { messages: signal.aborted ? trimUnanswered(messages) : messages };
 
   /**
@@ -392,7 +461,19 @@ export async function runAgent(input: AgentInput): Promise<RunOutcome> {
     messages.splice(0, messages.length, ...res.messages);
     // One event per tier, each reporting the sizes that tier actually saw.
     for (const step of res.steps) emit({ type: 'compacted', tier: step.tier, before: step.before, after: step.after });
+    reattachNote();
     await Promise.resolve(input.onCompacted?.(messages)).catch(() => {});
+  }
+
+  /**
+   * A long run has one user turn, and a summary can swallow it and the note on it. So the note comes
+   * back on the message that ends the history, where a summary has not reached.
+   */
+  function reattachNote() {
+    if (ACT_OFF) return;
+    const note = input.note?.() ?? '';
+    const last = messages[messages.length - 1];
+    if (note && last?.role === 'user') messages[messages.length - 1] = { ...last, content: [...last.content, { type: 'text', text: note }] };
   }
 
   async function loop() {
@@ -415,6 +496,8 @@ export async function runAgent(input: AgentInput): Promise<RunOutcome> {
     // Every other exit from the for loop is deliberate and says something; falling off the end is
     // the one that used to say nothing at all.
     let ranOut = true;
+    // How many tool calls a bounded run has made. A call refused for its name still counts.
+    let called = 0;
 
     for (let i = 0; i < MAX_ITERATIONS; i++) {
       if (signal.aborted) {
@@ -445,12 +528,12 @@ export async function runAgent(input: AgentInput): Promise<RunOutcome> {
         () => {
           streamed = 0;
           return provider.chat({
-            system: SYSTEM_PROMPT,
+            system: bounds ? bounds.system : SYSTEM_PROMPT,
             messages,
             // Re-read per attempt, not captured once: the request that discovers a blind endpoint
             // is often the one making this very call, and the next step's tool list should already
             // say so.
-            tools: toolsFor(input.canSeeImages?.() ?? true),
+            tools: bounds ? bounds.tools : toolsFor(input.canSeeImages?.() ?? true),
             signal,
             callbacks: {
               onText: (delta) => {
@@ -520,6 +603,7 @@ export async function runAgent(input: AgentInput): Promise<RunOutcome> {
         if (!shrunk.steps.length) throw e; // nothing left to cut: the same request would go again
         messages.splice(0, messages.length, ...shrunk.messages);
         for (const step of shrunk.steps) emit({ type: 'compacted', tier: step.tier, before: step.before, after: step.after });
+        reattachNote();
         await Promise.resolve(input.onCompacted?.(messages)).catch(() => {});
         modelStatus();
         res = await sendOnce();
@@ -550,10 +634,19 @@ export async function runAgent(input: AgentInput): Promise<RunOutcome> {
       let waitedMs = 0;
       const charged: ReadCall[] = [];
       for (const call of calls) {
+        // Before the row and the status line, which would say the tool is running while the run
+        // waits for the user to come back to the tab or say where the page should be.
+        if (!ACT_OFF) await env.operate?.guard(signal, i + 1).catch(() => {});
         emit({ type: 'tool_call', id: call.id, name: call.name, input: call.input });
         emit({ type: 'status', phase: 'tool', tool: call.name, detail: describeCall(call.name, call.input), iteration: i + 1 });
-        const r = await executeTool(call.name, call.input, env, emit, ctx, signal, input.onProposal, input.onOpenMod);
-        emit({ type: 'tool_result', id: call.id, summary: summarize(r.content), isError: !!r.isError });
+        const outOfBounds = bounds ? boundsRefusal(bounds, call.name, called++) : null;
+        if (bounds && called > bounds.maxCalls) spent = true;
+        const r = outOfBounds
+          ? err(outOfBounds)
+          : !ACT_OFF && signal.aborted && env.operate
+          ? err('Stopped before this ran.')
+          : await executeTool(call.name, call.input, env, emit, ctx, signal, input.onProposal, input.onOpenMod, { toolId: call.id, history: messages, iteration: i + 1 });
+        emit({ type: 'tool_result', id: call.id, summary: summarize(r.content), isError: !!r.isError, ...(r.effect ? { effect: r.effect } : {}) });
         // Late errors ride on whichever tool result comes next, taken after the tool ran so an
         // error its wait or its own run provoked is not held back a whole step. The panel's summary
         // above is of the tool's own result.
@@ -561,6 +654,7 @@ export async function runAgent(input: AgentInput): Promise<RunOutcome> {
         const content = late ? withLeadingLine(late, r.content) : r.content;
         results.push({ type: 'tool_result', toolCallId: call.id, content, isError: r.isError });
         if (call.name === 'propose_mod' && !r.isError) proposed = true;
+        if (!ACT_OFF && call.name === 'propose_skill' && !r.isError) proposed = true;
         waitedMs += r.waitedMs ?? 0;
         charged.push({
           name: call.name,
@@ -607,6 +701,10 @@ export async function runAgent(input: AgentInput): Promise<RunOutcome> {
         ranOut = false;
         break;
       }
+      if (spent) {
+        ranOut = false;
+        break;
+      }
       // A proposal ends the turn: the user decides what happens next.
       if (proposed && !queued.length) {
         ranOut = false;
@@ -637,6 +735,11 @@ function describeCall(name: string, input: Record<string, unknown>): string | un
   // doing, and a uuid tells them nothing they can act on.
   if (name === 'open_mod') return 'opening an installed mod';
   if (name === 'test_mod') return describeTest(input);
+  if (!ACT_OFF && name === 'act' && typeof input.description === 'string') return input.description.trim() || undefined;
+  if (!ACT_OFF && name === 'note') return 'keeping a note';
+  if (!ACT_OFF && name === 'propose_skill') return 'proposing a skill';
+  if (!ACT_OFF && name === 'open_skill') return 'opening a skill';
+  if (!ACT_OFF && name === 'run_skill') return 'asking you to run a skill';
   if (name === 'run_script' && typeof input.description === 'string' && input.description.trim()) return input.description.trim();
   if ((name === 'find_elements' || name === 'get_styles' || name === 'get_page') && typeof input.selector === 'string' && input.selector.trim()) {
     return input.selector.trim();
@@ -667,7 +770,19 @@ interface ToolOutcome {
   content: Part[];
   isError?: boolean;
   waitedMs?: number;
+  /** What the extension observed this call do to the page. */
+  effect?: ToolEffect;
 }
+
+/** Why a bounded run may not make this call. `made` is how many it had made before it. */
+function boundsRefusal(bounds: AgentBounds, name: string, made: number): string | null {
+  if (made >= bounds.maxCalls) return `You have used your ${bounds.maxCalls} tool calls. Reply with your one word now.`;
+  if (!bounds.tools.some((t) => t.name === name)) return `${name} is not available here. You have only ${bounds.tools.map((t) => t.name).join(', ')}.`;
+  return null;
+}
+
+/** A script that was refused by the user, as the model reads it. */
+const SCRIPT_DECLINED = 'The user declined this script. It did not run. Do not do the same thing another way unless they ask.';
 
 function text(s: string): ToolOutcome {
   return { content: [{ type: 'text', text: s }] };
@@ -685,6 +800,7 @@ async function executeTool(
   signal: AbortSignal,
   onProposal?: (p: ModProposal) => Promise<number | null>,
   onOpenMod?: (modId: string, replace: boolean) => Promise<{ ok: true; text: string; version: number | null } | { ok: false; reason: string }>,
+  call?: ActContext,
 ): Promise<ToolOutcome> {
   try {
     switch (name) {
@@ -705,9 +821,19 @@ async function executeTool(
         const selector = typeof input.selector === 'string' ? input.selector : undefined;
         const needle = typeof input.text === 'string' ? input.text : undefined;
         const overlays = input.overlays === true;
-        if (!selector?.trim() && !needle?.trim() && !overlays) return err('selector, text or overlays is required');
+        if (!selector?.trim() && !needle?.trim() && !overlays && (ACT_OFF || input.operable !== true)) return err('selector, text or overlays is required');
         const styles = Array.isArray(input.styles) ? input.styles.filter((p): p is string => typeof p === 'string' && !!p.trim() && p.length <= 60).slice(0, 12) : undefined;
+        const operable = !ACT_OFF && input.operable === true;
+        if (operable) {
+          const r = await env.sendToContent<{ text: string }>({ type: 'query', selector, overlays, operable, limit: Number(input.limit) || 20 });
+          return text(r.text);
+        }
         const r = await env.sendToContent<{ text: string }>({ type: 'query', selector, text: needle, limit: Number(input.limit) || 20, styles, overlays });
+        if (!ACT_OFF && env.operate && selector?.trim() && !needle?.trim() && !/^No elements match/.test(r.text)) {
+          const said = /^(\d+) elements?/m.exec(r.text);
+          const n = await env.operate.recordLook(selector.trim(), said ? Number(said[1]) : 1, /(^|[\s>+~])a([.#[:]|$)/.test(selector.trim().split(/\s+/).at(-1)!)).catch(() => undefined);
+          if (n) return text(`${r.text}\n[journal ${n}]`);
+        }
         return text(r.text);
       }
       case 'get_styles': {
@@ -729,12 +855,15 @@ async function executeTool(
           if (!parsed.ok) return err(`then_wait: ${parsed.error}`);
           thenWait = parsed.spec;
         }
-        const r = await env.runScript(input.code);
+        const description = typeof input.description === 'string' ? input.description.trim() : '';
+        if (!ACT_OFF && env.operate && !(await env.operate.beforeScript(description, input.code, signal, call?.iteration))) return err(SCRIPT_DECLINED);
+        const r = await (ACT_OFF ? env.runScript(input.code) : journalled(env, () => env.runScript(input.code as string)));
+        const effect = !ACT_OFF && env.operate ? runEffect(`ran a script: ${description || 'no description'}`, r) : undefined;
         const rendered = renderRunResult(r);
         // Only a run that actually completed counts as having tested the script. A navigation, a
         // timeout or a throw proves nothing, so propose_mod will still ask for a real test.
         if (r.outcome.kind === 'ok') ctx.testedSinceProposal = true;
-        if (!thenWait) return rendered.isError ? err(rendered.text) : text(rendered.text);
+        if (!thenWait) return { ...(rendered.isError ? err(rendered.text) : text(rendered.text)), ...(effect ? { effect } : {}) };
 
         // The composition case. A script that navigates loses its result (renderRunResult says so,
         // and rightly — normally that IS a lost result). But when the model said it was waiting for
@@ -754,22 +883,25 @@ async function executeTool(
         // A failed wait (a closed tab, a torn-down page) is an error; a timeout is not, and neither
         // is a navigation the model asked for.
         const isError = outcome.failure ? true : navigatedAsExpected ? false : rendered.isError;
-        return { content: [{ type: 'text', text: combined }], isError: isError || undefined, waitedMs };
+        return { content: [{ type: 'text', text: combined }], isError: isError || undefined, waitedMs, ...(effect ? { effect } : {}) };
       }
       case 'test_mod': {
         if (typeof input.code !== 'string' || !input.code.trim()) return err('code is required: the script body, as you will pass it to propose_mod.');
         if (!env.testMod) return err('test_mod is not available in this session; test with run_script.');
         const reload = input.reload === true;
-        const r = await env.testMod(input.code, reload, signal);
+        if (!ACT_OFF && env.operate && !(await env.operate.beforeScript(reload ? 'test the mod on a fresh load' : 'test the mod on this page', input.code, signal, call?.iteration))) return err(SCRIPT_DECLINED);
+        const r = await (ACT_OFF ? env.testMod(input.code, reload, signal) : journalled(env, () => env.testMod!(input.code as string, reload, signal)));
+        const effect = !ACT_OFF && env.operate ? runEffect(reload ? 'tested the mod on a fresh load' : 'tested the mod on this page', r.run) : undefined;
         const rendered = renderTestResult(r);
         const ok = r.run.outcome.kind === 'ok';
         // A successful test_mod is a successful run for the old check too, so nothing that used to
         // pass the gate stops passing it. What it adds is WHICH code ran and how, for the card.
         if (ok) ctx.testedSinceProposal = true;
         ctx.lastTest = { key: sourceKey(input.code), fresh: r.fresh, ok };
-        return rendered.isError ? err(rendered.text) : text(rendered.text);
+        return { ...(rendered.isError ? err(rendered.text) : text(rendered.text)), ...(effect ? { effect } : {}) };
       }
       case 'wait_for': {
+        if (!ACT_OFF && typeof input.ask_user === 'string' && env.operate) return await handOff(input, input.ask_user, env.operate, signal, call?.iteration);
         const parsed = parseWaitInput(input);
         // Invalid input is the one thing here that IS an error: the model wrote a condition that
         // cannot be answered, and telling it so is more useful than waiting 5s to say nothing.
@@ -778,6 +910,7 @@ async function executeTool(
         const outcome = await env.wait(parsed.spec, signal);
         const waitedMs = Date.now() - startedAt;
         const rendered = renderWaitResult(parsed.spec, outcome);
+        if (!ACT_OFF && env.operate && outcome.matched) await env.operate.recordWait(parsed.spec).catch(() => {});
         return { content: [{ type: 'text', text: rendered.text }], isError: rendered.isError || undefined, waitedMs };
       }
       case 'screenshot': {
@@ -799,6 +932,10 @@ async function executeTool(
       }
       case 'propose_mod': {
         const p = input as Partial<ModProposal> & { untested_reason?: unknown };
+        if (!ACT_OFF && env.skills) {
+          const refusal = env.skills.beforeMod(input.replace === true);
+          if (refusal) return err(refusal);
+        }
         if (!p.name || !p.code || !Array.isArray(p.matches) || !p.matches.length) return err('name, code and at least one match pattern are required');
         const untestedReason = typeof p.untested_reason === 'string' && p.untested_reason.trim() ? p.untested_reason.trim() : undefined;
         const problem = checkProposal({ code: p.code, matches: p.matches, untestedReason }, ctx);
@@ -831,9 +968,78 @@ async function executeTool(
         return text(`${shown}${note ? ` ${note}` : ''} Wait for their feedback.`);
       }
       default:
+        if (!ACT_OFF && env.skills && call) {
+          if (name === 'propose_skill') {
+            const r = await env.skills.propose(input, call.history);
+            if (!r.ok) return err(r.reason);
+            emit({ type: 'skill_proposal', card: r.card });
+            emit({ type: 'artifact', version: r.card.version });
+            return text(r.text);
+          }
+          if (name === 'open_skill') {
+            if (typeof input.skill_id !== 'string' || !input.skill_id.trim()) return err('skill_id is required: take it from the "[Skills on this page]" list.');
+            const r = await env.skills.open(input.skill_id.trim(), input.replace === true);
+            if (!r.ok) return err(r.reason);
+            if (r.version != null) emit({ type: 'artifact', version: r.version });
+            return text(r.text);
+          }
+          if (name === 'run_skill') {
+            if (typeof input.skill_id !== 'string' || !input.skill_id.trim()) return err('skill_id is required: take it from the "[Skills on this page]" list.');
+            const given = input.inputs && typeof input.inputs === 'object' ? (input.inputs as Record<string, unknown>) : {};
+            const values = Object.fromEntries(Object.entries(given).filter((e): e is [string, string] => typeof e[1] === 'string'));
+            const r = await env.skills.run(input.skill_id.trim(), values, call.toolId, signal);
+            return r.isError ? err(r.text) : text(r.text);
+          }
+        }
+        if (!ACT_OFF && env.operate && call) {
+          if (name === 'act') {
+            const parsed = parseActInput(input);
+            if (!parsed.ok) return err(parsed.error);
+            const r = await env.operate.act(parsed.call, call, signal);
+            return { content: [{ type: 'text', text: r.text }], ...(r.isError ? { isError: true } : {}), ...(r.waitedMs ? { waitedMs: r.waitedMs } : {}) };
+          }
+          if (name === 'note') {
+            const r = await env.operate.changeNote(input);
+            return r.ok ? text(r.text) : err(r.error);
+          }
+        }
         return err(`Unknown tool: ${name}`);
     }
   } catch (e) {
     return err(e instanceof Error ? e.message : String(e));
   }
+}
+
+/** A script's run, with the journal entry beforeScript wrote cleared whichever way it ends. */
+async function journalled<T>(env: AgentEnv, run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } finally {
+    await env.operate?.afterScript();
+  }
+}
+
+/** What a finished script was observed to do to the page, as a row, or nothing if it only looked. */
+function runEffect(lead: string, r: RunResult): ToolEffect | undefined {
+  const o = r.outcome;
+  return scriptEffect(lead, 'dom' in o ? o.dom : undefined, o.kind === 'navigated' ? o.url : undefined) ?? undefined;
+}
+
+/**
+ * wait_for with ask_user. Any condition is optional and not bound by a wait's clock, and the time
+ * the user takes is not charged to the waiting guard: `waitedMs` stays out of the result, so a long
+ * sign-in does not read as a model waiting about.
+ */
+async function handOff(input: Record<string, unknown>, words: string, operate: OperateEnv, signal: AbortSignal, iteration?: number): Promise<ToolOutcome> {
+  if (!words.trim()) return err('ask_user needs the words to show the user.');
+  const { ask_user: _ask, ...rest } = input;
+  const hasCondition = (['selector', 'text', 'url', 'load', 'idle', 'ms'] as const).some((k) => rest[k] !== undefined && rest[k] !== null);
+  const parsed = hasCondition ? parseWaitInput(rest) : null;
+  if (parsed && !parsed.ok) return err(parsed.error);
+  const r = await operate.handoff(words, parsed?.ok ? parsed.spec : null, signal, iteration);
+  if (r.by === 'user' || r.by === 'page') await operate.recordAsk(words, parsed?.ok ? parsed.spec : null).catch(() => {});
+  if (r.by === 'user') return text('The user says they have done it. Look at the page before you carry on.');
+  if (r.by === 'page') return text(`The page shows what you were waiting for${r.detail ? `: ${r.detail}` : ''}. The user has not said anything. Carry on.`);
+  if (r.by === 'gone') return err(r.detail ?? 'The tab was closed while waiting.');
+  return text('Stopped by the user.');
 }

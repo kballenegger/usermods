@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { ACT_OFF } from '@/lib/buildflags';
+import type { Skill } from '@/lib/skills';
 import {
   bulkTargets,
   editorSync,
@@ -8,8 +10,10 @@ import {
   modSiteOptions,
   modSize,
   modSource,
+  siteOptions,
   timeLabel,
   toggleSelectAll,
+  type KindFilter,
   type ModFilter,
 } from '@/lib/dashboard';
 import type { Chat } from '@/lib/chats';
@@ -17,6 +21,7 @@ import { previewFromSource } from '@/lib/mods';
 import { rpc } from '@/lib/rpc';
 import type { Mod } from '@/lib/types';
 import { InstallPanel } from './InstallPanel';
+import { SkillsPanes, useSkillList } from '../sidepanel/Skills';
 import { useModShare } from '../sidepanel/components/ExportMenu';
 import { openUpdateReview, useUpdates } from '../sidepanel/useUpdates';
 import { MenuButton, type MenuItem } from '../sidepanel/components/Menu';
@@ -28,6 +33,7 @@ export function ModsSection({
   origins = new Map(),
   onOpenChat,
   onEditMod,
+  onEditSkill,
 }: {
   mods: Mod[];
   loaded: boolean;
@@ -37,6 +43,7 @@ export function ModsSection({
   onOpenChat?: (chat: Chat) => void;
   /** Open this mod in a chat on its own page, with the side panel pointed at it. */
   onEditMod?: (mod: Mod) => void;
+  onEditSkill?: (skill: Skill) => void;
 }) {
   const [filter, setFilter] = useState<ModFilter>({ site: '', enabled: 'all', query: '' });
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -45,7 +52,9 @@ export function ModsSection({
   const [status, setStatus] = useState('');
 
   const visible = useMemo(() => filterMods(mods, filter), [mods, filter]);
-  const sites = useMemo(() => modSiteOptions(mods), [mods]);
+  const skills = ACT_OFF ? [] : useSkillList();
+  const [kind, setKind] = useState<KindFilter>('all');
+  const sites = useMemo(() => (ACT_OFF ? modSiteOptions(mods) : siteOptions(mods, skills)), [mods, skills]);
   const selection = bulkTargets(selected, visible);
   /**
    * The mod whose editor is open, derived from the current list rather than mirrored in state. Same
@@ -152,6 +161,13 @@ export function ModsSection({
             </option>
           ))}
         </select>
+        {ACT_OFF ? null : (
+          <select value={kind} onChange={(e) => setKind(e.target.value as KindFilter)} aria-label="Which kinds to list" data-testid="mod-kind">
+            <option value="all">All</option>
+            <option value="mods">Mods</option>
+            <option value="skills">Skills</option>
+          </select>
+        )}
         <select
           value={filter.enabled ?? 'all'}
           onChange={(e) => setFilter((f) => ({ ...f, enabled: e.target.value as ModFilter['enabled'] }))}
@@ -190,10 +206,10 @@ export function ModsSection({
       <div className="panes">
         <div>
           {!loaded && <div className="dash-empty">Loading…</div>}
-          {loaded && !mods.length && <div className="dash-empty">No mods yet. Build one in the side panel's chat, or install one below.</div>}
-          {loaded && mods.length > 0 && !visible.length && <div className="dash-empty">No mods match those filters.</div>}
+          {loaded && !mods.length && (ACT_OFF || kind !== 'skills') && <div className="dash-empty">No mods yet. Build one in the side panel's chat, or install one below.</div>}
+          {loaded && mods.length > 0 && !visible.length && (ACT_OFF || kind !== 'skills') && <div className="dash-empty">No mods match those filters.</div>}
           <div className="rows">
-            {visible.map((m) => (
+            {(!ACT_OFF && kind === 'skills' ? [] : visible).map((m) => (
               <ModRow
                 key={m.id}
                 mod={m}
@@ -236,6 +252,8 @@ export function ModsSection({
           )}
         </div>
       </div>
+
+      {!ACT_OFF && kind !== 'mods' && <SkillsPanes skills={skills} filter={filter} onStatus={say} onError={fail} {...(onEditSkill ? { onEdit: onEditSkill } : {})} />}
     </>
   );
 }

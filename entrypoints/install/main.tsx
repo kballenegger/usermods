@@ -6,10 +6,13 @@
 // out to be is shown in full below, and only http(s) is fetched.
 import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom/client';
-import { isInstallableUrl, scriptUrlFromLocation } from '@/lib/installurl';
+import { ACT_OFF } from '@/lib/buildflags';
+import type { InstallPreview as AnyPreview } from '@/lib/install';
+import { isInstallableUrl, isSkillUrl, scriptUrlFromLocation } from '@/lib/installurl';
 import { rpc } from '@/lib/rpc';
 import { applyStoredTheme } from '@/lib/theme';
 import type { ScriptPreview } from '@/lib/types';
+import { SkillPreviewCard } from '../sidepanel/Skills';
 import { InstallPreview } from '../sidepanel/components/InstallPreview';
 import { ThemeToggle } from '../sidepanel/components/ThemeToggle';
 import { UpdateReviewPage } from './UpdateReview';
@@ -37,7 +40,7 @@ function Page() {
 }
 
 function InstallPage() {
-  const [preview, setPreview] = useState<ScriptPreview | null>(null);
+  const [preview, setPreview] = useState<AnyPreview | null>(null);
   const [error, setError] = useState('');
   const [installError, setInstallError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -59,6 +62,12 @@ function InstallPage() {
     rpc({ type: 'mods.preview', url })
       .then(async (p) => {
         setPreview(p);
+        if (!ACT_OFF && p.kind === 'skill') {
+          // The same question of the skills, which never match a mod (lib/banner.ts skillInstallState).
+          const found = await rpc({ type: 'skills.findInstalled', source: p.source, url }).catch(() => null);
+          setInstalled(found ? { modId: found.skillId, version: found.version, newer: found.newer } : null);
+          return;
+        }
         // Matched by download URL, or @name + @namespace (lib/banner.ts installState). A script that
         // is already installed is updated in place rather than installed a second time.
         setInstalled(await rpc({ type: 'mods.findInstalled', source: p.source, url }).catch(() => null));
@@ -71,6 +80,12 @@ function InstallPage() {
     setBusy(true);
     setInstallError('');
     try {
+      if (!ACT_OFF && preview.kind === 'skill') {
+        await rpc({ type: 'skills.install', source: preview.source, downloadUrl: url, origin: 'installed', ...(installed ? { replaceId: installed.modId } : {}) });
+        setDone(true);
+        setBusy(false);
+        return;
+      }
       await rpc({
         type: 'mods.install',
         source: preview.source,
@@ -90,6 +105,8 @@ function InstallPage() {
     if (tab?.id != null) await chrome.tabs.remove(tab.id);
   }
 
+  const skillMode = !ACT_OFF && (preview ? preview.kind === 'skill' : isSkillUrl(url));
+
   return (
     <div className="page">
       <div className="page-head">
@@ -98,7 +115,7 @@ function InstallPage() {
             <img className="brand-mark" src="/icon/128.png" alt="" width={16} height={16} />
             usermods
           </div>
-          <h2>Install userscript</h2>
+          <h2>{skillMode ? 'Install skill' : 'Install userscript'}</h2>
         </div>
         <ThemeToggle />
       </div>
@@ -116,9 +133,11 @@ function InstallPage() {
             <h4 className="grow">Installed</h4>
           </div>
           <div className="desc">
-            {installed
-              ? `“${preview.name}” is updated${preview.version ? ` to v${preview.version}` : ''}. It will run the next time you load a page it matches.`
-              : `“${preview.name}” is installed and enabled. It will run the next time you load a page it matches. Manage it from the usermods side panel.`}
+            {skillMode
+              ? `“${preview.name}” is ${installed ? `updated${preview.version ? ` to v${preview.version}` : ''}` : 'installed'}. It does nothing until you run it, and its first run shows each step before it happens. It is in the Mods tab of the usermods side panel.`
+              : installed
+                ? `“${preview.name}” is updated${preview.version ? ` to v${preview.version}` : ''}. It will run the next time you load a page it matches.`
+                : `“${preview.name}” is installed and enabled. It will run the next time you load a page it matches. Manage it from the usermods side panel.`}
           </div>
           <div className="row">
             <button className="btn primary" onClick={() => void closeTab()}>Close tab</button>
@@ -131,20 +150,35 @@ function InstallPage() {
           {installed && (
             <div className="card" data-testid="install-already">
               <div className="desc">
-                {installed.newer
-                  ? `You have v${installed.version} of this script. Installing replaces it with v${preview.version}, keeping its settings and stored values.`
-                  : `This script is already installed${installed.version ? ` (v${installed.version})` : ''}. Installing again replaces it in place.`}
+                {skillMode
+                  ? installed.newer
+                    ? `You have v${installed.version} of this skill. Installing replaces it with v${preview.version}, and its next run shows each step again.`
+                    : `This skill is already installed${installed.version ? ` (v${installed.version})` : ''}. Installing again replaces it in place, and its next run shows each step again.`
+                  : installed.newer
+                    ? `You have v${installed.version} of this script. Installing replaces it with v${preview.version}, keeping its settings and stored values.`
+                    : `This script is already installed${installed.version ? ` (v${installed.version})` : ''}. Installing again replaces it in place.`}
               </div>
             </div>
           )}
-          <InstallPreview
-            preview={preview}
-            busy={busy}
-            error={installError}
-            onInstall={() => void install()}
-            onCancel={() => void closeTab()}
-            installLabel={installed ? (installed.newer ? `Update to v${preview.version}` : 'Reinstall') : 'Install'}
-          />
+          {!ACT_OFF && preview.kind === 'skill' ? (
+            <SkillPreviewCard
+              preview={preview}
+              busy={busy}
+              error={installError}
+              onInstall={() => void install()}
+              onCancel={() => void closeTab()}
+              installLabel={installed ? (installed.newer ? `Update to v${preview.version}` : 'Reinstall') : 'Install'}
+            />
+          ) : (
+            <InstallPreview
+              preview={preview as ScriptPreview}
+              busy={busy}
+              error={installError}
+              onInstall={() => void install()}
+              onCancel={() => void closeTab()}
+              installLabel={installed ? (installed.newer ? `Update to v${preview.version}` : 'Reinstall') : 'Install'}
+            />
+          )}
         </>
       )}
     </div>

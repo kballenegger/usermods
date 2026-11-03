@@ -4,6 +4,9 @@
 // The panel owns the clock and the port; this module owns the wording and the thresholds, so the
 // whole behaviour is testable without a browser (test/activity.test.ts).
 
+// The .ts extension: this module is loaded directly by node's test runner, see lib/agent/tools.ts.
+import { ACT_OFF } from './buildflags.ts';
+
 /**
  * A model call that has produced nothing for this long is described as "still waiting". Thinking
  * models legitimately spend this long before their first byte, so this is a reassurance, not an
@@ -46,7 +49,7 @@ const WAIT_TOOL = 'wait_for';
 const WAIT_PREFIX = 'waiting for ';
 
 /** What the agent is doing right now, as reported by the background over the port. */
-export type Phase = 'model' | 'tool' | 'idle';
+export type Phase = 'model' | 'tool' | 'idle' | 'waiting-user';
 
 /** Everything the label depends on. Times are milliseconds. */
 export interface ActivityState {
@@ -57,6 +60,8 @@ export interface ActivityState {
   detail?: string;
   /** Agent-loop iteration, 1-based. Shown as "step N" once past the first. */
   iteration?: number;
+  /** The run has operated the page; its own steps take the pointer mark. */
+  driving?: boolean;
   /** Since the run started (or since this phase began, whichever the panel feeds in). */
   elapsed: number;
   /** Since the LAST event of any kind arrived from the port. This is what detects a stall. */
@@ -123,6 +128,8 @@ export interface Activity {
   action?: 'stop' | 'retry';
   /** True while the dot should pulse. A stalled or disconnected line holds still. */
   pulse: boolean;
+  /** A step on the page: the pointer mark takes the dot's place. */
+  pointer?: boolean;
 }
 
 /** "4s", "1m 04s". Seconds only below a minute, which is where this line spends its life. */
@@ -181,6 +188,13 @@ export function activityFor(state: ActivityState): Activity | null {
 
   if (state.phase === 'idle') return null;
 
+  // The run is holding still for the user, and has said why. No stall timer and no pulse: however
+  // long a person takes is not the provider being stuck, and a line that has stopped must not look
+  // as if it is going. The detail is the whole line, so nothing about time rides along with it.
+  if (!ACT_OFF && state.phase === 'waiting-user') {
+    return { tone: 'warn', label: state.detail?.trim() || 'waiting for you', monoJoin: ' ', segments, action: 'stop', pulse: false };
+  }
+
   // A retry in progress is the whole story while it lasts: what went wrong, when the next attempt
   // is, and which one it will be. It takes the warning colour and offers Stop, because a user who
   // knows the network is gone should not have to sit through five attempts to say so. It is also
@@ -217,6 +231,9 @@ export function activityFor(state: ActivityState): Activity | null {
     if (state.writing) label = 'writing';
     else if (slow) label = 'still waiting for model';
     else label = state.detail?.trim() || 'waiting for model';
+  } else if (!ACT_OFF && state.driving && state.tool === 'act' && state.detail) {
+    // The driver's own words, "driving · clicking "Unsubscribe"", in the text face and not as a tool.
+    label = state.detail;
   } else {
     const t = toolLabel(state);
     label = t.label;
@@ -230,7 +247,8 @@ export function activityFor(state: ActivityState): Activity | null {
   if ((state.iteration ?? 1) > 1) segments.push(`step ${state.iteration}`);
   if (state.queued) segments.push(`${state.queued} queued`);
 
-  return { tone, label, mono, monoJoin, segments, action, pulse: !stalled, ...(labelFirst ? { labelFirst } : {}) };
+  const pointer = !ACT_OFF && !stalled && state.driving && state.phase === 'tool' && state.tool === 'act';
+  return { tone, label, mono, monoJoin, segments, action, pulse: !stalled, ...(labelFirst ? { labelFirst } : {}), ...(pointer ? { pointer } : {}) };
 }
 
 /** The whole line as one string, for tests and for the accessible label. */
@@ -256,6 +274,8 @@ export interface ChatActivity {
   tool?: string;
   detail?: string;
   iteration?: number;
+  /** This run has operated the page. It sticks: only the events of the driver itself carry it. */
+  driving?: boolean;
   /** When this chat's run started, as Date.now(). */
   startedAt: number | null;
   /** …and when its last event of any kind arrived. Silence here is what a stall is. */
@@ -275,7 +295,7 @@ export const IDLE_ACTIVITY: ChatActivity = { phase: 'idle', startedAt: null, las
 
 /** The shape of a port event this layer cares about. Structurally satisfied by AgentEvent. */
 type ActivityEvent =
-  | { type: 'status'; phase: Phase; tool?: string; detail?: string; iteration?: number; retry?: ChatActivity['retry'] }
+  | { type: 'status'; phase: Phase; tool?: string; detail?: string; iteration?: number; retry?: ChatActivity['retry']; driving?: boolean }
   | { type: 'text' }
   | { type: 'text_discard' }
   | { type: 'accepted' }
@@ -301,6 +321,7 @@ export function activityFromEvent(a: ChatActivity, e: ActivityEvent, now: number
         tool: s.tool,
         detail: s.detail,
         iteration: s.iteration,
+        ...(s.driving || a.driving ? { driving: true } : {}),
         startedAt: a.startedAt ?? now,
         lastEventAt: now,
         // A new phase has not written anything yet.

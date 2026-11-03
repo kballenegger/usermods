@@ -1,9 +1,11 @@
+import { ACT_OFF } from '@/lib/buildflags';
 import { createHolder } from '@/lib/keepalive-holder';
 import { computedStyles, describeElements } from '@/lib/inspect';
 import { pageText, sliceText, TEXT_DEFAULT_CHARS } from '@/lib/pagetext';
 import { reachFor, selectorFor, snapshot } from '@/lib/snapshot';
 import { queryAllDeep, waitForDom } from '@/lib/waitdom';
 import { initBanner } from '@/lib/bannerclient';
+import { handleInteractMessage, interactQuery, isInteractMessage } from '@/lib/interact/client';
 import { handleShareMessage } from '@/lib/shareclient';
 import type { ContentEvent, ContentRequest } from '@/lib/types';
 
@@ -37,6 +39,8 @@ export default defineContentScript({
     const waits = new Map<string, (reason?: string) => void>();
 
     chrome.runtime.onMessage.addListener((msg: ContentRequest, _sender, sendResponse) => {
+      // Operating the page. The folded flag is what keeps lib/interact out of a store or Safari bundle.
+      if (!ACT_OFF && isInteractMessage(msg)) return handleInteractMessage(msg, sendResponse);
       switch (msg.type) {
         case 'ping':
           sendResponse({ ok: true });
@@ -111,7 +115,7 @@ export default defineContentScript({
           return;
         }
         case 'query':
-          sendResponse({ text: describeElements(msg.selector, msg.limit, msg.text, { styles: msg.styles, overlays: msg.overlays }) });
+          sendResponse({ text: ACT_OFF ? describeElements(msg.selector, msg.limit, msg.text, { styles: msg.styles, overlays: msg.overlays }) : interactQuery(msg) });
           return;
         case 'styles':
           sendResponse({ text: computedStyles(msg.selector, msg.properties) });

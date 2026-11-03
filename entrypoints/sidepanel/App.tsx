@@ -9,6 +9,7 @@ import { BackIcon, DashboardIcon, MenuIcon, SettingsIcon } from './components/ic
 import { Sheet, SheetRow } from './components/Sheet';
 import { ThemeToggle } from './components/ThemeToggle';
 import { Consent } from './Consent';
+import { ACT_OFF } from '@/lib/buildflags';
 import { ModsView } from './ModsView';
 import { SettingsView } from './SettingsView';
 import { PANEL_SHELL, ShellContext, type Shell } from './shell';
@@ -80,6 +81,8 @@ export async function openDashboard(): Promise<void> {
 
 export function App({ surface = 'panel' }: AppProps = {}) {
   const [tab, setTab] = useState<Tab>('chat');
+  /** A row's Run, on its way to the chat's run card. Chat takes it when it mounts, and says so. */
+  const [runRequest, setRunRequest] = useState<string | null>(null);
   const [tabId, setTabId] = useState<number | null>(null);
   const [pageUrl, setPageUrl] = useState('');
   const [usStatus, setUsStatus] = useState<{ available: boolean; message: string } | null>(null);
@@ -224,13 +227,28 @@ export function App({ surface = 'panel' }: AppProps = {}) {
             onDismiss={consented ? () => setReviewing(false) : undefined}
           />
         ) : (
-          <Chat tabId={tabId} pageUrl={pageUrl} host={host} onOpenSettings={() => setTab('settings')} />
+          <Chat tabId={tabId} pageUrl={pageUrl} host={host} onOpenSettings={() => setTab('settings')} {...(ACT_OFF ? {} : { runRequest, onRunRequestTaken: () => setRunRequest(null) })} />
         ))}
       {/* "Edit in chat" on a mod row is a move between the two tabs, so the Mods view asks to be
           taken there rather than reaching into the Chat view: the chat it should land on is named
           by a session-storage handoff (the same one the dashboard writes), which Chat reads when it
           mounts on that host. */}
-      {tab === 'mods' && <ModsView tabId={tabId} pageUrl={pageUrl} host={host} onEditInChat={() => setTab('chat')} />}
+      {tab === 'mods' && (
+        <ModsView
+          tabId={tabId}
+          pageUrl={pageUrl}
+          host={host}
+          onEditInChat={() => setTab('chat')}
+          {...(ACT_OFF
+            ? {}
+            : {
+                onRunSkill: (id: string) => {
+                  setRunRequest(id);
+                  setTab('chat');
+                },
+              })}
+        />
+      )}
       {tab === 'settings' && (
         <SettingsView
           onReviewNotice={() => {

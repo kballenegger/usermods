@@ -8,10 +8,16 @@ import { checkCode, composeTest, engineRunsModOn, inPageWorld, patternsForPage, 
 import type { TestRun } from '@/lib/exec/adapter';
 import type { PersistReport, TestModResult } from '@/lib/agent/testmod';
 import { checkConnect, connectOf } from '@/lib/connect';
-import { dependenciesChanged, fetchText, previewFromUrl, reparseEditedSource, resolveDependencies, toBase64 } from '@/lib/install';
+import { dependenciesChanged, fetchText, previewFromText, previewFromUrl, reparseEditedSource, resolveDependencies, toBase64 } from '@/lib/install';
 import { UPDATED_MARK } from '@/lib/importreport';
-import { installPageUrl, isInstallableUrl, isUserScriptUrl, scriptIdentity, USER_JS_PATTERN, USER_JS_VIEW_PATTERN } from '@/lib/installurl';
-import { addDismissal, BANNER_DISMISSED_KEY, bannerWorthShowing, installState, isDismissed, type Detection } from '@/lib/banner';
+import { installPageUrl, isInstallableUrl, isUserScriptUrl, scriptIdentity, SKILL_MD_PATTERN, USER_JS_PATTERN, USER_JS_VIEW_PATTERN } from '@/lib/installurl';
+import { handleSkillsRpc, type SkillsRpc } from '@/lib/skillrpc';
+import { dropCarry, draftAsSkill, draftFromRun, keepAllowance, loadCarry, markWalked, openSkillDraft, openedText, proposeSkill, saveCard, saveCarry } from '@/lib/skillcontroller';
+import { repairAllowed, runRepair } from '@/lib/skillrepair';
+import { needsGoToStart, outputsNote, runReport, runSkill, stepsKey, type RepairResult, type RunCarry, type RunResult as SkillRunResult } from '@/lib/skillrun';
+import { loadSkills, upsertSkill } from '@/lib/skillstore';
+import { addressedHosts, pinAddress, setSkillFields, skillFromSource, skillHosts, skillMatchesUrl, skillsBlock, type Skill, type SkillStep } from '@/lib/skills';
+import { addDismissal, BANNER_DISMISSED_KEY, bannerWorthShowing, installState, isDismissed, skillInstallState, type Detection } from '@/lib/banner';
 import type { BannerStateReply } from '@/lib/bannerclient';
 import { createShareController } from '@/lib/sharecontroller';
 import { createUpdateController } from '@/lib/updatecontroller';
@@ -20,9 +26,9 @@ import { resyncPlan } from '@/lib/resync';
 import { describeCallbackError, mapStack, mergeLateErrors, parseError, prepareRunScript, renderLateErrors, renderRunResult, type DomEffect, type LateError, type RawCallbackError, type RunResult, type RunSource } from '@/lib/runscript';
 import { watchDocument } from '@/lib/navwatch';
 import { shouldUpdate } from '@/lib/version';
-import { draftSourceFor, loadMods, matchPatternForUrl, modFromProposal, modFromSource, parseHeader, previewFromSource, upsertMod, deleteMod, saveMods } from '@/lib/mods';
-import { appendTurn, archiveChat, bulkChats, countTurns, createChat, deleteChat, getChat, hostFromUrl, isArchived, listChats, loadItems, loadMessages, markTitleRefreshed, renameChat, saveItems, saveMessages, setChatArtifact, setChatModel, setChatThinking, setModelTitle, touchChat } from '@/lib/chats';
-import { loadRuns, markInterrupted, pruneRuns, resumableRuns, saveRuns, type RunMap, type RunRecord } from '@/lib/runstate';
+import { draftSourceFor, loadMods, matchPatternForUrl, modFromProposal, modFromSource, parseHeader, upsertMod, deleteMod, saveMods } from '@/lib/mods';
+import { addChatActions, appendTurn, archiveChat, bulkChats, countTurns, createChat, deleteChat, getChat, hostFromUrl, isArchived, listChats, loadItems, loadMessages, markTitleRefreshed, renameChat, saveItems, saveMessages, setChatArtifact, setChatModel, setChatRanSkill, setChatThinking, setModelTitle, touchChat } from '@/lib/chats';
+import { loadRuns, markInterrupted, nextRunRecord, pruneRuns, resumableRuns, saveRuns, withRunSkill, withSkillStep, withoutPending, withoutRunSkill, type PendingStep, type RunMap, type RunRecord } from '@/lib/runstate';
 import { AUTO_RESUMED_TEXT, autoResumable, countAutoResume, holdExpired, KEEPALIVE_MAX_HOLD_MS, KEEPALIVE_PORT, TAB_CLOSED_TEXT } from '@/lib/keepalive';
 import { isTombstoned, withKey } from '@/lib/storagequeue';
 import { collectBlobs } from '@/lib/blobs';
@@ -30,12 +36,19 @@ import { QUOTA_PANEL_NOTE, bytesInUse, quotaWarningNote, shouldWarn } from '@/li
 import { CONTEXT_LIMITS_KEY, effectiveBudget, limitKey, loadContextLimits, rememberLimit, saveContextLimits } from '@/lib/contextlimits';
 import { reduceItems } from '@/lib/transcript';
 import { addVersion, adoptMod, createArtifact, currentVersion, detachFromMod, draftBlock, fromMod, loadArtifact, recordProposal, rollbackTo, saveArtifact, toProposal, toSource, type Artifact } from '@/lib/artifact';
-import { draftStanding, duplicateOf, editModPlan, likelyUrlFor, modsBlock, modsForUrl, openModDecision, runsOnPage } from '@/lib/modmatch';
+import { draftStanding, duplicateOf, editModPlan, likelyUrlFor, modOverSkillRefusal, modsBlock, modsForUrl, openModDecision, runsOnPage } from '@/lib/modmatch';
 import { buildTitleInput, completedTurns, sanitizeTitle, titleDecision, TITLE_SYSTEM_PROMPT } from '@/lib/title';
 import { createProvider } from '@/lib/providers';
 import { VISION_FALLBACK_PANEL_NOTE, createVisionMemory, resolveImagesSetting, visionKeyFor } from '@/lib/providers/vision';
 import { MAX_EDGE, SCREENSHOT_CAPTURE_FORMAT, SCREENSHOT_QUALITY, fitWithin, parseDataUrl } from '@/lib/images';
-import { SAFARI_BUILD, SUBSCRIPTIONS_OFF, isSubscriptionProvider, unavailableProviderMessage } from '@/lib/buildflags';
+import { ACT_OFF, SAFARI_BUILD, SUBSCRIPTIONS_OFF, isSubscriptionProvider, unavailableProviderMessage } from '@/lib/buildflags';
+import { BAR_DONE, BAR_STOP } from '@/lib/pageui';
+import { hostOf } from '@/lib/agent/boundary';
+import { pendingResumeNote, type Driver } from '@/lib/agent/driver';
+import { noteBlock } from '@/lib/agent/note';
+import type { RepairOffer, RunEnding, StepRow } from '@/lib/agent/questions';
+import { fromExtensionPage } from '@/lib/agent/senders';
+import { createDriveController, type DriveRpc } from '@/lib/drive';
 import { listFailureMessage, listWithFallback, modelsRequest, parseModelIds, type ModelListResult, type ModelListTarget } from '@/lib/modellist';
 import type { OAuthKind } from '@/lib/oauth';
 import type { AgentAttachState, AgentPortRequest, OAuthLoginState, RpcRequest } from '@/lib/rpc';
@@ -180,8 +193,14 @@ export default defineBackground(() => {
   // case where this one is too early.
   void resumePendingLogins().catch(() => {});
 
-  chrome.runtime.onMessage.addListener((msg: RpcRequest | { type?: string }, _sender, sendResponse) => {
+  chrome.runtime.onMessage.addListener((msg: RpcRequest | { type?: string }, sender, sendResponse) => {
     if (!msg || typeof msg.type !== 'string' || !msg.type.includes('.')) return false; // not an RPC (e.g. content events)
+    // Every RPC comes from one of the extension's own pages. In a build that operates pages it is the
+    // rule: an answer to a question goes this way, and a page may say only Stop and "I have done it".
+    if (!ACT_OFF && !isExtensionPage(sender)) {
+      sendResponse({ ok: false, error: 'Not available to a page.' });
+      return false;
+    }
     handleRpc(msg as RpcRequest)
       .then((data) => sendResponse({ ok: true, data }))
       .catch((e: unknown) => sendResponse({ ok: false, error: e instanceof Error ? e.message : String(e) }));
@@ -246,6 +265,10 @@ export default defineBackground(() => {
     // A mod's GM shim and the Safari runner both connect too; exec.install() registered their
     // listener, so anything that is not the panel's agent port is not ours to handle here.
     if (port.name !== 'agent') return;
+    if (!ACT_OFF && !isExtensionPage(port.sender)) {
+      port.disconnect();
+      return;
+    }
     agentPorts.add(port);
     // A panel is listening again, so the transcript is its to write. Whatever was kept on its
     // behalf while nobody was (see recordDetached) goes to storage now, before it reads.
@@ -254,7 +277,10 @@ export default defineBackground(() => {
       if (req.type === 'resume') {
         // Nothing to do if this chat is already running: the button was pressed twice, or in two
         // panels. A second run over the same conversation is exactly what this must never start.
-        if (!sessions.isRunning(req.chatId)) void runChat(req.chatId, req.tabId, null);
+        if (!sessions.isRunning(req.chatId)) {
+          if (ACT_OFF) void runChat(req.chatId, req.tabId, null);
+          else void resumeRun(req.chatId, req.tabId);
+        }
         return;
       }
       if (req.type === 'abort') {
@@ -283,6 +309,13 @@ export default defineBackground(() => {
     // run produced rather than a conversation that stops where it was closed.
     port.onDisconnect.addListener(() => agentPorts.delete(port));
   });
+
+  // A new document has lost the bar. Only a run that is driving that tab has anything to put back.
+  if (!ACT_OFF) {
+    chrome.tabs.onUpdated.addListener((tabId, change) => {
+      if (change.status === 'complete') drive?.tabLoaded(tabId);
+    });
+  }
 });
 
 // ---------- agent sessions ----------
@@ -296,6 +329,21 @@ const sessions = new SessionMap();
 
 /** Every open side-panel port. A chat's events go to all of them; each panel routes by chat id. */
 const agentPorts = new Set<chrome.runtime.Port>();
+
+/** Is this sender one of the extension's own pages, as opposed to a content script on a page? */
+function isExtensionPage(sender: chrome.runtime.MessageSender | undefined): boolean {
+  return fromExtensionPage(sender, chrome.runtime.id, chrome.runtime.getURL(''));
+}
+
+/** Operating a page: the questions in the panel and each run's Driver. Null in a build with ACT_OFF. */
+const drive = ACT_OFF
+  ? null
+  : createDriveController({
+      sendToContent,
+      updateRuns,
+      post: postAgentEvent,
+      waitInTab,
+    });
 
 /**
  * Which OpenAI-compatible endpoints have refused an image (lib/providers/vision.ts).
@@ -461,10 +509,7 @@ function setRun(chatId: string, patch: Pick<RunRecord, 'state' | 'tabId'> & { er
   if (isTombstoned(chatId)) return Promise.resolve();
   return updateRuns((runs) => {
     if (isTombstoned(chatId)) return runs;
-    const now = Date.now();
-    const prev = runs[chatId];
-    const startedAt = patch.state === 'running' || !prev ? now : prev.startedAt;
-    return { ...runs, [chatId]: { state: patch.state, tabId: patch.tabId, startedAt, updatedAt: now, ...(patch.error ? { error: patch.error } : {}) } };
+    return { ...runs, [chatId]: nextRunRecord(runs[chatId], patch) };
   });
 }
 
@@ -566,7 +611,7 @@ async function attachState(): Promise<AgentAttachState> {
   const resumable = resumableRuns(runs);
   // A chat that is running in THIS worker is not resumable, whatever an old record says.
   for (const id of Object.keys(running)) delete resumable[id];
-  return { running, resumable };
+  return { running, resumable, ...(drive ? { questions: drive.questions() } : {}) };
 }
 
 /**
@@ -750,7 +795,17 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
   session.running = true;
   session.controller = new AbortController();
   const signal = session.controller.signal;
-  const post = (e: AgentEventBody) => postAgentEvent(chatId, e);
+  const driver = drive ? drive.driverFor(chatId, session.tabId) : null;
+  // How the run ended, for the card: the step cap is the one ending the loop only says as an event.
+  let ending: RunEnding = 'model';
+  const post = (e: AgentEventBody) => {
+    if (!ACT_OFF) {
+      if (e.type === 'stopped') ending = 'ceiling';
+      // Every status of a driving run says so, so a panel that opens mid-run reads it off the last one.
+      if (e.type === 'status' && e.phase !== 'idle' && driver?.isDriving) return postAgentEvent(chatId, { ...e, driving: true });
+    }
+    postAgentEvent(chatId, e);
+  };
   const release = holdWorker();
   // Safari's half: ask the page to hold a port open for as long as this run lasts. A no-op on
   // Chrome, and a no-op for a tab that cannot host a content script. See the keepalive block above.
@@ -759,6 +814,9 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
   // making the first token of every run wait on a storage read would be paying a real cost for an
   // optional one. `releaseHold` below is idempotent for a hold that was never taken.
   void loadSafariMode().then(() => acquireHold(session.tabId));
+  // A step the last run may or may not have got through. It goes to the model as a warning, and the
+  // record keeps it until that warning is safely in the saved conversation.
+  const cutOff = ACT_OFF ? undefined : (await loadRuns().catch(() => ({}) as RunMap))[chatId]?.pending;
   // Written before anything else happens, so there is no moment at which a run exists and storage
   // does not know. It also replaces a 'failed' or 'interrupted' record: whether this is a resume or
   // a new message, that run is no longer the thing to resume.
@@ -810,6 +868,9 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
     // owed mid-sentence, and re-reading the whole mod list for every queued message would put a
     // storage read (and every mod's full source) on the hot path of a streaming reply.
     const installedMods = await loadMods().catch(() => [] as Mod[]);
+    const installedSkills = ACT_OFF ? [] : await loadSkills().catch(() => [] as Skill[]);
+    const notes = drive ? drive.note(chatId) : null;
+    let noted = notes ? await notes.read().catch(() => '') : '';
     await touchChat(chatId, history.length || !turn ? { url } : { title: turn.text, url });
     const outcome = await runAgent({
       settings,
@@ -818,7 +879,50 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
       pullQueued: () => session.queue.splice(0),
       // test_mod needs the draft (its kept header, its link to an installed mod), which only this
       // closure has; `artifact` is read at call time, so a test after open_mod tests that mod.
-      env: { ...envForTab(session.tabId), testMod: (code, reload, sig) => testModInTab(session.tabId, code, reload, artifact, sig) },
+      env: {
+        ...envForTab(session.tabId),
+        testMod: (code, reload, sig) => testModInTab(session.tabId, code, reload, artifact, sig),
+        ...(drive && driver && notes
+          ? {
+              skills: {
+                beforeMod: (replace: boolean) => modOverSkillRefusal(artifact, replace),
+                propose: async (input: Record<string, unknown>, messages: readonly Msg[]) => {
+                  const r = await proposeSkill(chatId, input, messages);
+                  if (!r.ok) return r;
+                  artifact = r.artifact;
+                  return { ok: true as const, text: r.text, card: r.card };
+                },
+                open: async (skillId: string, replace: boolean) => {
+                  const skill = installedSkills.find((s) => s.id === skillId);
+                  if (!skill) return { ok: false as const, reason: `There is no skill with id ${skillId} on this page. The ids are in the "[Skills on this page]" list.` };
+                  const decision = openModDecision(draftStanding(artifact), { replace, alreadyLinked: artifact?.linkedSkillId === skill.id });
+                  if (!decision.ok) return { ok: false as const, reason: decision.reason.replace('opening a mod', 'opening a skill').replace('that mod', 'that skill').replace('open_mod', 'open_skill').replace('editing the installed mod', 'editing that skill') };
+                  if (!decision.noop) artifact = await openSkillDraft(chatId, skill);
+                  return { ok: true as const, text: openedText(skill, artifact!.current), version: artifact!.current };
+                },
+                run: (skillId: string, values: Record<string, string>, toolId: string, sig: AbortSignal) => runSkillForModel(chatId, session.tabId, driver, skillId, values, toolId, sig, post),
+              },
+              screenshot: () => drive.hidingBar(session.tabId, envForTab(session.tabId).screenshot),
+              operate: {
+                guard: (sig: AbortSignal, iteration?: number) => driver.guard(sig, iteration),
+                act: (call: Parameters<typeof driver.act>[0], ctx: Parameters<typeof driver.act>[1], sig: AbortSignal) => driver.act(call, ctx, sig),
+                handoff: (words: string, spec: WaitSpec | null, sig: AbortSignal, iteration?: number) => driver.handoff(words, spec, sig, iteration),
+                beforeScript: (description: string, code: string, sig: AbortSignal, iteration?: number) => driver.beforeScript(description, code, sig, iteration),
+                afterScript: () => driver.afterScript(),
+                recordWait: (spec: WaitSpec) => driver.recordWait(spec),
+                recordAsk: (words: string, spec: WaitSpec | null) => driver.recordAsk(words, spec),
+                recordLook: (selector: string, matched: number, links: boolean) => driver.recordLook(selector, matched, links),
+                changeNote: async (input: Record<string, unknown>) => {
+                  const r = await notes.change(input);
+                  if (r.ok) noted = r.note;
+                  return r;
+                },
+              },
+            }
+          : {}),
+      },
+      ...(drive ? { note: () => noteBlock(noted) } : {}),
+      ...(cutOff ? { resumeNote: pendingResumeNote(cutOff) } : {}),
       emit: post,
       signal,
       // Built here rather than inside the loop so it carries the two things only the background
@@ -868,6 +972,8 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
       // worker is evicted half-way through a twenty-step run, nineteen steps are on disk.
       onCheckpoint: async (msgs) => {
         await saveMessages(chatId, msgs);
+        // The warning about a cut-off step is in the saved conversation now, so it can leave the record.
+        if (!ACT_OFF && cutOff && !checkpointed) await updateRuns((runs) => withoutPending(runs, chatId));
         checkpointed = true;
       },
       retry: { policy: retryPolicy },
@@ -875,7 +981,9 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
       // Which mods already run on the page this turn is being sent from. Read fresh each time it is
       // asked for rather than captured once: open_mod links this chat to one of them mid-turn, and
       // the queued message that follows must see "THIS CHAT IS EDITING THIS ONE" against it.
-      installed: () => modsBlock(modsForUrl(installedMods, url, artifact?.linkedModId)),
+      installed: ACT_OFF
+        ? () => modsBlock(modsForUrl(installedMods, url, artifact?.linkedModId))
+        : () => [modsBlock(modsForUrl(installedMods, url, artifact?.linkedModId)), skillsBlock(installedSkills, url, artifact?.linkedSkillId)].filter(Boolean).join('\n'),
       onOpenMod: async (modId, replace) => {
         const mod = (await loadMods()).find((m) => m.id === modId);
         // The id came from a list this same worker wrote, so a miss means the mod was deleted
@@ -894,7 +1002,8 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
         if (!decision.noop) {
           // Adopt, rather than replace: the versions this chat already held stay in the strip, so
           // a chat that opened the wrong mod is one rollback away from where it was.
-          artifact = artifact ? adoptMod(artifact, mod) : fromMod(chatId, mod);
+          // A draft skill cannot become a mod by adoption; a chat holds one draft, and this replaces it.
+          artifact = artifact && (ACT_OFF || artifact.kind !== 'skill') ? adoptMod(artifact, mod) : fromMod(chatId, mod);
           await saveArtifact(artifact);
           await setChatArtifact(chatId, artifact.id, artifact.versions.length);
           // The panel re-reads the artifact on this event, which is how the "Editing <name>" line
@@ -922,11 +1031,13 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
         };
       },
       onProposal: async (proposal) => {
+        // In place of a draft skill, the chat is no longer editing that skill.
+        const overSkill = !ACT_OFF && artifact?.kind === 'skill';
         artifact = await recordProposal(chatId, proposal);
         // The index carries only the flag, so the dashboard can badge a chat without reading every
         // artifact. It is written through setChatArtifact rather than touchChat, because proposing
         // is not activity the switcher should reorder on.
-        await setChatArtifact(chatId, artifact.id, artifact.versions.length);
+        await setChatArtifact(chatId, artifact.id, artifact.versions.length, overSkill ? null : undefined);
         return artifact.current;
       },
     });
@@ -965,6 +1076,15 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
   } else {
     await clearRuns([chatId]);
   }
+  if (drive && driver) {
+    // What was recorded goes on the transcript after the model's report, and the bar comes down.
+    const card = await driver.finish(signal.aborted ? 'stopped' : ending).catch(() => null);
+    drive.end(chatId);
+    if (card) {
+      post({ type: 'page_card', card });
+      await addChatActions(chatId, card.total).catch(() => {});
+    }
+  }
   release();
   releaseHold(session.tabId);
   session.running = false;
@@ -985,6 +1105,248 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
     // It posts through this chat's own post(), so the rename lands on this chat and no other.
     if (succeeded && settings) void nameChat(chatId, settings, post);
   }
+}
+
+/** A Resume: a skill's run carries on through the skill, with no model. Anyone else's through the loop. */
+async function resumeRun(chatId: string, tabId: number): Promise<void> {
+  // Before the first await, so two presses of Resume cannot both get past it and do the same step twice.
+  if (!sessions.claim(chatId, tabId)) return;
+  const rec = (await loadRuns().catch(() => ({}) as RunMap))[chatId];
+  if (!rec?.skill) return runChat(chatId, tabId, null);
+  const { skill: ran, pending } = rec;
+  const skill = ran.draft ? await draftAsSkill(chatId).catch(() => null) : ((await loadSkills().catch(() => [] as Skill[])).find((s) => s.id === ran.id) ?? null);
+  const giveUp = (message: string) => {
+    postAgentEvent(chatId, { type: 'error', message });
+    postAgentEvent(chatId, { type: 'status', phase: 'idle', detail: 'done' });
+    postAgentEvent(chatId, { type: 'done' });
+    letGoOf(chatId, tabId);
+  };
+  // A file that changed under an interrupted run has other steps at those numbers.
+  if (!skill || stepsKey(skill.steps) !== ran.key) {
+    await clearRuns([chatId]);
+    await dropCarry(chatId);
+    giveUp(`“${ran.name}” has changed since this run stopped, so it cannot carry on. Start it again.`);
+    return;
+  }
+  // The record stays: it can be resumed once that run is over.
+  if (sessions.runningOnTab(tabId, chatId)) {
+    giveUp('Another chat is running on this tab. Stop it, then resume this one.');
+    return;
+  }
+  await runSkillChat(chatId, tabId, skill, await loadCarry(chatId), { from: ran.step, ...(pending ? { pending: pending.label, pendingKind: pending.kind } : {}), draft: ran.draft === true });
+}
+
+/** A claim that will not become a run. A message that queued behind it is not left waiting. */
+function letGoOf(chatId: string, tabId: number): void {
+  const next = sessions.unclaim(chatId);
+  if (next) void runChat(chatId, tabId, next);
+}
+
+/**
+ * One run of a skill: no model and no conversation, the same session, Stop, bar and journal as a chat's
+ * run, and the rows and the card of a driving one. lib/skillrun.ts is what happens; this is where.
+ */
+async function runSkillChat(chatId: string, tabId: number, skill: Skill, carry: RunCarry, opts: { from?: number; pending?: string; pendingKind?: PendingStep['kind']; draft?: boolean } = {}): Promise<void> {
+  const session = sessions.ensure(chatId, tabId);
+  session.running = true;
+  session.controller = new AbortController();
+  const signal = session.controller.signal;
+  const driver = drive!.driverFor(chatId, session.tabId);
+  const post = (e: AgentEventBody) => postAgentEvent(chatId, e.type === 'status' && e.phase !== 'idle' ? { ...e, driving: true } : e);
+  const release = holdWorker();
+  void loadSafariMode().then(() => acquireHold(session.tabId));
+  await setRun(chatId, { state: 'running', tabId: session.tabId });
+  await carrySkill(chatId, session.tabId, driver, skill, carry, signal, post, crypto.randomUUID(), opts);
+  drive!.end(chatId);
+  await clearRuns([chatId]);
+  release();
+  releaseHold(session.tabId);
+  session.running = false;
+  const next = session.queue.shift();
+  if (next && !signal.aborted) void runChat(chatId, session.tabId, next);
+  else {
+    post({ type: 'status', phase: 'idle', detail: 'done' });
+    post({ type: 'done' });
+    sessions.release(chatId);
+  }
+}
+
+/**
+ * A skill's run, inside whichever run holds the tab: the user's Run, or the model's run_skill. Everything
+ * from the journal to the card, and what became of it.
+ */
+async function carrySkill(chatId: string, tabId: number, driver: Driver, skill: Skill, carry: RunCarry, signal: AbortSignal, post: (e: AgentEventBody) => void, toolId: string, opts: { from?: number; pending?: string; pendingKind?: PendingStep['kind']; draft?: boolean; byModel?: boolean }): Promise<SkillRunResult | null> {
+  const key = stepsKey(skill.steps);
+  await updateRuns((runs) => withRunSkill(runs, chatId, { id: skill.id, name: skill.name, step: opts.from ?? 0, total: skill.steps.length, key, ...(opts.draft ? { draft: true } : {}) }));
+  await saveCarry(chatId, carry).catch(() => {});
+  post({ type: 'status', phase: 'tool', tool: 'act', detail: `running ${skill.name}` });
+  // A repair puts its own rows in the transcript, so the steps after it open a new group below them, and
+  // the transcript reads in the order things happened. A step's row stays in the group it started in.
+  let split = false;
+  let group = { id: toolId, next: 0 };
+  const groups: string[] = [];
+  const placed = new Map<number, { id: string; index: number }>();
+  const row = (key: number, step: StepRow) => {
+    let at = placed.get(key);
+    if (!at) {
+      if (split) {
+        split = false;
+        group = { id: crypto.randomUUID(), next: 0 };
+        groups.push(group.id);
+        post({ type: 'tool_call', id: group.id, name: 'run_skill', input: { skill: skill.name } });
+      }
+      at = { id: group.id, index: group.next++ };
+      placed.set(key, at);
+    }
+    post({ type: 'act_step', id: at.id, index: at.index, step });
+  };
+  // What the row and the card show. Numbers, and what the extension read: no input's value.
+  if (opts.from === undefined) {
+    const named = Object.keys(skill.inputs).filter((k) => carry.inputs[k]);
+    post({ type: 'note', text: `you ran ${skill.name} v${skill.version}${named.length ? ` · ${named.join(', ')}` : ''}` });
+  } else post({ type: 'note', text: `you resumed ${skill.name}` });
+  if (!opts.byModel) post({ type: 'tool_call', id: toolId, name: 'run_skill', input: { skill: skill.name } });
+  await touchChat(chatId, (await loadMessages(chatId)).length || opts.from !== undefined ? { url: await tabUrl(tabId) } : { title: skill.name, url: skill.start });
+  const hasNote = drive!.note(chatId);
+  let failure: string | null = null;
+  let result: SkillRunResult | null = null;
+  try {
+    // Off its site, Run opens where it starts. That is the one navigation pressing Run asked for.
+    const here = await tabUrl(tabId);
+    const onSite = skillMatchesUrl(skill, here);
+    if (!skillMatchesUrl(skill, skill.start)) throw new Error('This skill starts outside its own sites, so it does not run.');
+    if (!onSite) {
+      await chrome.tabs.update(tabId, { url: skill.start });
+      await drive!.settled(tabId, signal);
+    }
+    await driver.startDriving(pinAddress(skill, await tabUrl(tabId)), addressedHosts(skill));
+    const repair = await repairFor(chatId, skill, opts.draft === true, tabId, driver, post, () => (split = true));
+    result = await runSkill(
+      skill,
+      {
+        driver: { runStep: (s, o, sig) => driver.runStep(s, o, sig), ask: (q, sig) => driver.ask(q, sig), guard: (sig) => driver.guard(sig), announce: (b, a, sig) => driver.announce(b, a, sig), handoff: (t, spec, sig) => driver.handoff(t, spec, sig), didYourself: () => driver.didYourself() },
+        wait: (spec, sig) => waitInTab(tabId, spec, sig),
+        read: (s) => drive!.read(tabId, s),
+        atStep: (i) => updateRuns((runs) => withSkillStep(runs, chatId, i)),
+        pastStep: (i) => updateRuns((runs) => withSkillStep(withoutPending(runs, chatId), chatId, i)),
+        carry: (c) => saveCarry(chatId, c).catch(() => {}),
+        keepAllowance: (action) => keepAllowance(skill.id, action),
+        row,
+        note: (text) => post({ type: 'note', text }),
+        newId: () => crypto.randomUUID(),
+        ...(repair ? { repair: (req, sig) => repair(skill, req, sig) } : {}),
+      },
+      { ...(opts.from !== undefined ? { from: opts.from } : { toStart: needsGoToStart(skill, here, onSite) }), ...(opts.pending !== undefined ? { pending: opts.pending, ...(opts.pendingKind ? { pendingKind: opts.pendingKind } : {}) } : {}), carry },
+      signal,
+    );
+  } catch (e) {
+    failure = e instanceof Error ? e.message : String(e);
+  }
+  const summary = result ? `${result.ran} of ${skill.steps.length} steps` : (failure ?? 'stopped');
+  const isError = !!failure || result?.outcome.kind === 'refused';
+  for (const id of [...(opts.byModel ? [] : [toolId]), ...groups]) post({ type: 'tool_result', id, summary, isError });
+  if (result?.outcome.kind === 'refused') post({ type: 'error', message: result.outcome.message });
+  else if (failure) post({ type: 'error', message: failure });
+  const card = await driver.finishSkill(signal.aborted ? 'stopped' : (result?.ending ?? 'model'), { name: skill.name, label: result?.label ?? `stopped · ${skill.name}` }).catch(() => null);
+  if (card) {
+    const offer: RepairOffer | null = result?.repaired.length ? { run: driver.runId, steps: result.repaired, skillId: skill.id, key, ...(opts.draft ? { draft: true } : {}) } : null;
+    post({ type: 'page_card', card: { ...card, ...(result?.outputs.length ? { outputs: result.outputs } : {}), ...(offer ? { repair: offer } : {}) } });
+    if (card.total) await addChatActions(chatId, card.total).catch(() => {});
+    await setChatRanSkill(chatId, { name: skill.name, actions: card.total }).catch(() => {});
+  }
+  // What was read goes to the note of this chat and no other, so its model can be asked about it.
+  if (result?.outputs.length) await hasNote.change({ append: outputsNote(skill.name, result.outputs) }).catch(() => {});
+  if (!opts.draft && result?.outcome.kind === 'finished' && result.outcome.walked) await markWalked(skill.id, key).catch(() => {});
+  await dropCarry(chatId);
+  return result;
+}
+
+/**
+ * Whether this skill's broken steps go to the model, and if so how. No model connected, or a setting or
+ * an origin that says no, and the run simply stops at them as it always could.
+ */
+async function repairFor(chatId: string, skill: Skill, draft: boolean, tabId: number, driver: Driver, post: (e: AgentEventBody) => void, onRepaired: () => void): Promise<((skill: Skill, req: { index: number; step: SkillStep; message: string; inputs: Readonly<Record<string, string>> }, signal: AbortSignal) => Promise<RepairResult>) | null> {
+  const trusted = draft ? !(await loadArtifact(chatId))?.foreign : skill.origin === 'local';
+  if (!repairAllowed((await loadSettings()).repairSkills, trusted)) return null;
+  const resolved = await resolveChatModel(chatId).catch(() => null);
+  if (!resolved) return null;
+  return async (file, req, signal) => {
+    post({ type: 'note', text: `repairing step ${req.index + 1} with ${resolved.selection.model}` });
+    const page = await envForTab(tabId)
+      .sendToContent<{ text?: string }>({ type: 'inventory', maxChars: 8000 })
+      .catch(() => ({ text: '' }));
+    const outcome = await runRepair(
+      {
+        settings: resolved.settings,
+        provider: createProvider(resolved.settings, { memory: visionMemory, thinkingMemory }),
+        driver: { act: (call, ctx, sig, rules) => driver.act(call, ctx, sig, rules), guard: (sig, iteration) => driver.guard(sig, iteration), recordWait: (spec) => driver.recordWait(spec), recordLook: (s, m, l) => driver.recordLook(s, m, l), setRepairing: (i) => driver.setRepairing(i) },
+        env: envForTab(tabId),
+        emit: post,
+        newId: () => crypto.randomUUID(),
+      },
+      { skill: { name: file.name, description: file.description }, index: req.index, total: file.steps.length, step: req.step, message: req.message, inventory: page.text ?? '', inputs: req.inputs },
+      signal,
+    );
+    onRepaired();
+    return outcome;
+  };
+}
+
+/**
+ * run_skill: the card, in the panel, and only then the run, under its own driver so its rows and its
+ * card are its own. The model has nothing to answer the card with, and goes on waiting at this call.
+ */
+async function runSkillForModel(chatId: string, tabId: number, parent: Driver, skillId: string, values: Record<string, string>, toolId: string, signal: AbortSignal, post: (e: AgentEventBody) => void): Promise<{ text: string; isError: boolean }> {
+  const skill = (await loadSkills()).find((s) => s.id === skillId);
+  if (!skill) return { text: `There is no skill with id ${skillId}. The ids are in the "[Skills on this page]" list.`, isError: true };
+  const here = await tabUrl(tabId);
+  // A model stays on the site its run is on. Only the user's own Run opens somewhere else.
+  if (!skillMatchesUrl(skill, here)) return { text: `That skill runs on ${skillHosts(skill).join(', ')}, and this tab is on ${hostOf(here) || 'another page'}. Tell the user: they can run it from the Mods tab.`, isError: true };
+  const host = hostOf(here);
+  const siteAllowed = await drive!.siteAllowed(chatId, host);
+  // What the model suggested for what the file declares, and nothing else.
+  const suggested = Object.fromEntries(Object.entries(values).filter(([k]) => Object.hasOwn(skill.inputs, k)));
+  const answer = await parent.ask({ kind: 'run-skill', id: crypto.randomUUID(), skill, values: suggested, siteAllowed, host }, signal);
+  if (!answer) return { text: 'Stopped by the user.', isError: false };
+  if (answer.kind !== 'run') {
+    post({ type: 'note', text: `you did not run ${skill.name}` });
+    return { text: 'The user chose not to run it. Nothing ran. Do not do the same steps another way unless they ask.', isError: false };
+  }
+  if (!siteAllowed) await drive!.allowSiteFor(chatId, host, answer.standing === true);
+  const declared = Object.fromEntries(Object.entries(answer.inputs).filter(([k, v]) => Object.hasOwn(skill.inputs, k) && v.trim()));
+  const driver = drive!.driverFor(chatId, tabId);
+  try {
+    const result = await carrySkill(chatId, tabId, driver, skill, { inputs: declared, outputs: {} }, signal, post, toolId, { byModel: true });
+    return result ? runReport(skill, result) : { text: 'The run could not start.', isError: true };
+  } finally {
+    drive!.adopt(chatId, tabId, parent);
+    // The model's run carries on, and it is no longer a skill's to resume.
+    await updateRuns((runs) => withoutPending(withoutRunSkill(runs, chatId), chatId));
+  }
+}
+
+/** Edit in chat on a skill's row: the mods' decision about which chat, and the skill as its draft. */
+async function editSkillInChat(skillId: string, currentChatId: string | null, host: string, model: ModelSelection | null = null) {
+  const skill = (await loadSkills()).find((s) => s.id === skillId);
+  if (!skill) throw new Error('That skill no longer exists.');
+  const chats = await listChats();
+  const runsHere = skillMatchesUrl(skill, await activeUrl());
+  const current = currentChatId ? (chats.find((c) => c.id === currentChatId) ?? null) : null;
+  const currentCandidate = current ? { id: current.id, host: current.host, archived: isArchived(current), updatedAt: current.updatedAt, editingModId: current.editingModId, ...(await chatStanding(current.id)) } : null;
+  const plan = editModPlan(skillId, chats.map((c) => ({ id: c.id, host: c.host, archived: isArchived(c), updatedAt: c.updatedAt, editingModId: c.editingModId })), currentCandidate);
+  let chatId: string;
+  let created = false;
+  if (plan.action === 'reuse') {
+    chatId = plan.chatId;
+    if (plan.unarchive) await archiveChat(chatId, false);
+  } else if (plan.action === 'seed') chatId = plan.chatId;
+  else {
+    chatId = (await createChat((runsHere ? hostFromUrl(await activeUrl()) : hostFromUrl(skill.start)) || host, model)).id;
+    created = true;
+  }
+  const existing = await loadArtifact(chatId);
+  const artifact = plan.action === 'reuse' && existing?.linkedSkillId === skillId ? existing : await openSkillDraft(chatId, skill);
+  return { chatId, host: (await getChat(chatId))?.host ?? host, created, reused: plan.action === 'reuse', artifact, skill, runsHere };
 }
 
 /**
@@ -1092,11 +1454,13 @@ async function bootstrap() {
 const USER_JS_RULE_ID = 1;
 /** Lets a code host's HTML view of a .user.js file (a GitHub blob page) load as itself. */
 const USER_JS_VIEW_RULE_ID = 2;
+/** The same redirect for a .skill.md, in a build that has skills. The view rule above covers it too. */
+const SKILL_MD_RULE_ID = 3;
 
 async function installUserJsRedirect(): Promise<void> {
   const target = chrome.runtime.getURL('install.html');
   await chrome.declarativeNetRequest.updateDynamicRules({
-    removeRuleIds: [USER_JS_RULE_ID, USER_JS_VIEW_RULE_ID],
+    removeRuleIds: ACT_OFF ? [USER_JS_RULE_ID, USER_JS_VIEW_RULE_ID] : [USER_JS_RULE_ID, USER_JS_VIEW_RULE_ID, SKILL_MD_RULE_ID],
     addRules: [
       {
         id: USER_JS_RULE_ID,
@@ -1118,6 +1482,20 @@ async function installUserJsRedirect(): Promise<void> {
           resourceTypes: ['main_frame'],
         },
       },
+      ...(ACT_OFF
+        ? []
+        : [
+            {
+              id: SKILL_MD_RULE_ID,
+              priority: 1,
+              action: { type: 'redirect' as const, redirect: { regexSubstitution: `${target}#\\0` } },
+              condition: {
+                regexFilter: SKILL_MD_PATTERN,
+                isUrlFilterCaseSensitive: false,
+                resourceTypes: ['main_frame' as const],
+              },
+            },
+          ]),
     ],
   });
 }
@@ -1308,6 +1686,15 @@ const updates = createUpdateController({
     await upsertMod(fresh);
     await syncRegistrations();
   },
+  ...(ACT_OFF
+    ? {}
+    : {
+        loadSkills,
+        async installSkill(skill, source) {
+          // An update is new steps nobody has seen: the walk and any allowance start over.
+          await upsertSkill(skillFromSource(source, { existing: skill, origin: 'installed', ...(skill.downloadUrl ? { downloadUrl: skill.downloadUrl } : {}) }));
+        },
+      }),
   async modelAvailable() {
     const r = await reviewSettings().catch((e: unknown) => ({ ok: false as const, reason: e instanceof Error ? e.message : String(e) }));
     return r.ok ? { ok: true, model: r.model } : { ok: false, reason: r.reason };
@@ -1344,6 +1731,14 @@ const share = createShareController({
     await upsertMod(mod);
     await syncRegistrations();
   },
+  ...(ACT_OFF
+    ? {}
+    : {
+        loadSkills,
+        async saveSkill(skill) {
+          await upsertSkill(skill);
+        },
+      }),
   sendToContent,
 });
 
@@ -1358,13 +1753,32 @@ function cleanDetection(d: unknown): Detection | null {
     version: str(s?.version, 100),
     installUrl: str(s?.installUrl),
     ...(s?.downloadUrl ? { downloadUrl: str(s.downloadUrl) } : {}),
+    ...(!ACT_OFF && s?.skill === true ? { skill: true as const } : {}),
   }));
   const gist = x.gist && typeof x.gist.id === 'string' ? { user: str(x.gist.user, 100), id: str(x.gist.id, 64) } : undefined;
   return { kind: x.kind as Detection['kind'], scripts, ...(gist ? { gist } : {}) };
 }
 
+/** The same stop as the panel's: written down first, then aborted, one chat at a time. */
+async function stopRunsOnTab(tabId: number): Promise<void> {
+  for (const chatId of sessions.ids()) {
+    if (sessions.get(chatId)?.tabId !== tabId || !sessions.isRunning(chatId)) continue;
+    await markStopped(chatId);
+    for (const id of sessions.abort(chatId)) postAgentEvent(chatId, { type: 'unqueued', id });
+  }
+}
+
 async function handlePageMessage(msg: { type?: string } & Record<string, unknown>, sender: chrome.runtime.MessageSender): Promise<unknown> {
   const tab = sender.tab!;
+  if (!ACT_OFF && (msg.type === BAR_STOP || msg.type === BAR_DONE)) {
+    if (tab.id == null) return undefined;
+    // Stop from the bar on the page is the same stop as the panel's. "I have done it" ends a handoff
+    // and nothing else. These two are all a page can say about a run: harmless if forged, so no
+    // permission is ever behind a message from here.
+    if (msg.type === BAR_STOP) await stopRunsOnTab(tab.id);
+    else drive?.barDone(tab.id);
+    return { ok: true };
+  }
   switch (msg.type) {
     case 'usermods:banner-state': {
       const quiet: BannerStateReply = { show: false, states: [] };
@@ -1378,8 +1792,10 @@ async function handlePageMessage(msg: { type?: string } & Record<string, unknown
       const mods = await loadMods();
       // The user's own shared gist is theirs; offering to install it back is a nag.
       if (detection.gist && mods.some((m) => m.share?.gist?.id === detection.gist!.id)) return quiet;
+      const skills = ACT_OFF ? [] : await loadSkills();
+      if (!ACT_OFF && detection.gist && skills.some((m) => m.share?.gist?.id === detection.gist!.id)) return quiet;
       const states = detection.scripts.map((s) => {
-        const st = installState(s, mods);
+        const st = !ACT_OFF && s.skill ? skillInstallState(s, skills) : installState(s, mods);
         return bannerWorthShowing(detection.kind, st) ? st : null;
       });
       return { show: states.some(Boolean), states } satisfies BannerStateReply;
@@ -1407,6 +1823,34 @@ async function handlePageMessage(msg: { type?: string } & Record<string, unknown
 // ---------- RPC ----------
 
 async function handleRpc(req: RpcRequest): Promise<unknown> {
+  if (!ACT_OFF && req.type.startsWith('act.')) return drive!.rpc(req as DriveRpc);
+  if (!ACT_OFF && req.type.startsWith('skills.')) {
+    return handleSkillsRpc(req as SkillsRpc, {
+      async checkNow(id) {
+        await updates.check({ force: true, onlyId: id });
+        return (await updates.summary())[id];
+      },
+      async run(r) {
+        // A skill's run takes the page, and Run off its site opens another: not from under a run on this tab.
+        if (sessions.runningOnTab(r.tabId, r.chatId)) throw new Error('Another chat is running on this tab. Stop it first.');
+        if (!sessions.claim(r.chatId, r.tabId)) throw new Error('This chat is already running. Stop it first.');
+        let skill: Skill | undefined;
+        try {
+          skill = r.draft ? await draftAsSkill(r.chatId) : (await loadSkills()).find((s) => s.id === r.skillId);
+          if (!skill) throw new Error('That skill no longer exists.');
+          if (r.allowSite) await drive!.allowSiteFor(r.chatId, hostOf(skillMatchesUrl(skill, await tabUrl(r.tabId)) ? await tabUrl(r.tabId) : skill.start), r.standing === true);
+        } catch (e) {
+          letGoOf(r.chatId, r.tabId);
+          throw e;
+        }
+        void runSkillChat(r.chatId, r.tabId, skill, { inputs: r.inputs, outputs: {} }, r.draft ? { draft: true } : {});
+      },
+      siteAllowed: async (chatId, host) => (chatId ? drive!.siteAllowed(chatId, host) : drive!.siteAllowed('', host)),
+      saveCard: (r) => saveCard(r.chatId, r.run, r.title),
+      draft: (r) => draftFromRun(r.chatId, r.run, r.decisions, { ...(r.replace ? { replace: true } : {}), today: new Date().toISOString().slice(0, 10) }),
+      edit: (r) => editSkillInChat(r.skillId, r.currentChatId ?? null, r.host, r.model ?? null),
+    });
+  }
   switch (req.type) {
     case 'mods.list':
       return loadMods();
@@ -1432,7 +1876,7 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
       return mods;
     }
     case 'mods.preview':
-      return 'url' in req ? previewFromUrl(req.url) : previewFromSource(req.source);
+      return 'url' in req ? previewFromUrl(req.url) : previewFromText(req.source);
     case 'mods.install': {
       // replaceId: the install page updating a script that is already installed (it found it with
       // mods.findInstalled and said so on its button) — same mod, same id, values and enabled flag.
@@ -1551,6 +1995,7 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
       forgetDetached([req.id]);
       await deleteChat(req.id);
       await clearRuns([req.id]);
+      if (!ACT_OFF) await drive?.forget([req.id]).catch(() => {});
       return { ok: true };
     case 'chats.archive':
       await archiveChat(req.id, req.archived);
@@ -1562,6 +2007,7 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
       if (req.action === 'delete') forgetDetached(req.ids);
       await bulkChats(req.ids, req.action);
       if (req.action === 'delete') await clearRuns(req.ids);
+      if (!ACT_OFF && req.action === 'delete') await drive?.forget(req.ids).catch(() => {});
       return { ok: true };
     case 'mods.bulk': {
       const wanted = new Set(req.ids);
@@ -1639,7 +2085,7 @@ async function handleRpc(req: RpcRequest): Promise<unknown> {
       if (!name || !v || name === v.name) return a;
       // A rename is a version like any other, so the strip shows when the draft was renamed and a
       // rollback can undo it. addVersion dedupes an identical one, so this cannot make an empty step.
-      const next = addVersion(a, { code: v.code, name, description: v.description, matches: v.matches, source: 'user-edit', untestedReason: a.untestedReason });
+      const next = addVersion(a, { code: !ACT_OFF && a.kind === 'skill' ? setSkillFields(v.code, { name }) : v.code, name, description: v.description, matches: v.matches, source: 'user-edit', untestedReason: a.untestedReason });
       await saveArtifact(next);
       await setChatArtifact(req.chatId, next.id, next.versions.length);
       return next;
@@ -1822,6 +2268,7 @@ async function saveArtifactAsMod(
   overwriteModId?: string,
 ): Promise<{ artifact: Artifact; mod: Mod; created: boolean; relinked: boolean } | { duplicate: { id: string; name: string } }> {
   const artifact = await requireArtifact(chatId);
+  if (!ACT_OFF && artifact.kind === 'skill') throw new Error('This draft is a skill.');
   const proposal = toProposal(artifact);
   if (!proposal) throw new Error('This draft has no versions to save.');
 

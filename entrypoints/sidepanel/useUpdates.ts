@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { ACT_OFF } from '@/lib/buildflags';
 import { rpc } from '@/lib/rpc';
 
 export type UpdateSummary = Record<string, { available?: string; error?: string; lastChecked?: number }>;
@@ -18,7 +19,7 @@ export function useUpdates(): { summary: UpdateSummary; count: number; refresh: 
     refresh();
     void rpc({ type: 'updates.check' }).then(refresh).catch(() => {});
     const onChanged = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
-      if (area === 'local' && (changes.updates || changes.mods)) refresh();
+      if (area === 'local' && (changes.updates || changes.mods || (!ACT_OFF && changes.skills))) refresh();
     };
     chrome.storage.onChanged.addListener(onChanged);
     return () => chrome.storage.onChanged.removeListener(onChanged);

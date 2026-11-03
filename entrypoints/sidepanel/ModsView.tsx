@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
+import { ACT_OFF } from '@/lib/buildflags';
+import type { Skill } from '@/lib/skills';
 import { summarizeImport } from '@/lib/importreport';
+import type { InstallPreview as AnyPreview } from '@/lib/install';
 import { rpc } from '@/lib/rpc';
 import type { Mod, ScriptPreview } from '@/lib/types';
 import { HANDOFF_KEY, type ChatHandoff } from '@/lib/dashboard';
@@ -10,16 +13,17 @@ import { InstallPreview } from './components/InstallPreview';
 import { MenuButton, type MenuItem } from './components/Menu';
 import { Sheet, SheetRow } from './components/Sheet';
 import { TampermonkeyCard } from './components/TampermonkeyCard';
+import { SkillCard, SkillPreviewCard, skillsHere, useSkillList, useSkillShare } from './Skills';
 import { useShell } from './shell';
 import { openUpdateReview, useUpdates, type UpdateSummary } from './useUpdates';
 
 /** A script waiting on the user's confirmation, plus where it came from. */
 interface Pending {
-  preview: ScriptPreview;
+  preview: AnyPreview;
   downloadUrl?: string;
 }
 
-export function ModsView({ tabId, pageUrl, host, onEditInChat }: { tabId: number | null; pageUrl: string; host: string; onEditInChat: () => void }) {
+export function ModsView({ tabId, pageUrl, host, onEditInChat, onRunSkill }: { tabId: number | null; pageUrl: string; host: string; onEditInChat: () => void; onRunSkill?: (id: string) => void }) {
   const [mods, setMods] = useState<Mod[]>([]);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
@@ -97,6 +101,14 @@ export function ModsView({ tabId, pageUrl, host, onEditInChat }: { tabId: number
     setBusy(true);
     setInstallError('');
     try {
+      if (!ACT_OFF && pending.preview.kind === 'skill') {
+        await rpc({ type: 'skills.install', source: pending.preview.source, origin: pending.downloadUrl ? 'installed' : 'imported', ...(pending.downloadUrl ? { downloadUrl: pending.downloadUrl } : {}) });
+        setStatus(`Installed the skill “${pending.preview.name}”.`);
+        setPending(null);
+        setUrl('');
+        setBusy(false);
+        return;
+      }
       const next = await rpc({
         type: 'mods.install',
         source: pending.preview.source,
@@ -116,7 +128,7 @@ export function ModsView({ tabId, pageUrl, host, onEditInChat }: { tabId: number
   function importFile() {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.js,.user.js,text/javascript';
+    input.accept = ACT_OFF ? '.js,.user.js,text/javascript' : '.js,.user.js,.md,.skill.md,text/javascript,text/markdown';
     input.onchange = () => {
       const f = input.files?.[0];
       if (f) void f.text().then((source) => preview({ source }));
@@ -150,6 +162,52 @@ export function ModsView({ tabId, pageUrl, host, onEditInChat }: { tabId: number
     onChanged: () => void rpc({ type: 'mods.list' }).then(setMods).catch(() => {}),
   });
 
+  // Skills: their own rows and their own Export. Nothing here runs without the flag, or once it is folded.
+  const skills = ACT_OFF ? [] : useSkillList();
+  const skillShare = ACT_OFF
+    ? null
+    : useSkillShare({
+        onStatus: (s) => {
+          setError('');
+          setStatus(s);
+        },
+        onError: fail,
+      });
+  const skillsSplit = ACT_OFF ? null : skillsHere(skills, pageUrl);
+  const skillProps = {
+    onDelete: (name: string, id: string) => {
+      if (!confirm(`Delete "${name}"?`)) return;
+      void rpc({ type: 'skills.delete', ids: [id] }).catch(fail);
+    },
+    onUpdate: (name: string, id: string) => {
+      setError('');
+      setStatus('');
+      void rpc({ type: 'skills.update', id })
+        .then((r) => {
+          if (r.available) {
+            setStatus(`“${name}” v${r.available} is available. Review it in the tab that opened; nothing changes until you install it.`);
+            openUpdateReview(id);
+          } else setStatus(`“${name}” is up to date.`);
+        })
+        .catch(fail);
+    },
+    onCopyLink: (url: string) => void copyText(url).then(() => setStatus('Copied the install link.'), fail),
+    onRun: (id: string) => onRunSkill?.(id),
+    onEdit: (s: Skill) => {
+      setError('');
+      setStatus('');
+      void rpc({ type: 'skills.edit', skillId: s.id, host })
+        .then(async (r) => {
+          const handoff: ChatHandoff = { chatId: r.chatId, host: r.host, at: Date.now() };
+          await chrome.storage.session.set({ [HANDOFF_KEY]: handoff }).catch(() => {});
+          if (r.host && r.host !== host) setStatus(`“${s.name}” is for ${r.host}. Its chat is ready: open ${s.start} and the panel will land on it.`);
+          else onEditInChat();
+        })
+        .catch(fail);
+    },
+    updates: updates.summary,
+  };
+
   const here = mods.filter((m) => pageUrl && urlMatches(pageUrl, [...m.matches, ...m.includeGlobs]));
   const elsewhere = mods.filter((m) => !here.includes(m));
   const cardProps = {
@@ -169,6 +227,8 @@ export function ModsView({ tabId, pageUrl, host, onEditInChat }: { tabId: number
       {status && <div className="ok">● {status}</div>}
       {share.prompt}
       {share.notices}
+      {ACT_OFF ? null : skillShare!.prompt}
+      {ACT_OFF ? null : skillShare!.notices}
 
       <TampermonkeyCard
         onImported={(r) => {
@@ -194,30 +254,41 @@ export function ModsView({ tabId, pageUrl, host, onEditInChat }: { tabId: number
           </button>
         </div>
         <div className="row">
-          <span className="muted grow" style={{ fontSize: 'var(--fs-meta)' }}>or import a .user.js file from disk</span>
+          <span className="muted grow" style={{ fontSize: 'var(--fs-meta)' }}>{ACT_OFF ? 'or import a .user.js file from disk' : 'or import a .user.js or .skill.md file from disk'}</span>
           <button className="btn" onClick={importFile}>Import file</button>
         </div>
       </div>
 
-      {pending && (
-        <InstallPreview
-          preview={pending.preview}
-          busy={busy}
-          error={installError}
-          onInstall={() => void confirmInstall()}
-          onCancel={() => setPending(null)}
-        />
-      )}
+      {pending &&
+        (!ACT_OFF && pending.preview.kind === 'skill' ? (
+          <SkillPreviewCard preview={pending.preview} busy={busy} error={installError} onInstall={() => void confirmInstall()} onCancel={() => setPending(null)} />
+        ) : (
+          <InstallPreview
+            preview={pending.preview as ScriptPreview}
+            busy={busy}
+            error={installError}
+            onInstall={() => void confirmInstall()}
+            onCancel={() => setPending(null)}
+          />
+        ))}
 
-      {mods.length === 0 && <div className="empty">no mods yet · build one in Chat, or install one above</div>}
+      {mods.length === 0 && skills.length === 0 && <div className="empty">no mods yet · build one in Chat, or install one above</div>}
       {here.length > 0 && (
-        <div className="label" style={{ marginBottom: 0 }}>On this site · {here.length}</div>
+        <div className="label" style={{ marginBottom: 0 }}>{ACT_OFF ? 'On this site' : 'Mods on this site'} · {here.length}</div>
       )}
       {here.length > 0 && <div className="list">{here.map((m) => <ModCard key={m.id} m={m} {...cardProps} />)}</div>}
       {elsewhere.length > 0 && (
-        <div className="label" style={{ marginBottom: 0 }}>Other sites · {elsewhere.length}</div>
+        <div className="label" style={{ marginBottom: 0 }}>{ACT_OFF ? 'Other sites' : 'Other mods'} · {elsewhere.length}</div>
       )}
       {elsewhere.length > 0 && <div className="list">{elsewhere.map((m) => <ModCard key={m.id} m={m} {...cardProps} />)}</div>}
+      {ACT_OFF ? null : (
+        <>
+          {skillsSplit!.here.length > 0 && <div className="label" style={{ marginBottom: 0 }}>Skills on this site · {skillsSplit!.here.length}</div>}
+          {skillsSplit!.here.length > 0 && <div className="list">{skillsSplit!.here.map((s) => <SkillCard key={s.id} skill={s} here exportItems={skillShare!.items} {...skillProps} />)}</div>}
+          {skillsSplit!.elsewhere.length > 0 && <div className="label" style={{ marginBottom: 0 }}>Other skills · {skillsSplit!.elsewhere.length}</div>}
+          {skillsSplit!.elsewhere.length > 0 && <div className="list">{skillsSplit!.elsewhere.map((s) => <SkillCard key={s.id} skill={s} here={false} exportItems={skillShare!.items} {...skillProps} />)}</div>}
+        </>
+      )}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { ACT_OFF } from '@/lib/buildflags';
 import { describeLeak, scanForLeaks, type Leak } from '@/lib/leakscan';
 import { rpc } from '@/lib/rpc';
 import { SUGGESTED_LICENSE, SUGGESTED_NAMESPACE, prepareShare, shareFileName, shareMenuLabels, type GreasyForkKey, type ShareOptions, type ShareTarget } from '@/lib/share';
@@ -55,6 +56,7 @@ export function useModShare({ onStatus, onError, onChanged }: { onStatus: (s: st
   useEffect(() => {
     const onMessage = (msg: ShareEvent) => {
       if (msg?.type !== 'usermods:share-event') return;
+      if (!ACT_OFF && msg.skill) return; // Skills.tsx hears those.
       void rpc({ type: 'mods.list' }).then((mods) => {
         const m = mods.find((x) => x.id === msg.modId);
         const name = m?.name ?? 'your mod';

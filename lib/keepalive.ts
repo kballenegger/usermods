@@ -70,6 +70,7 @@
 
 // Type-only, so this module stays importable by the node test runner, which resolves no
 // extensionless relative specifiers.
+import { ACT_OFF } from './buildflags.ts';
 import type { RunMap, RunRecord } from './runstate';
 
 /**
@@ -219,7 +220,7 @@ export const AUTO_RESUMED_TEXT = 'Resumed after Safari paused the extension.';
  * been written down before it did.
  */
 export interface AutoResumeInput {
-  record: Pick<RunRecord, 'state'> & { autoResumes?: number; stoppedByUser?: boolean };
+  record: Pick<RunRecord, 'state'> & { autoResumes?: number; stoppedByUser?: boolean; pending?: RunRecord['pending']; skill?: RunRecord['skill'] };
   /** Whether a session for this chat is live in THIS worker right now. */
   live: boolean;
   /** Whether this build should auto-resume at all. False on Chrome. */
@@ -244,6 +245,9 @@ export interface AutoResumeInput {
  *     retries). Sending exactly the same thing again would fail exactly the same way; that is what
  *     the button and the error text are for.
  *   - **stopped by the user** — Stop means stop. This is the clause the owner would notice.
+ *   - **a pending step** — the journal says something was in flight when the worker died, and it may
+ *     or may not have happened. Going on by itself is how a submit gets sent twice. A person looks
+ *     first; the same record is what the Resume block reads.
  *   - **out of attempts** — see MAX_AUTO_RESUMES.
  *
  * What is left is precisely the case the owner described: a run that was going, that the user did
@@ -254,6 +258,9 @@ export function shouldAutoResume({ record, live, safari }: AutoResumeInput): boo
   if (live) return false;
   if (record.state !== 'interrupted') return false;
   if (record.stoppedByUser) return false;
+  if (record.pending) return false;
+  // A skill's run holds values only the user can give again, and its pending step is the user's to answer.
+  if (!ACT_OFF && record.skill) return false;
   return (record.autoResumes ?? 0) < MAX_AUTO_RESUMES;
 }
 

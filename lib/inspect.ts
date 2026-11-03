@@ -15,6 +15,7 @@
 // parsed page by reading boxes and styles from attributes (see test/inspect.test.ts).
 
 // The .ts extension: see lib/agent/tools.ts. node's test runner loads this file directly.
+import { ACT_OFF } from './buildflags.ts';
 import { durabilityLabel, isGeneratedClass, isVisible, reachFor, selectorFor, trunc } from './snapshot.ts';
 import { deepestOnly, elementsWithText, hasText, queryAllDeep, type DeepMatch } from './waitdom.ts';
 
@@ -115,7 +116,7 @@ export function layoutFacts(style: (p: string) => string): string {
 }
 
 /** The parent, crossing out of an open shadow root to its host. */
-function parentOf(el: Element): { el: Element | null; viaHost: boolean } {
+export function parentOf(el: Element): { el: Element | null; viaHost: boolean } {
   if (el.parentElement) return { el: el.parentElement, viaHost: false };
   const root = el.getRootNode?.() as (Node & { host?: Element }) | undefined;
   return root?.host ? { el: root.host, viaHost: true } : { el: null, viaHost: false };
@@ -240,6 +241,8 @@ export interface FindOptions {
   styles?: string[];
   /** List the page's layers and scroll locks (describeFurniture) ahead of any matches. */
   overlays?: boolean;
+  /** Every listed match carries a `ref=` from this. Only a build that operates pages passes it. */
+  refOf?: (el: Element) => string;
 }
 
 /**
@@ -255,11 +258,11 @@ export function describeElements(selector: string | undefined, limit = 20, text?
   const needle = text?.trim() || undefined;
   const furniture = opts.overlays ? describeFurniture(probe) : '';
   if (!sel && !needle) return furniture || 'Give a selector, a text, or both.';
-  const matches = describeMatches(sel, needle, limit, opts.styles ?? [], probe);
+  const matches = describeMatches(sel, needle, limit, opts.styles ?? [], probe, opts.refOf);
   return furniture ? `${furniture}\n\n${matches}` : matches;
 }
 
-function describeMatches(sel: string | undefined, needle: string | undefined, limit: number, styles: string[], probe: Probe): string {
+function describeMatches(sel: string | undefined, needle: string | undefined, limit: number, styles: string[], probe: Probe, refOf?: (el: Element) => string): string {
   let found: DeepMatch[];
   let searchedRoots = 0;
   if (sel) {
@@ -289,7 +292,7 @@ function describeMatches(sel: string | undefined, needle: string | undefined, li
     const style = probe.style(el);
     const layout = layoutFacts(style);
     const out = [
-      `${i + 1}. ${s} ${durabilityLabel(s)} [${size(r)} @${Math.round(r.x)},${Math.round(r.y)}]${layout ? ` ${layout}` : ''} ${m.hosts.length ? '(in shadow root) ' : ''}${probe.visible(el) ? '' : '(hidden) '}${trunc((el as HTMLElement).innerText ?? el.textContent ?? '', 120)}`,
+      `${i + 1}. ${s} ${durabilityLabel(s)}${!ACT_OFF && refOf ? ` ref=${refOf(el)}` : ''} [${size(r)} @${Math.round(r.x)},${Math.round(r.y)}]${layout ? ` ${layout}` : ''} ${m.hosts.length ? '(in shadow root) ' : ''}${probe.visible(el) ? '' : '(hidden) '}${trunc((el as HTMLElement).innerText ?? el.textContent ?? '', 120)}`,
     ];
     if (styles.length) out.push(`   ${styles.map((p) => `${p}: ${trunc(style(p), MAX_STYLE_VALUE) || '(none)'}`).join('; ')}`);
     if (i < CHAIN_MATCHES) {

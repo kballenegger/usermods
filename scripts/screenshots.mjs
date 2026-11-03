@@ -92,6 +92,10 @@ import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { ARTIFACT_V1, ARTIFACT_V2, ARTIFACT_V3, COMPACT_MARKER, EDITMOD_PROMPTS, editModSource, FAST_MARKER, IMAGES_MARKER, MARKDOWN_REPLY, MODELS, RESUME as RESUME_CONV, SLOW_MARKER, SUMMARY_MARKER, THINKING, VISION as VISION_CONV, WAIT_MARKER } from './mock-llm.mjs';
 import { extDir } from './build-dir.mjs';
+import { interactFlow } from './lib/interact-flow.mjs';
+import { actFlow } from './lib/act-flow.mjs';
+import { skillsFlow } from './lib/skills-flow.mjs';
+import { skillsModelFlow } from './lib/skills-model-flow.mjs';
 import { bannerFlow, shareFlow } from './lib/share-flows.mjs';
 import { updatesFlow } from './lib/update-flow.mjs';
 import fs from 'node:fs';
@@ -110,6 +114,11 @@ const PANEL = { width: 420, height: 820 };
 const SCALE = 2;
 
 const SMOKE = process.argv.includes('--smoke');
+/** The content messages behind operating a page, driven through the built extension. */
+const INTERACT = process.argv.includes('--interact');
+const ACT_FLOW = process.argv.includes('--act');
+const SKILLS_FLOW = process.argv.includes('--skills');
+const SKILLS_MODEL_FLOW = process.argv.includes('--skills-model');
 const CHATS = process.argv.includes('--chats');
 const ISOLATION = process.argv.includes('--isolation');
 const COMPACTION = process.argv.includes('--compaction');
@@ -209,7 +218,7 @@ const CAPTURING =
   !SMOKE && !CHATS && !ISOLATION && !COMPACTION && !DASHBOARD && !DASHBOARD_SHOT && !THEME &&
   !TABBAR && !TABBAR_SHOT && !WAIT && !IMAGES && !VISION && !STYLEGUIDE && !ARTIFACT && !ARTIFACT_SHOT &&
   !PANELSCOPE && !RESUME && !EDITMOD && !COMPOSER && !MODELS_FLOW && !THINKING_FLOW && !COMPOSER_HEIGHT &&
-  !SHARE_FLOW && !SHARE_SHOT && !BANNER_FLOW && !BANNER_SHOT && !EXPORT_SHOT && !UPDATES_FLOW && !UPDATES_SHOT;
+  !SHARE_FLOW && !SHARE_SHOT && !BANNER_FLOW && !BANNER_SHOT && !EXPORT_SHOT && !UPDATES_FLOW && !UPDATES_SHOT && !INTERACT && !ACT_FLOW && !SKILLS_FLOW;
 // --editmod-capture writes screenshots, so it wears the capture mask (the untested line is an
 // artefact of the automated profile, not of the product; see HIDE_UNTESTED_LINE).
 const CAPTURING_EDITMOD = EDITMOD_SHOT || COMPOSER_SHOT || EXPORT_SHOT;
@@ -286,7 +295,9 @@ async function launch(colorScheme = 'light', { args = [] } = {}) {
     colorScheme,
     viewport: PANEL,
     deviceScaleFactor: SCALE,
-    args: [`--disable-extensions-except=${EXT_DIR}`, `--load-extension=${EXT_DIR}`, ...args],
+    // Chromium ignores HTTPS_PROXY on macOS, so a machine whose network is behind a local proxy names
+    // it here, or every flow that opens the live test page times out. Loopback bypasses it by default.
+    args: [`--disable-extensions-except=${EXT_DIR}`, `--load-extension=${EXT_DIR}`, ...(process.env.USERMODS_BROWSER_PROXY ? [`--proxy-server=${process.env.USERMODS_BROWSER_PROXY}`] : []), ...args],
   });
 
   let [sw] = ctx.serviceWorkers();
@@ -3016,6 +3027,8 @@ async function dashboardFlow({ capture = false } = {}) {
 
     // --- 1. Chats are grouped by host, newest site first, with per-group counts.
     const groups = page.locator('[data-testid="hostgroup"]');
+    // The list arrives over an RPC: under load the first count can land before it does.
+    await groups.nth(1).waitFor({ timeout: 15_000 }).catch(() => {});
     if ((await groups.count()) !== 2) fail(`expected 2 host groups, got ${await groups.count()}`);
     const hosts = await groups.evaluateAll((els) => els.map((e) => e.dataset.host));
     if (hosts[0] !== 'en.wikipedia.org') fail(`the most recently used site was not first (order: ${hosts.join(', ')})`);
@@ -5283,7 +5296,7 @@ async function composerFlow() {
       };
     });
     if (menuA11y.haspopup !== 'menu' || menuA11y.expanded !== 'true' || !menuA11y.controls || menuA11y.role !== 'menu') fail(`the "+" button is not a menu button: ${JSON.stringify(menuA11y)}`);
-    if (JSON.stringify(menuA11y.items) !== JSON.stringify(['Point at element', 'Attach image', 'New chat'])) fail(`the "+" menu offers ${JSON.stringify(menuA11y.items)}`);
+    if (JSON.stringify(menuA11y.items) !== JSON.stringify(['Point at element', 'Attach image', 'New chat', 'Run a skill…'])) fail(`the "+" menu offers ${JSON.stringify(menuA11y.items)}`);
     if (!menuA11y.focusedFirst) fail('opening the "+" menu from the keyboard did not focus its first item');
     await panel.keyboard.press('ArrowDown');
     if ((await panel.evaluate(() => document.activeElement?.getAttribute('data-testid'))) !== 'menu-attach') fail('ArrowDown did not move to Attach image');
@@ -5743,6 +5756,22 @@ async function main() {
       await waitFlow();
       return;
     }
+    if (INTERACT) {
+      await interactFlow({ launch, log });
+      return;
+    }
+    if (ACT_FLOW) {
+      await actFlow({ launch, openPanel, openSite, waitForComposer, sendPrompt, startNewChat, stopServiceWorker, requestsFor, clearViolations, fetchViolations, log });
+      return;
+    }
+    if (SKILLS_FLOW) {
+      await skillsFlow({ launch, openPanel, openSite, waitForComposer, sendPrompt, startNewChat, stopServiceWorker, fetchRequests, clearViolations, fetchViolations, log });
+      return;
+    }
+    if (SKILLS_MODEL_FLOW) {
+      await skillsModelFlow({ launch, openPanel, openSite, waitForComposer, sendPrompt, startNewChat, fetchRequests, clearViolations, fetchViolations, log });
+      return;
+    }
     if (IMAGES) {
       await imagesFlow();
       return;
@@ -5879,6 +5908,10 @@ async function main() {
       await shareFlow({ launch, openPanel, openSite, log, outDir: OUT_DIR });
       await bannerFlow({ launch, log, outDir: OUT_DIR });
       await updatesFlow({ launch, openPanel, openSite, log, controlBase: CONTROL_BASE });
+      await interactFlow({ launch, log });
+      await actFlow({ launch, openPanel, openSite, waitForComposer, sendPrompt, startNewChat, stopServiceWorker, requestsFor, clearViolations, fetchViolations, log });
+      await skillsFlow({ launch, openPanel, openSite, waitForComposer, sendPrompt, startNewChat, stopServiceWorker, fetchRequests, clearViolations, fetchViolations, log });
+      await skillsModelFlow({ launch, openPanel, openSite, waitForComposer, sendPrompt, startNewChat, fetchRequests, clearViolations, fetchViolations, log });
       return;
     }
     // The dark set: the design system's own palette, and what the README leads with.

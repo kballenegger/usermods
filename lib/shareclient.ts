@@ -59,7 +59,7 @@ async function hint(spec: ShareHintSpec): Promise<{ ok: true; copied?: boolean }
   if (spec.copy) {
     const text = spec.copy;
     actions.push({
-      label: 'Copy script',
+      label: spec.copyLabel ?? 'Copy script',
       testId: 'usermods-hint-copy',
       onClick: () => {
         void copy(text).then((ok) => {

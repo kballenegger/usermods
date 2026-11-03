@@ -6,6 +6,28 @@ All notable changes to usermods are recorded here. The format follows
 
 ## [Unreleased]
 
+### Skills and operating a page (GitHub build only, unreleased and behind `__ACT__`)
+
+Nothing here is in a store build or a Safari build: the flag removes the code, and
+`npm run check:act-bundle` reads the packages to say so. It has been run against a scripted model only,
+and not yet with a real one or in the owner's own use; [the spec's As built section](docs/specs/skills.md#as-built)
+lists what is unmet.
+
+- **`act`, `note` and Your turn.** The model can click, type and choose on the page. Each step is read
+  from the live element, decided by a gate from that read, written down before it runs, and never
+  replayed on a resume. It asks before anything it can tell sends, buys, deletes or unsubscribes, and
+  never types a password, a one-time code or a card number. Permissions are answered only in the panel;
+  the bar on the page has status, Stop and I have done it.
+- **Skills.** A `.skill.md` is a recorded list of steps with inputs and outputs, and no code. It can be
+  saved from a run, run again with no model, shared as a gist, installed from a raw link through a
+  preview that says what it does, and updated through a review of what changed.
+- **The model's part.** `propose_skill` offers what a run did as a skill: it names journal entries and
+  cannot write a step. `open_skill` and Edit in chat bring one in to edit, with new steps spliced where
+  `after_step` says. `run_skill` shows the run card, which only the user can answer.
+- **Repair.** With the setting on (*skills made here*, by default), a broken step goes to the model in a
+  bounded sub-run: four tools, eight tool calls, no `go`, no script, every action asked, and a stranger's
+  words fenced with a nonce. **Update skill with the repair** offers what it did as a patch version.
+
 ### Fixed
 
 - iOS: the app crashed on launch on iOS 27 when built with the iOS 27 SDK, because it had no scene

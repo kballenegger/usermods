@@ -10,6 +10,7 @@
 
 declare const __STORE_BUILD__: boolean | undefined;
 declare const __SAFARI_BUILD__: boolean | undefined;
+declare const __ACT__: boolean | undefined;
 
 /** True in a Chrome Web Store build. Constant-folded at build time. */
 export const STORE_BUILD: boolean = typeof __STORE_BUILD__ === 'undefined' ? false : __STORE_BUILD__;
@@ -40,6 +41,25 @@ export const SAFARI_BUILD: boolean = typeof __SAFARI_BUILD__ === 'undefined' ? f
  * further variant would not need every call site found again.
  */
 export const SUBSCRIPTIONS_OFF: boolean = STORE_BUILD && SAFARI_BUILD;
+
+/**
+ * Whether operating pages (the act tool, the allow questions, the driving bar) is left out of this
+ * build. See docs/specs/browser-use.md, section 5.9.
+ *
+ * Acting is true only in a build that is neither a storefront build nor a Safari build: a store
+ * has not tested the single-purpose claim, and Safari has its own phase, because its model scripts
+ * share the content script's world. So unlike SUBSCRIPTIONS_OFF this reads both axes, through
+ * actEnabled below, which wxt.config.ts calls to set the define.
+ *
+ * It removes the code and not only the controls: everything behind it is reached through
+ * `if (!ACT_OFF)` so the bundler drops it, and a flag-off package holds no dormant agent.
+ */
+export const ACT_OFF: boolean = typeof __ACT__ === 'undefined' ? false : !__ACT__;
+
+/** The rule behind __ACT__, for both axes: on only when the build is neither store nor Safari. */
+export function actEnabled(store: boolean, safari: boolean): boolean {
+  return !store && !safari;
+}
 
 // ---------- pure logic (tested in test/buildflags.test.ts) ----------
 
