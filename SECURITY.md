@@ -71,9 +71,8 @@ Out of scope:
 This is a young project with one maintainer. Only the **latest release, and `main`**, are supported.
 Fixes go to `main` and into the next release; there are no backports to older tags.
 
-The Chrome Web Store build (`npm run build:store`) omits subscription sign-in and tree-shakes
-`lib/oauth.ts` out of the bundle entirely, so findings in the OAuth flow apply to the GitHub build
-only. Please say which build you tested.
+The GitHub build and the Chrome Web Store build (`npm run build:store`) both include subscription
+sign-in from 0.1.2, so findings in the OAuth flow apply to both. Please say which build you tested.
 
 ## What to expect
 

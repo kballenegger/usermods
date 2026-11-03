@@ -5,7 +5,7 @@
 // the extension the owner has loaded unpacked in his real browser:
 //
 //   .output/chrome-mv3        npm run build / npm run dev   — the one Chrome loads unpacked
-//   .output/store-chrome-mv3  npm run build:store           — USERMODS_STORE=1, no subscription
+//   .output/store-chrome-mv3  npm run build:store           — USERMODS_STORE=1, with subscription
 //                                                              sign-in (see lib/buildflags.ts)
 //   .output/test-chrome-mv3   npm run smoke, screenshots,      set by USERMODS_TEST_BUILD=1 in
 //                              store-assets, styleguide, ...    package.json; never the folder

@@ -12,6 +12,15 @@ All notable changes to usermods are recorded here. The format follows
   manifest. It now adopts the UIScene lifecycle. `safari-xcode.mjs launch-check` starts the Release
   build on an iPhone and an iPad simulator, and `archive` will not proceed without it.
 
+## [0.1.2] — 2026-11-02
+
+### Subscription sign-in in the Chrome Web Store build
+
+- **ChatGPT and SuperGrok sign-in are now in the store build**, as they already were in the GitHub
+  build. They use endpoints the vendors do not document for third parties, which is why 0.1.1 left
+  them out, and this version is submitted to see whether the store accepts them. API keys and local
+  models work as before.
+
 ## [0.1.1] — 2026-09-30
 
 The version live on the [Chrome Web Store](https://chromewebstore.google.com/detail/usermods/dhmdjekbeinhhnfhcgnkgdpgdafpboic), where the listing is dated 2026-10-02. 0.1.0 was submitted on 2026-09-22 and rejected the

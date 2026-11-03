@@ -1,18 +1,18 @@
-# Store package audit — v0.1.1
+# Store package audit — v0.1.2
 
-What is inside the zip that goes to the Chrome Web Store, checked before the resubmission. Rebuild
+What is inside the zip that goes to the Chrome Web Store, checked before the 0.1.2 submission. Rebuild
 and re-audit with `npm run zip:store` whenever the package changes.
 
-**Audited:** 2026-09-30 · **Build:** `npm run zip:store` (`USERMODS_STORE=1 wxt zip`), built into
+**Audited:** 2026-11-02 · **Build:** `npm run zip:store` (`USERMODS_STORE=1 wxt zip`), built into
 `.output/store-chrome-mv3` · **Source:** the commit that introduces this audit; the zip depends only
 on the source tree, and rebuilding at that commit reproduces the checksum below.
 
 | | |
 |---|---|
-| Artifact | `.output/usermods-0.1.1-chrome.zip` |
-| Size | **512,270 bytes** (500.3 KiB) |
-| SHA-256 | `a6298bf434a4ad74c6a0adad5faef102a8fc9887ff68a271dc560d39af6cc750` |
-| Unpacked | 1,425,345 bytes across **36 files** |
+| Artifact | `.output/usermods-0.1.2-chrome.zip` |
+| Size | **518,976 bytes** (506.8 KiB) |
+| SHA-256 | `a3dcb8f9575120e8d02a5535103193da2a00e4028a485afe7358c18a5edbfb11` |
+| Unpacked | 1,447,711 bytes across **36 files** |
 
 Built twice for this audit with the same SHA-256 both times: the build is deterministic for an
 unchanged tree.
@@ -55,22 +55,17 @@ No `declarative_net_request` ruleset key: the two rules are registered at runtim
 | Source maps | **0** | no `*.map` files; no `sourceMappingURL` in any file |
 | `.DS_Store` | **0** | `find -name .DS_Store` |
 | Test files, scripts, TypeScript sources, `package.json`, `tsconfig.json`, Markdown | **0** | `find` over `*.ts *.tsx *.test.* *.mjs package.json tsconfig.json *.md` |
-| Subscription sign-in endpoints | **0** | `grep -aroF -e auth.openai.com -e auth.x.ai -e chatgpt.com/backend-api -e cli-chat-proxy.grok.com` over the unzipped tree prints nothing |
 | Safari-only files | **0** | no file named `*popup*` or `*modrunner*`; no `popup-size` or "Safari toolbar popup" string; `icon/` has the five Chrome sizes, not the 256/512 Safari adds |
 | Remotely loaded scripts | **0** | every `<script src>` in the four HTML files is a package path (`/chunks/…`, `/theme-boot.js`); no `importScripts` |
 | Code strings injected with `chrome.scripting` | **0** | `scripting.executeScript` is called with the packaged content script, the packaged gist-editor function and the packaged document-identity function only; model-written and user scripts run through `chrome.userScripts` alone |
 | `eval(` / `new Function(` calls | **0** | the only two matches in the package are inside the regular expressions in `background.js` that *refuse* a proposed script using them (`lib/agent/propose.ts`) |
 
-**Subscription wording.** The words "subscription sign-in", "ChatGPT" and "SuperGrok" do still
-appear in `background.js` and one chunk, in two places only, both deliberate: the message that a
-provider carried over from the GitHub build "is not available in the Chrome Web Store build", and
-the labels that name such a provider in the list. Nothing in the store build offers or describes
-signing in. Three strings that did (the line by the message box, the empty model picker, the hint
-under Base URL) were found in this audit and are now compiled out.
-
-**What the page reads send.** Checked in a real side-panel conversation on a form holding eight
-kinds of secret (typed and script-synced passwords, a card number, hidden tokens, text areas): none
-reached the model. Before 0.1.1 a value a site wrote back into an input's `value` attribute could.
+**Subscription sign-in is in this package, on purpose, from 0.1.2.** `auth.openai.com`, `auth.x.ai`,
+`chatgpt.com/backend-api` and `cli-chat-proxy.grok.com` each appear in one file. On 2026-11-02 the
+packaged build offered both presets, and "Sign in with ChatGPT" got a code and opened
+`auth.openai.com`. Approving a code and using a subscription from this build was not tested. The
+manifest's permissions are the same as 0.1.1's. Sections below that were written for 0.1.1 and not
+re-measured say so by their own date.
 
 A plain `grep oauth background.js` also matches strings inside the bundled `@anthropic-ai/sdk`
 (`urn:ietf:params:oauth:grant-type:jwt-bearer` and similar). They are vendor SDK constants on a code

@@ -120,7 +120,7 @@ Caveats worth knowing:
 
 For any other subscription, the same rule applies: run a local proxy that exposes it as an Anthropic- or OpenAI-compatible endpoint and point a Custom preset at it.
 
-**Not in the [Chrome Web Store](https://chromewebstore.google.com/detail/usermods/dhmdjekbeinhhnfhcgnkgdpgdafpboic) build.** Subscription sign-in ships only in the GitHub build — the one you get from [Install (from source)](../README.md#install-from-source). `npm run build:store` and `npm run zip:store` produce the Web Store variant, which sets a compile-time flag that removes the two subscription presets, their provider options and the sign-in card, and tree-shakes the OAuth module out of the bundle entirely, so that build contacts no vendor auth endpoint. These logins rely on endpoints neither vendor documents or licenses for third parties, which does not fit a listing that has to declare exactly what it talks to. If you install the Web Store build over a profile that was signed in, Settings falls back to the default provider and tells you why; the GitHub build keeps every feature, this one included.
+**In the Chrome Web Store build from 0.1.2.** Version 0.1.1 in the store leaves subscription sign-in out; the [GitHub build](../README.md#install-from-source) has always had it. These logins rely on endpoints neither vendor documents or licenses for third parties, so either vendor can change or close them without notice.
 
 ## Editing a mod you already have
 

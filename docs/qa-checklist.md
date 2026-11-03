@@ -780,7 +780,7 @@ Same flow as section 11, with the **SuperGrok subscription** preset / "xAI subsc
 
 ---
 
-## 13. `npm run build:store` — no subscription options
+## 13. `npm run build:store` — subscription options present
 
 1. From the worktree root: `npm run build:store`.
    **Expected:** build completes clean (same as a normal build, just with `USERMODS_STORE=1`).
@@ -789,26 +789,14 @@ Same flow as section 11, with the **SuperGrok subscription** preset / "xAI subsc
    `.output/chrome-mv3` so this never touches the extension already loaded from the normal build)
    as an unpacked extension, in a separate profile or alongside the dev build.
 3. Open Settings.
-   **Expected:** the **Add provider** row has **no** "ChatGPT subscription" or "SuperGrok
-   subscription" buttons — only the key-based and Custom presets.
+   **Expected:** the **Add provider** row has "ChatGPT subscription" and "SuperGrok subscription"
+   buttons beside the key-based and Custom presets, since 0.1.2.
    **If it fails:** side panel DevTools — view page source / React DevTools if available to
    confirm the options are actually absent from the DOM, not just hidden.
 4. Open the consent notice (Settings → **Review data notice**, or fresh profile first run).
-   **Expected:** the "Where it goes" section does **not** mention "your ChatGPT or SuperGrok
-   subscription", and "What stays here" does not mention "and subscription tokens" — the
-   `STORE_BUILD` conditionals in `Consent.tsx` should have dropped that language.
+   **Expected:** the "Where it goes" section mentions "your ChatGPT or SuperGrok subscription", and
+   "What stays here" mentions "and subscription tokens".
    **If it fails:** side panel DevTools; screenshot the exact wording that leaked through.
-5. If you have a profile previously signed in to ChatGPT/xAI from the GitHub build, point this
-   store build at that same profile's data.
-   **Expected:** a red line at the top of Providers: "This build of usermods does not include
-   subscription sign-in, so ChatGPT subscription cannot be used here. It is kept as it was: add a
-   provider with an API key below, or install the GitHub build to use it again." The provider
-   stays in the list with the summary **Not available in this build** and only a **Remove**
-   button; it does **not** appear in the chat's model picker, and a chat that was using it says
-   "ChatGPT subscription is not available in this build of usermods. Pick another model to
-   continue." with **Send** disabled. Nothing was rewritten: going back to the GitHub build finds
-   the provider and its sign-in intact.
-   **If it fails:** side panel DevTools.
 
 ---
 
@@ -1115,7 +1103,7 @@ OpenAI-compatible endpoint, ideally a local server as well.
 | 10 | Tampermonkey import — ZIP | | |
 | 11 | ChatGPT subscription sign-in + turn | | |
 | 12 | SuperGrok subscription sign-in + turn | | |
-| 13 | `npm run build:store` — no subscription options | | |
+| 13 | `npm run build:store` — subscription options present | | |
 | 14 | Export a mod → import into Tampermonkey | | |
 | 14a | Share to a real gist: fill, create, install link, update, deleted gist, sign-in, leak check | | |
 | 14a | Publish and post a new version on a real Greasy Fork account | | |

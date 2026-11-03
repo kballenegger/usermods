@@ -31,11 +31,11 @@ the panel's wording. `node scripts/listing-check.mjs` checks the block is within
 ## Test instructions
 
 ```
-Username = API base URL, Password = API key (test AI model; no login).
+Username = API base URL, Password = API key (test model; no login).
 1. chrome://extensions > usermods > Details > turn on "Allow User Scripts".
 2. Open en.wikipedia.org/wiki/Common_kingfisher. Click the usermods icon (puzzle menu), then "I understand".
 3. Settings (sliders icon) > Add provider > "Custom OpenAI API". Replace all of Base URL with Username; API key = Password.
-4. Chat > "Pick a model" > type ornith, Enter.
+4. Chat > "Pick a model" > type ornith-1.5-35b, Enter.
 5. Send: hide the table of contents. Click "Save & enable", reload.
 ```
 
@@ -82,8 +82,8 @@ autosaves as you type, so there is no Save button to look for.
 There is no Model field in Settings. The model is chosen in the chat: in the bar above the
 conversation is a button that reads **Pick a model** until one is chosen (or **No provider
 connected** before a provider is added). Clicking it opens a list of the connected provider's
-models with a text field on top; typing `ornith` and pressing Enter selects that model whether or
-not the endpoint lists its models, because a typed id is offered as *Use "ornith" on Custom OpenAI
+models with a text field on top; typing `ornith-1.5-35b` and pressing Enter selects that model whether or
+not the endpoint lists its models, because a typed id is offered as *Use "ornith-1.5-35b" on Custom OpenAI
 API* when nothing listed matches. Until a model is picked, **Send** is disabled and a line by the
 message box says what is missing, so a reviewer who skips this step sees an instruction rather than
 an error.
@@ -95,13 +95,13 @@ and need no key, but need a model server running on the reviewer's own machine, 
 usable for review. Several providers can be connected at once, and the model can be changed in the
 middle of a conversation; none of that is needed for the test above.
 
-Subscription sign-in (ChatGPT, SuperGrok) is **not in this package**. It ships only in the GitHub
-build. The Chrome Web Store build is compiled with a flag that removes that code entirely (see
-`lib/buildflags.ts`), because signing in with a vendor subscription uses endpoints the vendors do
-not document for third parties, which does not belong in a listing that has to state exactly what it
-talks to. None of the store screenshots shows it. If a profile carried over from the GitHub build
-holds a subscription provider, the store build keeps it in the list marked **Not available in this
-build**, leaves it out of the model picker, and says why.
+Subscription sign-in (ChatGPT, SuperGrok) is **in this package from 0.1.2**, as two optional presets
+under **Add provider**. It is not needed for the test above. The sign-in is the provider's own
+device-code flow: usermods shows a short code and opens the provider's page, the user approves there,
+and usermods never sees the password. The resulting tokens stay in extension local storage and are
+sent only to that provider. usermods sells nothing and nothing is locked behind a sign-in. These
+sign-ins use endpoints the vendors do not document for third parties, and the source is public in
+`lib/oauth.ts`.
 
 ### What the test does, step by step
 
