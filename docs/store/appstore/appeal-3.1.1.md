@@ -7,8 +7,12 @@ appeal to the App Review Board and a shorter reply for the Resolution Center thr
 
 **Where it goes:** the appeal form at
 <https://developer.apple.com/contact/app-store/?topic=appeal>, signed in as the account holder of
-team 2TK86C98Z5. App name *usermods*, Apple ID 6820909625, platform iOS. Paste the block under
-[Appeal](#appeal). Nothing here has been sent.
+team 2TK86C98Z5. App name *usermods*, Apple ID 6820909625, platform iOS.
+
+**Sent 2026-11-06** through that form (topic App Rejection, guideline 3.1.1), with the text under
+[As sent](#as-sent): the form's reason field takes 2,000 characters, so the longer draft under
+[Appeal](#appeal) was cut to fit. Apple confirmed receipt on the page; the App Review Board answers
+by email and in App Store Connect. The Resolution Center reply below was not sent.
 
 The ChatGPT and SuperGrok in-app purchases were read from their App Store pages on 2026-11-06. The
 list of other apps comes from the US App Store on the same day; recheck that they are still listed
@@ -47,6 +51,20 @@ We ask that usermods be held to the same standard as these apps.
 For testing, the App Review notes include an endpoint and key we provide at no cost.
 
 Thank you for reconsidering.
+```
+
+## As sent
+
+```
+usermods is a Safari extension that writes userscripts with an AI model the user picks. It has no In-App Purchase and sells nothing: no price, upgrade, subscription or purchase link, no account and no server. Nothing is locked or unlocked by a key.
+
+1. The subscription sign-ins are sold through In-App Purchase by their providers. ChatGPT Plus, Go and Pro are In-App Purchases in OpenAI's ChatGPT app (id6448311069); SuperGrok, Lite and Heavy in X Corp.'s Grok app (id6670324846). That is the case 3.1.1 allows: access purchasable via In-App Purchase in the API provider's associated app.
+
+2. An endpoint and key are connection settings, not a purchase. Connecting to a model through an endpoint URL and key is standard for AI tools; the OpenAI-compatible and Anthropic APIs are implemented by many providers and open-source servers. The endpoint can be a model the user runs on their own computer or network (Ollama, LM Studio), with no key and no payment, or any LLM offering a standard API. The key is the user's own credential, entered like a mail server and password in an email client. We receive no money from any provider, and every feature works the same with a free local model.
+
+3. This is common, accepted practice. Many approved AI clients let users enter their own OpenAI, Anthropic, Google, xAI or OpenRouter key, several updated in recent weeks: Pal Chat (id6447545085), Petey (id6446047813), Liquid Apollo (id6448019325), Open Minis (id6759188481), Solair AI (id6758450823), BayesChat (id6777948055), Bring Your Own AI (id6784853025), RouterChat (id6776368852), LLM Bridge (id6738298481), and OpenCat on the Mac App Store (id6445999201). We ask that usermods be held to the same standard.
+
+The App Review notes include a free endpoint and key for testing. Thank you for reconsidering.
 ```
 
 ## Resolution Center reply
