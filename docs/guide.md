@@ -86,6 +86,17 @@ not Default the chip in the chat bar says so (`claude-opus-5 · high`).
 - **One scale, each provider's own knob.** On current Claude models it is `output_config.effort`,
   and on older ones a thinking token budget; on ChatGPT and SuperGrok it is `reasoning.effort`; on
   an OpenAI-compatible endpoint it is `reasoning_effort`, or Qwen 3's `enable_thinking`.
+- **Qwen 3 under Auto offers Default, Off, Low and Medium.** Off sends
+  `chat_template_kwargs: {enable_thinking: false}`. Low and Medium send `enable_thinking: true` plus
+  a top-level `reasoning_effort`, which vLLM, llama.cpp and similar servers read for depth. Default
+  sends neither, so the server picks, and many pick their maximum: on a slow server that can mean
+  minutes of thinking before the answer. High and above are not offered because servers disagree on
+  what those values mean.
+- **You can watch it think.** When a model streams its reasoning (`reasoning_content` or
+  `reasoning` on OpenAI-compatible servers, thinking text on Claude, reasoning summaries on the
+  Responses API), the activity line reads *thinking* with a running character count, and **Show
+  thinking** under it opens the latest text. It is only shown, never kept in the transcript or
+  sent back to the model.
 - **What a model cannot do is not offered.** SuperGrok cannot stop reasoning, so it has no Off;
   Claude Fable and Mythos always think, so they have no Off either; Grok's `-fast` variants and
   ordinary chat models like `gpt-4o` take no reasoning setting at all, so the row is hidden.
@@ -99,6 +110,14 @@ not Default the chip in the chat bar says so (`claude-opus-5 · high`).
   `chat_template_kwargs: enable_thinking`, or None — and a **Custom request fields** box for extra
   JSON merged into every request. If a server answers 400 to the reasoning field, usermods sends
   that one request again without it, says so, and leaves it out for that model from then on.
+- **Max output tokens** (per OpenAI-compatible provider, default 16384) is the most the model may
+  write in one reply, thinking included. usermods always sends it, as `max_completion_tokens` to
+  api.openai.com and `max_tokens` everywhere else, because some servers cap a request without one
+  at 4096 tokens. A server that refuses the field gets the request again without it, and is
+  remembered if the field itself was the problem.
+- **A reply with nothing in it is an error, not a silent stop.** If the model spends its whole
+  output limit thinking and never answers, the panel says so and suggests lowering Thinking or
+  raising Max output tokens.
 
 ### Using a subscription instead of an API key
 

@@ -10,6 +10,7 @@ import {
   thinkingKey,
   type ThinkingMemory,
 } from '../thinking.ts';
+import { maxTokensFieldFor, outputLimitRejection, resolveMaxOutputTokens } from '../outputlimit.ts';
 import type { Msg, Part, Settings, ToolDef } from '../types';
 import { ProviderError, fetchOrNetworkError, httpError, parseRetryAfter, readStream, streamIncomplete } from './errors.ts';
 import type { Provider, ProviderResponse } from './types';
@@ -154,6 +155,22 @@ export interface OpenAIProviderDeps {
   thinkingMemory?: ThinkingMemory;
   /** Told once, when a server has just refused the reasoning field. The panel shows a note. */
   onThinkingUnsupported?: (key: string) => void;
+  /** Where "this endpoint+model does not take max_tokens" is remembered (lib/outputlimit.ts). */
+  outputLimitMemory?: ThinkingMemory;
+}
+
+/**
+ * The reasoning text in one chat/completions delta, if any. vLLM and DeepSeek-style servers send
+ * `reasoning_content`; llama.cpp, Ollama and OpenRouter send `reasoning`. Both are plain strings
+ * on the delta. Anything else (an object, an array of details) is ignored.
+ */
+export function reasoningDelta(delta: Record<string, unknown> | null | undefined): string {
+  if (!delta) return '';
+  for (const k of ['reasoning_content', 'reasoning'] as const) {
+    const v = delta[k];
+    if (typeof v === 'string' && v) return v;
+  }
+  return '';
 }
 
 export function createOpenAIProvider(settings: Settings, deps: OpenAIProviderDeps = {}): Provider {
@@ -163,6 +180,9 @@ export function createOpenAIProvider(settings: Settings, deps: OpenAIProviderDep
   const key = visionKeyFor(settings);
   const thinkMemory = deps.thinkingMemory ?? NO_THINKING_MEMORY;
   const thinkKey = thinkingKey(settings.baseUrl || DEFAULT_OPENAI_BASE, settings.model ?? '');
+  const limitMemory = deps.outputLimitMemory ?? NO_THINKING_MEMORY;
+  const limitField = maxTokensFieldFor(base);
+  const limitValue = resolveMaxOutputTokens(settings.maxOutputTokens);
 
   return {
     async chat({ system, messages, tools, signal, callbacks }): Promise<ProviderResponse> {
@@ -172,7 +192,7 @@ export function createOpenAIProvider(settings: Settings, deps: OpenAIProviderDep
 
       // The reasoning fields this chat's Thinking level asks for, if any. 'default' produces
       // nothing, and so does a model whose connection says it takes no reasoning field — in both
-      // cases the request below is byte-for-byte what it was before this feature.
+      // cases the request carries no reasoning field at all.
       const level = resolveThinkingLevel(settings.thinking);
       const cap = thinkingCapability({ kind: 'openai-compatible', model: settings.model, reasoningField: resolveReasoningField(settings.reasoningField) });
       const reasoningFields = applyThinking(level, cap).body;
@@ -180,7 +200,7 @@ export function createOpenAIProvider(settings: Settings, deps: OpenAIProviderDep
       // Merged last so an explicitly typed field wins over the mapped one.
       const custom = settings.customFields ?? {};
 
-      const send = (withImages: boolean, withReasoning: boolean) =>
+      const send = (withImages: boolean, withReasoning: boolean, withLimit: boolean) =>
         fetchOrNetworkError(`${base}/chat/completions`, {
           method: 'POST',
           signal,
@@ -193,6 +213,7 @@ export function createOpenAIProvider(settings: Settings, deps: OpenAIProviderDep
             stream: true,
             messages: toOpenAIMessages(system, messages, withImages),
             ...toolsField,
+            ...(withLimit ? { [limitField]: limitValue } : {}),
             ...(withReasoning ? reasoningFields : {}),
             ...(withReasoning ? custom : {}),
           }),
@@ -209,7 +230,10 @@ export function createOpenAIProvider(settings: Settings, deps: OpenAIProviderDep
       const carriesReasoning = Object.keys(reasoningFields).length > 0 || Object.keys(custom).length > 0;
       const withReasoning = carriesReasoning && !(await thinkMemory.isUnsupported(thinkKey));
 
-      let res = await send(withImages, withReasoning);
+      // The output limit goes on every request unless this endpoint+model has refused the field.
+      const withLimit = !(await limitMemory.isUnsupported(thinkKey));
+
+      let res = await send(withImages, withReasoning, withLimit);
 
       // The Auto fallback. It lives HERE, in the adapter, rather than in the agent loop, for two
       // reasons. Only the adapter knows whether this request actually put an `image_url` part on
@@ -229,11 +253,16 @@ export function createOpenAIProvider(settings: Settings, deps: OpenAIProviderDep
       // refusals are INDEPENDENT. A text-only server that also takes no reasoning_effort would
       // otherwise have its second complaint hidden behind the first, so each 400 is classified on
       // its own and each drops only the thing it named. A request can therefore shed the images,
-      // then shed the reasoning field, and still be the same conversation — at most two extra
+      // then shed the reasoning field, and still be the same conversation: at most a few extra
       // sends, each immediate and each remembered so the next turn pays for neither.
+      //
+      // The output limit is the third thing a server can refuse, shed the same way. A server that
+      // does not take the field at all is remembered; a limit that does not fit the window beside
+      // this prompt is dropped for this request only, so the next turn sends it again.
       let sentImages = withImages;
       let sentReasoning = withReasoning;
-      for (let attempt = 0; attempt < 2 && !res.ok; attempt++) {
+      let sentLimit = withLimit;
+      for (let attempt = 0; attempt < 3 && !res.ok; attempt++) {
         // The body is read here rather than by httpError, because the classifiers need it and a
         // Response body can only be read once.
         const body = await res.text().catch(() => '');
@@ -241,14 +270,21 @@ export function createOpenAIProvider(settings: Settings, deps: OpenAIProviderDep
           await memory.markUnsupported(key);
           deps.onVisionUnsupported?.(key);
           sentImages = false;
-          res = await send(sentImages, sentReasoning);
+          res = await send(sentImages, sentReasoning, sentLimit);
+          continue;
+        }
+        const limitRefusal = sentLimit ? outputLimitRejection(res.status, body) : null;
+        if (limitRefusal) {
+          if (limitRefusal === 'unsupported') await limitMemory.markUnsupported(thinkKey);
+          sentLimit = false;
+          res = await send(sentImages, sentReasoning, sentLimit);
           continue;
         }
         if (sentReasoning && isReasoningRejection(res.status, body)) {
           await thinkMemory.markUnsupported(thinkKey);
           deps.onThinkingUnsupported?.(thinkKey);
           sentReasoning = false;
-          res = await send(sentImages, sentReasoning);
+          res = await send(sentImages, sentReasoning, sentLimit);
           continue;
         }
         throw new ProviderError(`${res.status} ${res.statusText}: ${body.slice(0, 500)}`.trim(), {
@@ -290,6 +326,8 @@ export function createOpenAIProvider(settings: Settings, deps: OpenAIProviderDep
           const choice = json.choices?.[0];
           if (!choice) continue;
           const delta = choice.delta ?? {};
+          const thought = reasoningDelta(delta);
+          if (thought) callbacks.onThinking?.(thought);
           if (typeof delta.content === 'string' && delta.content) {
             text += delta.content;
             callbacks.onText(delta.content);

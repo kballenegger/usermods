@@ -1876,6 +1876,8 @@ export function Chat({ tabId, pageUrl, host, onOpenSettings }: { tabId: number |
         startedAt={activity.startedAt}
         lastEventAt={activity.lastEventAt}
         writing={activity.writing}
+        thinkingChars={activity.thinkingChars}
+        thinkingText={activity.thinkingText}
         queued={activity.queued}
         disconnected={activity.disconnected}
         retry={activity.retry}

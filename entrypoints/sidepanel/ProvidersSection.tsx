@@ -31,6 +31,7 @@ import {
 } from '@/lib/connections';
 import { FALLBACK_NOTE } from '@/lib/modellist';
 import { resolveImagesSetting } from '@/lib/providers/vision';
+import { DEFAULT_MAX_OUTPUT_TOKENS, MAX_OUTPUT_TOKENS_CEILING, resolveMaxOutputTokens } from '@/lib/outputlimit';
 import { CUSTOM_FIELDS_MAX, parseCustomFields, resolveReasoningField, type ReasoningField } from '@/lib/thinking';
 import { rpc, type OAuthKind, type OAuthLoginState } from '@/lib/rpc';
 import type { ImagesSetting } from '@/lib/types';
@@ -158,6 +159,9 @@ function ConnectionCard({
   // Kept as TEXT, not as parsed JSON: a half-typed object has to survive a keystroke and be shown
   // back with its error, which a parsed value cannot do.
   const [customFields, setCustomFields] = useState(conn.customFields ?? '');
+  // Text, like the JSON box. An emptied field saves as 0, which reads as the default: an undefined
+  // value would vanish in the message to the background and leave the old number stored.
+  const [maxOutput, setMaxOutput] = useState(conn.maxOutputTokens ? String(conn.maxOutputTokens) : '');
   /** Shown under the box instead of the help line while the JSON does not parse. */
   const customFieldsError = parseCustomFields(customFields).error;
   const [confirming, setConfirming] = useState(false);
@@ -371,9 +375,33 @@ function ConnectionCard({
                 </select>
                 <span>
                   How the Thinking level in the composer is sent to this endpoint. Auto uses reasoning_effort for OpenAI’s
-                  o-series and GPT-5 models, enable_thinking for Qwen 3, and sends nothing for anything it does not
-                  recognise. If a server answers 400 to the field, usermods sends that request again without it and leaves
-                  it out for that model from then on.
+                  o-series and GPT-5 models. For Qwen 3 it uses enable_thinking to turn thinking off, and adds
+                  reasoning_effort for Low and Medium; Default leaves the depth to the server, which is often its maximum.
+                  Anything Auto does not recognise gets nothing. If a server answers 400 to the field, usermods sends that
+                  request again without it and leaves it out for that model from then on.
+                </span>
+              </label>
+              <label className="field">
+                Max output tokens
+                <input
+                  data-testid="settings-max-output-tokens"
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={MAX_OUTPUT_TOKENS_CEILING}
+                  step={1}
+                  placeholder={String(DEFAULT_MAX_OUTPUT_TOKENS)}
+                  value={maxOutput}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    setMaxOutput(raw);
+                    save({ maxOutputTokens: raw.trim() ? resolveMaxOutputTokens(raw) : 0 });
+                  }}
+                />
+                <span>
+                  The most the model may write per reply, thinking included. Empty means {DEFAULT_MAX_OUTPUT_TOKENS}. Some
+                  servers cap a request with no limit at 4096 tokens, which a thinking model can spend before it answers. If
+                  a server refuses the field, usermods sends the request again without it.
                 </span>
               </label>
               <label className="field">

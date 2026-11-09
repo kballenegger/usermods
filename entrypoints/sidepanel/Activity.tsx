@@ -28,6 +28,10 @@ export interface ActivityProps {
   lastEventAt: number | null;
   /** Set once text has streamed in the current model phase: "waiting" has become "writing". */
   writing?: boolean;
+  /** Reasoning characters streamed in the current model phase. */
+  thinkingChars?: number;
+  /** The tail of that reasoning, shown in a collapsed "thinking" view under the line. */
+  thinkingText?: string;
   /** Messages the user sent that have not entered the conversation yet. */
   queued?: number;
   /** The port went away mid-run. */
@@ -69,14 +73,17 @@ export function Activity(props: ActivityProps) {
     elapsed: startedAt == null ? 0 : now - startedAt,
     sinceLastEvent: lastEventAt == null ? 0 : now - lastEventAt,
     writing: props.writing,
+    thinkingChars: props.thinkingChars,
     queued: props.queued,
     disconnected,
     retry: props.retry ? { ...props.retry, remainingMs: props.retry.until - now } : undefined,
   });
   if (!a) return null;
   const action = a.action ?? (props.stopAlways ? 'stop' : undefined);
+  const thought = phase === 'model' && !disconnected ? props.thinkingText?.trim() : '';
 
   return (
+    <>
     <div className={`activity${a.tone === 'live' ? '' : ` ${a.tone}`}`} role="status" aria-live="polite">
       {/* The design system's own dot, so a running line reads like a running tool row. */}
       <span className="dot" aria-hidden="true" />
@@ -103,5 +110,15 @@ export function Activity(props: ActivityProps) {
         </button>
       )}
     </div>
+    {/* The model's reasoning, collapsed by default and outside the live region, so a screen reader
+        hears "thinking" once and the text only when someone opens it. Display only: none of this
+        is kept in the transcript or sent back to the model. */}
+    {thought && (
+      <details className="activity-thinking" data-testid="activity-thinking">
+        <summary>Show thinking</summary>
+        <pre>{thought}</pre>
+      </details>
+    )}
+    </>
   );
 }

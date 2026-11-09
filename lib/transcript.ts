@@ -146,6 +146,9 @@ export function reduceItems(items: ChatItem[], event: AgentEventBody): ChatItem[
       if (last && last.connectionId === event.connectionId && last.model === event.model && (last.thinking ?? 'default') === level) return items;
       return [...items, { kind: 'model', connectionId: event.connectionId, label: event.label, model: event.model, ...(level === 'default' ? {} : { thinking: level }) }];
     }
+    case 'thinking':
+      // Reasoning text is shown live on the activity line and is never kept: same array, no write.
+      return items;
     case 'status':
       // What the run is doing right now drives the activity line, which is not a transcript row:
       // it says nothing that is worth reading back tomorrow. Returning the SAME array matters as

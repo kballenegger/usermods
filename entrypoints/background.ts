@@ -56,7 +56,9 @@ import {
   type ModelCache,
   type ModelSelection,
 } from '@/lib/connections';
+import { OUTPUT_LIMIT_STORAGE_KEY } from '@/lib/outputlimit';
 import {
+  createKeySetMemory,
   createThinkingMemory,
   lowestThinkingLevel,
   resolveReasoningField,
@@ -306,6 +308,8 @@ const agentPorts = new Set<chrome.runtime.Port>();
  */
 const visionMemory = createVisionMemory();
 const thinkingMemory = createThinkingMemory();
+/** Which OpenAI-compatible endpoints refuse an output-limit field (lib/outputlimit.ts). */
+const outputLimitMemory = createKeySetMemory(OUTPUT_LIMIT_STORAGE_KEY);
 
 /**
  * The single chokepoint where an agent event is stamped with its chat and put on the wire. The
@@ -351,7 +355,7 @@ const DETACHED_TEXT_DEBOUNCE_MS = 400;
 
 function recordDetached(chatId: string, body: AgentEventBody): void {
   // These never change a transcript (reduceItems returns its input), so they need not load one.
-  if (body.type === 'status' || body.type === 'chat_title' || body.type === 'done') {
+  if (body.type === 'status' || body.type === 'thinking' || body.type === 'chat_title' || body.type === 'done') {
     if (body.type === 'done') void flushDetachedChat(chatId);
     return;
   }
@@ -835,6 +839,7 @@ async function runChat(chatId: string, tabId: number, turn: UserTurn | null): Pr
         // sessions, and said once per run rather than once per request.
         thinkingMemory,
         onThinkingUnsupported: () => post({ type: 'note', text: THINKING_FALLBACK_PANEL_NOTE }),
+        outputLimitMemory,
       }),
       // How `screenshot` is described to the model. Only the OpenAI-compatible adapter can ever
       // answer no, and only once it has learned so — every other backend shows images to every

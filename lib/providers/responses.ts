@@ -123,6 +123,12 @@ export function createResponsesProvider(cfg: ResponsesConfig): Provider {
             case 'response.output_text.delta':
               if (typeof ev.delta === 'string') callbacks.onText(ev.delta);
               break;
+            // Reasoning summaries (and raw reasoning text, where a backend streams it). Display
+            // only: the reasoning item itself is replayed as the opaque item, never as this text.
+            case 'response.reasoning_summary_text.delta':
+            case 'response.reasoning_text.delta':
+              if (typeof ev.delta === 'string' && ev.delta) callbacks.onThinking?.(ev.delta);
+              break;
             case 'response.output_item.done': {
               const item = ev.item as Item;
               // Keep the raw item for replay, then derive the neutral parts.

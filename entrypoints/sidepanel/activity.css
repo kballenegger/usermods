@@ -116,6 +116,47 @@
   text-underline-offset: 2px;
 }
 
+/*
+ * The model's reasoning while it thinks, under the line and collapsed by default. A terminal
+ * readout in the BBS style: mono text on the raised surface, square corners, a cyan (info) rail.
+ * Capped in height so a long think scrolls inside itself and never pushes the composer away.
+ */
+.activity-thinking {
+  flex: none;
+  padding: 0 var(--sp-4) var(--sp-2);
+  background: var(--surface-1);
+  font: 400 var(--fs-meta) / 1.35 var(--font-ui);
+  color: var(--text-2);
+}
+
+.activity-thinking > summary {
+  cursor: pointer;
+  font-size: var(--fs-label);
+  font-weight: var(--fw-label);
+  text-transform: uppercase;
+  letter-spacing: var(--lbl-tracking);
+  color: var(--info-text);
+}
+
+.activity-thinking > summary:focus-visible {
+  outline: 2px solid var(--info);
+  outline-offset: 2px;
+}
+
+.activity-thinking > pre {
+  margin: var(--sp-2) 0 0;
+  max-height: 8.5em;
+  overflow: auto;
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--surface-2);
+  box-shadow: inset 3px 0 0 var(--info);
+  border-radius: 0;
+  font-family: var(--font-mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--text-2);
+}
+
 @keyframes activity-pulse {
   0%,
   100% {

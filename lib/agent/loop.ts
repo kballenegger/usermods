@@ -49,6 +49,15 @@ export function contextOverflowNote(budget: number): string {
   return `This model's context window is smaller than the context budget. usermods compacted the conversation to about ${budget.toLocaleString('en-US')} tokens and is sending it again. Set a lower context budget in Settings to avoid this.`;
 }
 
+/** What the panel says when a reply came back with no text and no tool calls. */
+export const EMPTY_AT_LIMIT_MESSAGE =
+  'The model used its whole output limit (thinking) without answering. Lower Thinking or raise Max output tokens on the connection.';
+export const EMPTY_REPLY_MESSAGE = 'The model returned an empty reply. Try again, or try another model.';
+
+export function emptyReplyMessage(stopReason: string): string {
+  return stopReason === 'max_tokens' ? EMPTY_AT_LIMIT_MESSAGE : EMPTY_REPLY_MESSAGE;
+}
+
 /** Everything a tool needs from the browser. Implemented in the background worker. */
 export interface AgentEnv {
   sendToContent<T = unknown>(req: unknown): Promise<T>;
@@ -457,6 +466,9 @@ export async function runAgent(input: AgentInput): Promise<RunOutcome> {
                 streamed += delta.length;
                 emit({ type: 'text', delta });
               },
+              // Display only. Reasoning text goes to the activity line and nowhere else: it is not
+              // part of res.content, so it never reaches the history sent back to the model.
+              onThinking: (delta) => emit({ type: 'thinking', delta }),
             },
           });
         },
@@ -524,9 +536,19 @@ export async function runAgent(input: AgentInput): Promise<RunOutcome> {
         modelStatus();
         res = await sendOnce();
       }
+      const calls = res.content.filter((p): p is Extract<Part, { type: 'tool_call' }> => p.type === 'tool_call');
+      // A reply with no words and no tool calls. Ending the turn here used to look like nothing at
+      // all: the panel stopped and the model had said nothing. The usual cause is a thinking model
+      // that spent its whole output limit reasoning, so the error says what to change. The empty
+      // reply is not put in the history either.
+      const saidSomething = res.content.some((p) => p.type === 'text' && p.text.trim());
+      if (!calls.length && !saidSomething && res.stopReason !== 'refusal') {
+        emit({ type: 'error', message: emptyReplyMessage(res.stopReason) });
+        ranOut = false;
+        break;
+      }
       messages.push({ role: 'assistant', content: res.content });
 
-      const calls = res.content.filter((p): p is Extract<Part, { type: 'tool_call' }> => p.type === 'tool_call');
       if (res.stopReason === 'max_tokens' && calls.length) {
         messages.pop();
         emit({ type: 'error', message: 'The model hit its output limit mid tool call. Try again with a smaller request.' });

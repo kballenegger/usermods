@@ -24,6 +24,7 @@
 // ./types, because the node test runner resolves neither extensionless specifiers nor WXT aliases.
 import { isSubscriptionProvider, providerAvailable, SUBSCRIPTIONS_OFF } from './buildflags.ts';
 import { parseCustomFields, resolveThinkingLevel, type ReasoningField, type ThinkingLevel } from './thinking.ts';
+import { resolveMaxOutputTokens } from './outputlimit.ts';
 import type { ImagesSetting, ProviderKind, Settings } from './types';
 
 // ---------------------------------------------------------------------------
@@ -70,6 +71,13 @@ export interface Connection {
    * its error; parsed on the way out (effectiveSettings) and invalid text is simply not sent.
    */
   customFields?: string;
+  /**
+   * The output limit each request to this endpoint carries (lib/outputlimit.ts). Absent (every
+   * connection saved by an older build) or 0 (the field was emptied) reads as
+   * DEFAULT_MAX_OUTPUT_TOKENS. Only read for
+   * 'openai-compatible'.
+   */
+  maxOutputTokens?: number;
   /**
    * Model ids offered whether or not a listing has them: the preset's default, the model a migrated
    * profile was using, and anything the user typed into the picker. This is what makes an endpoint
@@ -207,7 +215,7 @@ export function addConnection(state: ConnectionsState, conn: Connection): Connec
 }
 
 /** What Settings may change on a connection. `id` and `kind` are fixed for its life. */
-export type ConnectionPatch = Partial<Pick<Connection, 'label' | 'baseUrl' | 'apiKey' | 'images' | 'reasoningField' | 'customFields' | 'extraModels' | 'models'>>;
+export type ConnectionPatch = Partial<Pick<Connection, 'label' | 'baseUrl' | 'apiKey' | 'images' | 'reasoningField' | 'customFields' | 'maxOutputTokens' | 'extraModels' | 'models'>>;
 
 /**
  * Apply a patch to one connection. An unknown id is a no-op (the connection was removed in another
@@ -460,6 +468,7 @@ export function effectiveSettings(prefs: Settings, connection: Connection, model
     images: connection.images,
     thinking,
     reasoningField: connection.reasoningField,
+    maxOutputTokens: resolveMaxOutputTokens(connection.maxOutputTokens),
     ...(custom.ok && Object.keys(custom.fields).length ? { customFields: custom.fields } : {}),
   };
 }

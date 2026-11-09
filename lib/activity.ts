@@ -17,6 +17,17 @@ export const STILL_WAITING_MS = 20_000;
  */
 export const STALL_MS = 90_000;
 
+/** How much reasoning text the panel keeps per chat for the "show thinking" view. */
+export const THINKING_TAIL_CHARS = 4000;
+
+/**
+ * The reasoning count as the line shows it. Whole thousands only, so the polite live region
+ * changes every thousand characters rather than on every token.
+ */
+export function thinkingCharsLabel(chars: number): string {
+  return chars >= 1000 ? `${Math.floor(chars / 1000)}k chars` : '';
+}
+
 /** How often the panel re-renders the line so the elapsed timer ticks. */
 export const TICK_MS = 1000;
 
@@ -63,6 +74,8 @@ export interface ActivityState {
   sinceLastEvent: number;
   /** True once the model has streamed text in this model phase: waiting has become writing. */
   writing?: boolean;
+  /** Reasoning characters streamed in this model phase. Above zero, waiting has become thinking. */
+  thinkingChars?: number;
   /** Messages the user sent that have not entered the conversation yet. */
   queued?: number;
   /** The port went away mid-run: the service worker died under us. */
@@ -215,6 +228,7 @@ export function activityFor(state: ActivityState): Activity | null {
     action = 'stop';
   } else if (state.phase === 'model') {
     if (state.writing) label = 'writing';
+    else if (state.thinkingChars) label = 'thinking';
     else if (slow) label = 'still waiting for model';
     else label = state.detail?.trim() || 'waiting for model';
   } else {
@@ -227,6 +241,10 @@ export function activityFor(state: ActivityState): Activity | null {
 
   // Elapsed always rides along, except on the stall line, which already names its own duration.
   if (!stalled) segments.push(formatElapsed(state.elapsed));
+  if (!stalled && state.phase === 'model' && !state.writing && state.thinkingChars) {
+    const chars = thinkingCharsLabel(state.thinkingChars);
+    if (chars) segments.push(chars);
+  }
   if ((state.iteration ?? 1) > 1) segments.push(`step ${state.iteration}`);
   if (state.queued) segments.push(`${state.queued} queued`);
 
@@ -262,6 +280,10 @@ export interface ChatActivity {
   lastEventAt: number | null;
   /** True once the model has streamed text in this model phase. */
   writing?: boolean;
+  /** Reasoning characters streamed in this model phase (display only, never stored). */
+  thinkingChars?: number;
+  /** The tail of that reasoning text, at most THINKING_TAIL_CHARS, for the collapsible view. */
+  thinkingText?: string;
   /** Messages sent into this chat that have not entered its conversation yet. */
   queued: number;
   /** The port went away while this chat was mid-run. */
@@ -277,6 +299,7 @@ export const IDLE_ACTIVITY: ChatActivity = { phase: 'idle', startedAt: null, las
 type ActivityEvent =
   | { type: 'status'; phase: Phase; tool?: string; detail?: string; iteration?: number; retry?: ChatActivity['retry'] }
   | { type: 'text' }
+  | { type: 'thinking'; delta: string }
   | { type: 'text_discard' }
   | { type: 'accepted' }
   | { type: 'unqueued' }
@@ -303,8 +326,10 @@ export function activityFromEvent(a: ChatActivity, e: ActivityEvent, now: number
         iteration: s.iteration,
         startedAt: a.startedAt ?? now,
         lastEventAt: now,
-        // A new phase has not written anything yet.
+        // A new phase has not written or thought anything yet.
         writing: false,
+        thinkingChars: 0,
+        thinkingText: '',
         disconnected: false,
         // Set explicitly, never inherited: the ordinary status event that follows a retry wait
         // carries no `retry`, and that absence is what puts the line back to normal.
@@ -313,9 +338,15 @@ export function activityFromEvent(a: ChatActivity, e: ActivityEvent, now: number
     }
     case 'text':
       return { ...a, lastEventAt: now, writing: a.phase === 'model' ? true : a.writing, retry: undefined };
+    case 'thinking': {
+      const delta = (e as { delta?: unknown }).delta;
+      if (typeof delta !== 'string' || !delta) return { ...a, lastEventAt: now };
+      const text = ((a.thinkingText ?? '') + delta).slice(-THINKING_TAIL_CHARS);
+      return { ...a, lastEventAt: now, thinkingChars: (a.thinkingChars ?? 0) + delta.length, thinkingText: text, retry: undefined };
+    }
     case 'text_discard':
       // The attempt that was writing has failed; whatever comes next starts from "waiting" again.
-      return { ...a, lastEventAt: now, writing: false };
+      return { ...a, lastEventAt: now, writing: false, thinkingChars: 0, thinkingText: '' };
     case 'accepted':
     case 'unqueued':
       return { ...a, lastEventAt: now, queued: Math.max(0, a.queued - 1) };

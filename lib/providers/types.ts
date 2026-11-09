@@ -2,6 +2,11 @@ import type { Msg, Part, Settings, ToolDef } from '../types';
 
 export interface StreamCallbacks {
   onText: (delta: string) => void;
+  /**
+   * Reasoning text as the model streams it, where the provider exposes any. Display only: the
+   * caller shows it while the model thinks and never puts it in the history sent back.
+   */
+  onThinking?: (delta: string) => void;
 }
 
 export interface ProviderResponse {

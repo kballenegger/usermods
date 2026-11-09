@@ -160,6 +160,11 @@ export interface Settings {
   reasoningField?: ReasoningField;
   /** Extra top-level request fields for this connection, already parsed and validated. */
   customFields?: Record<string, unknown>;
+  /**
+   * The output limit an OpenAI-compatible request carries, from the connection (lib/outputlimit.ts).
+   * Absent reads as DEFAULT_MAX_OUTPUT_TOKENS.
+   */
+  maxOutputTokens?: number;
 }
 
 /** The global preferences: the part of `Settings` stored under 'settings', none of it about a provider. */
@@ -311,6 +316,12 @@ export interface ModProposal {
 // background stamps `chatId` on at its single post() chokepoint, so no emitter can forget it.
 export type AgentEventBody =
   | { type: 'text'; delta: string }
+  /**
+   * Reasoning text the model streamed before (or between) its answer. Display only: the panel
+   * shows it on the activity line while the model thinks, and it is never stored in the
+   * transcript or sent back to the model.
+   */
+  | { type: 'thinking'; delta: string }
   /**
    * Which connection and model this run talks to, posted once at the start of every run (a fresh
    * turn, a queued message's turn, a Resume). The panel uses it for two things: the transcript

@@ -84,9 +84,18 @@ export function thinkingLabel(level: ThinkingLevel): string {
  *   'responses-effort'  Responses API reasoning.effort
  *   'chat-effort'       chat/completions reasoning_effort
  *   'chat-template'     chat/completions chat_template_kwargs.enable_thinking (local servers)
+ *   'chat-template-effort'  the Qwen 3 guess under 'auto': enable_thinking for on/off, plus a
+ *                       top-level reasoning_effort for low and medium
  *   'none'              this model takes no reasoning field at all; the row is hidden
  */
-export type ThinkingStyle = 'anthropic-effort' | 'anthropic-budget' | 'responses-effort' | 'chat-effort' | 'chat-template' | 'none';
+export type ThinkingStyle =
+  | 'anthropic-effort'
+  | 'anthropic-budget'
+  | 'responses-effort'
+  | 'chat-effort'
+  | 'chat-template'
+  | 'chat-template-effort'
+  | 'none';
 
 export interface ThinkingCapability {
   style: ThinkingStyle;
@@ -249,6 +258,16 @@ export function thinkingCapability({ kind, model, reasoningField = 'auto' }: Cap
         ? { style: 'responses-effort', levels: ['default', 'low', 'medium', 'high'] }
         : NO_THINKING;
     case 'openai-compatible': {
+      // A Qwen 3 id under 'auto'. enable_thinking alone only switches reasoning on or off, and a
+      // server left to its own default effort can spend a whole output limit thinking (measured:
+      // over five minutes and 16k tokens of reasoning before a word of answer). So the guess adds
+      // the top-level reasoning_effort that vLLM, llama.cpp and similar servers read for depth. A
+      // server that rejects it sheds it through the reasoning fallback in the adapter. high and
+      // above are not offered: servers disagree on those values, and 'default' already means
+      // "as much as the server likes". An explicit 'enable_thinking' keeps the plain switch.
+      if (reasoningField === 'auto' && TEMPLATE_THINKING_MODEL.test(m)) {
+        return { style: 'chat-template-effort', levels: ['default', 'off', 'low', 'medium'] };
+      }
       const field = reasoningField === 'auto' ? guessReasoningField(m) : reasoningField;
       if (field === 'reasoning_effort') {
         return {
@@ -343,6 +362,11 @@ export function applyThinking(level: ThinkingLevel, cap: ThinkingCapability): Th
     case 'chat-template':
       // A boolean switch, so only the ends of the scale mean anything here.
       return { body: { chat_template_kwargs: { enable_thinking: level !== 'off' } } };
+    case 'chat-template-effort': {
+      if (level === 'off') return { body: { chat_template_kwargs: { enable_thinking: false } } };
+      const effort = EFFORT[level];
+      return effort ? { body: { reasoning_effort: effort, chat_template_kwargs: { enable_thinking: true } } } : EMPTY;
+    }
     case 'none':
       return EMPTY;
   }
@@ -481,13 +505,21 @@ export const NO_THINKING_MEMORY: ThinkingMemory = {
  * Neither is worth failing a chat over. See createVisionMemory, which this mirrors.
  */
 export function createThinkingMemory(): ThinkingMemory {
+  return createKeySetMemory(THINKING_STORAGE_KEY);
+}
+
+/**
+ * A set of endpoint+model keys over one chrome.storage.local entry. The thinking store above and
+ * the output-limit store (lib/outputlimit.ts) are both this, under different storage keys.
+ */
+export function createKeySetMemory(storageKey: string): ThinkingMemory {
   let cache: Set<string> | null = null;
 
   const load = async (): Promise<Set<string>> => {
     if (cache) return cache;
     try {
-      const r = await chrome.storage.local.get(THINKING_STORAGE_KEY);
-      const raw = r[THINKING_STORAGE_KEY];
+      const r = await chrome.storage.local.get(storageKey);
+      const raw = r[storageKey];
       cache = new Set(Array.isArray(raw) ? raw.filter((k): k is string => typeof k === 'string') : []);
     } catch {
       cache = new Set();
@@ -504,7 +536,7 @@ export function createThinkingMemory(): ThinkingMemory {
       if (set.has(key)) return;
       set.add(key);
       try {
-        await chrome.storage.local.set({ [THINKING_STORAGE_KEY]: [...set] });
+        await chrome.storage.local.set({ [storageKey]: [...set] });
       } catch {
         /* remembered for this worker's lifetime at least */
       }

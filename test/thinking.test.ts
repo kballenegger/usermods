@@ -257,12 +257,25 @@ describe('OpenAI-compatible chat/completions', () => {
     }
   });
 
-  test('Qwen 3 goes through chat_template_kwargs, as a boolean', () => {
+  test('Qwen 3 under auto: enable_thinking for on/off, reasoning_effort for depth', () => {
     const c = cap('openai-compatible', 'qwen3-32b');
+    assert.equal(c.style, 'chat-template-effort');
+    // No high/xhigh/max: servers disagree on those values, and default covers the top.
+    assert.deepEqual(c.levels, ['default', 'off', 'low', 'medium']);
+    assert.deepEqual(applyThinking('default', c).body, {});
+    assert.deepEqual(applyThinking('off', c).body, { chat_template_kwargs: { enable_thinking: false } });
+    assert.deepEqual(applyThinking('low', c).body, { reasoning_effort: 'low', chat_template_kwargs: { enable_thinking: true } });
+    assert.deepEqual(applyThinking('medium', c).body, { reasoning_effort: 'medium', chat_template_kwargs: { enable_thinking: true } });
+    // A chat that stored 'high' under the old boolean mapping sends nothing now, not a guess.
+    assert.deepEqual(applyThinking('high', c).body, {});
+    assert.equal(cap('openai-compatible', 'qwen3.8-flash-next').style, 'chat-template-effort');
+  });
+
+  test('an explicit enable_thinking keeps the plain boolean switch', () => {
+    const c = cap('openai-compatible', 'qwen3-32b', 'enable_thinking');
     assert.equal(c.style, 'chat-template');
     assert.deepEqual(applyThinking('off', c).body, { chat_template_kwargs: { enable_thinking: false } });
     assert.deepEqual(applyThinking('high', c).body, { chat_template_kwargs: { enable_thinking: true } });
-    // A boolean has no ladder: the middle levels are not offered rather than silently rounded.
     assert.deepEqual(c.levels, ['default', 'off', 'high']);
   });
 

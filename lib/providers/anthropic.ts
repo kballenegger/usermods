@@ -162,6 +162,9 @@ export function createAnthropicProvider(settings: Settings): Provider {
         { signal },
       );
       stream.on('text', (delta) => callbacks.onText(delta));
+      // Thinking text, when the model streams any, is shown live and goes no further: the thinking
+      // blocks themselves are still dropped from the content below.
+      if (callbacks.onThinking) stream.on('thinking', (delta) => callbacks.onThinking?.(delta));
       let message: Anthropic.Message;
       try {
         message = await stream.finalMessage();
