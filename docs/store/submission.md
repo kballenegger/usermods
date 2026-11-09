@@ -19,6 +19,9 @@
 - **2026-11-02: 0.1.2 prepared with subscription sign-in in the store build**, to see whether it is
   approved. If it is rejected for that, `SUBSCRIPTIONS_OFF = STORE_BUILD` in `lib/buildflags.ts`
   restores the old build. Steps are under [Submitting 0.1.2](#submitting-012).
+- **2026-11-09: 0.1.2 submitted, pending review.** Package, description, host-permission
+  justification and test instructions replaced; the reviewer key was checked first and lists
+  `ornith-1.5-35b`. The submit dialog ticks "Publish automatically" by default: untick it every time.
 - Automatic publication is **off**: an approved item waits for Publish to be pressed.
 
 Things the dashboard turned out to do differently from Google's docs, learned on the first
