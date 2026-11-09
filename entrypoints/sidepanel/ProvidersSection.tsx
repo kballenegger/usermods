@@ -31,7 +31,7 @@ import {
 } from '@/lib/connections';
 import { FALLBACK_NOTE } from '@/lib/modellist';
 import { resolveImagesSetting } from '@/lib/providers/vision';
-import { DEFAULT_MAX_OUTPUT_TOKENS, MAX_OUTPUT_TOKENS_CEILING, resolveMaxOutputTokens } from '@/lib/outputlimit';
+import { DEFAULT_MAX_OUTPUT_TOKENS, MAX_OUTPUT_TOKENS_CEILING, omitsDefaultLimit, resolveMaxOutputTokens } from '@/lib/outputlimit';
 import { CUSTOM_FIELDS_MAX, parseCustomFields, resolveReasoningField, type ReasoningField } from '@/lib/thinking';
 import { rpc, type OAuthKind, type OAuthLoginState } from '@/lib/rpc';
 import type { ImagesSetting } from '@/lib/types';
@@ -390,7 +390,7 @@ function ConnectionCard({
                   min={1}
                   max={MAX_OUTPUT_TOKENS_CEILING}
                   step={1}
-                  placeholder={String(DEFAULT_MAX_OUTPUT_TOKENS)}
+                  placeholder={omitsDefaultLimit(baseUrl) ? 'Model maximum' : String(DEFAULT_MAX_OUTPUT_TOKENS)}
                   value={maxOutput}
                   onChange={(e) => {
                     const raw = e.target.value;
@@ -399,7 +399,8 @@ function ConnectionCard({
                   }}
                 />
                 <span>
-                  The most the model may write per reply, thinking included. Empty means {DEFAULT_MAX_OUTPUT_TOKENS}. Some
+                  The most the model may write per reply, thinking included. Empty means {DEFAULT_MAX_OUTPUT_TOKENS}, except
+                  on OpenAI and OpenRouter, where empty sends no limit and the model gets its full output. Some
                   servers cap a request with no limit at 4096 tokens, which a thinking model can spend before it answers. If
                   a server refuses the field, usermods sends the request again without it.
                 </span>

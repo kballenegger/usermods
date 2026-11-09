@@ -454,11 +454,10 @@ test('effective settings: the connection and the chat\'s model over the global p
     images: 'never',
     thinking: 'default',
     reasoningField: undefined,
-    // A connection from an older build has no limit stored; it reads as the default.
-    maxOutputTokens: 16384,
+    // A connection from an older build has no limit stored; it stays unset (the adapter picks).
   });
   assert.equal(effectiveSettings(prefs, conn({ id: 'm', maxOutputTokens: 4096 }), 'm').maxOutputTokens, 4096);
-  assert.equal(effectiveSettings(prefs, conn({ id: 'z', maxOutputTokens: 0 }), 'm').maxOutputTokens, 16384, 'an emptied field reads as the default');
+  assert.equal(effectiveSettings(prefs, conn({ id: 'z', maxOutputTokens: 0 }), 'm').maxOutputTokens, undefined, 'an emptied field is unset');
   // A connection with no Images setting must not inherit one from anywhere: it reads as Auto.
   assert.equal(effectiveSettings({ ...prefs, images: 'never' }, conn({ id: 'x' }), 'm').images, undefined);
 });

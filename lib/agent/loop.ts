@@ -541,8 +541,16 @@ export async function runAgent(input: AgentInput): Promise<RunOutcome> {
       // all: the panel stopped and the model had said nothing. The usual cause is a thinking model
       // that spent its whole output limit reasoning, so the error says what to change. The empty
       // reply is not put in the history either.
+      //
+      // One empty reply is normal: an end_turn with nothing in it after a tool step. Claude does this
+      // when the tool results already finish the job and it has nothing to add. That ends the turn
+      // quietly, as before. At the output limit it is still an error, step or no step.
       const saidSomething = res.content.some((p) => p.type === 'text' && p.text.trim());
       if (!calls.length && !saidSomething && res.stopReason !== 'refusal') {
+        if (res.stopReason !== 'max_tokens' && i > 0) {
+          ranOut = false;
+          break;
+        }
         emit({ type: 'error', message: emptyReplyMessage(res.stopReason) });
         ranOut = false;
         break;

@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { activityFor, activityFromEvent, IDLE_ACTIVITY, THINKING_TAIL_CHARS } from '../lib/activity.ts';
 import { EMPTY_AT_LIMIT_MESSAGE, EMPTY_REPLY_MESSAGE, runAgent, type AgentEnv } from '../lib/agent/loop.ts';
-import { DEFAULT_MAX_OUTPUT_TOKENS, maxTokensFieldFor, outputLimitRejection, resolveMaxOutputTokens } from '../lib/outputlimit.ts';
+import { DEFAULT_MAX_OUTPUT_TOKENS, maxTokensFieldFor, outputLimitCeiling, outputLimitFor, outputLimitRejection, resolveMaxOutputTokens } from '../lib/outputlimit.ts';
 import { createOpenAIProvider, reasoningDelta } from '../lib/providers/openai.ts';
 import type { Provider, ProviderResponse } from '../lib/providers/types.ts';
 import { reduceItems } from '../lib/transcript.ts';
@@ -154,6 +154,46 @@ describe('the output limit', () => {
     );
   });
 
+  test('OpenAI and OpenRouter send no limit unless one is set; other hosts send the default', async () => {
+    assert.equal(outputLimitFor('https://api.openai.com/v1', undefined), null);
+    assert.equal(outputLimitFor('https://openrouter.ai/api/v1', 0), null);
+    assert.equal(outputLimitFor('https://openrouter.ai/api/v1', 8000), 8000);
+    assert.equal(outputLimitFor('http://localhost:8888/v1', undefined), DEFAULT_MAX_OUTPUT_TOKENS);
+    assert.equal(outputLimitFor('http://localhost:8888/v1', -3), DEFAULT_MAX_OUTPUT_TOKENS);
+    await withFetch(
+      () => stream([{ content: 'ok' }]),
+      async (sent) => {
+        await chat(settings({ baseUrl: 'https://api.openai.com/v1', model: 'gpt-5' }));
+        assert.ok(!('max_completion_tokens' in sent[0]) && !('max_tokens' in sent[0]));
+        await chat(settings({ baseUrl: 'https://openrouter.ai/api/v1', model: 'x/y' }));
+        assert.ok(!('max_tokens' in sent[1]));
+      },
+    );
+  });
+
+  test('a value past a stated maximum is too-large, not unsupported, and retried at that maximum', async () => {
+    const deepseek = 'Invalid max_tokens value, the valid range of max_tokens is [1, 8192]';
+    const openai = "Invalid 'max_completion_tokens': integer above maximum value. Expected a value <= 8192, but got 16384 instead.";
+    assert.equal(outputLimitRejection(400, deepseek), 'too-large');
+    assert.equal(outputLimitRejection(400, openai), 'too-large');
+    assert.equal(outputLimitCeiling(deepseek), 8192);
+    assert.equal(outputLimitCeiling(openai), 8192);
+    assert.equal(outputLimitCeiling("This model's maximum context length is 32768 tokens."), null);
+    const mem = memory();
+    await withFetch(
+      (b) => (b.max_tokens > 8192 ? errorResponse(400, deepseek) : stream([{ content: 'ok' }])),
+      async (sent) => {
+        const { res } = await chat(settings(), { outputLimitMemory: mem });
+        assert.equal(res.stopReason, 'end_turn');
+        assert.equal(sent.length, 2);
+        assert.equal(sent[1].max_tokens, 8192, 'the stated maximum, not no limit');
+        assert.equal(mem.keys.size, 0, 'not remembered as unsupported');
+        await chat(settings({ maxOutputTokens: 8192 }), { outputLimitMemory: mem });
+        assert.equal(sent[2].max_tokens, 8192, 'a fitting setting goes through untouched');
+      },
+    );
+  });
+
   test('the classifier leaves other 400s alone', () => {
     assert.equal(outputLimitRejection(400, 'Unsupported parameter: max_tokens is not supported with this model.'), 'unsupported');
     assert.equal(outputLimitRejection(400, "This model's maximum context length is 8192 tokens. However, you requested 9000 tokens (8000 in the messages, 1000 in the completion)."), 'too-large');
@@ -172,6 +212,24 @@ describe('the output limit', () => {
         assert.deepEqual(sent[0].chat_template_kwargs, { enable_thinking: true });
         await chat(settings({ thinking: 'default' }));
         assert.ok(!('reasoning_effort' in sent[1]) && !('chat_template_kwargs' in sent[1]));
+      },
+    );
+  });
+
+  test('a server that refuses only reasoning_effort keeps the Qwen 3 on/off switch', async () => {
+    const mem = memory();
+    await withFetch(
+      (b) => ('reasoning_effort' in b ? errorResponse(400, 'Unrecognized request argument supplied: reasoning_effort') : stream([{ content: 'ok' }])),
+      async (sent) => {
+        await chat(settings({ thinking: 'low' }), { thinkingMemory: mem });
+        assert.equal(sent.length, 2);
+        assert.deepEqual(sent[1].chat_template_kwargs, { enable_thinking: true }, 'the switch survives');
+        assert.ok(!('reasoning_effort' in sent[1]));
+        await chat(settings({ thinking: 'off' }), { thinkingMemory: mem });
+        assert.deepEqual(sent[2].chat_template_kwargs, { enable_thinking: false }, 'Off still works');
+        await chat(settings({ thinking: 'medium' }), { thinkingMemory: mem });
+        assert.equal(sent.length, 4, 'the effort field is remembered, no second 400');
+        assert.ok(!('reasoning_effort' in sent[3]));
       },
     );
   });
@@ -230,6 +288,30 @@ describe('the loop never ends silently on an empty reply', () => {
     const { events } = await run({ content: [{ type: 'text', text: '  ' }], stopReason: 'end_turn' });
     const err = events.find((e) => e.type === 'error');
     assert.equal(err && 'message' in err ? err.message : '', EMPTY_REPLY_MESSAGE);
+  });
+
+  test('an empty end_turn after a tool step ends the turn quietly', async () => {
+    const replies: ProviderResponse[] = [
+      { content: [{ type: 'tool_call', id: 'c1', name: 'get_page', input: {} }], stopReason: 'tool_use' },
+      { content: [], stopReason: 'end_turn' },
+    ];
+    let n = 0;
+    const provider: Provider = { async chat() { return replies[n++]!; } };
+    const events: AgentEventBody[] = [];
+    const out = await runAgent({
+      settings: settings(),
+      history: [],
+      turn: { id: 't1', text: 'hide the sidebar' },
+      pullQueued: () => [],
+      env,
+      emit: (e) => events.push(e),
+      signal: new AbortController().signal,
+      provider,
+      retry: { deps: { sleep: async () => {}, random: () => 0.5, isOnline: () => true } },
+    });
+    assert.equal(n, 2);
+    assert.ok(!events.some((e) => e.type === 'error'), 'a finished turn is not an error');
+    assert.ok(!(out.messages as Msg[]).some((m) => m.role === 'assistant' && !m.content.length), 'no empty assistant turn');
   });
 
   test('a real answer is unchanged', async () => {

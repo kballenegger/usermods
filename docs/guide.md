@@ -111,13 +111,16 @@ not Default the chip in the chat bar says so (`claude-opus-5 · high`).
   JSON merged into every request. If a server answers 400 to the reasoning field, usermods sends
   that one request again without it, says so, and leaves it out for that model from then on.
 - **Max output tokens** (per OpenAI-compatible provider, default 16384) is the most the model may
-  write in one reply, thinking included. usermods always sends it, as `max_completion_tokens` to
+  write in one reply, thinking included. usermods sends it as `max_completion_tokens` to
   api.openai.com and `max_tokens` everywhere else, because some servers cap a request without one
-  at 4096 tokens. A server that refuses the field gets the request again without it, and is
-  remembered if the field itself was the problem.
+  at 4096 tokens. Left empty on OpenAI or OpenRouter, nothing is sent and the model gets its full
+  output. If a server says the value is above its maximum, the request goes again at that maximum.
+  A server that does not take the field at all gets the request again without it, and is
+  remembered.
 - **A reply with nothing in it is an error, not a silent stop.** If the model spends its whole
   output limit thinking and never answers, the panel says so and suggests lowering Thinking or
-  raising Max output tokens.
+  raising Max output tokens. An empty reply right after a tool step is a normal ending and stays
+  quiet.
 
 ### Using a subscription instead of an API key
 

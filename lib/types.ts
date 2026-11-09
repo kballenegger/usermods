@@ -162,7 +162,7 @@ export interface Settings {
   customFields?: Record<string, unknown>;
   /**
    * The output limit an OpenAI-compatible request carries, from the connection (lib/outputlimit.ts).
-   * Absent reads as DEFAULT_MAX_OUTPUT_TOKENS.
+   * Absent means unset: DEFAULT_MAX_OUTPUT_TOKENS, or no limit on api.openai.com and OpenRouter.
    */
   maxOutputTokens?: number;
 }

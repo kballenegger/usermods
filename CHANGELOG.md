@@ -14,13 +14,17 @@ All notable changes to usermods are recorded here. The format follows
     collapsed **Show thinking** view) for OpenAI-compatible servers that send `reasoning_content` or
     `reasoning`, for Claude thinking text and for Responses reasoning summaries. It is display only.
   - Each OpenAI-compatible provider has a **Max output tokens** setting, default 16384, sent as
-    `max_completion_tokens` to api.openai.com and `max_tokens` elsewhere. A server that refuses it
-    gets the request again without it.
+    `max_completion_tokens` to api.openai.com and `max_tokens` elsewhere. Left empty on OpenAI or
+    OpenRouter it sends nothing, since those already give the model its full output. A server that
+    states a maximum gets the request again at that maximum; one that refuses the field gets it
+    again without.
   - A reply with no text and no tool calls now ends with an error. At the output limit it says the
-    model spent the limit thinking and what to change.
+    model spent the limit thinking and what to change. An empty reply after a tool step still ends
+    the turn quietly, since Claude does that when it has nothing to add.
   - Qwen 3 under Auto offers Default, Off, Low and Medium. Low and Medium add a top-level
     `reasoning_effort` beside `enable_thinking`, so the server no longer has to think at its own
-    maximum. A chat that had Qwen 3 on High now sends nothing, which is the server's default.
+    maximum. A chat that had Qwen 3 on High now sends nothing, which is the server's default. A
+    server that refuses `reasoning_effort` loses only that field, so Off keeps working.
 
 - iOS: the app crashed on launch on iOS 27 when built with the iOS 27 SDK, because it had no scene
   manifest. It now adopts the UIScene lifecycle. `safari-xcode.mjs launch-check` starts the Release

@@ -10,7 +10,7 @@ import {
   thinkingKey,
   type ThinkingMemory,
 } from '../thinking.ts';
-import { maxTokensFieldFor, outputLimitRejection, resolveMaxOutputTokens } from '../outputlimit.ts';
+import { maxTokensFieldFor, outputLimitCeiling, outputLimitFor, outputLimitRejection } from '../outputlimit.ts';
 import type { Msg, Part, Settings, ToolDef } from '../types';
 import { ProviderError, fetchOrNetworkError, httpError, parseRetryAfter, readStream, streamIncomplete } from './errors.ts';
 import type { Provider, ProviderResponse } from './types';
@@ -182,7 +182,10 @@ export function createOpenAIProvider(settings: Settings, deps: OpenAIProviderDep
   const thinkKey = thinkingKey(settings.baseUrl || DEFAULT_OPENAI_BASE, settings.model ?? '');
   const limitMemory = deps.outputLimitMemory ?? NO_THINKING_MEMORY;
   const limitField = maxTokensFieldFor(base);
-  const limitValue = resolveMaxOutputTokens(settings.maxOutputTokens);
+  const limitValue = outputLimitFor(base, settings.maxOutputTokens);
+  // Where a refused reasoning_effort is remembered when it rode beside chat_template_kwargs, so
+  // dropping it does not also drop the on/off switch.
+  const effortKey = `${thinkKey}#reasoning_effort`;
 
   return {
     async chat({ system, messages, tools, signal, callbacks }): Promise<ProviderResponse> {
@@ -195,12 +198,20 @@ export function createOpenAIProvider(settings: Settings, deps: OpenAIProviderDep
       // cases the request carries no reasoning field at all.
       const level = resolveThinkingLevel(settings.thinking);
       const cap = thinkingCapability({ kind: 'openai-compatible', model: settings.model, reasoningField: resolveReasoningField(settings.reasoningField) });
-      const reasoningFields = applyThinking(level, cap).body;
+      let reasoningFields: Record<string, unknown> = applyThinking(level, cap).body;
+      // The Qwen 3 guess sends reasoning_effort beside chat_template_kwargs. A server that takes the
+      // switch but not the effort field loses only the effort field, so Off keeps working.
+      const effortIsExtra = () => 'reasoning_effort' in reasoningFields && 'chat_template_kwargs' in reasoningFields;
+      const dropEffort = () => {
+        const { reasoning_effort: _dropped, ...rest } = reasoningFields;
+        reasoningFields = rest;
+      };
+      if (effortIsExtra() && (await thinkMemory.isUnsupported(effortKey))) dropEffort();
       // The connection's own "Custom request fields" box, for servers whose knob nothing can guess.
       // Merged last so an explicitly typed field wins over the mapped one.
       const custom = settings.customFields ?? {};
 
-      const send = (withImages: boolean, withReasoning: boolean, withLimit: boolean) =>
+      const send = (withImages: boolean, withReasoning: boolean, limit: number | null) =>
         fetchOrNetworkError(`${base}/chat/completions`, {
           method: 'POST',
           signal,
@@ -213,7 +224,7 @@ export function createOpenAIProvider(settings: Settings, deps: OpenAIProviderDep
             stream: true,
             messages: toOpenAIMessages(system, messages, withImages),
             ...toolsField,
-            ...(withLimit ? { [limitField]: limitValue } : {}),
+            ...(limit !== null ? { [limitField]: limit } : {}),
             ...(withReasoning ? reasoningFields : {}),
             ...(withReasoning ? custom : {}),
           }),
@@ -230,8 +241,9 @@ export function createOpenAIProvider(settings: Settings, deps: OpenAIProviderDep
       const carriesReasoning = Object.keys(reasoningFields).length > 0 || Object.keys(custom).length > 0;
       const withReasoning = carriesReasoning && !(await thinkMemory.isUnsupported(thinkKey));
 
-      // The output limit goes on every request unless this endpoint+model has refused the field.
-      const withLimit = !(await limitMemory.isUnsupported(thinkKey));
+      // The output limit goes on every request that has one, unless this endpoint+model has refused
+      // the field.
+      const withLimit = limitValue !== null && !(await limitMemory.isUnsupported(thinkKey)) ? limitValue : null;
 
       let res = await send(withImages, withReasoning, withLimit);
 
@@ -257,12 +269,13 @@ export function createOpenAIProvider(settings: Settings, deps: OpenAIProviderDep
       // sends, each immediate and each remembered so the next turn pays for neither.
       //
       // The output limit is the third thing a server can refuse, shed the same way. A server that
-      // does not take the field at all is remembered; a limit that does not fit the window beside
-      // this prompt is dropped for this request only, so the next turn sends it again.
+      // does not take the field at all is remembered. A value the server finds too large is not: if
+      // the refusal names a maximum the request goes again with that, otherwise with no limit, and
+      // either way the next turn sends the setting again.
       let sentImages = withImages;
       let sentReasoning = withReasoning;
       let sentLimit = withLimit;
-      for (let attempt = 0; attempt < 3 && !res.ok; attempt++) {
+      for (let attempt = 0; attempt < 5 && !res.ok; attempt++) {
         // The body is read here rather than by httpError, because the classifiers need it and a
         // Response body can only be read once.
         const body = await res.text().catch(() => '');
@@ -273,10 +286,17 @@ export function createOpenAIProvider(settings: Settings, deps: OpenAIProviderDep
           res = await send(sentImages, sentReasoning, sentLimit);
           continue;
         }
-        const limitRefusal = sentLimit ? outputLimitRejection(res.status, body) : null;
-        if (limitRefusal) {
+        const limitRefusal = sentLimit !== null ? outputLimitRejection(res.status, body) : null;
+        if (limitRefusal && sentLimit !== null) {
           if (limitRefusal === 'unsupported') await limitMemory.markUnsupported(thinkKey);
-          sentLimit = false;
+          const ceiling = limitRefusal === 'too-large' ? outputLimitCeiling(body) : null;
+          sentLimit = ceiling !== null && ceiling < sentLimit ? ceiling : null;
+          res = await send(sentImages, sentReasoning, sentLimit);
+          continue;
+        }
+        if (sentReasoning && effortIsExtra() && /\breasoning_effort\b/i.test(body) && isReasoningRejection(res.status, body)) {
+          await thinkMemory.markUnsupported(effortKey);
+          dropEffort();
           res = await send(sentImages, sentReasoning, sentLimit);
           continue;
         }
