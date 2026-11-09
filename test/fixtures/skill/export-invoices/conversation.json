@@ -1,0 +1,13 @@
+{
+  "prompt": "SKILLFLOW-INVOICES export this month's invoices as a CSV and list the invoice numbers",
+  "done": "SKILLFLOW-INVOICES-DONE",
+  "steps": [
+    { "calls": [{ "name": "act", "args": { "description": "open the invoices page", "steps": [{ "do": "go", "text": "/invoices" }] } }] },
+    { "calls": [{ "name": "find_elements", "args": { "selector": "select", "limit": 3 } }] },
+    { "calls": [{ "name": "act", "args": { "description": "show only this month's invoices", "steps": [{ "do": "select", "target": "#period", "text": "This month" }], "then_wait": { "selector": "tr:nth-child(3)", "state": "visible" } } }] },
+    { "calls": [{ "name": "find_elements", "args": { "selector": "table tbody tr td.number", "limit": 20 } }] },
+    { "calls": [{ "name": "act", "args": { "description": "download the filtered list", "steps": [{ "do": "click", "target": "#download-csv" }] } }] },
+    { "calls": [{ "name": "wait_for", "args": { "ms": 500 } }] },
+    { "text": "SKILLFLOW-INVOICES-DONE Here are the numbers." }
+  ]
+}

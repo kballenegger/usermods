@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Interact fixture</title>
+    <style>
+      body { font: 14px/1.4 sans-serif; margin: 90px 16px 16px; }
+      section { margin: 12px 0; padding: 8px; border: 1px solid #ccc; }
+      #covered-wrap { position: relative; display: inline-block; }
+      #cookie-wall { position: absolute; inset: -4px; background: rgba(0, 0, 0, 0.4); }
+      .menu { display: none; }
+      .menu.open { display: block; }
+      #tall { height: 1800px; }
+    </style>
+  </head>
+  <body>
+    <nav aria-label="Pagination">
+      <a id="next" href="/page2">Next page</a>
+      <a id="route" href="/route" data-route>Route change</a>
+      <a id="newtab" href="/page2" target="_blank">Open in a new tab</a>
+    </nav>
+
+    <section aria-label="Basics">
+      <button id="show">Show more</button>
+      <button id="rename" type="button">Save</button>
+      <span id="covered-wrap"><button id="covered">Apply</button><span id="cookie-wall" class="cookie-wall"></span></span>
+      <button id="disabled" disabled>Later</button>
+      <button id="hidden" hidden>Unseen</button>
+      <div id="div-click" style="cursor: pointer">A clickable div</div>
+    </section>
+
+    <section aria-label="Menu">
+      <!-- A menu library listens on pointerdown, which el.click() alone would not reach. -->
+      <button id="menu-open" type="button">Account</button>
+      <div id="menu" class="menu" role="menu"><a role="menuitem" id="menu-item" href="#signout">Sign out</a></div>
+    </section>
+
+    <section>
+      <form aria-label="New expense" id="expense" method="post" action="/submit">
+        <h2>New expense</h2>
+        <label for="merchant">Merchant</label>
+        <input id="merchant" name="merchant" />
+        <label for="note">Note</label>
+        <textarea id="note" name="note"></textarea>
+        <label for="delivery">Delivery</label>
+        <select id="delivery" name="delivery">
+          <option value="std">Standard</option>
+          <option value="exp">Express</option>
+        </select>
+        <label><input id="agree" type="checkbox" name="agree" /> Remember me</label>
+        <button id="submit-expense">Submit expense</button>
+      </form>
+      <div id="rich" contenteditable="true" aria-label="Rich note" style="min-height: 24px; border: 1px solid #999"></div>
+    </section>
+
+    <section>
+      <form aria-label="Sign in" id="login" method="post" action="/login">
+        <input id="username" name="username" aria-label="Username" />
+        <input id="password" name="password" type="password" aria-label="Password" />
+        <button id="sign-in">Sign in</button>
+      </form>
+      <input id="otp" autocomplete="one-time-code" aria-label="Code" />
+    </section>
+
+    <section aria-label="Subscriptions" id="subs">
+      <ul>
+        <li><button class="unsub" type="button">Unsubscribe</button></li>
+        <li><button class="unsub" type="button">Unsubscribe</button></li>
+        <li><button class="unsub" type="button">Unsubscribe</button></li>
+      </ul>
+    </section>
+
+    <section aria-label="Elsewhere">
+      <div id="shadow-host"></div>
+      <iframe id="frame" title="Framed" srcdoc="<!doctype html><button id='in-frame'>In the frame</button>"></iframe>
+    </section>
+
+    <section id="rerender"><button id="rerender-me" type="button">Regenerate</button></section>
+    <div id="tall"></div>
+    <button id="far">Far below</button>
+
+    <script>
+      // What the page saw, for the flow to read. The events are recorded with isTrusted: everything
+      // the extension does must read false, and only the flow's deliberate real mouse click true.
+      window.__events = [];
+      const log = (e) => window.__events.push({ type: e.type, id: e.target.id, trusted: e.isTrusted, x: e.clientX, y: e.clientY });
+      for (const t of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click', 'input', 'change', 'keydown']) document.addEventListener(t, log, true);
+
+      document.getElementById('menu-open').addEventListener('pointerdown', () => document.getElementById('menu').classList.add('open'));
+
+      // A controlled input the way a framework keeps one: its state follows `input` events only.
+      window.__merchant = '';
+      document.getElementById('merchant').addEventListener('input', (e) => (window.__merchant = e.target.value));
+
+      // Each row answers late, as a real unsubscribe does.
+      for (const b of document.querySelectorAll('.unsub')) {
+        b.addEventListener('click', () => setTimeout(() => b.closest('li').remove(), 400));
+      }
+
+      document.querySelector('[data-route]').addEventListener('click', (e) => {
+        e.preventDefault();
+        history.pushState({}, '', '/routed');
+      });
+
+      const root = document.getElementById('shadow-host').attachShadow({ mode: 'open' });
+      root.innerHTML = '<button id="in-shadow">In the shadow</button>';
+      document.getElementById('show').addEventListener('click', () => {
+        const more = document.createElement('div');
+        more.className = 'more';
+        more.innerHTML = '<a href="/more">permalink</a>';
+        document.body.append(more);
+      });
+      window.renameIt = () => (document.getElementById('rename').textContent = 'Delete account');
+      window.rerenderIt = () => (document.getElementById('rerender').innerHTML = '<button id="rerendered" type="button">Regenerate</button>');
+    </script>
+  </body>
+</html>

@@ -3,6 +3,7 @@ import type { AttachedImage, ImageThumb } from './images';
 import type { WaitCondition } from './agent/wait';
 import type { ImagesSetting } from './providers/vision';
 import type { ReasoningField, ThinkingLevel } from './thinking';
+import type { PageCard, Question, SkillProposalCard, StepRow, ToolEffect } from './agent/questions';
 
 export type { AttachedImage, ImageThumb, ImagesSetting, ReasoningField, ThinkingLevel };
 
@@ -160,10 +161,23 @@ export interface Settings {
   reasoningField?: ReasoningField;
   /** Extra top-level request fields for this connection, already parsed and validated. */
   customFields?: Record<string, unknown>;
+  /**
+   * Settings' "Ask before every step": every step and every script waits for the user, whatever the
+   * gate would have decided. Optional, and absent reads as off. Never read in a build with ACT_OFF.
+   */
+  askEveryStep?: boolean;
+  /**
+   * Settings' "Repair broken steps with the model". Absent reads as 'here'. Never read in a build
+   * with ACT_OFF. See lib/skillrepair.ts.
+   */
+  repairSkills?: RepairSetting;
 }
 
+/** Which skills a model may repair: none, the ones made on this device, or every one. */
+export type RepairSetting = 'never' | 'here' | 'every';
+
 /** The global preferences: the part of `Settings` stored under 'settings', none of it about a provider. */
-export type Prefs = Pick<Settings, 'autoNameChats' | 'theme' | 'contextBudget' | 'sidePanelScope' | 'checkUpdates'>;
+export type Prefs = Pick<Settings, 'autoNameChats' | 'theme' | 'contextBudget' | 'sidePanelScope' | 'checkUpdates' | 'askEveryStep' | 'repairSkills'>;
 
 /**
  * Default context budget, in estimated tokens. Well under the 200k window of the models this ships
@@ -327,13 +341,16 @@ export type AgentEventBody =
    */
   | {
       type: 'status';
-      phase: 'model' | 'tool' | 'idle';
+      /** 'waiting-user': the run holds still until the user does something. See lib/activity.ts. */
+      phase: 'model' | 'tool' | 'idle' | 'waiting-user';
       /** Tool name, for phase 'tool'. */
       tool?: string;
       /** Human detail: the script's description, the selector, or 'waiting for model'. */
       detail?: string;
       /** Agent-loop iteration, 1-based. */
       iteration?: number;
+      /** This run has operated the page (lib/agent/driver.ts). Sticks until the run ends. */
+      driving?: boolean;
       /**
        * Set while the model request is being retried (lib/agent/retry.ts): the request failed for a
        * reason that will probably pass, and the loop is waiting before it asks again. `until` is a
@@ -358,7 +375,17 @@ export type AgentEventBody =
    */
   | { type: 'text_discard'; chars: number }
   | { type: 'tool_call'; id: string; name: string; input: Record<string, unknown> }
-  | { type: 'tool_result'; id: string; summary: string; isError: boolean }
+  | { type: 'tool_result'; id: string; summary: string; isError: boolean; /** What the extension observed this call do to the page. */ effect?: ToolEffect }
+  /** One step of an `act` call, as it starts and again as it ends. `index` is its place in the call. */
+  | { type: 'act_step'; id: string; index: number; step: StepRow }
+  /** The run waits on this. Permissions are answered only in the panel; see lib/agent/questions.ts. */
+  | { type: 'question'; question: Question }
+  /** That question is over: answered, in any panel, or the run stopped under it. */
+  | { type: 'question_done'; id: string }
+  /** What the extension recorded of a run that operated the page, at the end of the run. */
+  | { type: 'page_card'; card: PageCard }
+  /** propose_skill was accepted. The hero card, with the version it became on it. */
+  | { type: 'skill_proposal'; card: SkillProposalCard }
   | { type: 'proposal'; proposal: ModProposal }
   /**
    * The chat's draft mod gained a version. Emitted after the background has stored it, so the panel
@@ -414,7 +441,7 @@ export type AgentEvent = AgentEventBody & { chatId: string };
 export type ChatItem =
   | { kind: 'user'; id: string; text: string; refs?: ElementRef[]; images?: ImageThumb[]; queued?: boolean }
   | { kind: 'assistant'; text: string }
-  | { kind: 'tool'; id: string; name: string; input: Record<string, unknown>; summary?: string; isError?: boolean }
+  | { kind: 'tool'; id: string; name: string; input: Record<string, unknown>; summary?: string; isError?: boolean; /** An `act` call's steps. */ steps?: StepRow[]; effect?: ToolEffect }
   /**
    * A proposal, as history. `version` is the artifact version this proposal became, so a card in
    * the transcript can say "v2" and its button can select that version in the artifact panel
@@ -427,6 +454,8 @@ export type ChatItem =
    * `saved` on a transcript restored from an older build is simply ignored.
    */
   | { kind: 'proposal'; proposal: ModProposal; version?: number }
+  | { kind: 'page_card'; card: PageCard }
+  | { kind: 'skill_proposal'; card: SkillProposalCard }
   | { kind: 'note'; text: string }
   /**
    * The model the turns after it were produced by, until the next one of these: which connection
@@ -467,7 +496,7 @@ export type ContentRequest =
   /** `text`: readable text instead of HTML (lib/pagetext.ts), from character `offset`. */
   | { type: 'snapshot'; selector?: string; maxChars?: number; includeHidden?: boolean; text?: boolean; offset?: number }
   /** `styles` and `overlays`: see FindOptions in lib/inspect.ts. */
-  | { type: 'query'; selector?: string; limit?: number; text?: string; styles?: string[]; overlays?: boolean }
+  | { type: 'query'; selector?: string; limit?: number; text?: string; styles?: string[]; overlays?: boolean; /** The inventory of what can be operated (lib/interact/view.ts), scoped by `selector`. */ operable?: boolean }
   | { type: 'styles'; selector: string; properties?: string[] }
   | { type: 'pick' }
   /**
@@ -495,6 +524,8 @@ export type ContentRequest =
   | { type: 'share-fill'; req: import('./sharefill').FillRequest }
   | { type: 'share-hint'; hint: ShareHintSpec }
   | { type: 'share-files' }
+  /** Operating the page (lib/interact/client.ts). Absent from a build with ACT_OFF. */
+  | import('./interact/client').InteractMessage
   | { type: 'ping' };
 
 /** A hint bubble, as the background asks for it. The content script finds the anchor itself. */
@@ -506,6 +537,8 @@ export interface ShareHintSpec {
   /** Put this on the clipboard (and offer a Copy button); `text`/`textNotCopied` say which happened. */
   copy?: string;
   textNotCopied?: string;
+  /** The Copy button's word, when it is not a script being copied. */
+  copyLabel?: string;
   /** Offer "Share as a new gist" (a deleted gist's edit page). */
   offerNewGist?: boolean;
   testId?: string;

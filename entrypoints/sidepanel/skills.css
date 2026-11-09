@@ -1,0 +1,82 @@
+/*
+ * Skills: the install preview, the rows and the source editor. Built from the design system's parts;
+ * this file only lays them out. The preview's facts are label and value, side by side where there is
+ * room and stacked in a narrow panel.
+ */
+
+.skill-facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--sp-2) var(--sp-3);
+  margin: 0;
+}
+.skill-facts dt {
+  margin: 0;
+  font: 400 var(--fs-label) / 1.45 var(--font-mono);
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.skill-facts dt.warn {
+  color: var(--warn);
+}
+.skill-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font: 400 var(--fs-meta) / 1.45 var(--font-ui);
+  color: var(--text-1);
+}
+.skill-facts dd > div + div {
+  margin-top: var(--sp-1);
+}
+@media (max-width: 480px) {
+  .skill-facts {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-1);
+  }
+  .skill-facts dd {
+    margin-bottom: var(--sp-2);
+  }
+}
+
+.skill-steps {
+  margin: var(--sp-2) 0 0;
+  padding-left: 3ch;
+  font: 400 var(--fs-meta) / 1.5 var(--font-mono);
+  overflow-wrap: anywhere;
+}
+.skill-steps .warn {
+  color: var(--warn);
+}
+.skill-prose {
+  margin: var(--sp-2) 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: 400 var(--fs-meta) / 1.5 var(--font-ui);
+  color: var(--text-1);
+}
+
+.skill-card input[type='text'],
+.skill-card input[type='number'],
+.skill-card input[type='date'],
+.skill-card select {
+  width: 100%;
+}
+.skill-card-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+  margin: 0;
+  padding: var(--sp-2);
+  border: 1px solid var(--border-hair);
+}
+.skill-card-group legend {
+  padding: 0 var(--sp-1);
+  font: 400 var(--fs-label) / 1.35 var(--font-mono);
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+.skill-card-group .mono {
+  font-family: var(--font-mono);
+}

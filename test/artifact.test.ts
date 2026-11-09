@@ -419,3 +419,13 @@ function baseMod(): Mod {
     updatedAt: 0,
   };
 }
+
+test('a draft skill: the block says so and carries its steps but not its notes, and a proposed mod replaces it', () => {
+  const code = '---\nusermods-skill: 1\nname: File it\ndescription: d\nversion: 1.0.0\nmatch:\n  - "*://x.example.com/*"\nstart: https://x.example.com/\ninputs: {}\noutputs: {}\n---\n\nA-NOTE in the body\n\n```steps\n- click: button "Go"\n  at: { css: "#go" }\n  why: A-WHY\n```\n';
+  const skill = { ...createArtifact('c', { code, name: 'File it', description: 'd', matches: ['*://x/*'], source: 'proposal' }), kind: 'skill' as const };
+  const block = draftBlock(skill);
+  assert.match(block, /\[Current draft skill v1 "File it"/);
+  assert.match(block, /click button "Go"/);
+  assert.doesNotMatch(block, /A-NOTE|A-WHY/);
+  assert.doesNotMatch(block, /propose the COMPLETE/);
+});

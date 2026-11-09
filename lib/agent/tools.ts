@@ -1,3 +1,4 @@
+import { ACT_OFF } from '../buildflags.ts';
 import type { ToolDef } from '../types';
 // The .ts extension is needed because this is a VALUE import and `npm test` loads these files
 // under node --experimental-strip-types, whose resolver does not guess extensions. tsconfig sets
@@ -61,7 +62,160 @@ export function toolsFor(canSeeImages: boolean): ToolDef[] {
   return TOOLS.map((t) => (t.name === 'screenshot' ? { ...t, description: SCREENSHOT_DESCRIPTION_BLIND } : t));
 }
 
-export const TOOLS: ToolDef[] = [
+/**
+ * What a build that can operate pages adds: `act` and `note`, `ask_user` on wait_for, and the
+ * inventory on find_elements. `TOOLS` is the list unchanged when the flag is off, and this function
+ * is dropped with the branch that calls it.
+ */
+function withActing(base: ToolDef[]): ToolDef[] {
+  const extended = base.map((t) => {
+    if (t.name === 'find_elements') {
+      const schema = t.inputSchema as { properties: Record<string, unknown> };
+      return {
+        ...t,
+        description: `${t.description} Each match carries a ref for act. operable: true lists what can be clicked or typed into, scoped by selector.`,
+        inputSchema: { ...t.inputSchema, properties: { ...schema.properties, operable: { type: 'boolean', description: 'List what can be operated, with refs, under the selector or on the whole page. Needs no text.' } } },
+      };
+    }
+    if (t.name === 'propose_mod') {
+      const schema = t.inputSchema as { properties: Record<string, unknown> };
+      return { ...t, inputSchema: { ...t.inputSchema, properties: { ...schema.properties, replace: { type: 'boolean', description: 'Only after a refusal: take the place of a draft skill with unsaved changes. Ask the user first.' } } } };
+    }
+    if (t.name === 'wait_for') {
+      const schema = t.inputSchema as { properties: Record<string, unknown> };
+      return {
+        ...t,
+        description: `${t.description} With ask_user it hands the page to the user: they see your words, and it ends when the condition holds or they say they are done, however long that takes. Use it for a login, a code, a captcha, a card number.`,
+        inputSchema: { ...t.inputSchema, properties: { ...schema.properties, ask_user: { type: 'string', description: 'What the user should do, in one sentence. Any condition is then optional.' } } },
+      };
+    }
+    return t;
+  });
+  return [
+    ...extended,
+    {
+      name: 'act',
+      description:
+        'Carry out steps on the page for the user: click, type, choose, go. Steps run in order and stop at the first that does not happen. Returns what changed. The user may be asked first, and may say no. A target is a ref from find_elements, or a selector that matches exactly one element.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          steps: {
+            type: 'array',
+            minItems: 1,
+            maxItems: 20,
+            items: {
+              type: 'object',
+              properties: {
+                do: { type: 'string', enum: ['click', 'fill', 'select', 'check', 'press', 'hover', 'scroll_to', 'go'] },
+                target: { type: 'string', description: 'A ref such as k3e14, or a selector matching one element. Not for go; press without one goes to whatever has focus.' },
+                text: { type: 'string', description: 'fill: what to type. select: the option. check: "off" to untick. press: the key, such as Enter. go: a URL on this site, or back, forward, reload.' },
+                repeat: { type: 'integer', description: 'Click only, at most 50: click, find the same control again, and stop when none is left.' },
+              },
+              required: ['do'],
+              additionalProperties: false,
+            },
+          },
+          description: { type: 'string', description: 'One line saying what these steps are for. The user sees it labelled as yours.' },
+          then_wait: {
+            type: 'object',
+            description: 'Optional. After the last step, wait for this condition before returning. Same shape as wait_for.',
+            properties: { ...WAIT_CONDITION_PROPERTIES, timeout_ms: { type: 'integer', description: `Default 5000, max ${MAX_TIMEOUT_MS}.` } },
+            additionalProperties: false,
+          },
+        },
+        required: ['steps', 'description'],
+        additionalProperties: false,
+      },
+    },
+    {
+      name: 'note',
+      description: 'Your scratchpad in this chat. It comes back on every user turn and survives compaction and navigation, so put collected data here.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          set: { type: 'string', description: 'Replace the note with this.' },
+          append: { type: 'string', description: 'Add this as a new line.' },
+        },
+        additionalProperties: false,
+      },
+    },
+    {
+      name: 'propose_skill',
+      description:
+        'Offer what you just did as a skill the user can run again. You cannot write steps: usermods records them, and you name which ones by the [journal n] number on each act result and each find_elements. Do the task once with act first. Refused if nothing has run since your last proposal (unless a draft exists, when only its words, inputs and outputs change), if a named journal step does not exist, if a fill you did not name as an input or a constant typed anything, or if an output is not from a find_elements that matched.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Short human name, e.g. "File an expense".' },
+          description: { type: 'string', description: 'One sentence.' },
+          from_step: { type: 'integer', description: 'First journal step. Default: the latest run\'s first act.' },
+          to_step: { type: 'integer', description: 'Last journal step. Default: its last call.' },
+          after_step: { type: 'integer', description: 'With a draft skill: put the new journal steps after this step of the draft, counted from 1. 0 is before its first step.' },
+          inputs: {
+            type: 'array',
+            description: 'The typed values that change each run. Never put a value in a name or a label.',
+            items: {
+              type: 'object',
+              properties: { journal_step: { type: 'integer' }, name: { type: 'string', description: 'lower_snake_case' }, label: { type: 'string' }, optional: { type: 'boolean' } },
+              required: ['journal_step', 'name', 'label'],
+              additionalProperties: false,
+            },
+          },
+          outputs: {
+            type: 'array',
+            description: 'What a run should read from the page: find_elements calls you made.',
+            items: {
+              type: 'object',
+              properties: { name: { type: 'string', description: 'lower_snake_case' }, label: { type: 'string' }, from_step: { type: 'integer' }, take: { type: 'string', description: 'text, href, src, or an attribute name.' }, list: { type: 'boolean', description: 'Every match, rather than the first.' } },
+              required: ['name', 'label', 'from_step', 'take'],
+              additionalProperties: false,
+            },
+          },
+          constants: { type: 'array', items: { type: 'integer' }, description: 'Journal steps whose typed value stays in the file as it is. Only when the user asked for that.' },
+          rename_inputs: {
+            type: 'array',
+            description: 'Rename inputs the draft already has.',
+            items: { type: 'object', properties: { from: { type: 'string' }, to: { type: 'string' }, label: { type: 'string' } }, required: ['from', 'to'], additionalProperties: false },
+          },
+          replace: { type: 'boolean', description: 'Only after a refusal: take the place of a draft mod. Ask the user first.' },
+        },
+        required: ['name', 'description'],
+        additionalProperties: false,
+      },
+    },
+    {
+      name: 'open_skill',
+      description:
+        'Adopt a listed skill as this chat\'s draft, so the next propose_skill revises it. Take the id from the "[Skills on this page]" list. It returns what the skill does, not its notes. A change that needs a new step is done on the page with act and proposed with after_step.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          skill_id: { type: 'string', description: 'The id, exactly as the list gives it.' },
+          replace: { type: 'boolean', description: 'Only after a refusal: take the place of a draft with unsaved changes. Ask the user first.' },
+        },
+        required: ['skill_id'],
+        additionalProperties: false,
+      },
+    },
+    {
+      name: 'run_skill',
+      description:
+        'Offer to run a listed skill on this page. The user sees a card with what it will do and your values, can change them, and starts it or does not: you cannot start it yourself. It runs with no model and returns its record and outputs when it ends.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          skill_id: { type: 'string', description: 'The id, exactly as the list gives it.' },
+          inputs: { type: 'object', description: 'Your suggestion for each input, by name.', additionalProperties: { type: 'string' } },
+        },
+        required: ['skill_id'],
+        additionalProperties: false,
+      },
+    },
+  ];
+}
+
+const BASE_TOOLS: ToolDef[] = [
   {
     name: 'get_page',
     description:
@@ -199,3 +353,17 @@ export const TOOLS: ToolDef[] = [
     },
   },
 ];
+
+export const TOOLS: ToolDef[] = ACT_OFF ? BASE_TOOLS : withActing(BASE_TOOLS);
+
+/** What a repair of a skill's step may use (lib/skillrepair.ts). The loop refuses anything else, whatever is called. */
+export const repairTools = ACT_OFF
+  ? (): ToolDef[] => []
+  : (): ToolDef[] =>
+      TOOLS.filter((t) => ['find_elements', 'act', 'wait_for', 'note'].includes(t.name)).map((t) => {
+        if (t.name !== 'wait_for') return t;
+        // Your turn is the user's, and a repair has no business asking for it.
+        const schema = t.inputSchema as { properties: Record<string, unknown> };
+        const { ask_user: _ask, ...properties } = schema.properties;
+        return { ...t, description: t.description.split(' With ask_user')[0]!, inputSchema: { ...t.inputSchema, properties } };
+      });

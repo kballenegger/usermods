@@ -9,6 +9,7 @@
 // `import type`, which is erased), and `npm test` runs these files through node --experimental-
 // strip-types, whose ESM resolver does not guess extensions. tsconfig sets
 // allowImportingTsExtensions, so tsc and vite both take it as written.
+import { ACT_OFF } from './buildflags.ts';
 import { parseWaitInput, waitConditionLabel } from './agent/wait.ts';
 import type { AgentEventBody, ChatItem } from './types';
 
@@ -57,6 +58,10 @@ export function modelRowText(items: ChatItem[], index: number, { showFirst = fal
  * drop it otherwise). Use `unqueuedItem` to read the bubble before reducing.
  */
 export function reduceItems(items: ChatItem[], event: AgentEventBody): ChatItem[] {
+  if (!ACT_OFF) {
+    const operated = reduceOperating(items, event);
+    if (operated) return operated;
+  }
   switch (event.type) {
     case 'text': {
       const last = items[items.length - 1];
@@ -96,7 +101,7 @@ export function reduceItems(items: ChatItem[], event: AgentEventBody): ChatItem[
       const i = items.findIndex((x) => x.kind === 'tool' && x.id === event.id);
       if (i < 0) return items;
       const next = items.slice();
-      next[i] = { ...(next[i] as Extract<ChatItem, { kind: 'tool' }>), summary: event.summary, isError: event.isError };
+      next[i] = { ...(next[i] as Extract<ChatItem, { kind: 'tool' }>), summary: event.summary, isError: event.isError, ...(event.effect ? { effect: event.effect } : {}) };
       return next;
     }
     case 'proposal':
@@ -113,6 +118,8 @@ export function reduceItems(items: ChatItem[], event: AgentEventBody): ChatItem[
       // version and offers its old Save, which is the honest fallback.
       for (let i = items.length - 1; i >= 0; i--) {
         const it = items[i];
+        // A draft skill's card carries its own version, and a mod's card above it is about something else.
+        if (!ACT_OFF && it?.kind === 'skill_proposal') return items;
         if (it?.kind !== 'proposal') continue;
         // Already stamped with this number: the event is a duplicate, not a second proposal, so
         // nothing changes. (The de-duped re-proposal case — the model proposing the same script
@@ -175,6 +182,36 @@ export function reduceItems(items: ChatItem[], event: AgentEventBody): ChatItem[
       return [...items, { kind: 'error', text: event.message }];
     case 'done':
       return items;
+  }
+  return items;
+}
+
+/** The events of a run that operates the page, or null for any other event. Out of a build with ACT_OFF. */
+function reduceOperating(items: ChatItem[], event: AgentEventBody): ChatItem[] | null {
+  switch (event.type) {
+    case 'act_step': {
+      // Step by step, into the row of the call they belong to, so the transcript keeps one row per
+      // tool call: what a reload, an interrupted run and a gap in the rows all reason about.
+      const i = items.findIndex((x) => x.kind === 'tool' && x.id === event.id);
+      if (i < 0) return items;
+      const row = items[i] as Extract<ChatItem, { kind: 'tool' }>;
+      const steps = (row.steps ?? []).slice();
+      steps[event.index] = event.step;
+      const next = items.slice();
+      next[i] = { ...row, steps };
+      return next;
+    }
+    case 'page_card':
+      return [...items, { kind: 'page_card', card: event.card }];
+    case 'skill_proposal':
+      return [...items, { kind: 'skill_proposal', card: event.card }];
+    case 'question':
+    case 'question_done':
+      // A question is a row of the chat column, not of the transcript: what it asked and how it was
+      // answered is said by the note rows, and a question left over from another day means nothing.
+      return items;
+    default:
+      return null;
   }
 }
 

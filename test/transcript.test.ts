@@ -416,3 +416,34 @@ test('a level-only change reads as the level, not as a swap to the model it is a
   assert.equal(modelRowText(items, 1), null);
   assert.equal(modelRowText(items, 1, { showFirst: true }), 'model: demo · Local');
 });
+
+// ---------- Claiming a chat before anything is awaited ----------
+
+test('a claim holds from the moment it is made: a second one for that chat gets nothing', () => {
+  const s = new SessionMap();
+  assert.ok(s.claim('A', 1));
+  assert.equal(s.isRunning('A'), true);
+  assert.equal(s.claim('A', 1), null, 'a second Resume finds it taken, before any storage read');
+  assert.equal(s.get('A')!.tabId, 1);
+});
+
+test('a claim is let go of with nothing queued, and hands back what queued behind it', () => {
+  const s = new SessionMap();
+  s.claim('A', 1);
+  assert.equal(s.unclaim('A'), undefined);
+  assert.equal(s.isRunning('A'), false);
+  assert.equal(s.get('A'), undefined, 'the session went with it');
+  s.claim('B', 2);
+  s.accept('B', 2, turn('m1'));
+  assert.equal(s.unclaim('B')?.id, 'm1');
+});
+
+test('a run holds its tab: another chat asking for the same tab can see it', () => {
+  const s = new SessionMap();
+  s.claim('A', 1);
+  assert.equal(s.runningOnTab(1, 'B'), true);
+  assert.equal(s.runningOnTab(1, 'A'), false, 'not against itself');
+  assert.equal(s.runningOnTab(2, 'B'), false);
+  s.unclaim('A');
+  assert.equal(s.runningOnTab(1, 'B'), false);
+});

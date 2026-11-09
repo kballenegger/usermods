@@ -1,4 +1,6 @@
+import path from 'node:path';
 import { defineConfig } from 'wxt';
+import { actEnabled } from './lib/buildflags';
 import { buildManifest, isSafariOnlyIcon } from './lib/manifest';
 
 /**
@@ -44,11 +46,29 @@ export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   outDirTemplate,
   vite: (env) => ({
+    // A flag-off build holds none of the panel's operating or skills UI, and no skill parser: `./Operate`,
+    // `./Skills` and `lib/skills` are sets of empty stubs there.
+    plugins: actEnabled(storeBuild, env.browser === 'safari')
+      ? []
+      : [
+          {
+            name: 'usermods:leave-out-operate',
+            enforce: 'pre' as const,
+            resolveId(source: string) {
+              if (/(^|\/)Operate$/.test(source)) return path.resolve(process.cwd(), 'entrypoints/sidepanel/operate-off.ts');
+              if (/(^|\/)Skills$/.test(source)) return path.resolve(process.cwd(), 'entrypoints/sidepanel/skills-off.ts');
+              if (/(^|\/)skills(\.ts)?$/.test(source)) return path.resolve(process.cwd(), 'lib/skills-off.ts');
+              return null;
+            },
+          },
+        ],
     define: {
       __STORE_BUILD__: JSON.stringify(storeBuild),
       // Safari ships API-key providers only for now; see lib/buildflags.ts for why. A literal
       // define, so the bundler folds the flag and drops lib/oauth from that build too.
       __SAFARI_BUILD__: JSON.stringify(env.browser === 'safari'),
+      // Operating pages is compiled out of every store and Safari build; see ACT_OFF.
+      __ACT__: JSON.stringify(actEnabled(storeBuild, env.browser === 'safari')),
     },
   }),
   // Safari's own default in WXT is MV2. usermods is an MV3 extension throughout, with a service-worker

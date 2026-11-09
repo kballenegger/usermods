@@ -29,8 +29,9 @@ import type { ChatItem } from './types';
  *  - 'model'   the model picker, as its own sheet
  *  - 'draft'   the full draft panel: versions, diff, Try, Export, rename, roll back, detach
  *  - 'editmod' the installed-mod picker behind "Edit a mod…"
+ *  - 'runskill' the skill picker behind "Run a skill…", in a build with skills
  */
-export type ChatSheet = 'chat' | 'add' | 'model' | 'draft' | 'editmod';
+export type ChatSheet = 'chat' | 'add' | 'model' | 'draft' | 'editmod' | 'runskill';
 
 export type SheetEvent =
   | { type: 'open'; sheet: ChatSheet }

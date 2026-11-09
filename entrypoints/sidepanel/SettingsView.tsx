@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { SUBSCRIPTIONS_OFF } from '@/lib/buildflags';
+import { ACT_OFF, SUBSCRIPTIONS_OFF } from '@/lib/buildflags';
 import { commitContextBudget, loadSettings, MIN_CONTEXT_BUDGET, savePrefs } from '@/lib/settings';
 import { resolveScope } from '@/lib/sidepanel';
 import { applyTheme } from '@/lib/theme';
 import { DEFAULT_CONTEXT_BUDGET, type Prefs, type Settings, type SidePanelScope, type ThemeChoice } from '@/lib/types';
+import { OperatingPages } from './Operate';
 import { ProvidersSection } from './ProvidersSection';
 import { useConnections } from './useConnections';
 
@@ -203,6 +204,8 @@ export function SettingsView({ onReviewNotice }: { onReviewNotice?: () => void }
           own header — the toolbar icon opens it and cannot close it again.
         </span>
       </label>
+
+      {ACT_OFF ? null : <OperatingPages askEveryStep={s.askEveryStep === true} onAskEveryStep={(askEveryStep) => update({ askEveryStep })} repair={s.repairSkills ?? 'here'} onRepair={(repairSkills) => update({ repairSkills })} />}
 
       {/*
         The theme is applied the moment it is picked, so the choice is visible while you make it;

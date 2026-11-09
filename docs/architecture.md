@@ -40,6 +40,36 @@ side panel (React)  ──rpc──▶  background service worker  ──▶  LL
 - **Chats** are per site and live in `chrome.storage.local`, so they survive the panel closing, the service worker sleeping and a browser restart. Opening the panel on a site brings back its last chat, transcript and all, without a click; that keeps happening until you start a new one or **archive** it. Archiving is the switcher's main "done with this" action and needs no confirmation, because it is reversible: archived chats move to an *Archived* group at the bottom of the switcher, where you can reopen one (sending in it unarchives it), put it back, or delete it for good. Only deleting asks. Chats name themselves: once the first turn finishes, usermods makes one small extra call to the same model — no tools, a few hundred characters of the exchange — and asks for a three-to-six-word title, refreshing it once more when the chat reaches its fourth turn. That call happens after your turn is done and is never allowed to slow it down or fail it; if it errors, the truncated first message stays. **Rename** in the switcher gives a chat your own name, and nothing overwrites that afterwards. Turn the whole thing off with *Name chats automatically* in Settings. Runs are isolated per chat and several can be in flight at once on different tabs: a chat keeps streaming into its own transcript while you read another one, and Stop only stops the chat you are looking at. The index is capped at 200 chats per profile, oldest dropped, with archived chats evicted before live ones, and screenshots are stripped from stored history.
 - **Attached images** (`lib/images.ts`, `entrypoints/sidepanel/images.ts`) are processed entirely in the panel: `createImageBitmap` + `OffscreenCanvas` (with a `<canvas>` fallback) decode, downscale to 1568px and re-encode, which is also what strips EXIF. A turn's images become `image` content parts placed *before* its text, because that is the order all three provider adapters expect, each with a one-line caption (`[attached image 1: 1200x800 png, mock.png]`) so the model can refer to them. A chat's full-size attachments live under a fourth storage key, `chat:<id>:blobs`, keyed by content hash so the same picture is stored once and removed with the chat; the transcript keeps only a 320px thumbnail, which is what a reloaded panel renders and what the dashboard's preview shows. Compaction counts an image at its flat cost and elides old ones in tier 1.
 
+### Operating a page and skills (behind `__ACT__`)
+
+This is GitHub-build code: `lib/buildflags.ts` `ACT_OFF` is true in a store or Safari build, and
+constant folding and a resolve plugin in `wxt.config.ts` remove it (`npm run check:act-bundle` reads the
+packages). The designs are [docs/specs/browser-use.md](specs/browser-use.md) and
+[docs/specs/skills.md](specs/skills.md), whose As built section says where the code differs.
+
+Everything that touches a page goes through one path, `Driver.runStep` in `lib/agent/driver.ts`: describe
+(the content script reads the live element, `lib/interact/`), decide (`lib/agent/gate.ts`, from that read and
+never from anything a model or a file claims), ask (`lib/agent/questions.ts`, answered only over an RPC an
+extension page sent), journal (`RunRecord.pending` in `lib/runstate.ts`, before the step), act, clear. A step
+whose answer was lost is never sent again by anything. `lib/drive.ts` is the browser half.
+
+A skill (`lib/skills.ts`, `lib/skillyaml.ts`) is data, and never goes near `lib/exec` or `buildRegisteredCode`.
+`lib/skillrun.ts` is its run as a state machine with no model in it, each step going through `runStep`.
+`lib/skillcompile.ts` turns the chat's journal into a file: an entry holds what the extension read and where
+a typed value is in the saved conversation, never the value.
+
+The model's part has three tools in `lib/agent/tools.ts`, behind `AgentEnv.skills`. `propose_skill` names
+journal entries and `compileProposal` has nowhere else to take a target from. `run_skill` waits on a
+`run-skill` question, which only the panel can answer. The turn's `[Skills on this page]` block (`skillsBlock`)
+and a draft's block (`skillForModel`) say what a skill does and leave out what it says.
+
+A repair (`lib/skillrepair.ts`) is the one place a file's words reach a model. It is the same loop over an
+empty conversation with `AgentInput.bounds`, which refuses, before anything runs, any tool outside
+`repairTools()` and any call past the eighth. `Driver.act` with `RepairRules` forces every step to ask, gives
+none a standing allowance, refuses `go` and `repeat`, and types only the broken step's own value, which the
+model writes as `$value` and is not told. Its note is its own and is dropped with it. What it did is journalled with
+`repairOf`, and `repairedSkill` turns those entries into the patch version **Update skill with the repair** offers.
+
 ## Development and the test harness
 
 For development, `npm run dev` starts WXT with hot reload and opens a Chrome profile with the extension loaded. `npm run typecheck` type-checks, and `npm test` runs the Node test suite, including Safari execution and security coverage (no browser or API key needed).
@@ -118,11 +148,17 @@ names a newly added `@connect` host, that "Check with the agent first" sent the 
 and a user message holding the two sources and no page content, that Skip hides the version, and
 that only "Install update" installs a later one.
 
+`npm run smoke:skills-model` (`scripts/lib/skills-model-flow.mjs`) scripts the mock as a model that believes
+everything it reads, and measures what the extension lets that model do: from the mock's record of each
+request (`toolNames`, `messages`) and from what the routed site was asked. `npm run smoke:skills` does the same
+for replays with no model, and `npm run smoke:act` for the `act` tool.
+
 ## Security notes
 
 - Page content that the model reads is untrusted. The system prompt tells the model to treat it as data, and every generated script is shown to you before it is saved. Read it.
 - Scripts run in an isolated world: they see the DOM but not the page's JavaScript globals. Default `@match` is the current site only.
 - Your API keys are stored in extension local storage, and each is sent only to the provider it belongs to. Removing a provider deletes its key.
+- A skill holds no code and has no network of its own. Outside a repair the model is not given a skill's notes or `why` lines; in a repair they are fenced with a nonce, every action is asked, and the off-by-default setting for installed skills keeps a stranger's words from the model. [The spec's section 5.5](specs/skills.md#55-the-residual-risk) says what remains.
 - Updates are offered, never applied by a check (`lib/updates.ts`, `lib/updatecontroller.ts`): only the review screen's Install update installs, and only the exact text it showed (matched by hash). The optional safety review sends the model the two sources and the header changes, fenced as untrusted text; its verdict is advisory.
 - Sharing to a gist or Greasy Fork holds no credential and sends nothing: `lib/sharecontroller.ts` opens the site's page in your tab, `lib/shareclient.ts` fills it, and the site's own button (which you press) submits it. A pre-share scan (`lib/leakscan.ts`) lists likely secrets first. The install banner (`lib/banner.ts`) reads the page it is on and nothing else, and never installs.
 

@@ -2,8 +2,11 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Chat } from '@/lib/chats';
 import { chatOpenUrl, HANDOFF_KEY, modOrigins, overview, type ChatHandoff } from '@/lib/dashboard';
 import { rpc } from '@/lib/rpc';
+import { ACT_OFF } from '@/lib/buildflags';
+import type { Skill } from '@/lib/skills';
 import { isConnected } from '@/lib/connections';
 import type { Mod } from '@/lib/types';
+import { useSkillList } from '../sidepanel/Skills';
 import { useConnections } from '../sidepanel/useConnections';
 import { useUpdates } from '../sidepanel/useUpdates';
 import { SettingsView } from '../sidepanel/SettingsView';
@@ -134,6 +137,29 @@ export function Dashboard() {
     [refresh],
   );
 
+  /** The same, for a skill: which chat is the background's call, and the handoff carries the user there. */
+  const editSkill = ACT_OFF
+    ? undefined
+    : (skill: Skill) => {
+        try {
+          const p = chrome.sidePanel.open({ windowId: chrome.windows.WINDOW_ID_CURRENT });
+          if (p && typeof p.catch === 'function') p.catch(() => {});
+        } catch {
+          /* as for a mod, above */
+        }
+        void (async () => {
+          try {
+            const r = await rpc({ type: 'skills.edit', skillId: skill.id, host: '' });
+            const handoff: ChatHandoff = { chatId: r.chatId, host: r.host, at: Date.now() };
+            await chrome.storage.session.set({ [HANDOFF_KEY]: handoff }).catch(() => {});
+            await chrome.tabs.create({ url: skill.start, active: true }).catch(() => {});
+            await refresh();
+          } catch (e) {
+            setError(e instanceof Error ? e.message : String(e));
+          }
+        })();
+      };
+
   // Stay live while the side panel works: anything it changes lands in chrome.storage.local, and
   // both the chat index and the mod list are single keys there. (The overview's provider line keeps
   // itself current: useConnections listens to storage on its own.)
@@ -160,6 +186,7 @@ export function Dashboard() {
   }
 
   const o = overview(mods, chats);
+  const skills = ACT_OFF ? [] : useSkillList();
   const connectedLabels = providers.state.list.filter((c) => isConnected(c, providers.signedIn)).map((c) => c.label);
 
   return (
@@ -176,6 +203,7 @@ export function Dashboard() {
 
         <div className="overview" data-testid="overview">
           <Stat n={`${o.modsEnabled}/${o.modsTotal}`} k="mods enabled" />
+          {ACT_OFF ? null : <Stat n={String(skills.length)} k="skills" />}
           <Stat n={String(o.chatsLive)} k="chats live" />
           <Stat n={String(o.chatsArchived)} k="chats archived" />
           <Stat n={String(o.sitesCustomised)} k="sites customised" />
@@ -221,7 +249,7 @@ export function Dashboard() {
         </nav>
 
         {section === 'chats' && <ChatsSection chats={chats} loaded={loaded} onChanged={refresh} />}
-        {section === 'mods' && <ModsSection mods={mods} loaded={loaded} onChanged={refresh} origins={origins} onOpenChat={openChat} onEditMod={editMod} />}
+        {section === 'mods' && <ModsSection mods={mods} loaded={loaded} onChanged={refresh} origins={origins} onOpenChat={openChat} onEditMod={editMod} {...(editSkill ? { onEditSkill: editSkill } : {})} />}
         {/* The panel's own Settings view, unchanged: it reads and writes lib/settings, which is the
             same storage this page reads, so the overview above follows a change made here. */}
         {section === 'settings' && (

@@ -1,6 +1,7 @@
 // Matching a draft against the mods that already exist: which one a proposal revises, which ones
 // run on the page the user is looking at, and whether a save is about to mint a twin of something
 // already installed. Pure, so it is all testable under node.
+import { ACT_OFF } from './buildflags.ts';
 import { modMatchesUrl } from './mods.ts';
 import type { Mod } from './types';
 
@@ -132,10 +133,20 @@ export function modsBlock(mods: ModOnPage[]): string {
  */
 export type DraftStanding = 'none' | 'saved' | 'unsaved';
 
-export function draftStanding(a: { current: number; linkedModId?: string; savedVersion?: number } | null | undefined): DraftStanding {
+export function draftStanding(a: { current: number; linkedModId?: string; linkedSkillId?: string; savedVersion?: number } | null | undefined): DraftStanding {
   if (!a) return 'none';
   if (a.linkedModId && a.savedVersion === a.current) return 'saved';
+  if (!ACT_OFF && a.linkedSkillId && a.savedVersion === a.current) return 'saved';
   return 'unsaved';
+}
+
+/**
+ * Why propose_mod may not take the place of this draft yet. A chat holds one draft, and a mod and a skill
+ * do not mix, so a mod proposed over a draft skill loses that draft: unsaved, it asks first, as open_mod does.
+ */
+export function modOverSkillRefusal(a: { kind?: string; current: number; linkedSkillId?: string; savedVersion?: number } | null | undefined, replace: boolean): string | null {
+  if (ACT_OFF || a?.kind !== 'skill' || replace || draftStanding(a) !== 'unsaved') return null;
+  return 'This chat has a draft skill with unsaved changes, and a chat holds one draft. Ask the user, and call propose_mod again with replace: true if they want the mod instead: that draft’s unsaved versions would go.';
 }
 
 // ---------------------------------------------------------------------------

@@ -1,0 +1,52 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Invoices</title>
+<body>
+<main>
+  <h1>Invoices</h1>
+  <form id="filters" aria-label="Filters">
+    <p><label for="period">Period</label>
+      <select id="period" name="period"><option>All time</option><option>This month</option></select></p>
+  </form>
+  <section id="list" aria-label="Invoices">
+    <table><tbody id="rows"><tr><td class="number">INV-9000</td></tr></tbody></table>
+    <p id="downloads">
+      <a id="download-csv" href="/invoices.csv" download="invoices.csv" data-this-month>Download CSV</a>
+      <a id="download-all" href="/all.csv" download="all.csv" data-wrong>Download CSV</a>
+    </p>
+  </section>
+</main>
+<script>
+  // The variants of docs/specs/skills.md, section 9. What a step must never touch is marked data-wrong.
+  const v = window.__variant;
+  const by = (id) => document.getElementById(id);
+  const select = by('period');
+  const fill = () => {
+    if (select.value !== 'This month') return;
+    by('rows').innerHTML = '<tr><td class="number">INV-2001</td></tr><tr><td class="number">INV-2002</td></tr><tr><td class="number">INV-2003</td></tr>';
+  };
+  select.addEventListener('change', () => setTimeout(fill, 40));
+  if (v === 'renamed-class') {
+    select.id = 'range-select'; select.setAttribute('name', 'range_select');
+    document.querySelector('label').htmlFor = 'range-select';
+    by('download-csv').id = 'dl-month';
+    by('dl-month').setAttribute('data-testid', 'csv-this-month');
+  }
+  if (v === 'moved') {
+    const aside = document.createElement('section');
+    aside.setAttribute('aria-label', 'Options');
+    aside.append(by('period').parentElement);
+    document.querySelector('main').prepend(aside);
+  }
+  if (v === 'reordered') by('downloads').prepend(by('download-all'));
+  if (v === 'decoy') {
+    const p = document.createElement('p');
+    p.innerHTML = '<label for="evil">Period</label> <select id="evil" data-wrong><option>This month</option></select>';
+    by('filters').prepend(p);
+  }
+  if (v === 'renamed-button') {
+    document.querySelector('label').textContent = 'Billing range';
+    select.setAttribute('data-wrong', '');
+  }
+  if (v === 'removed') select.parentElement.remove();
+</script>
