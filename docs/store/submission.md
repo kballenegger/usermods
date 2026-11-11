@@ -22,6 +22,9 @@
 - **2026-11-09: 0.1.2 submitted, pending review.** Package, description, host-permission
   justification and test instructions replaced; the reviewer key was checked first and lists
   `ornith-1.5-35b`. The submit dialog ticks "Publish automatically" by default: untick it every time.
+- **2026-11-11: 0.1.2 accepted, "Ready to publish"** (must be published before 2026-12-10).
+  Subscription sign-in in the store build passed review. It went through in about two days and
+  no mail arrived, again: check the dashboard Status tab.
 - Automatic publication is **off**: an approved item waits for Publish to be pressed.
 
 Things the dashboard turned out to do differently from Google's docs, learned on the first
