@@ -11,7 +11,7 @@ import type { IncomingMessage, Server, ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { join, resolve } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
-import { brotliCompressSync, gzipSync } from "node:zlib";
+import { brotliCompressSync, constants as zlib, gzipSync } from "node:zlib";
 import { KEY_RE, submitPending } from "./indexnow.ts";
 import { openDb, recordRequest } from "./traffic.ts";
 
@@ -34,8 +34,9 @@ type Env = Record<string, string | undefined>;
 
 interface Entry {
   body: Buffer;
-  gzip: Buffer | null;
-  br: Buffer | null;
+  compress: boolean;
+  gzip?: Buffer; // filled on the first request that accepts the encoding
+  br?: Buffer;
   etag: string; // unquoted hash; variants add -gz / -br
   lastmod: number; // ms, truncated to the second
   type: string;
@@ -68,11 +69,9 @@ function escapeAttr(s: string): string {
 function entry(body: Buffer, type: string, lastmod: string): Entry {
   const ms = Date.parse(lastmod);
   if (Number.isNaN(ms)) throw new Error(`manifest: bad lastmod ${JSON.stringify(lastmod)}`);
-  const compress = COMPRESSIBLE.test(type);
   return {
     body,
-    gzip: compress ? gzipSync(body) : null,
-    br: compress ? brotliCompressSync(body) : null,
+    compress: COMPRESSIBLE.test(type),
     etag: createHash("sha256").update(body).digest("base64url").slice(0, 27),
     lastmod: Math.floor(ms / 1000) * 1000,
     type,
@@ -176,12 +175,12 @@ function send(
   const ae = req.headers["accept-encoding"];
   let body = e.body;
   let tag = e.etag;
-  if (e.br && quality(ae, "br") > 0) {
-    body = e.br;
+  if (e.compress && quality(ae, "br") > 0) {
+    body = e.br ??= brotliCompressSync(e.body, { params: { [zlib.BROTLI_PARAM_QUALITY]: 5 } });
     tag += "-br";
     res.setHeader("Content-Encoding", "br");
-  } else if (e.gzip && quality(ae, "gzip") > 0) {
-    body = e.gzip;
+  } else if (e.compress && quality(ae, "gzip") > 0) {
+    body = e.gzip ??= gzipSync(e.body);
     tag += "-gz";
     res.setHeader("Content-Encoding", "gzip");
   }
