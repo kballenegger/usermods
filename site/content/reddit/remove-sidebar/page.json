@@ -1,0 +1,34 @@
+{
+  "slug": "remove-sidebar",
+  "title": "Remove the Reddit sidebar",
+  "question": "How do I remove the right sidebar on Reddit and make the feed wider?",
+  "answer": "Reddit's desktop site has no option to turn off the right-hand sidebar. The usermods script on this page hides it and lets the feed, posts and comments take the freed width, about 340 extra pixels. Install it with usermods or any userscript manager. Without a userscript, a uBlock Origin filter on #right-sidebar-container hides the sidebar but leaves its column empty.",
+  "prompt": "Remove the right sidebar on Reddit and let the posts use the full width.",
+  "details": "Reddit lays out the feed and the sidebar as a two-column grid with fixed widths, so hiding the sidebar alone leaves a blank column. The script hides `#right-sidebar-container` and turns that grid into one column. It is CSS only and applies before the page draws.\n\nIt leaves the left navigation menu, the header and the post and comment layout alone.",
+  "alternatives": [
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filters",
+      "body": "The first line hides the sidebar, the second gives its column back to the feed. Our check runs the script, not these filters.\n\n```\nwww.reddit.com###right-sidebar-container\nwww.reddit.com##.main-container:style(grid-template-columns: minmax(0, 1fr) !important)\n```"
+    },
+    {
+      "kind": "other",
+      "title": "old.reddit.com",
+      "body": "old.reddit.com still serves the previous design, where the sidebar sits beside a full-width list of links."
+    }
+  ],
+  "related": [
+    "reddit/hide-promoted-posts"
+  ],
+  "check": {
+    "urls": [
+      "https://www.reddit.com/r/AskReddit/"
+    ],
+    "loggedOut": true,
+    "waitFor": "shreddit-post",
+    "settleMs": 3000,
+    "baseline": "document.getElementById('right-sidebar-container')?.checkVisibility() === true",
+    "expect": "document.getElementById('right-sidebar-container') !== null && !document.getElementById('right-sidebar-container').checkVisibility() && document.getElementById('main-content').getBoundingClientRect().width > 900",
+    "intact": "[...document.querySelectorAll('shreddit-post')].filter((p) => p.checkVisibility()).length >= 5"
+  }
+}

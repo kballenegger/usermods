@@ -1,0 +1,7 @@
+{
+  "slug": "youtube",
+  "name": "YouTube",
+  "domains": ["youtube.com", "www.youtube.com"],
+  "category": "video",
+  "intro": "Userscripts that change how YouTube looks and behaves on desktop: fewer distractions, less clutter, and the defaults you would pick yourself."
+}

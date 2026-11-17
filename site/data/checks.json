@@ -1,0 +1,59 @@
+{
+  "google/remove-ai-overview": [
+    {
+      "at": "2026-11-17T04:52:24Z",
+      "result": "pass",
+      "url": "https://www.google.com/search?q=how+does+caffeine+affect+sleep&hl=en&gl=us",
+      "scriptSha": "c7106f6c5487fa29f770c455dc61213568b1f0de4e478cbc5e82e19bddf54a5d",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T04:46:53Z",
+      "result": "fail",
+      "url": "https://www.google.com/search?q=how+does+caffeine+affect+sleep&hl=en&gl=us",
+      "scriptSha": "8858675f12e64547f09526c3a0ebf50b19e259b0c072a03ac5ea2154f0cc5084",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "expect was false, intact was false"
+    },
+    {
+      "at": "2026-11-17T04:45:32Z",
+      "result": "fail",
+      "url": "https://www.google.com/search?q=how+does+caffeine+affect+sleep&hl=en&gl=us",
+      "scriptSha": "bf29e7c08e17811ddf4c12e5bd2f10f28004be13593ff156ee27862f5023bf1e",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "intact was false"
+    }
+  ],
+  "reddit/remove-sidebar": [
+    {
+      "at": "2026-11-17T04:44:51Z",
+      "result": "pass",
+      "url": "https://www.reddit.com/r/AskReddit/",
+      "scriptSha": "0f734459891d4025a20a35190b39b7ea3fdff84dfd38c62df8cf991e5ad3a97b",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T04:44:22Z",
+      "result": "blocked",
+      "url": "https://www.reddit.com/r/AskReddit/",
+      "scriptSha": "0f734459891d4025a20a35190b39b7ea3fdff84dfd38c62df8cf991e5ad3a97b",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "load without script: timed out after 60 s"
+    }
+  ],
+  "youtube/hide-shorts": [
+    {
+      "at": "2026-11-17T04:44:35Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/results?search_query=minecraft",
+      "scriptSha": "2e8f11998a0bc3c016438701e794dda10d95709ba715255889fa87c95969a3c0",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ]
+}

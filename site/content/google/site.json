@@ -1,0 +1,7 @@
+{
+  "slug": "google",
+  "name": "Google Search",
+  "domains": ["google.com", "www.google.com"],
+  "category": "search",
+  "intro": "Userscripts for Google Search results pages: remove the extra panels and get back to the list of links."
+}
