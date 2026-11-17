@@ -1,0 +1,55 @@
+{
+  "slug": "download-cover-art",
+  "title": "Download full-size SoundCloud cover art",
+  "question": "How do I download the full-size cover art of a SoundCloud track?",
+  "answer": "SoundCloud has no download button for cover art, and the artwork on a track page is a 500x500 preview. The usermods script on this page adds a \"Full-size cover art\" link under the artwork on track and playlist pages that opens the image at the size it was uploaded, ready to save. Without a script, find the artwork address ending in -t500x500.jpg with your browser's inspector and replace t500x500 with original.",
+  "prompt": "Add a link under the SoundCloud artwork that opens the cover art at full size.",
+  "details": "SoundCloud serves track artwork from `i1.sndcdn.com` at fixed sizes such as `-t500x500.jpg`, and keeps the uploaded file at the same address ending in `-original`. The script reads the address from the big artwork on the page, swaps the size for `original` and puts the result in a link under the image. It updates the link when you move to another track without a reload. Nothing is downloaded until you click.\n\nThe link opens the image in a new tab, where you save it as usual; browsers ignore the `download` attribute for images on another domain. The check loads a track page; playlist pages use the same artwork block.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Edit the image address",
+      "body": "Open the browser inspector on the artwork, copy the `background-image` address ending in `-t500x500.jpg`, replace `t500x500` with `original` and open it."
+    }
+  ],
+  "related": [
+    "soundcloud/direct-links",
+    "soundcloud/hide-reposts"
+  ],
+  "demand": {
+    "score": 58,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/14591",
+        "note": "Soundcloud Album Art Downloader (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/20771",
+        "note": "Stig's Art Grabr (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/ggplcohodggmdfpopelnpplhgfjclomi",
+        "note": "SoundCloud Enhanced Pro (users, read on the detail page); multi-purpose extension, not counted in the score"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=soundcloud%20artwork%20download",
+        "note": "returns \"soundcloud artwork downloader\"; suggestions: soundcloud artwork downloader | soundcloud artwork downloader extension | soundcloud image downloader | soundcloud song artwork downloader | soundcloud cover art downloader extension"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://soundcloud.com/forss/flickermood"
+    ],
+    "loggedOut": true,
+    "waitFor": ".listenArtworkWrapper .image__full",
+    "settleMs": 4000,
+    "baseline": "(() => { const s = document.querySelector('.listenArtworkWrapper__artwork .image__full'); return !!s && s.checkVisibility() && /-t500x500\\.jpg/.test(s.style.backgroundImage) && !document.querySelector('a[href*=\"-original.\"]'); })()",
+    "expect": "(() => { const a = document.querySelector('.listenArtworkWrapper a.usermods-cover-art'); return !!a && a.checkVisibility() && a.href === 'https://i1.sndcdn.com/artworks-000067273316-smsiqx-original.jpg' && a.textContent === 'Full-size cover art'; })()",
+    "intact": "(() => { const s = document.querySelector('.listenArtworkWrapper__artwork .image__full'); return !!s && s.checkVisibility() && /-t500x500\\.jpg/.test(s.style.backgroundImage) && !!document.querySelector('.soundTitle__title'); })()"
+  }
+}

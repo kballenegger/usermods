@@ -1,0 +1,42 @@
+{
+  "slug": "wide-layout",
+  "title": "Make Reddit use the full width of the screen",
+  "question": "How do I make Reddit use the full width of the screen?",
+  "answer": "Reddit has no setting for a wider layout: on a large screen it keeps the feed and sidebar in a column about 1120 pixels wide with empty space on both sides. The usermods script on this page removes that limit, so the feed and posts stretch to fill the window while the sidebar stays on the right. Without an extension, old.reddit.com uses the full width of the window.",
+  "prompt": "Make Reddit use the full width of my screen instead of a narrow centred column.",
+  "details": "Reddit centres its content in a column that is 1120px wide and gives the feed a fixed width beside the 316px sidebar. The script makes the content column fill the space to the right of the left-hand menu and lets the feed column take all the width the sidebar doesn't use. The left-hand menu and the sidebar keep their size.\n\nOn a window narrower than about 1440px there is little spare space, so the change is small. The check runs in a 1366px window, so it widens Reddit's page container to 2400px in both loads to stand in for a large monitor, then measures the feed on a subreddit page. To drop the sidebar as well, use the Remove the Reddit sidebar script.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "old.reddit.com",
+      "body": "The old design at [old.reddit.com](https://old.reddit.com) stretches to the full width of the window."
+    }
+  ],
+  "related": [
+    "reddit/remove-sidebar",
+    "reddit/hide-promoted",
+    "reddit/expand-threads"
+  ],
+  "check": {
+    "urls": [
+      "https://www.reddit.com/r/AskReddit/"
+    ],
+    "loggedOut": true,
+    "waitFor": "shreddit-post",
+    "settleMs": 4000,
+    "actions": "const g = document.querySelector(\".grid-container\"); if (g) { g.style.width = \"2400px\"; g.style.maxWidth = \"none\"; } await new Promise((r) => setTimeout(r, 500));",
+    "baseline": "(() => { const sb = document.querySelector(\"#right-sidebar-container\"); return Math.round(document.querySelector(\"#main-content\").getBoundingClientRect().width) < 800 && !!sb && sb.checkVisibility(); })()",
+    "expect": "(() => { const sb = document.querySelector(\"#right-sidebar-container\"); return Math.round(document.querySelector(\"#main-content\").getBoundingClientRect().width) > 1500 && !!sb && sb.checkVisibility() && Math.round(sb.getBoundingClientRect().width) === 316; })()",
+    "intact": "[...document.querySelectorAll(\"shreddit-post\")].filter((p) => p.checkVisibility() && p.getBoundingClientRect().width > 1000).length >= 3"
+  },
+  "demand": {
+    "score": 48,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/405073",
+        "note": "Wide new reddit | Userscript (1576 total installs)"
+      }
+    ]
+  }
+}

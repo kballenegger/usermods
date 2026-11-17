@@ -1,0 +1,49 @@
+{
+  "slug": "open-in-alphaxiv",
+  "title": "Open arXiv papers on alphaXiv",
+  "question": "How do I open an arXiv paper on alphaXiv?",
+  "answer": "Replace arxiv.org with alphaxiv.org in the paper's address: arxiv.org/abs/1706.03762 becomes alphaxiv.org/abs/1706.03762, since both sites use the same paper ids. The usermods script on this page adds an \"alphaXiv\" button to the Access Paper list on every arXiv abstract page, next to View PDF, that opens the same paper and version on alphaXiv. arXiv also has an alphaXiv toggle, off by default, in the Code, Data, Media tab of its Labs section further down the page.",
+  "prompt": "Add a button on arXiv abstract pages that opens the paper on alphaXiv.",
+  "details": "The script reads the paper id from the page's `citation_arxiv_id` meta tag and keeps the version number when the address has one (`/abs/1706.03762v5`). The button uses arXiv's own button style and opens in the same tab. It runs only on `arxiv.org/abs/` pages and changes nothing else.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Edit the address",
+      "body": "Change `arxiv` to `alphaxiv` in the address bar. `https://arxiv.org/abs/<id>` and `https://www.alphaxiv.org/abs/<id>` show the same paper."
+    },
+    {
+      "kind": "site-setting",
+      "title": "arXiv Labs toggle",
+      "body": "Under the abstract, open the Code, Data, Media tab of arXivLabs and switch on the alphaXiv toggle. It stays below the abstract rather than next to View PDF."
+    },
+    {
+      "kind": "extension",
+      "title": "alphaXiv extension",
+      "body": "alphaXiv publishes its own Chrome extension that adds a link to alphaXiv on arXiv pages."
+    }
+  ],
+  "related": [
+    "arxiv/dark-mode"
+  ],
+  "demand": {
+    "score": 67,
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/liihfcjialakefgidmaadhajjikbjjab",
+        "note": "alphaXiv - Understand Research Papers (users, read on the detail page)"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://arxiv.org/abs/1706.03762"
+    ],
+    "loggedOut": true,
+    "waitFor": ".full-text a.download-pdf",
+    "settleMs": 1000,
+    "baseline": "!!document.querySelector('.full-text a.download-pdf') && ![...document.querySelectorAll('a[href*=\"alphaxiv.org/abs/\"]')].some((a) => a.checkVisibility())",
+    "expect": "(() => { const a = [...document.querySelectorAll('.full-text a')].filter((x) => x.href === 'https://www.alphaxiv.org/abs/1706.03762'); return a.length === 1 && a[0].checkVisibility() && a[0].textContent === 'alphaXiv'; })()",
+    "intact": "document.querySelector('.full-text a.download-pdf').checkVisibility() && document.querySelector('h1.title').checkVisibility() && document.querySelector('blockquote.abstract').checkVisibility()"
+  }
+}

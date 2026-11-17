@@ -1,0 +1,56 @@
+{
+  "slug": "view-thumbnail",
+  "title": "Open a YouTube video's thumbnail",
+  "question": "How do I see the full-size thumbnail of a YouTube video?",
+  "answer": "YouTube has no button to open a video's thumbnail. The full-size image lives at i.ytimg.com/vi/VIDEO_ID/maxresdefault.jpg, where VIDEO_ID is the code after v= in the video's address, though some older videos only have hqdefault.jpg. The usermods script on this page adds a \"View thumbnail\" link under the title of every video that opens the largest thumbnail YouTube has for it in a new tab. Without an extension, type that address yourself.",
+  "prompt": "Add a link under YouTube videos that opens the full-size thumbnail.",
+  "details": "The script reads the thumbnail list the YouTube player already has for the current video and links to the last, largest entry, so it works for videos without a `maxresdefault` image too. The link sits under the title and updates when you open another video without a page reload. Nothing else on the page changes.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Build the address by hand",
+      "body": "Take the video id from the address (`watch?v=jNQXAC9IVRw`) and open `https://i.ytimg.com/vi/jNQXAC9IVRw/maxresdefault.jpg`. If that shows a grey placeholder, use `hqdefault.jpg` instead."
+    }
+  ],
+  "related": [
+    "youtube/expand-description",
+    "youtube/always-theater-mode",
+    "youtube/clean-description-links"
+  ],
+  "demand": {
+    "score": 64,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/420140",
+        "note": "Youtube Cover (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/nbpcbacmemknaffckhckoaophpnmdchb",
+        "note": "Youtube\u2122 Thumbnail Preview (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/lnkbdmjocdiomabiedmflmgikjlifham",
+        "note": "PrevYou \u2014 YouTube Thumbnail Previewer (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20thumbnail%20viewer",
+        "note": "returns the query; suggestions: youtube thumbnail viewer | youtube thumbnail viewer online | youtube thumbnail viewer extension | youtube thumbnail viewer hd | youtube thumbnail viewer and downloader"
+      }
+    ]
+  },
+  "check": {
+    "loggedOut": true,
+    "urls": [
+      "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    ],
+    "waitFor": "ytd-watch-metadata #title h1",
+    "settleMs": 4000,
+    "baseline": "(() => { const t = document.querySelector('#movie_player').getPlayerResponse().videoDetails.thumbnail.thumbnails; return t.length > 0 && t[t.length - 1].width >= 1280 && !document.querySelector('ytd-watch-metadata a[href*=\"i.ytimg.com/vi\"]'); })()",
+    "expect": "(() => { const a = document.getElementById('usermods-view-thumbnail'); return !!a && a.checkVisibility() && /^https:\\/\\/i\\.ytimg\\.com\\/vi(_webp)?\\/dQw4w9WgXcQ\\/maxresdefault\\./.test(a.href) && a.target === '_blank'; })()",
+    "intact": "document.querySelector('#movie_player video').checkVisibility() && document.querySelector('ytd-watch-metadata h1').checkVisibility()"
+  }
+}

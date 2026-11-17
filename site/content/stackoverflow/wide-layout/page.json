@@ -1,0 +1,41 @@
+{
+  "slug": "wide-layout",
+  "title": "Make Stack Overflow full width",
+  "question": "How do I make Stack Overflow use the full width?",
+  "answer": "Stack Overflow has no full width setting; it caps its pages at about 1260 pixels and the question column at about 730, so wide screens show empty margins. The usermods script on this page removes those caps on question pages, so the question and answers grow with the window while the right sidebar stays beside them. Without an extension, the only fix is zooming the browser out.",
+  "prompt": "Make Stack Overflow question pages use the full width of my window.",
+  "details": "The script lifts the maximum width of the page container and the content area and sets the question column to the remaining width beside the sidebar. Long code blocks gain the most.\n\nThe check loads a question page at 1366 pixels wide, where the gain is smaller than on a wide monitor. To drop the sidebar as well, see the page on hiding it.",
+  "alternatives": [
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filters",
+      "body": "The same rules as the script. Our check runs the script, not these filters.\n\n```\nstackoverflow.com##body > .container:style(max-width: none !important)\nstackoverflow.com###content:style(max-width: none !important)\nstackoverflow.com###mainbar:style(width: calc(100% - 324px) !important)\n```"
+    }
+  ],
+  "related": [
+    "stackoverflow/hide-sidebar",
+    "stackoverflow/dark-mode",
+    "stackoverflow/iso-dates"
+  ],
+  "check": {
+    "urls": [
+      "https://stackoverflow.com/questions/11227809/why-is-processing-a-sorted-array-faster-than-processing-an-unsorted-array"
+    ],
+    "loggedOut": true,
+    "waitFor": "#question",
+    "settleMs": 4000,
+    "baseline": "window.innerWidth >= 1350 && document.querySelector('#content').getBoundingClientRect().width <= 1100 && document.querySelector('#mainbar').getBoundingClientRect().width < 760",
+    "expect": "(() => { const c = document.querySelector('#content').getBoundingClientRect(); const s = document.querySelector('#sidebar'); return c.width > 1150 && document.querySelector('#mainbar').getBoundingClientRect().width > 800 && s.checkVisibility() && s.getBoundingClientRect().left > document.querySelector('#mainbar').getBoundingClientRect().right - 1; })()",
+    "intact": "(() => { const q = document.querySelector('#question .s-prose'); const answers = [...document.querySelectorAll('#answers .answer')].filter((a) => a.checkVisibility()); return !!q && q.checkVisibility() && answers.length >= 5; })()"
+  },
+  "demand": {
+    "score": 30,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/373879",
+        "note": "Greasy Fork total installs: \"Wide easily readable StackOverflow\" (read via api.greasyfork.org, 2026-11-17)"
+      }
+    ]
+  }
+}

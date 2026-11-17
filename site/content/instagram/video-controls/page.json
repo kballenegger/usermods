@@ -1,0 +1,56 @@
+{
+  "slug": "video-controls",
+  "title": "Add video controls to Instagram",
+  "question": "How do I get a progress bar and seek controls on Instagram videos?",
+  "answer": "Instagram on the web has no setting for a progress bar or seek controls on videos and reels. The usermods script on this page turns on the browser's own video controls for Instagram videos, so you get a progress bar you can drag, the time played, volume, playback speed and fullscreen. It lets clicks reach those controls through the layers Instagram puts over its videos. Without an extension, there is no way to seek inside an Instagram video in the browser.",
+  "prompt": "Show the normal video controls on Instagram videos so I can see a progress bar, seek, change the volume and go fullscreen.",
+  "details": "Instagram plays videos in a normal `<video>` element with its controls switched off and covers it with transparent layers that catch clicks. The script switches the controls on and makes the layers sitting over each video let clicks through.\n\nWhat changes:\n\n- Every video gets Chrome's control bar: play and pause, progress bar, time, volume, fullscreen, and the menu with playback speed and picture-in-picture.\n- Instagram's own buttons drawn on the video, such as its mute button and the tags button, are hidden. The control bar does the same jobs, and clicking the video pauses and plays it.\n\nLikes, comments and the rest of the post are untouched. The check opens a reel logged out; feeds and stories use the same `<video>` element but the check does not load them.",
+  "alternatives": [
+    {
+      "kind": "extension",
+      "title": "Video extensions for Instagram",
+      "body": "Extensions such as *Better Videos for Instagram* in the Chrome Web Store add a progress bar and volume control. They are not run by our check."
+    }
+  ],
+  "related": [
+    "instagram/remove-login-popup",
+    "instagram/open-full-size-image"
+  ],
+  "demand": {
+    "score": 72,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/367667",
+        "note": "Add Instagram Video Progressbar (total installs: 2434)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/537876",
+        "note": "Instagram Video Controls with Persistent UI, Volume, Speed, Boost, Ad Blocker & Downloader (total installs: 567)"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/ijgmchfimkocepiapjeoehcicfnhhchp",
+        "note": "Better Videos for Instagram: Playback & Volume (30,000 users)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=instagram%20video%20progress%20bar",
+        "note": "suggestions: instagram video progress bar | instagram video progress bar extension | instagram video progress bar missing | instagram video progress bar firefox | instagram video no progress bar"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.instagram.com/nasa/reel/Df0DoVpmTBI/"
+    ],
+    "loggedOut": true,
+    "waitFor": "video",
+    "settleMs": 6000,
+    "actions": "document.querySelector('[role=\"dialog\"] svg[aria-label=\"Close\"]')?.closest('[role=\"button\"]')?.click(); await new Promise((r) => setTimeout(r, 1500));",
+    "baseline": "[...document.querySelectorAll('video')].some((v) => v.checkVisibility() && !v.controls)",
+    "expect": "(() => { const vids = [...document.querySelectorAll('video')].filter((v) => v.checkVisibility() && v.getBoundingClientRect().width > 200); return vids.length > 0 && vids.every((v) => { const r = v.getBoundingClientRect(); return v.controls && document.elementFromPoint(r.left + r.width / 2, r.bottom - 15) === v; }); })()",
+    "intact": "(() => { const v = [...document.querySelectorAll('video')].find((x) => x.checkVisibility()); return !!v && v.getBoundingClientRect().height > 300 && v.readyState > 0 && [...document.querySelectorAll('svg[aria-label=\"Like\"]')].some((s) => s.checkVisibility()); })()"
+  }
+}

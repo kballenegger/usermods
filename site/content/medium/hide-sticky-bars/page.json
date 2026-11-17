@@ -1,0 +1,48 @@
+{
+  "slug": "hide-sticky-bars",
+  "title": "Stop Medium's header from following you down the page",
+  "question": "How do I remove the sticky bars on Medium articles?",
+  "answer": "Medium has no setting for this: on a story page the top bar with the logo, search, Write and Sign in stays pinned to the top of the window as you scroll. The usermods script on this page unpins that bar so it scrolls away with the page and the story gets the full height of the window. The bar is still there when you scroll back to the top. Without an extension, the browser's Reader view shows the story without Medium's bars.",
+  "prompt": "Stop the Medium top bar from sticking to the top of the screen when I scroll down an article.",
+  "details": "Medium's class names change between builds, so the script finds the bar through the Medium logo inside it (`data-testid=\"headerMediumLogo\"`), walks up to the element pinned with `position: sticky` or `fixed`, marks it, and sets it back to normal positioning. It does the same when Medium redraws the bar after in-app navigation.\n\nIt does not touch the table of contents button on the right edge or the sign-up dialog Medium shows logged-out readers after some scrolling. The check loads a story on medium.com logged out and scrolls down; publications on their own domains are not matched.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Reader view",
+      "body": "Safari's Reader, Firefox's Reader View and Chrome's Reading mode show the story text without Medium's header."
+    }
+  ],
+  "related": [
+    "medium/hide-member-only"
+  ],
+  "demand": {
+    "score": 40,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/35950",
+        "note": "Greasy Fork total installs: \"Sticky itens hider (medium.com, hackernoon)\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/377531",
+        "note": "Greasy Fork total installs: \"Remove medium Bar\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/374167",
+        "note": "Greasy Fork total installs: \"Medium cleanup\" (read via api.greasyfork.org, 2026-11-17)"
+      }
+    ]
+  },
+  "check": {
+    "urls": ["https://medium.com/@curllmooha/i-built-a-three-js-portfolio-you-can-walk-around-in-d0ff55fd1645"],
+    "loggedOut": true,
+    "waitFor": "[data-testid=\"headerMediumLogo\"]",
+    "settleMs": 4000,
+    "actions": "window.scrollTo(0, 2500); await new Promise((r) => setTimeout(r, 1500));",
+    "baseline": "(() => { const logo = document.querySelector('[data-testid=\"headerMediumLogo\"]'); if (!logo || !logo.checkVisibility()) return false; const r = logo.getBoundingClientRect(); return scrollY >= 2000 && r.top >= 0 && r.bottom <= 80; })()",
+    "expect": "(() => { const logo = document.querySelector('[data-testid=\"headerMediumLogo\"]'); const bar = document.querySelector('[data-usermods-unpinned]'); return scrollY >= 2000 && !!logo && !!bar && bar.contains(logo) && logo.getBoundingClientRect().bottom <= 0; })()",
+    "intact": "(() => { const ps = [...document.querySelectorAll('article p')].filter((p) => p.checkVisibility()); const h1 = document.querySelector('h1'); return ps.length >= 10 && !!h1 && h1.checkVisibility(); })()"
+  }
+}

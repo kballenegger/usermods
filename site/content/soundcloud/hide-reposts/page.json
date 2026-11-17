@@ -1,0 +1,55 @@
+{
+  "slug": "hide-reposts",
+  "title": "Hide reposts on SoundCloud",
+  "question": "How do I hide reposts on a SoundCloud profile or feed?",
+  "answer": "SoundCloud has no setting to hide reposts on a profile's main page or in your feed. The usermods script on this page hides every track and playlist marked \"Reposted by\" on profile pages, so only the artist's own uploads, albums and playlists remain. A profile's Reposts tab is left alone. Without a script, open the profile's Tracks tab, which lists only the artist's own uploads.",
+  "prompt": "Hide reposted tracks on SoundCloud profiles and in my feed.",
+  "details": "On a profile, a repost shows the original uploader's name with a small \"Reposted by\" badge for the profile owner. The script hides any list item with that badge, using CSS injected before the page draws, so new items stay hidden as the list loads more on scroll. A profile's own Reposts tab is excluded.\n\nIn the logged-in feed, reposts carry a separate repost line above the track and the script hides those too. The check only runs logged out, on a profile page, so the feed rule is not covered by it.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Tracks tab",
+      "body": "Every profile has a Tracks tab (`soundcloud.com/<name>/tracks`) that shows only the artist's own uploads."
+    },
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin cosmetic filter",
+      "body": "Not run by the check.\n\n```\nsoundcloud.com##.soundList__item:has(.soundTitle__info .sc-ministats-reposts)\n```"
+    },
+    {
+      "kind": "extension",
+      "title": "SoundCloud Feed Filter Extended",
+      "body": "A Chrome extension that filters reposts and other items out of the feed."
+    }
+  ],
+  "related": [
+    "soundcloud/direct-links",
+    "soundcloud/download-cover-art"
+  ],
+  "demand": {
+    "score": 38,
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/mnfcpieidcneompnhaamejajfodlclal",
+        "note": "SoundCloud Feed Filter Extended (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=soundcloud%20hide%20reposts",
+        "note": "returns \"soundcloud hide reposts\"; suggestions: soundcloud hide reposts | soundcloud remove reposts | can you hide your likes on soundcloud"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://soundcloud.com/diplo"
+    ],
+    "loggedOut": true,
+    "waitFor": ".soundList__item .soundTitle__title",
+    "settleMs": 4000,
+    "baseline": "[...document.querySelectorAll('.soundList__item')].filter((i) => i.querySelector('.soundTitle__info .sc-ministats-reposts') && i.checkVisibility()).length >= 1",
+    "expect": "(() => { const r = [...document.querySelectorAll('.soundList__item')].filter((i) => i.querySelector('[title^=\"Reposted by\"]')); return r.length > 0 && r.every((i) => !i.checkVisibility()); })()",
+    "intact": "[...document.querySelectorAll('.soundList__item')].filter((i) => !i.querySelector('[title^=\"Reposted by\"]') && i.checkVisibility()).length >= 5"
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "slug": "message-navigator",
+  "title": "Jump between messages in long ChatGPT chats",
+  "question": "How do I navigate a long ChatGPT conversation?",
+  "answer": "ChatGPT has no outline or table of contents for a conversation, so in a long chat you scroll and search with Ctrl+F. The usermods script on this page adds a small numbered list of your own messages at the right edge of the chat. Click an entry and the page scrolls back to that question, with the answer below it. The list appears once a chat has two of your messages and updates as you add more or switch chats.",
+  "prompt": "In ChatGPT, add a list of my questions on the side of the chat that scrolls to each one when I click it.",
+  "details": "The list is built from your messages in the page (`li[data-message-role=\"user\"]`), numbered, with each entry cut to one line; hover an entry for the full text. It sits at the top right, 150 pixels wide, and scrolls on its own when there are many entries. The script sends nothing anywhere and does not change the messages.\n\nOn narrow windows the list can overlap the right edge of the chat. The check sends two long questions logged out, then clicks the first entry and confirms the first question is back on screen.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Find in page",
+      "body": "Ctrl+F or Cmd+F finds text in the messages ChatGPT has loaded. It works when you remember a word from the question."
+    },
+    {
+      "kind": "extension",
+      "title": "Navigator extensions",
+      "body": "Chrome extensions such as ChatGPT Navigator and AI Chat Navigator add a similar sidebar, some with search and export."
+    }
+  ],
+  "related": [
+    "chatgpt/wide-chat",
+    "chatgpt/export-chat",
+    "chatgpt/hide-sidebar"
+  ],
+  "demand": {
+    "score": 53,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/545883",
+        "note": "AI Conversation Navigator (1,645 total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/546619",
+        "note": "AI Chat Scroll Navigator — ChatGPT, DeepSeek, Gemini, Grok, Qwen, Doub (483 total installs)"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/bmhmlfpnagmndmnhcbpabndfgnegdfib",
+        "note": "AI Chat Navigator: Navigation Sidebar, Mindmap & Export for ChatGPT & More (1,000 users)"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/pchkljckekioepjocghikghmocnkbgcm",
+        "note": "ChatGPT Navigator (306 users)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=chatgpt%20navigator",
+        "note": "returns the query; suggestions: chatgpt navigator | chatgpt navigator extension | chatgpt navigator archetype | chatgpt navigator minimap & conversation sidebar | chatgpt navigator firefox"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://chatgpt.com/"
+    ],
+    "loggedOut": true,
+    "waitFor": "form textarea[name=\"prompt\"]",
+    "settleMs": 3000,
+    "actions": "const sleep = (ms) => new Promise((r) => setTimeout(r, ms)); let box; box = document.querySelector('form textarea[name=\"prompt\"]'); box.focus(); document.execCommand('insertText', false, 'Write about 300 words on the history of the bicycle.'); await sleep(500); box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true })); for (let i = 0; i < 70 && document.querySelectorAll('li[data-message-role=\"assistant\"][data-message-complete]').length < 1; i++) await sleep(500); await sleep(1500); box = document.querySelector('form textarea[name=\"prompt\"]'); box.focus(); document.execCommand('insertText', false, 'Now write about 300 words on the history of the railway.'); await sleep(500); box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true })); for (let i = 0; i < 70 && document.querySelectorAll('li[data-message-role=\"assistant\"][data-message-complete]').length < 2; i++) await sleep(500); await sleep(1500); const first = document.querySelector('#usermods-nav button'); if (first) { first.click(); await sleep(1500); }",
+    "baseline": "document.querySelectorAll('li[data-message-role=\"user\"]').length === 2 && document.querySelectorAll('li[data-message-role=\"assistant\"][data-message-complete]').length === 2 && !document.getElementById('usermods-nav') && !(() => { const r = document.querySelector('li[data-message-role=\"user\"]').getBoundingClientRect(); return r.top >= 0 && r.top < innerHeight / 2; })()",
+    "expect": "(() => { const nav = document.getElementById('usermods-nav'); const users = [...document.querySelectorAll('li[data-message-role=\"user\"] p[data-user-message-copy]')].map((p) => p.textContent.trim()); const items = nav ? [...nav.querySelectorAll('button')] : []; return !!nav && nav.checkVisibility() && users.length === 2 && items.length === 2 && items.every((b, i) => b.checkVisibility() && b.textContent.includes(users[i])) && (() => { const r = document.querySelector('li[data-message-role=\"user\"]').getBoundingClientRect(); return r.top >= 0 && r.top < innerHeight / 2; })(); })()",
+    "intact": "document.querySelectorAll('li[data-message-role=\"assistant\"][data-message-complete]').length === 2 && [...document.querySelectorAll('li[data-message-role]')].filter((m) => m.checkVisibility()).length === 4 && document.querySelector('form textarea[name=\"prompt\"]').checkVisibility()"
+  }
+}

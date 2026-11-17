@@ -1,0 +1,7 @@
+{
+  "slug": "guardian",
+  "name": "The Guardian",
+  "domains": ["theguardian.com", "www.theguardian.com"],
+  "category": "news",
+  "intro": "Userscripts for Guardian articles, checked against the live site while logged out."
+}

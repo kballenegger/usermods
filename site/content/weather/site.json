@@ -1,0 +1,7 @@
+{
+  "slug": "weather",
+  "name": "Weather.com",
+  "domains": ["weather.com"],
+  "category": "news",
+  "intro": "Userscripts for The Weather Channel's site at weather.com: fewer ads and a forecast that is easier to read."
+}

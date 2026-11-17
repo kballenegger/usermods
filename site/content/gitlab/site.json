@@ -1,0 +1,9 @@
+{
+  "slug": "gitlab",
+  "name": "GitLab",
+  "domains": [
+    "gitlab.com"
+  ],
+  "category": "work",
+  "intro": "Userscripts that change how gitlab.com looks."
+}

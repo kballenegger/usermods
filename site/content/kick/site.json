@@ -1,0 +1,7 @@
+{
+  "slug": "kick",
+  "name": "Kick",
+  "domains": ["kick.com"],
+  "category": "video",
+  "intro": "Userscripts for watching Kick streams and VODs on desktop: a bigger player, less on screen around it, and controls that behave the way you expect."
+}

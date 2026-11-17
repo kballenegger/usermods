@@ -1,0 +1,7 @@
+{
+  "slug": "bing",
+  "name": "Bing",
+  "domains": ["bing.com", "www.bing.com"],
+  "category": "search",
+  "intro": "Userscripts for the Bing homepage and search results, checked against the live site while logged out."
+}

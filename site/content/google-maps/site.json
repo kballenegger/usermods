@@ -1,0 +1,7 @@
+{
+  "slug": "google-maps",
+  "name": "Google Maps",
+  "domains": ["www.google.com/maps", "maps.google.com"],
+  "category": "reference",
+  "intro": "Userscripts for Google Maps in a desktop browser: a dark theme, quicker access to coordinates, and a calmer layout."
+}

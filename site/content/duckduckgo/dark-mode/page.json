@@ -1,0 +1,56 @@
+{
+  "slug": "dark-mode",
+  "title": "Dark mode for DuckDuckGo",
+  "question": "How do I make DuckDuckGo dark without changing settings each time?",
+  "answer": "DuckDuckGo has a Dark theme under Settings, and its default theme follows your system's dark mode, but the choice is stored in a cookie, so clearing cookies or opening a private window brings back the default theme, which is light unless your system is in dark mode. The usermods script on this page sets DuckDuckGo's own dark theme cookie before the page starts, so search results load dark on every visit. Without an extension, adding &kae=d to a search URL or bookmark gives the dark theme for that page.",
+  "prompt": "Always show DuckDuckGo in its dark theme, even after I clear cookies.",
+  "details": "DuckDuckGo stores the theme in a cookie named `ae`; `d` is Dark. The script writes that cookie at document start when it is missing or holds another theme, and DuckDuckGo's page code reads it and applies its own dark theme. Nothing else is restyled, so the page looks exactly like DuckDuckGo's Dark theme. It replaces any other theme picked in Settings. The check loads a results page with no cookies and confirms the background is dark and the results are there.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Settings theme",
+      "body": "Open DuckDuckGo's settings from the menu at the top right of a results page and pick the Dark theme. It is saved in a cookie for this browser."
+    },
+    {
+      "kind": "other",
+      "title": "URL parameter",
+      "body": "Add `&kae=d` to a search URL, or use `https://duckduckgo.com/?kae=d&q=%s` as the browser's search engine URL."
+    }
+  ],
+  "related": [
+    "duckduckgo/declutter",
+    "duckduckgo/hide-ai",
+    "duckduckgo/remove-ads"
+  ],
+  "check": {
+    "urls": [
+      "https://duckduckgo.com/?q=how+to+bake+bread&kl=us-en"
+    ],
+    "loggedOut": true,
+    "waitFor": "[data-testid=\"result\"]",
+    "settleMs": 4000,
+    "baseline": "(() => { const [r, g, b] = getComputedStyle(document.body).backgroundColor.match(/\\d+/g).map(Number); return r + g + b > 600; })()",
+    "expect": "(() => { const [r, g, b] = getComputedStyle(document.body).backgroundColor.match(/\\d+/g).map(Number); return r + g + b < 150 && document.documentElement.classList.contains('dark-bg'); })()",
+    "intact": "(() => { const res = [...document.querySelectorAll('[data-testid=\"result\"]')].filter((r) => r.checkVisibility()); const a = res[0] && res[0].querySelector('a[data-testid=\"result-title-a\"]'); const c = a ? getComputedStyle(a).color.match(/\\d+/g).map(Number) : [0, 0, 0]; return res.length >= 5 && c[0] + c[1] + c[2] > 300; })()"
+  },
+  "demand": {
+    "score": 45,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/388015",
+        "note": "DuckDuckGo Always Terminal Theme (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/plcaegpgnhgchmjcfdokejgahdbpmnga",
+        "note": "DuckDuckGo HTML Dark Theme (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=duckduckgo%20dark%20mode",
+        "note": "returns the query; suggestions: duckduckgo dark mode | duckduckgo dark mode android | duckduckgo dark mode extension | duckduckgo night mode | duckduckgo dark theme"
+      }
+    ]
+  }
+}

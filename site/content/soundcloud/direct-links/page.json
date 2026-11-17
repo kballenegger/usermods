@@ -1,0 +1,40 @@
+{
+  "slug": "direct-links",
+  "title": "Skip SoundCloud's gate.sc link redirect",
+  "question": "How do I make SoundCloud links go straight to the site instead of gate.sc?",
+  "answer": "SoundCloud has no setting to turn off its gate.sc redirect; every outbound link in track descriptions, profiles and buy buttons goes through gate.sc first. The usermods script on this page reads the real address from each gate.sc link and points the link straight at it, so clicking opens the site directly and hovering shows the true URL. Without a script, you can copy the link text from the description and paste it into the address bar yourself.",
+  "prompt": "Make links on SoundCloud go straight to the real website instead of through gate.sc.",
+  "details": "A gate.sc link looks like `https://gate.sc/?url=<encoded address>&token=...`. The script decodes the `url` parameter and swaps it into the link, and only accepts `http` and `https` addresses. It watches the page for new links, so it keeps working as you move between tracks and profiles without a reload.\n\nThe check loads a track page with a description link and a buy link. Profile links in the sidebar use the same gate.sc format and get the same treatment.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Direct links out",
+      "body": "The [Direct links out](https://greasyfork.org/en/scripts/15857) userscript on Greasy Fork removes redirect wrappers on many sites, SoundCloud among them."
+    }
+  ],
+  "related": [
+    "soundcloud/hide-reposts",
+    "soundcloud/download-cover-art"
+  ],
+  "demand": {
+    "score": 68,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/15857",
+        "note": "Direct links out (total installs)"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://soundcloud.com/forss/flickermood"
+    ],
+    "loggedOut": true,
+    "waitFor": ".truncatedAudioInfo__content a",
+    "settleMs": 4000,
+    "baseline": "[...document.querySelectorAll('a[href]')].filter((a) => new URL(a.href).hostname === 'gate.sc').length >= 2",
+    "expect": "(() => { const links = [...document.querySelectorAll('a[href]')]; return links.every((a) => new URL(a.href).hostname !== 'gate.sc') && links.some((a) => a.href.startsWith('https://www.dswshoes.com/tv_commercial.jsp')) && links.some((a) => a.href.startsWith('http://sonarkollektiv.com/tracks/')); })()",
+    "intact": "!!document.querySelector('.soundTitle__title') && [...document.querySelectorAll('.truncatedAudioInfo__content a')].some((a) => a.checkVisibility())"
+  }
+}

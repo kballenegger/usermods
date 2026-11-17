@@ -1,0 +1,45 @@
+{
+  "slug": "dark-mode",
+  "title": "Dark mode for GitLab",
+  "question": "How do I use dark mode on GitLab?",
+  "answer": "Signed in, open Preferences from your avatar menu and choose Dark under Color mode. Signed out, gitlab.com follows your system's light or dark setting and has no switch on the page. The usermods script on this page turns on GitLab's own dark mode on gitlab.com while you are signed out, whatever your system uses. Without an extension, switching your operating system to dark mode makes signed-out gitlab.com follow.",
+  "prompt": "Make gitlab.com always use its dark mode, even when I'm signed out.",
+  "details": "Signed out, gitlab.com loads its light and dark stylesheets together and picks one with a media query on your system setting. The script makes the dark ones always apply and the light ones never, and sets the `gl-dark` class GitLab uses for signed-in dark mode. All colors are GitLab's own.\n\nIt matches gitlab.com only, not self-hosted GitLab. The check runs signed out. Signed in, use the color mode in your preferences instead.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Color mode preference",
+      "body": "Signed in: avatar menu > **Preferences** > **Color mode**, then **Dark**, or **Auto** to follow your system."
+    },
+    {
+      "kind": "other",
+      "title": "System appearance",
+      "body": "Signed out, gitlab.com follows the light or dark setting of your operating system."
+    }
+  ],
+  "related": [
+    "github/dark-mode",
+    "stackoverflow/dark-mode"
+  ],
+  "check": {
+    "urls": [
+      "https://gitlab.com/gitlab-org/gitlab"
+    ],
+    "loggedOut": true,
+    "waitFor": "h1",
+    "settleMs": 4000,
+    "baseline": "(() => { const lum = (c) => { const m = c.match(/[\\d.]+/g).map(Number); return 0.2126 * m[0] + 0.7152 * m[1] + 0.0722 * m[2]; }; return !document.documentElement.classList.contains('gl-dark') && lum(getComputedStyle(document.body).backgroundColor) > 200; })()",
+    "expect": "(() => { const lum = (c) => { const m = c.match(/[\\d.]+/g).map(Number); return 0.2126 * m[0] + 0.7152 * m[1] + 0.0722 * m[2]; }; const h = [...document.querySelectorAll('h1')].find((e) => e.checkVisibility() && /GitLab/.test(e.textContent)); return !!h && document.documentElement.classList.contains('gl-dark') && lum(getComputedStyle(document.body).backgroundColor) < 60 && lum(getComputedStyle(h).color) > 180; })()",
+    "intact": "(() => { const h = [...document.querySelectorAll('h1')].find((e) => e.checkVisibility() && /GitLab/.test(e.textContent)); const links = [...document.querySelectorAll('main a[href*=\"/gitlab-org/gitlab/-/\"]')].filter((a) => a.checkVisibility()); return !!h && links.length >= 5; })()"
+  },
+  "demand": {
+    "score": 5,
+    "evidence": [
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=gitlab%20dark%20mo",
+        "note": "Google suggests \"gitlab dark mode\""
+      }
+    ]
+  }
+}

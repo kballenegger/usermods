@@ -1,0 +1,56 @@
+{
+  "slug": "full-width",
+  "title": "Make GitHub pages full width",
+  "question": "How do I make GitHub use the full width of my screen?",
+  "answer": "GitHub has no full width setting; it caps most pages at 1280 pixels and its main column at about 1000, leaving empty space on wide screens. The usermods script on this page removes those limits so pages such as issue and pull request lists stretch to the width of the window, while README and comment text keep their own width so lines stay readable. Without an extension, zooming the browser out is the only way to fit more on screen.",
+  "prompt": "Make GitHub use the full width of my browser window instead of a narrow centered column.",
+  "details": "The script removes the maximum width from GitHub's page containers, including the newer Primer page layouts whose class names carry a build hash and are matched by their prefix. Rendered Markdown (READMEs, issue bodies, comments) keeps its width so lines stay short enough to read.\n\nThe difference is largest on wide screens. The check loads a pull request list at 1366 pixels wide; repository pages and pull request pages use the same containers, but the check does not load them.",
+  "alternatives": [
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filter",
+      "body": "The same rules as the script, as cosmetic style filters. Our check runs the script, not these filters.\n\n```\ngithub.com##.container-xl:style(max-width: none !important)\ngithub.com##[class*=\"prc-PageLayout-Content-\"]:style(max-width: none !important)\ngithub.com##[class*=\"prc-PageLayout-PageLayoutRoot\"]:style(max-width: none !important)\n```"
+    },
+    {
+      "kind": "extension",
+      "title": "Wide GitHub",
+      "body": "The Wide GitHub extension for Chrome and Firefox does the same."
+    }
+  ],
+  "related": [
+    "github/dark-mode",
+    "github/absolute-dates",
+    "github/file-icons"
+  ],
+  "check": {
+    "urls": [
+      "https://github.com/facebook/react/pulls"
+    ],
+    "loggedOut": true,
+    "waitFor": "[data-testid=\"listitem-title-link\"]",
+    "settleMs": 4000,
+    "baseline": "window.innerWidth >= 1350 && (() => { const els = [...document.querySelectorAll('.container-xl, [class*=\"prc-PageLayout-Content-\"]')].filter((e) => e.checkVisibility()); return els.length ? Math.max(...els.map((e) => e.getBoundingClientRect().width)) : 0; })() <= window.innerWidth - 80",
+    "expect": "(() => { const els = [...document.querySelectorAll('.container-xl, [class*=\"prc-PageLayout-Content-\"]')].filter((e) => e.checkVisibility()); return els.length ? Math.max(...els.map((e) => e.getBoundingClientRect().width)) : 0; })() >= window.innerWidth - 40",
+    "intact": "[...document.querySelectorAll('a[data-testid=\"listitem-title-link\"][href*=\"/pull/\"]')].filter((a) => a.checkVisibility()).length >= 10"
+  },
+  "demand": {
+    "score": 42,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/1711",
+        "note": "Greasy Fork total installs, \"Make GitHub Pull Request, Commit, and Blob pages full width\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/hohnneiphpemlbhmiiipkfjnfhmnobpo",
+        "note": "Chrome Web Store users, \"Wide GitHub\""
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=github%20full%20wid",
+        "note": "Google suggests \"github full width\""
+      }
+    ]
+  }
+}

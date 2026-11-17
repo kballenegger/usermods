@@ -1,0 +1,34 @@
+{
+  "slug": "remove-ai-overview",
+  "title": "Remove the AI Overview from Google Search",
+  "question": "How do I remove the AI Overview from Google search results?",
+  "answer": "Google has no setting that turns off AI Overviews. The usermods script on this page hides the AI Overview block at the top of the results, including when it loads after the rest of the page, and leaves the ordinary results in place. Install it with usermods or any userscript manager. Without an extension, the Web tab under the search box shows results with no AI Overview.",
+  "prompt": "Hide the AI Overview box on Google search results.",
+  "details": "Google renames the AI Overview's CSS classes often, so the script finds the block by its heading text and hides the whole block around it. A MutationObserver catches overviews that load after the page.\n\nIt matches the English heading \"AI Overview\", so it works when Google's interface is in English. It does not touch AI Mode, which is a separate tab, or the \"People also ask\" box.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "The Web tab",
+      "body": "Click **Web** under the search box (it can sit behind **More**). That tab shows plain links with no AI Overview. Adding `&udm=14` to a search URL opens the same tab, so a custom search engine set to `https://www.google.com/search?q=%s&udm=14` makes it the default in Chrome."
+    },
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filter",
+      "body": "A procedural filter that finds the same heading and hides its block. Our check runs the script, not this filter.\n\n```\nwww.google.com##[role=\"heading\"]:has-text(/^AI Overview$/):upward(#rcnt > div, #center_col > div, #rso > div)\n```"
+    }
+  ],
+  "related": [
+    "google/hide-sponsored"
+  ],
+  "check": {
+    "urls": [
+      "https://www.google.com/search?q=how+does+caffeine+affect+sleep&hl=en&gl=us"
+    ],
+    "loggedOut": true,
+    "waitFor": "#rso",
+    "settleMs": 4000,
+    "baseline": "[...document.querySelectorAll('[role=\"heading\"]')].some((h) => h.textContent.trim() === 'AI Overview' && h.checkVisibility())",
+    "expect": "(() => { const hs = [...document.querySelectorAll('[role=\"heading\"]')].filter((h) => h.textContent.trim() === 'AI Overview'); return hs.length > 0 && hs.every((h) => !h.checkVisibility()); })()",
+    "intact": "[...document.querySelectorAll('#rso a h3')].filter((h) => h.checkVisibility()).length >= 5"
+  }
+}

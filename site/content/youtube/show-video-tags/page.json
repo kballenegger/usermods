@@ -1,0 +1,55 @@
+{
+  "slug": "show-video-tags",
+  "title": "Show a YouTube video's tags",
+  "question": "How can I see the tags on a YouTube video?",
+  "answer": "YouTube does not show a video's tags on the page; the hashtags above the title come from the description, not the tags. The usermods script on this page lists the uploader's tags under the video title, each one a link that searches YouTube for that tag, and says when a video has none. Without an extension, view the page source (Ctrl+U or Cmd+Option+U) and search for \"keywords\": the meta keywords line holds the same tags.",
+  "prompt": "Show the tags of each YouTube video under its title.",
+  "details": "The tags come from the data YouTube's player already loaded for the video, so the script makes no network requests. It reads them from the player rather than the page HTML, so the list stays right when you click from one video to the next without a reload. The check loads one watch page directly and does not cover that in-page navigation.\n\nTags are what the uploader typed in YouTube Studio. Many videos have none, and YouTube uses them less for search than titles and descriptions.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "View the page source",
+      "body": "Open the video, press Ctrl+U (Cmd+Option+U on a Mac) and search for `name=\"keywords\"`. The `content` of that meta tag lists the tags, separated by commas. If you reached the video by clicking around YouTube, reload the page first."
+    },
+    {
+      "kind": "extension",
+      "title": "YouTube Tags",
+      "body": "The YouTube Tags extension shows a video's tags in a panel and lets you copy them."
+    }
+  ],
+  "related": [
+    "youtube/video-screenshot",
+    "youtube/hide-recommendations"
+  ],
+  "demand": {
+    "score": 79,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/1196",
+        "note": "View YouTube tags (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/fffiogeaioiinfekkflcfebaoiohkkgp",
+        "note": "YouTube Tags (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20tags%20viewer",
+        "note": "returns the query; suggestions: youtube tags viewer | youtube tags viewer extension | youtube tags viewer firefox | youtube tags view | youtube tags reader"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.youtube.com/watch?v=jNQXAC9IVRw"
+    ],
+    "loggedOut": true,
+    "waitFor": "ytd-watch-metadata #title h1",
+    "settleMs": 4000,
+    "baseline": "(() => { const tags = document.querySelector('#movie_player').getPlayerResponse().videoDetails.keywords; const shown = (t) => [...document.querySelectorAll('ytd-watch-metadata a, ytd-watch-metadata span')].some((e) => e.checkVisibility() && e.textContent.trim().toLowerCase() === t.toLowerCase()); return tags.includes('jawed karim') && tags.includes('first youtube video') && !shown('first youtube video'); })()",
+    "expect": "(() => { const box = document.querySelector('ytd-watch-metadata #usermods-tags'); if (!box || !box.checkVisibility()) return false; const links = [...box.querySelectorAll('a')]; const texts = links.map((a) => a.textContent); return texts.includes('jawed karim') && texts.includes('first youtube video') && links.every((a) => a.checkVisibility() && a.href.includes('/results?search_query=')); })()",
+    "intact": "(() => { const t = document.querySelector('ytd-watch-metadata #title h1'); return t.checkVisibility() && t.textContent.trim() === 'Me at the zoo' && document.querySelector('#movie_player video') !== null && document.querySelector('ytd-watch-metadata #description').checkVisibility(); })()"
+  }
+}

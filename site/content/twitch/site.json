@@ -1,0 +1,7 @@
+{
+  "slug": "twitch",
+  "name": "Twitch",
+  "domains": ["twitch.tv", "www.twitch.tv"],
+  "category": "video",
+  "intro": "Userscripts that change how Twitch looks and behaves on desktop: less autoplay, less clutter around the player, and controls that work the way you expect."
+}

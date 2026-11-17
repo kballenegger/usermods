@@ -1,0 +1,46 @@
+{
+  "slug": "click-to-pause",
+  "title": "Click the Kick player to pause",
+  "question": "How do I pause a Kick stream by clicking the video?",
+  "answer": "Kick's player does not pause when you click the video; only the pause button and the space bar do. There is no setting to change that. The usermods script on this page makes a left click on the video pause it, and a second click play it again, on live streams and VODs. Clicks on the control bar, chat and the rest of the page work as before. Without the script, press the space bar.",
+  "prompt": "Make clicking the video on Kick pause and play it.",
+  "details": "The script listens for clicks on the document and reacts only when the click lands on the player's `<video>` element (`#video-player`), so it keeps working when Kick changes page without a reload. Double-clicking toggles twice, which leaves the video playing. The check runs on a VOD page; live channel pages use the same player element.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Space bar",
+      "body": "Kick's own shortcut: **Space** pauses and plays while the page has focus."
+    }
+  ],
+  "related": [
+    "kick/theater-mode",
+    "kick/hide-chat"
+  ],
+  "check": {
+    "urls": [
+      "https://kick.com/lospollostv/videos/01a1d33b-ebd0-73ba-a568-6b54155cd924"
+    ],
+    "loggedOut": true,
+    "waitFor": "#video-player",
+    "settleMs": 6000,
+    "actions": "document.querySelector('[data-testid=mature]')?.click(); await new Promise((r) => setTimeout(r, 3000)); document.querySelector('#video-player').click(); await new Promise((r) => setTimeout(r, 1500));",
+    "baseline": "(() => { const v = document.querySelector('#video-player'); return !!v && !v.paused && v.currentTime > 0; })()",
+    "expect": "(() => { const v = document.querySelector('#video-player'); return !!v && v.paused; })()",
+    "intact": "(() => { const v = document.querySelector('#video-player'); return !!v && v.checkVisibility() && v.readyState >= 2 && !!document.querySelector('#channel-chatroom'); })()"
+  },
+  "demand": {
+    "score": 37,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/479899",
+        "note": "Click Video To Pause (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=kick%20click%20to%20pause",
+        "note": "returns \"kick click to pause\"; suggestions: kick click to pause | pause play keyboard shortcuts | how long to pause on pause squats"
+      }
+    ]
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "slug": "dark-mode",
+  "title": "Use dark mode on archive.org",
+  "question": "Does archive.org have a dark mode?",
+  "answer": "No, archive.org has no dark mode setting; item pages are dark text on white below a dark top bar. The usermods script on this page turns archive.org dark by inverting the page's colours, then flips images, videos, the top bar and the book reader area back so they look as they did. Without a script, Chrome's Auto Dark Mode flag or a dark-mode extension such as Dark Reader does a similar job.",
+  "prompt": "Make archive.org dark: dark background and light text, with images and the book reader left as they are.",
+  "details": "archive.org has no dark theme to switch on, so the script applies `filter: invert(0.92) hue-rotate(180deg)` to the whole page. The top bar (`#topnav`), the black viewer area that holds the book reader or media player (`#theatre-ia-wrap`), and images, videos, canvases and iframes outside those get the same filter again, which undoes it for them. The check loads a book's item page; search results and other archive.org pages get the same treatment but the check doesn't load them. Wayback Machine snapshots on web.archive.org are not matched.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Chrome's Auto Dark Mode",
+      "body": "`chrome://flags/#enable-force-dark` darkens every site. It is an experimental flag and changes all pages, not only archive.org."
+    },
+    {
+      "kind": "extension",
+      "title": "Dark Reader",
+      "body": "Dark Reader recolours any site and can be turned on per site."
+    }
+  ],
+  "related": [
+    "archive/pdf-download-link",
+    "archive/hide-wayback-toolbar"
+  ],
+  "demand": {
+    "score": 5,
+    "evidence": [
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=archive.org%20dark%20mode",
+        "note": "returns \"archive.org dark mode\"; suggestions: archive.org dark mode | archive. org dark theme | does archive.org have dark mode | is there a dark mode for archive of our own | does archive of our own have dark mode"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://archive.org/details/alicesadventures00carr"
+    ],
+    "loggedOut": true,
+    "waitFor": ".item-download-options a.download-pill",
+    "settleMs": 3000,
+    "baseline": "(() => { const lum = (c) => { const [r, g, b] = c.match(/[\\d.]+/g).map(Number); return 0.2126 * r + 0.7152 * g + 0.0722 * b; }; const about = document.querySelector('.item-details-about'); return getComputedStyle(document.documentElement).filter === 'none' && lum(getComputedStyle(document.body).backgroundColor) > 200 && !!about && lum(getComputedStyle(about).color) < 80; })()",
+    "expect": "(() => { const f = (e) => getComputedStyle(e).filter; const flip = /invert\\(1\\)/; const theatre = document.querySelector('#theatre-ia-wrap'); const nav = document.querySelector('#topnav'); const imgs = [...document.querySelectorAll('img')].filter((i) => i.checkVisibility() && !i.closest('#topnav, #theatre-ia-wrap')); return /invert\\(0\\.92\\)/.test(f(document.documentElement)) && !!theatre && flip.test(f(theatre)) && !!nav && flip.test(f(nav)) && imgs.length > 0 && imgs.every((i) => flip.test(f(i)) || flip.test(f(i.closest('picture') || i))); })()",
+    "intact": "(() => { const t = document.querySelector('h1.item-title'); const box = document.querySelector('.item-download-options'); const theatre = document.querySelector('#theatre-ia'); return [t, box, theatre].every((e) => e && e.checkVisibility()); })()"
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "slug": "remove-ads",
+  "title": "Remove ads from DuckDuckGo results",
+  "question": "How do I block ads in DuckDuckGo search results?",
+  "answer": "DuckDuckGo lets you turn ads off: open duckduckgo.com/settings and switch off Advertisements, or add k1=-1 to the search URL. The setting is saved for that browser. If you would rather not depend on it, the usermods script on this page hides the sponsored results and the sponsored Shopping rows DuckDuckGo places among the web results, and leaves the ordinary results and the tabs in place.",
+  "prompt": "Hide the sponsored ads in DuckDuckGo search results.",
+  "details": "DuckDuckGo tags each ad in the result list with `data-layout=\"ad\"`, and the ad itself carries `data-testid=\"ad\"`. The \"Shopping for ...\" product rows carry an Ad badge with a `data-testid` that starts with `ad-badge-ad-tooltip-products`. One CSS rule hides list items with any of these markers, including ads loaded by **More results**.\n\nDuckDuckGo does not show the shopping rows on every load, so the check covers the text ads; the shopping rule is not part of it. The script does nothing on the Images, News, Videos or Shopping tabs.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Turn ads off in Settings",
+      "body": "Open duckduckgo.com/settings and turn off **Advertisements**. DuckDuckGo saves it for that browser. The same setting as a URL parameter is `k1=-1`, for example `https://duckduckgo.com/?q=%s&k1=-1` as a custom search engine."
+    },
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filter",
+      "body": "uBlock Origin's default lists already block most of these ads. Our check runs the script, not these filters.\n\n```\nduckduckgo.com##li[data-layout=\"ad\"]\nduckduckgo.com##li:has([data-testid^=\"ad-badge-ad-tooltip-products\"])\n```"
+    }
+  ],
+  "related": [
+    "duckduckgo/hide-ai",
+    "duckduckgo/disable-safe-search",
+    "duckduckgo/declutter",
+    "google/hide-sponsored"
+  ],
+  "demand": {
+    "score": 41,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/424874",
+        "note": "Greasy Fork total installs: \"DuckDuckGo - Ad Remover\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=duckduckgo+remove+ads",
+        "note": "suggests \"duckduckgo disable ads\""
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://duckduckgo.com/?q=car+insurance+quote&kl=us-en"
+    ],
+    "loggedOut": true,
+    "waitFor": "[data-testid=\"result\"]",
+    "settleMs": 4000,
+    "baseline": "(() => { const ads = [...document.querySelectorAll('li[data-layout=\"ad\"]')].filter((li) => li.checkVisibility()); return ads.length > 0 && ads.every((li) => li.querySelector('[data-testid^=\"ad-badge\"]')); })()",
+    "expect": "(() => { const ads = [...document.querySelectorAll('[data-testid=\"ad\"], li:has([data-testid^=\"ad-badge-ad-tooltip-products\"])')]; return ads.length > 0 && ads.every((a) => !a.checkVisibility()); })()",
+    "intact": "[...document.querySelectorAll('li[data-layout=\"organic\"] [data-testid=\"result\"]')].filter((r) => r.checkVisibility()).length >= 5"
+  }
+}

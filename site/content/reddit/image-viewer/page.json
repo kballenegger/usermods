@@ -1,0 +1,67 @@
+{
+  "slug": "image-viewer",
+  "title": "Open Reddit images full size",
+  "question": "How do I open a Reddit image directly at full size?",
+  "answer": "Reddit shows a resized copy of each image from preview.redd.it, and clicking it opens Reddit's own viewer or the comments page rather than the image file. The usermods script on this page makes a click on a post image open the original full-size file from i.redd.it in a new tab, on the feed and on post pages, including each image of a gallery. Without a script, right-click the image in Reddit's viewer and open it in a new tab.",
+  "prompt": "On Reddit, when I click an image in a post, open the original full-size image in a new tab.",
+  "details": "For single-image posts the script uses the original URL Reddit stores on the post (`content-href`). For gallery images it takes the file name from the preview URL: `preview.redd.it/some-title-v0-abc123.jpeg?width=640` becomes `i.redd.it/abc123.jpeg`.\n\nIt only takes over a plain left click on the post image. The title, the comments link, video posts and links to other sites behave as before, and so do middle clicks. The check clicks a single-image post on r/pics logged out; galleries use the same code but the check does not click one.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Open from Reddit's viewer",
+      "body": "Click the image to open Reddit's viewer, then right-click the large image and choose **Open image in new tab**. That tab shows the i.redd.it file."
+    },
+    {
+      "kind": "other",
+      "title": "old.reddit.com",
+      "body": "On old.reddit.com the post title of an image post links straight to the i.redd.it file."
+    },
+    {
+      "kind": "extension",
+      "title": "Image opener extensions",
+      "body": "Chrome extensions such as Reddit Image Opener do the same and add download buttons."
+    }
+  ],
+  "related": [
+    "reddit/wide-layout",
+    "reddit/remove-sidebar",
+    "reddit/hide-promoted"
+  ],
+  "demand": {
+    "score": 65,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/432718",
+        "note": "Better Reddit Image Previews (3,166 total installs)"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/iffnacikcgjlndahdgnckeekdefoafbn",
+        "note": "Reddit Image Opener (10,000 users)"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/ifcbbmfoblmmckaacfoeillbkchclfpe",
+        "note": "view reddit images directly (6,000 users)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=reddit%20image%20viewer",
+        "note": "returns the query; suggestions: reddit image viewer | reddit image viewer scroll | reddit image viewer extension | reddit image viewer online | reddit image viewer website"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.reddit.com/r/pics/"
+    ],
+    "loggedOut": true,
+    "waitFor": "shreddit-post[post-type=\"image\"]",
+    "settleMs": 4000,
+    "actions": "const sleep = (ms) => new Promise((r) => setTimeout(r, ms)); window.__um = { opened: [] }; window.open = (u) => { window.__um.opened.push(String(u)); return null; }; const post = document.querySelector('shreddit-post[post-type=\"image\"]'); const img = post && [...post.querySelectorAll('[slot=\"post-media-container\"] img')].find((i) => i.checkVisibility() && i.getBoundingClientRect().width > 100); if (img) { window.__um.src = img.currentSrc || img.src; window.__um.original = post.getAttribute('content-href'); img.click(); } await sleep(1500);",
+    "baseline": "(() => { const u = window.__um; return !!u && /^https:\\/\\/preview\\.redd\\.it\\//.test(u.src || '') && /^https:\\/\\/i\\.redd\\.it\\//.test(u.original || '') && u.opened.length === 0; })()",
+    "expect": "(() => { const u = window.__um; return !!u && /^https:\\/\\/preview\\.redd\\.it\\//.test(u.src || '') && /^https:\\/\\/i\\.redd\\.it\\//.test(u.original || '') && u.opened.length === 1 && u.opened[0] === u.original; })()",
+    "intact": "location.pathname.startsWith('/r/pics') && [...document.querySelectorAll('shreddit-post')].filter((p) => p.checkVisibility()).length >= 3"
+  }
+}

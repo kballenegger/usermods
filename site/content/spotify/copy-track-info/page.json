@@ -1,0 +1,39 @@
+{
+  "slug": "copy-track-info",
+  "title": "Copy track info from Spotify web",
+  "question": "How do I copy song title and artist from the Spotify web player?",
+  "answer": "The Spotify web player can copy a song link (right-click a song, Share, Copy link to Song), but not the title and artist as text. The usermods script on this page adds a Copy button to every song row on album, playlist, artist and search pages. Clicking it copies \"Title - Artist\" to the clipboard, with all artists listed. Without an extension, copy the song link instead: the page it opens shows the title and artist.",
+  "prompt": "In the Spotify web player, add a button to each song row that copies the title and artist as \"Title - Artist\".",
+  "details": "The button sits at the start of the row's last column, next to the duration, and shows when you hover the row or move to it with the keyboard. It reads the song title and every artist link from the row at the moment you click, so it stays right as Spotify recycles rows while you scroll. The click doesn't reach the row, so it doesn't start playback.\n\nIt works logged out and logged in. It does not add anything to the player bar at the bottom. The check loads an album page, clicks the first row's button and compares the copied text with the row.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Copy link to Song",
+      "body": "Right-click a song, choose **Share**, then **Copy link to Song**. You get an `open.spotify.com/track/...` link, not the title and artist."
+    }
+  ],
+  "related": [
+    "spotify/download-cover"
+  ],
+  "demand": {
+    "score": 55,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/36788",
+        "note": "Greasy Fork total installs, \"Spotify Web - Copy track info to clipboard\" (api.greasyfork.org, 2026-11-17)"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://open.spotify.com/album/4LH4d3cOWNNsVw41Gqt2kv"
+    ],
+    "loggedOut": true,
+    "waitFor": "[data-testid=\"tracklist-row\"] a[data-testid=\"internal-track-link\"]",
+    "settleMs": 3000,
+    "baseline": "[...document.querySelectorAll('[data-testid=\"tracklist-row\"]')].filter((r) => r.checkVisibility() && r.querySelector('a[data-testid=\"internal-track-link\"]') && r.querySelector('a[href^=\"/artist/\"]')).length >= 5 && !document.querySelector('.usermods-copy-track')",
+    "expect": "(async () => { const rows = [...document.querySelectorAll('[data-testid=\"tracklist-row\"]')].filter((r) => r.querySelector('a[data-testid=\"internal-track-link\"]')); if (rows.length < 5 || !rows.every((r) => r.querySelector('button.usermods-copy-track')?.checkVisibility())) return false; const row = rows[0]; const want = row.querySelector('a[data-testid=\"internal-track-link\"]').textContent.trim() + ' - ' + row.querySelector('a[href^=\"/artist/\"]').textContent.trim(); let got = null; navigator.clipboard.writeText = async (t) => { got = t; }; row.querySelector('button.usermods-copy-track').click(); await new Promise((r) => setTimeout(r, 300)); return got === want && row.querySelector('button.usermods-copy-track').textContent === 'Copied'; })()",
+    "intact": "[...document.querySelectorAll('[data-testid=\"tracklist-row\"] a[data-testid=\"internal-track-link\"]')].filter((a) => a.checkVisibility()).length >= 5 && !!document.querySelector('[data-testid=\"control-button-playpause\"]')"
+  }
+}

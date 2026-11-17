@@ -1,0 +1,44 @@
+{
+  "slug": "disable-channel-autoplay",
+  "title": "Stop the channel trailer autoplaying on YouTube",
+  "question": "How do I stop YouTube channel pages from autoplaying the trailer?",
+  "answer": "YouTube has no setting to stop a channel's featured video or trailer from playing when you open the channel page. The usermods script on this page pauses that video as soon as it starts on its own, so the channel page opens silent and still. Click the player and it plays normally. Videos on watch pages are not affected. Without an extension, the only option is to pause the trailer yourself each time.",
+  "prompt": "Stop the featured video on YouTube channel pages from playing automatically.",
+  "details": "The script listens for the featured video on a channel's home tab (the `ytd-channel-video-player-renderer` player) starting to play and pauses it. After you click or use the keyboard on that player, it stops interfering until you open another page, so you can still watch the trailer. It does not touch the main player on video pages, the previews that play when you hover over thumbnails, or the autoplay of the next video.",
+  "related": [
+    "youtube/disable-autoplay",
+    "youtube/hide-shorts",
+    "youtube/block-channels"
+  ],
+  "demand": {
+    "score": 65,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/399862",
+        "note": "Kill YouTube Channel Video Autoplay (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/555488",
+        "note": "YouTube - Block Autoplay Preview Thumbnail and Channel Trailer (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20channel%20autoplay",
+        "note": "returns the query; suggestions: youtube channel autoplay | youtube channel video autoplay | youtube channel trailer autoplay | youtube stop channel autoplay | youtube block channel from autoplay"
+      }
+    ]
+  },
+  "check": {
+    "loggedOut": true,
+    "urls": [
+      "https://www.youtube.com/@MrBeast"
+    ],
+    "waitFor": "ytd-channel-video-player-renderer video",
+    "settleMs": 6000,
+    "baseline": "(() => { const v = document.querySelector('ytd-channel-video-player-renderer video'); return !v.paused && v.currentTime > 1; })()",
+    "expect": "(() => { const v = document.querySelector('ytd-channel-video-player-renderer video'); return v.paused && v.currentTime < 2; })()",
+    "intact": "document.querySelector('ytd-channel-video-player-renderer').checkVisibility() && [...document.querySelectorAll('a[href^=\"/watch?v=\"]')].filter((a) => a.checkVisibility()).length >= 5"
+  }
+}

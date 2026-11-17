@@ -1,0 +1,7 @@
+{
+  "slug": "reddit",
+  "name": "Reddit",
+  "domains": ["reddit.com", "www.reddit.com"],
+  "category": "social",
+  "intro": "Userscripts for the current Reddit desktop site: layout fixes, wider feeds and less noise around the posts."
+}

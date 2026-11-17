@@ -1,0 +1,33 @@
+{
+  "slug": "hide-sponsored",
+  "title": "Hide sponsored products on Amazon",
+  "question": "How do I hide sponsored products in Amazon search?",
+  "answer": "Amazon has no setting or filter that removes sponsored products from search results. The usermods script on this page hides them: every result marked Sponsored, the sponsored brand banner above the results, and sponsored carousels between them. The ordinary results stay in place and in order. Install it with usermods or any userscript manager. Without an extension, the only option is to scroll past the listings labelled Sponsored.",
+  "prompt": "Hide all sponsored products and ads in Amazon search results.",
+  "details": "Amazon tags each ad slot in its search results with the `AdHolder` class and puts a \"Sponsored\" label on each sponsored product. The script injects CSS that hides any result slot that is an ad or contains that label. Because it is plain CSS, it also applies to results that load when you change filters or pages.\n\nIt runs on amazon.com search pages only. Product pages, which have their own sponsored carousels, are left alone.",
+  "alternatives": [
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filters",
+      "body": "The same selectors as cosmetic filters. Our check runs the script, not these filters.\n\n```\nwww.amazon.com##.s-result-item.AdHolder\nwww.amazon.com##.s-result-item:has(.puis-sponsored-label-text)\n```"
+    }
+  ],
+  "demand": {
+    "score": 64,
+    "evidence": [
+      { "type": "cws", "url": "https://chromewebstore.google.com/detail/amazon-ad-sponsored-listi/lepiapjabmikggmkkefllaojbfijaffl", "note": "Chrome Web Store users: \"Amazon Ad & Sponsored Listing Blocker\" (2026-11-17)" },
+      { "type": "greasyfork", "url": "https://greasyfork.org/en/scripts/388822", "note": "Greasy Fork total installs: \"Amazon Sponsored Products remover\" (read via api.greasyfork.org, 2026-11-17)" },
+      { "type": "greasyfork", "url": "https://greasyfork.org/en/scripts/36512", "note": "Greasy Fork total installs: \"Amazon Sponsored Products / Ad block\" (read via api.greasyfork.org, 2026-11-17)" },
+      { "type": "autocomplete", "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=amazon+hide+sponsored", "note": "suggests \"amazon hide sponsored results\"" }
+    ]
+  },
+  "check": {
+    "urls": ["https://www.amazon.com/s?k=usb+c+cable"],
+    "loggedOut": true,
+    "waitFor": "[data-component-type=\"s-search-result\"]",
+    "settleMs": 4000,
+    "baseline": "[...document.querySelectorAll('.s-result-item')].some((r) => (r.classList.contains('AdHolder') || r.querySelector('.puis-sponsored-label-text')) && r.checkVisibility())",
+    "expect": "(() => { const ads = [...document.querySelectorAll('.s-result-item')].filter((r) => r.classList.contains('AdHolder') || r.querySelector('.puis-sponsored-label-text')); const labels = [...document.querySelectorAll('.puis-sponsored-label-text')]; return ads.length > 0 && labels.length > 0 && ads.every((r) => !r.checkVisibility()) && labels.every((l) => !l.checkVisibility()); })()",
+    "intact": "[...document.querySelectorAll('[data-component-type=\"s-search-result\"]')].filter((r) => r.checkVisibility()).length >= 8"
+  }
+}

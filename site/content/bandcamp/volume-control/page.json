@@ -1,0 +1,76 @@
+{
+  "slug": "volume-control",
+  "title": "Add a volume slider to Bandcamp",
+  "question": "How do I change the volume on Bandcamp's player?",
+  "answer": "Bandcamp's web player has no volume control: album and track pages only have play, skip and a progress bar, so the only way to turn it down is your computer's volume. The usermods script on this page adds a Volume slider under the player and sets the level of the audio Bandcamp plays. It remembers the level on that artist's pages. Without a userscript, a Bandcamp volume extension or your system volume mixer does the same.",
+  "prompt": "Add a volume slider to the Bandcamp player.",
+  "details": "The slider sits in a new row under the player's progress bar and goes from 0 to 100%. Moving it sets `volume` on the `<audio>` elements Bandcamp uses, and the level is applied again whenever a track starts.\n\nThe level is saved in the page's local storage. Each artist has their own `*.bandcamp.com` subdomain, so the saved level is per artist; a new artist starts at 100%. The script runs on album and track pages; it does not change the player in the Bandcamp app, your collection page or Bandcamp Daily. The check loads one album page and moves the slider.",
+  "alternatives": [
+    {
+      "kind": "extension",
+      "title": "Bandcamp volume extensions",
+      "body": "Several Chrome extensions, such as Bandcamp Volume, add a slider to the player and do only that."
+    },
+    {
+      "kind": "other",
+      "title": "System volume mixer",
+      "body": "On Windows the volume mixer can turn down the browser alone. On macOS there is no per-app volume without a third-party tool."
+    }
+  ],
+  "related": [
+    "bandcamp/playback-speed",
+    "bandcamp/album-duration"
+  ],
+  "demand": {
+    "score": 62,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/38012",
+        "note": "Bandcamp Volume Bar (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/11047",
+        "note": "Bandcamp Volume Bar (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/399032",
+        "note": "Bandcamp Volume Bar (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/kihpomglkbgbhdhogikhpbgakniddmfj",
+        "note": "Bandcamp Volume (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/lpjafdmpdcnbpjlbnaecnnbaegeedkga",
+        "note": "Bandcamp Volume (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/lfbhdnmepaoehbppjihkjmoinhehgefd",
+        "note": "Bandcamp Volume Controller (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=bandcamp%20volume",
+        "note": "returns \"bandcamp volume\"; suggestions: bandcamp volume slider | bandcamp volume | bandcamp volume extension | bandcamp volume slider extension | bandcamp volume firefox"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://radiohead.bandcamp.com/album/in-rainbows"
+    ],
+    "loggedOut": true,
+    "waitFor": "#track_table .track_row_view",
+    "settleMs": 3000,
+    "actions": "const s = document.querySelector('.inline_player input[type=range]'); if (s) { s.value = '30'; s.dispatchEvent(new Event('input', { bubbles: true })); }",
+    "baseline": "(() => { const p = document.querySelector('.inline_player'); return !!p && p.checkVisibility() && document.querySelectorAll('audio').length > 0 && !p.querySelector('input[type=range]'); })()",
+    "expect": "(() => { const s = document.querySelector('.inline_player input[type=range]'); const a = [...document.querySelectorAll('audio')]; return !!s && s.checkVisibility() && a.length > 0 && a.every((x) => Math.abs(x.volume - 0.3) < 0.001); })()",
+    "intact": "(() => { const p = document.querySelector('.inline_player'); return !!p && !!p.querySelector('[aria-label=\"Play/pause\"]') && [...document.querySelectorAll('#track_table .track_row_view')].filter((r) => r.checkVisibility()).length >= 10; })()"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "slug": "trello",
+  "name": "Trello",
+  "domains": ["trello.com"],
+  "category": "work",
+  "intro": "Userscripts for Trello boards: show details on cards that Trello keeps out of sight."
+}

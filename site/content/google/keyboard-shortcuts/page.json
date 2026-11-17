@@ -1,0 +1,45 @@
+{
+  "slug": "keyboard-shortcuts",
+  "title": "Add keyboard shortcuts to Google Search results",
+  "question": "How do I navigate Google search results with the keyboard?",
+  "answer": "Google Search has no shortcut keys for moving between results; the Tab key steps through every link on the page. The usermods script on this page adds j to move to the next result and k to the previous one, outlines the selected result, and leaves Enter to open it. Typing in the search box is not affected. Install it with usermods or any userscript manager. Without a script, Tab and Shift-Tab move through the links one at a time.",
+  "prompt": "Let me press j and k to move between Google search results and Enter to open one.",
+  "details": "The script lists the visible result titles in the results list, skipping ads, and moves keyboard focus along that list, scrolling the selected result to the middle of the screen. Keys pressed in a text field or with Ctrl, Cmd or Alt are ignored. Ctrl-Enter (Cmd-Enter on a Mac) opens the focused result in a new tab, which is the browser's own behaviour. The check presses j twice and confirms the second result has focus.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Tab key",
+      "body": "Press **Tab** and **Shift-Tab** to move through the links on the page and **Enter** to follow one. It stops on every link, not just results."
+    }
+  ],
+  "related": [
+    "google/open-results-new-tab"
+  ],
+  "demand": {
+    "score": 64,
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/google-search-keyboard-sh/iobmefdldoplhmonnnkchglfdeepnfhd",
+        "note": "Chrome Web Store users: \"Google Search Keyboard Shortcuts\" (2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=google+search+keyboard+shortcuts",
+        "note": "suggests \"google search keyboard shortcuts extension\""
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.google.com/search?q=how+to+bake+bread&hl=en&gl=us"
+    ],
+    "loggedOut": true,
+    "waitFor": "#rso",
+    "settleMs": 4000,
+    "actions": "for (let n = 0; n < 2; n++) document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'j', bubbles: true, cancelable: true }));",
+    "baseline": "(() => { const l = [...document.querySelectorAll('#rso a[href]:has(h3)')].filter((a) => a.checkVisibility() && !a.closest('[data-text-ad]')); return l.length >= 2 && document.activeElement !== l[1]; })()",
+    "expect": "(() => { const l = [...document.querySelectorAll('#rso a[href]:has(h3)')].filter((a) => a.checkVisibility() && !a.closest('[data-text-ad]')); return l.length >= 2 && document.activeElement === l[1] && l[1].hasAttribute('data-usermods-current'); })()",
+    "intact": "[...document.querySelectorAll('#rso a h3')].filter((h) => h.checkVisibility() && !h.closest('[data-text-ad]')).length >= 5"
+  }
+}

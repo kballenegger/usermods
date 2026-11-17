@@ -1,0 +1,7 @@
+{
+  "slug": "fandom",
+  "name": "Fandom",
+  "domains": ["fandom.com"],
+  "category": "reference",
+  "intro": "Userscripts for Fandom wikis: send moved wikis to their independent homes and strip the page down to the article."
+}

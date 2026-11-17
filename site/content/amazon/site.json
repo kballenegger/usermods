@@ -1,0 +1,7 @@
+{
+  "slug": "amazon",
+  "name": "Amazon",
+  "domains": ["amazon.com", "www.amazon.com"],
+  "category": "shopping",
+  "intro": "Userscripts for Amazon.com on desktop: cleaner search results and the information Amazon leaves out of them."
+}

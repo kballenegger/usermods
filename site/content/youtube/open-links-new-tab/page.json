@@ -1,0 +1,48 @@
+{
+  "slug": "open-links-new-tab",
+  "title": "Open YouTube videos in a new tab",
+  "question": "How do I make YouTube open videos in a new tab?",
+  "answer": "YouTube has no setting to open videos in a new tab. Ctrl-click (Cmd-click on a Mac) or a middle click on a video opens it in a new tab, but a plain click replaces the page you are on. The usermods script on this page makes a plain left click on a link to another video or Short open it in a new tab, so search results and your feed stay where you left them. Timestamp and chapter links to the video you are watching still jump within it, and links to channels and playlists open as before.",
+  "prompt": "Make YouTube open every video I click in a new tab.",
+  "details": "YouTube handles clicks on its own links and swaps the page in place. The script listens first and, for a plain left click on a link to `/watch` or `/shorts/`, stops YouTube's handler and opens the link in a new tab. Links to the video already on screen, such as chapter and comment timestamps, and links inside the player, such as its Next button, are left to YouTube. Modified clicks and middle clicks are left to the browser. The check clicks a video on a search results page and confirms the results page stays and a new tab is requested for the video. It also clicks a chapter timestamp link on a watch page and confirms no new tab is requested and the same video stays on screen. It does not click the player's Next button.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Ctrl-click or middle click",
+      "body": "Hold **Ctrl** (**Cmd** on a Mac) while clicking a video, or click it with the middle mouse button. Both open it in a new tab without any extension."
+    }
+  ],
+  "related": [
+    "youtube/disable-hover-preview",
+    "youtube/hide-shorts",
+    "youtube/redirect-shorts"
+  ],
+  "check": {
+    "urls": [
+      "https://www.youtube.com/results?search_query=minecraft&hl=en",
+      "https://www.youtube.com/watch?v=1KxqLC7F0iE&hl=en"
+    ],
+    "loggedOut": true,
+    "waitFor": "ytd-video-renderer a#video-title, a[href^=\"/watch?v=1KxqLC7F0iE&t=\"]",
+    "settleMs": 3000,
+    "actions": "window.__start = location.pathname; window.__v = new URLSearchParams(location.search).get('v'); window.__opened = []; window.open = (u) => { window.__opened.push(String(u)); return null; }; if (window.__start === '/results') document.querySelector('ytd-video-renderer a#video-title').click(); else document.querySelector(`a[href^=\"/watch?v=${window.__v}&t=\"]`).click(); await new Promise((r) => setTimeout(r, 3000));",
+    "baseline": "window.__start === '/results' ? location.pathname === '/watch' && window.__opened.length === 0 : window.__opened.length === 0 && new URLSearchParams(location.search).get('v') === window.__v",
+    "expect": "window.__start === '/results' ? location.pathname === '/results' && window.__opened.length === 1 && /\\/watch\\?v=/.test(window.__opened[0]) : window.__opened.length === 0 && new URLSearchParams(location.search).get('v') === window.__v",
+    "intact": "window.__start === '/results' ? [...document.querySelectorAll('ytd-video-renderer')].filter((v) => v.checkVisibility()).length >= 5 : document.querySelector('#movie_player').checkVisibility()"
+  },
+  "demand": {
+    "score": 55,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/23010",
+        "note": "Open Youtube video links in new tab (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20open%20in%20new%20tab",
+        "note": "returns the query; suggestions: youtube open in new tab | youtube open in new tab not working | youtube open in new tab not working chrome | youtube studio open in new tab | youtube open video in new tab"
+      }
+    ]
+  }
+}

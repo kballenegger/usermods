@@ -1,0 +1,48 @@
+{
+  "slug": "hide-sign-in-prompt",
+  "title": "Hide YouTube sign-in prompts",
+  "question": "How do I get rid of the YouTube sign in popup?",
+  "answer": "YouTube has no setting to turn off its sign-in prompts for logged-out visitors. The usermods script on this page hides the \"Sign in to like videos, comment, and subscribe\" box in the side menu and the popups that ask you to sign in when you click Like, Dislike or Subscribe. Videos, search and the Sign in button at the top right keep working. Signing in is the only way to make YouTube stop asking.",
+  "prompt": "Hide the sign-in popups and sign-in boxes YouTube shows when I am not logged in.",
+  "details": "The script is one CSS rule injected before the page draws. It hides the sign-in box in the expanded side menu and any popup dropdown that contains a link to Google's sign-in page, which is what YouTube opens when a logged-out visitor clicks Like, Dislike or Subscribe. Other dropdowns, such as Share and the three-dot menus, are untouched.\n\nThe clicks themselves still do nothing while you are logged out; the script only removes the popup. The check loads the YouTube home page for the side menu box and a watch page, where it clicks Like, for the popup. Full-page sign-in walls such as \"Sign in to confirm you're not a bot\" are not covered: they block the video itself.",
+  "alternatives": [
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filter",
+      "body": "Hides the same two elements. Our check runs the script, not this filter.\n\n```\nwww.youtube.com##ytd-guide-signin-promo-renderer\nwww.youtube.com##ytd-popup-container tp-yt-iron-dropdown:has(ytd-modal-with-title-and-button-renderer a[href*=\"ServiceLogin\"])\n```"
+    }
+  ],
+  "related": [
+    "youtube/hide-shorts",
+    "youtube/hide-recommendations",
+    "youtube/disable-autoplay"
+  ],
+  "check": {
+    "urls": [
+      "https://www.youtube.com/",
+      "https://www.youtube.com/watch?v=jNQXAC9IVRw"
+    ],
+    "loggedOut": true,
+    "waitFor": "ytd-app",
+    "settleMs": 6000,
+    "actions": "const like = location.pathname === \"/watch\" && document.querySelector(\"ytd-watch-metadata like-button-view-model button\"); if (like) { like.click(); await new Promise((r) => setTimeout(r, 2500)); }",
+    "baseline": "(() => { if (location.pathname === \"/watch\") return [...document.querySelectorAll(\"ytd-popup-container tp-yt-iron-dropdown\")].filter((d) => /Sign in to make your opinion count/.test(d.textContent)).some((d) => d.checkVisibility()); const p = document.querySelector(\"ytd-guide-signin-promo-renderer\"); return !!p && p.checkVisibility() && /Sign in to like videos/.test(p.textContent); })()",
+    "expect": "(() => { if (location.pathname === \"/watch\") { const d = [...document.querySelectorAll(\"ytd-popup-container tp-yt-iron-dropdown\")].filter((d) => /Sign in to make your opinion count/.test(d.textContent)); return d.length > 0 && d.every((x) => !x.checkVisibility()); } const p = document.querySelector(\"ytd-guide-signin-promo-renderer\"); return !!p && /Sign in to like videos/.test(p.textContent) && !p.checkVisibility(); })()",
+    "intact": "(() => { const signIn = [...document.querySelectorAll(\"ytd-masthead a\")].some((a) => /Sign in/.test(a.textContent) && a.checkVisibility()); if (location.pathname === \"/watch\") { const v = document.querySelector(\"#movie_player video\"); return signIn && !!v && v.checkVisibility(); } const guide = [...document.querySelectorAll(\"ytd-guide-entry-renderer\")].filter((e) => e.checkVisibility()); return signIn && guide.length >= 3; })()"
+  },
+  "demand": {
+    "score": 67,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/412178",
+        "note": "Youtube - dismiss sign-in (13596 total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20sign%20in%20popup",
+        "note": "returns the query; suggestions: youtube sign in popup | youtube sign in on tv popup | youtube sign in tv pop up | youtube please sign in pop up | how to get rid of youtube sign in popup"
+      }
+    ]
+  }
+}

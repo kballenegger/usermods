@@ -1,0 +1,41 @@
+{
+  "slug": "playback-speed",
+  "title": "Change Bandcamp playback speed",
+  "question": "Can I speed up or slow down tracks on Bandcamp?",
+  "answer": "Bandcamp's web player has no speed setting; tracks always play at normal speed. The usermods script on this page adds a Speed menu under the player on album and track pages, from 0.5x to 2x, and sets the playback rate of the audio Bandcamp plays. The pitch stays the same, so slowed-down tracks keep their key. It remembers the choice on that artist's pages. Without a userscript, the Bandcamp Tempo Adjust extension adds a tempo control too.",
+  "prompt": "Add a playback speed control to the Bandcamp player.",
+  "details": "The menu sits in a new row under the player and offers 0.5x, 0.75x, 0.9x, 1x, 1.1x, 1.25x, 1.5x, 1.75x and 2x. Picking a speed sets `playbackRate` and `defaultPlaybackRate` on Bandcamp's `<audio>` elements, so the speed carries over when the next track starts. Chrome keeps the pitch when it changes speed.\n\nThe choice is saved in the page's local storage. Each artist has their own `*.bandcamp.com` subdomain, so it is kept per artist. The check loads one album page and picks 1.5x.",
+  "alternatives": [
+    {
+      "kind": "extension",
+      "title": "Bandcamp Tempo Adjust",
+      "body": "A Chrome extension that adds a tempo control to Bandcamp's player."
+    }
+  ],
+  "related": [
+    "bandcamp/volume-control",
+    "bandcamp/album-duration"
+  ],
+  "demand": {
+    "score": 60,
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/iniomjoihcjgakkfaebmcbnhmiobppel",
+        "note": "Bandcamp Tempo Adjust (users, read on the detail page)"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://radiohead.bandcamp.com/album/in-rainbows"
+    ],
+    "loggedOut": true,
+    "waitFor": "#track_table .track_row_view",
+    "settleMs": 3000,
+    "actions": "const s = document.querySelector('.inline_player select'); if (s) { s.value = '1.5'; s.dispatchEvent(new Event('change', { bubbles: true })); }",
+    "baseline": "(() => { const p = document.querySelector('.inline_player'); const a = [...document.querySelectorAll('audio')]; return !!p && !p.querySelector('select') && a.length > 0 && a.every((x) => x.playbackRate === 1); })()",
+    "expect": "(() => { const s = document.querySelector('.inline_player select'); const a = [...document.querySelectorAll('audio')]; return !!s && s.checkVisibility() && a.length > 0 && a.every((x) => x.playbackRate === 1.5 && x.defaultPlaybackRate === 1.5); })()",
+    "intact": "(() => { const p = document.querySelector('.inline_player'); return !!p && !!p.querySelector('[aria-label=\"Play/pause\"]') && [...document.querySelectorAll('#track_table .track_row_view')].filter((r) => r.checkVisibility()).length >= 10; })()"
+  }
+}

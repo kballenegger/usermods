@@ -1,0 +1,52 @@
+{
+  "slug": "hide-ads",
+  "title": "Hide ads in Etsy search results",
+  "question": "How do I hide ads on Etsy search?",
+  "answer": "Etsy has no setting that turns off the ads in its search results; the listings marked \"Ad\" are placements that sellers pay for. The usermods script on this page hides every listing marked as an ad in the search results grid, so only ordinary results are left and they fill the gaps. Install it with usermods or any userscript manager. Without an extension, the only way to tell them apart is the small \"Ad\" before the shop name.",
+  "prompt": "Hide the sponsored \"Ad\" listings in Etsy search results.",
+  "details": "Etsy gives an ad listing's title an id that starts with `ad-listing-title-`. The script is one CSS rule that hides any list item containing such a title, so it applies before the page draws and to results that load later.\n\nIt does not touch ads on listing pages, the home page or in emails, and it does not change the order of the remaining results. The check loads a search for \"mug\" and confirms the ad listings are hidden and at least 20 ordinary ones still show.",
+  "alternatives": [
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filter",
+      "body": "The same selector as the script. Our check runs the script, not this filter.\n\n```\nwww.etsy.com##li:has(h3[id^=\"ad-listing-title-\"])\n```"
+    }
+  ],
+  "related": [],
+  "demand": {
+    "score": 38,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/465085",
+        "note": "Greasy Fork total installs: \"Etsy - Sponsored Products remover\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/419644",
+        "note": "Greasy Fork total installs: \"Etsy - Remove Ads\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/etsy-ad-free/lkmidcopffikdeokfcmejoleakoaechf",
+        "note": "Chrome Web Store users: \"Etsy Ad-Free\" (2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=etsy+hide+ads",
+        "note": "suggests \"block etsy ads\""
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.etsy.com/search?q=mug&instant_download=false"
+    ],
+    "loggedOut": true,
+    "waitFor": "ul[data-results-grid-container] h3.v2-listing-card__title",
+    "settleMs": 4000,
+    "baseline": "[...document.querySelectorAll('h3[id^=\"ad-listing-title-\"]')].filter((h) => h.checkVisibility()).length >= 3",
+    "expect": "(() => { const ads = [...document.querySelectorAll('h3[id^=\"ad-listing-title-\"]')]; return ads.length >= 3 && ads.every((h) => !h.checkVisibility()); })()",
+    "intact": "[...document.querySelectorAll('h3[id^=\"listing-title-\"]')].filter((h) => h.checkVisibility()).length >= 20"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "slug": "medium",
+  "name": "Medium",
+  "domains": ["medium.com"],
+  "category": "news",
+  "intro": "Userscripts for reading Medium: change what shows up in feeds and on story pages."
+}

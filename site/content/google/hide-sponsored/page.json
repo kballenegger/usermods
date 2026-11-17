@@ -1,0 +1,56 @@
+{
+  "slug": "hide-sponsored",
+  "title": "Hide sponsored results in Google Search",
+  "question": "How do I remove sponsored results from Google?",
+  "answer": "Google has no setting that turns off sponsored results. The usermods script on this page hides the text ads that Google labels Sponsored results, both the block above the results and ad blocks placed further down the list, and leaves the ordinary results in place. Install it with usermods or any userscript manager. Without a script, an ad blocker such as uBlock Origin removes the same ads with its default filter lists.",
+  "prompt": "Hide the sponsored ads on Google search results.",
+  "details": "Google tags every text ad with a `data-text-ad` attribute and puts the top ads in `#tads` and the bottom ones in `#bottomads`. The script hides those containers and any block in the results list that holds an ad, using CSS only, so nothing flashes on screen.\n\nIt does not hide sponsored product carousels in the Shopping tab or the right-hand panel; the check covers text ads on a commercial search.",
+  "alternatives": [
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin",
+      "body": "uBlock Origin's default lists already remove Google's text ads. To add the same rules by hand (our check runs the script, not these filters):\n\n```\nwww.google.com###tads\nwww.google.com###bottomads\nwww.google.com###rso > div:has([data-text-ad])\n```"
+    }
+  ],
+  "related": [
+    "google/remove-ai-overview",
+    "google/hide-people-also-ask",
+    "google/block-sites"
+  ],
+  "demand": {
+    "score": 65,
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/unsponsored/pmbneaajfhcoecedlmkfkdnjemmebbcb",
+        "note": "Chrome Web Store users: \"UnSponsored\" (2026-11-17)"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/google-search-ad-remover/pdhiefmcgnjohonhoobalejfnbminlkc",
+        "note": "Chrome Web Store users: \"Google Search Ad Remover And Customizer\" (2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/462047",
+        "note": "Greasy Fork total installs: \"Google Search No Sponsors\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=remove+sponsored+results+google",
+        "note": "suggests \"remove sponsored results google extension\""
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.google.com/search?q=car+insurance+quote&hl=en&gl=us"
+    ],
+    "loggedOut": true,
+    "waitFor": "#rso",
+    "settleMs": 4000,
+    "baseline": "[...document.querySelectorAll('[data-text-ad]')].some((a) => a.checkVisibility())",
+    "expect": "(() => { const ads = [...document.querySelectorAll('[data-text-ad]')]; const heads = [...document.querySelectorAll('[role=\"heading\"]')].filter((h) => /^Sponsored/.test(h.textContent.trim())); return ads.length > 0 && ads.every((a) => !a.checkVisibility()) && heads.every((h) => !h.checkVisibility()); })()",
+    "intact": "[...document.querySelectorAll('#rso a h3')].filter((h) => h.checkVisibility() && !h.closest('[data-text-ad]')).length >= 5"
+  }
+}

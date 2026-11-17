@@ -1,0 +1,45 @@
+{
+  "slug": "theater-mode",
+  "title": "Always open Twitch in theatre mode",
+  "question": "How do I make Twitch always open in theater mode?",
+  "answer": "Twitch has a theatre mode button and an Alt+T shortcut, but it opens each channel in the normal layout. The usermods script on this page presses the player's Theatre Mode button for you whenever you open a channel, so the video fills the window with chat beside it. Install it with usermods or any userscript manager. Without an extension, press Alt+T or click the theatre button at the bottom right of the player.",
+  "prompt": "Make Twitch switch to theatre mode automatically whenever I open a stream.",
+  "details": "The script waits for the main player to appear and clicks its own **Theatre Mode** button once per page. It finds the button by the `alt+t` shortcut in its label, which Twitch uses in every language.\n\nIf you leave theatre mode, the script leaves it off until you open another page. The check loads a 24-hour channel logged out; VOD pages use the same player, but the check doesn't load one.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Keyboard shortcut",
+      "body": "Press **Alt+T** (Option+T on a Mac) on a channel page, or click the theatre button at the bottom right of the player."
+    }
+  ],
+  "related": [
+    "twitch/hide-chat",
+    "twitch/hide-sidebar"
+  ],
+  "demand": {
+    "score": 43,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/431429",
+        "note": "Twitch - Auto Theatre (744 total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/396372",
+        "note": "TrueTheaterMode - twitch.tv (500 total installs)"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.twitch.tv/caedrel247"
+    ],
+    "loggedOut": true,
+    "waitFor": ".persistent-player [data-a-target=\"player-controls\"] button[aria-label*=\"alt+t\" i]",
+    "settleMs": 4000,
+    "baseline": "(() => { const p = document.querySelector('.persistent-player'); return !!p && !p.classList.contains('persistent-player--theatre') && document.querySelector('[data-a-target=\"video-player\"]').getBoundingClientRect().left > 100; })()",
+    "expect": "(() => { const p = document.querySelector('.persistent-player'); const r = document.querySelector('[data-a-target=\"video-player\"]').getBoundingClientRect(); return !!p && p.classList.contains('persistent-player--theatre') && r.left < 5 && r.top < 5 && r.width > 900; })()",
+    "intact": "new Promise((done) => { const v = document.querySelector('[data-a-target=\"video-player\"] video'); if (!v || !v.checkVisibility()) return done(false); const t0 = v.currentTime; const end = Date.now() + 10000; const tick = () => { if (!v.paused && v.currentTime > t0 + 0.5) return done(true); if (Date.now() > end) return done(false); setTimeout(tick, 250); }; tick(); })"
+  }
+}

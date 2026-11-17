@@ -1,0 +1,36 @@
+{
+  "slug": "open-in-app",
+  "title": "Open Spotify links in the desktop app",
+  "question": "How do I make open.spotify.com links open in the Spotify app?",
+  "answer": "Spotify has no setting that sends open.spotify.com links to the desktop app; on a computer they open in the web player. The usermods script on this page turns the link into a spotify: address such as spotify:album:<id> once the page has loaded and opens it, so the browser hands it to the installed Spotify app. The tab stays open with a green bar that links to the app again. Without an extension, paste the link into the search box of the Spotify desktop app.",
+  "prompt": "When I open an open.spotify.com link, open it in the Spotify desktop app instead of the web player.",
+  "details": "The script reads the type and id from the address (track, album, artist, playlist, show, episode, user or genre, with or without an `intl-xx` prefix) and opens the matching `spotify:` URI once, when the page first loads, by clicking a link to it. Moving around inside the web player afterwards stays in the browser. Home, search and other pages without an id are left alone.\n\nThe first time, the browser asks whether to open Spotify; Chrome and Edge offer a checkbox to always allow it for open.spotify.com. If you dismiss the prompt, the bar's \"Open in app again\" link tries again.\n\nThe check loads an album page and confirms the bar and its `spotify:album:` link. It cannot see the desktop app open, and it needs the app installed on your computer to do anything.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Paste the link into the app",
+      "body": "Copy the open.spotify.com link and paste it into the search box of the Spotify desktop app. The app opens the track, album or playlist."
+    }
+  ],
+  "related": [
+    "spotify/copy-track-info",
+    "spotify/hide-upgrade-prompts"
+  ],
+  "demand": {
+    "score": 57,
+    "evidence": [
+      { "type": "greasyfork", "url": "https://greasyfork.org/en/scripts/38920", "note": "Spotify open in app (1677 total installs)" },
+      { "type": "cws", "url": "https://chromewebstore.google.com/detail/ccilmbdijoknlfpepncnebjkiclplhig", "note": "Open Spotify Desktop App (3000 users)" },
+      { "type": "autocomplete", "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=spotify%20open%20in%20app", "note": "suggestions: spotify open in app, spotify open in app link, spotify open in desktop app" }
+    ]
+  },
+  "check": {
+    "urls": ["https://open.spotify.com/album/4LH4d3cOWNNsVw41Gqt2kv"],
+    "loggedOut": true,
+    "waitFor": "[data-testid=\"tracklist-row\"]",
+    "settleMs": 3000,
+    "baseline": "location.hostname === 'open.spotify.com' && !document.querySelector('a[href^=\"spotify:\"]') && [...document.querySelectorAll('[data-testid=\"tracklist-row\"]')].some((r) => r.checkVisibility())",
+    "expect": "(() => { const a = document.querySelector('#usermods-open-in-app a'); return !!a && a.checkVisibility() && a.getAttribute('href') === 'spotify:album:' + location.pathname.match(/\\/album\\/([A-Za-z0-9]+)/)[1]; })()",
+    "intact": "[...document.querySelectorAll('[data-testid=\"tracklist-row\"]')].filter((r) => r.checkVisibility()).length >= 5"
+  }
+}

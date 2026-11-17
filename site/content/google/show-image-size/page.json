@@ -1,0 +1,44 @@
+{
+  "slug": "show-image-size",
+  "title": "Show image dimensions in Google Images",
+  "question": "How do I see image sizes in Google Images results?",
+  "answer": "Google Images has no setting that shows image dimensions on its results grid. The usermods script on this page puts each original image's width and height, such as 1920 × 1080, in the corner of every result in the first batch. Install it with usermods or any userscript manager. Without a script, Tools under the search box has a Size filter (Large, Medium, Icon) that limits results by size.",
+  "prompt": "Show the width and height of each image on Google Images results.",
+  "details": "Google keeps each result's original size in the page's own data. The script reads it from there and labels every result in the first batch, about 100 images. Results that load as you scroll further down come from a later request the script can't read, so they get no label.\n\nThe label is width × height in pixels of the original file, not of the thumbnail. The check confirms each label has the same shape as its thumbnail.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Size filter",
+      "body": "Click **Tools** under the search box, then **Size**, and pick **Large**, **Medium** or **Icon**. It filters by size but does not show the numbers."
+    }
+  ],
+  "related": [
+    "google/images-direct-links"
+  ],
+  "demand": {
+    "score": 61,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/401432",
+        "note": "Greasy Fork total installs: \"Google Image Search - Show Image Dimensions\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/41059",
+        "note": "Greasy Fork total installs: \"Google Search - Always Show Image Size\" (read via api.greasyfork.org, 2026-11-17)"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.google.com/search?q=mountain&udm=2&hl=en&gl=us"
+    ],
+    "loggedOut": true,
+    "waitFor": "[data-docid][data-lpage]",
+    "settleMs": 4000,
+    "baseline": "(() => { const tiles = [...document.querySelectorAll('[data-docid][data-lpage]')].filter((t) => t.checkVisibility()); return tiles.length >= 20 && !tiles.some((t) => /\\d+ × \\d+/.test(t.textContent)); })()",
+    "expect": "(() => { const tiles = [...document.querySelectorAll('[data-docid][data-lpage]')].filter((t) => t.checkVisibility()); const labelled = tiles.map((t) => [t, t.querySelector('.usermods-size')]).filter(([, l]) => l && l.checkVisibility() && /^\\d+ × \\d+$/.test(l.textContent)); if (labelled.length < 20) return false; const checked = labelled.slice(0, 8).filter(([t]) => { const i = t.querySelector('img'); return i && i.naturalWidth > 1; }); return checked.length >= 4 && checked.every(([t, l]) => { const [w, h] = l.textContent.split(' × ').map(Number); const i = t.querySelector('img'); return w > 0 && h > 0 && Math.abs(w / h - i.naturalWidth / i.naturalHeight) < 0.05; }); })()",
+    "intact": "(() => { const tiles = [...document.querySelectorAll('[data-docid][data-lpage]')].filter((t) => t.checkVisibility()); return tiles.length >= 20 && tiles.filter((t) => { const i = t.querySelector('img'); return i && i.checkVisibility(); }).length >= 20; })()"
+  }
+}

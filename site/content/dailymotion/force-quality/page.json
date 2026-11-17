@@ -1,0 +1,45 @@
+{
+  "slug": "force-quality",
+  "title": "Set Dailymotion video quality",
+  "question": "How do I make Dailymotion play in higher quality by default?",
+  "answer": "Pick a quality in the player's settings menu, or use a userscript to do it for every video. The player starts each video on Auto, which picks a quality from your connection and the player size. The usermods script on this page switches every Dailymotion video to the highest quality it offers once the video starts playing. You can still change it by hand in the settings menu, and the script will not switch it back for that video.",
+  "prompt": "Make Dailymotion always play videos in the highest quality available.",
+  "details": "The player sits in an iframe on geo.dailymotion.com. The script uses the player API that Dailymotion's own page loads (`window.dailymotion`) to read the video's quality list and call `setQuality()` with the highest entry, once per video. Set `MAX` at the top of the script to a number such as `720` to cap it instead.\n\nThe player switches after the video it has already buffered, so the new quality shows a few seconds in. The check confirms the quality changes from Auto to the top of the list on a video page within 20 seconds. Logged-out visitors are often offered no more than 720p. Embedded players on other sites are not covered.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Player settings menu",
+      "body": "The gear icon in the player's controls has a quality list. It applies to the video you are watching."
+    }
+  ],
+  "related": [
+    "dailymotion/disable-autoplay",
+    "dailymotion/full-window-player"
+  ],
+  "demand": {
+    "score": 48,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/3666",
+        "note": "Greasy Fork total installs: \"Dailymotion: Playback Quality Control Feature\" (682)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=dailymotion%20quality",
+        "note": "Google suggests: dailymotion quality settings, dailymotion video quality, dailymotion higher quality"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.dailymotion.com/video/x7tgad0"
+    ],
+    "loggedOut": true,
+    "waitFor": "#player-wrapper iframe.dailymotion-player",
+    "settleMs": 6000,
+    "baseline": "(async () => { const s = await (await dailymotion.getPlayer()).getState(); return s.videoId === 'x7tgad0' && s.videoQuality === 'Auto' && (s.videoQualitiesList || []).length > 1; })()",
+    "expect": "(async () => { const p = await dailymotion.getPlayer(); for (let i = 0; i < 20; i++) { const s = await p.getState(); if (s.videoQuality === String(Math.max(...s.videoQualitiesList.map(Number)))) return true; await new Promise((r) => setTimeout(r, 1000)); } return false; })()",
+    "intact": "(async () => { const s = await (await dailymotion.getPlayer()).getState(); return s.videoId === 'x7tgad0' && !s.playerError && (s.playerIsPlaying || s.adIsPlaying) && document.querySelector('iframe.dailymotion-player').checkVisibility(); })()"
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "slug": "hide-paid-promotion",
+  "title": "Hide the \"Includes paid promotion\" label on YouTube",
+  "question": "How do I remove the \"Includes paid promotion\" overlay on YouTube?",
+  "answer": "YouTube has no setting to turn off the \"Includes paid promotion\" label. Creators turn it on for videos with a sponsor, and YouTube shows it over the player for about five seconds when the video starts. The usermods script on this page hides that label on every video. The sponsored segment inside the video still plays, and the rest of the player works as before. A one-line uBlock Origin filter does the same.",
+  "prompt": "Hide the \"Includes paid promotion\" label on YouTube videos.",
+  "details": "The label sits in the player in an element with the class `ytp-paid-content-overlay`. One CSS rule hides it before the page draws, and it keeps working as you move between videos. The script does not skip or cut the sponsor segment itself; that needs a different tool such as SponsorBlock.",
+  "alternatives": [
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filter",
+      "body": "Uses the same selector as the script. Our check runs the script, not this filter.\n\n```\nwww.youtube.com##.ytp-paid-content-overlay\n```"
+    },
+    {
+      "kind": "extension",
+      "title": "SponsorBlock",
+      "body": "The SponsorBlock extension skips sponsor segments inside videos, using times submitted by its users. It is a separate job from hiding the label."
+    }
+  ],
+  "related": [
+    "youtube/hide-end-screens",
+    "youtube/hide-recommendations",
+    "youtube/disable-hover-preview"
+  ],
+  "check": {
+    "urls": [
+      "https://www.youtube.com/watch?v=1KxqLC7F0iE&hl=en"
+    ],
+    "loggedOut": true,
+    "waitFor": ".ytp-paid-content-overlay",
+    "settleMs": 500,
+    "baseline": "new Promise((res) => { const end = Date.now() + 25000; const t = () => { if ((() => { const e = document.querySelector('.ytp-paid-content-overlay-text'); return !!e && e.checkVisibility() && /Includes paid promotion/.test(e.textContent); })()) return res(true); if (Date.now() > end) return res(false); setTimeout(t, 200); }; t(); })",
+    "expect": "(async () => { const found = await new Promise((res) => { const end = Date.now() + 25000; const t = () => { if (/Includes paid promotion/.test(document.querySelector('.ytp-paid-content-overlay-text')?.textContent || '')) return res(true); if (Date.now() > end) return res(false); setTimeout(t, 200); }; t(); }); const o = document.querySelector('.ytp-paid-content-overlay'); return found && !!o && !o.checkVisibility(); })()",
+    "intact": "new Promise((res) => { const end = Date.now() + 25000; const t = () => { if ((() => { const v = document.querySelector('#movie_player video'); const t = document.querySelector('ytd-watch-metadata h1'); return !!v && v.checkVisibility() && !!t && t.checkVisibility() && t.textContent.trim().length > 0; })()) return res(true); if (Date.now() > end) return res(false); setTimeout(t, 200); }; t(); })"
+  },
+  "demand": {
+    "score": 59,
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/aogjfjongkoccofipcpolhonhgnmfgjl",
+        "note": "YouTube paid promotion hider (4,000 users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20hide%20includes%20paid%20promotion",
+        "note": "returns the query; suggestions: youtube hide includes paid promotion | youtube remove includes paid promotion | youtube remove includes paid promotion on thumbnail | youtube disable includes paid promotion button | youtube remove includes paid promotion overlay"
+      }
+    ]
+  }
+}

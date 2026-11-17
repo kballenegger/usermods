@@ -1,0 +1,7 @@
+{
+  "slug": "craigslist",
+  "name": "Craigslist",
+  "domains": ["craigslist.org"],
+  "category": "shopping",
+  "intro": "Userscripts for Craigslist search pages: filter out the listings you don't want and change how the site looks."
+}

@@ -1,0 +1,48 @@
+{
+  "slug": "full-window-player",
+  "title": "Make the Dailymotion player fill the window",
+  "question": "How do I make Dailymotion videos bigger without going fullscreen?",
+  "answer": "Use a userscript that stretches the player over the browser window. Dailymotion's watch page shows the video in a column beside the recommendations, and its own way to go bigger is fullscreen. The usermods script on this page makes the player cover the whole browser window on every video page while the browser stays windowed, so other windows and tabs remain one click away. Press W on the page to switch back to the normal layout and again to return.",
+  "prompt": "Make the Dailymotion video player fill the whole browser window without going fullscreen.",
+  "details": "Dailymotion positions the player with inline `top`, `left`, `width` and `height` values on `#player-wrapper`. The script overrides them with CSS so the wrapper covers the window, and the player inside resizes to match. It only applies on `/video/` pages and follows the site's in-page navigation.\n\nW toggles it. A key press only reaches the script when the page has focus: after clicking into the player, the player gets the keys, so click outside it first. Typing in the search box is ignored.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Fullscreen",
+      "body": "The fullscreen button in the player's controls fills the screen instead of the window."
+    },
+    {
+      "kind": "other",
+      "title": "Browser zoom",
+      "body": "Zooming the page in with Ctrl or Cmd and + makes the player column wider, along with everything else on the page."
+    }
+  ],
+  "related": [
+    "dailymotion/disable-autoplay",
+    "dailymotion/force-quality"
+  ],
+  "demand": {
+    "score": 59,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/10815",
+        "note": "Greasy Fork total installs: \"Resize Video To Window Size\" (4,055), a multi-site script"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=dailymotion%20full%20screen",
+        "note": "Google suggests: dailymotion full screen, dailymotion full screen not working, dailymotion full screen shortcut"
+      }
+    ]
+  },
+  "check": {
+    "urls": ["https://www.dailymotion.com/video/x7tgad0"],
+    "loggedOut": true,
+    "waitFor": "#player-wrapper iframe.dailymotion-player",
+    "settleMs": 4000,
+    "baseline": "(() => { const w = document.querySelector('#player-wrapper'); const r = w.getBoundingClientRect(); return w.checkVisibility() && r.width > 300 && r.width < innerWidth * 0.7; })()",
+    "expect": "(() => { const w = document.querySelector('#player-wrapper'); const r = w.getBoundingClientRect(); const f = w.querySelector('iframe.dailymotion-player').getBoundingClientRect(); const top = document.elementFromPoint(innerWidth / 2, innerHeight / 2); return r.left === 0 && r.top === 0 && r.width >= innerWidth - 20 && r.height >= innerHeight - 1 && f.width >= innerWidth - 20 && f.height >= innerHeight - 1 && w.contains(top); })()",
+    "intact": "(async () => { const p = await dailymotion.getPlayer(); const s = await p.getState(); return s.videoId === 'x7tgad0' && !s.playerError && document.querySelector('iframe.dailymotion-player').checkVisibility(); })()"
+  }
+}

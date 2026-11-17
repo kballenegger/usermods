@@ -1,0 +1,60 @@
+{
+  "slug": "more-videos-per-row",
+  "title": "Show more videos per row on YouTube",
+  "question": "How do I get more videos per row on the YouTube home page?",
+  "answer": "YouTube has no setting for how many videos appear in each row. It picks the number from your window width, often 3 or 4 on a laptop. The usermods script on this page sets YouTube's video grids to 5 per row, with smaller thumbnails, and you can change the number at the top of the script. Install it with usermods or any userscript manager. Without an extension, zooming the page out to 80% or 67% makes YouTube fit more per row.",
+  "prompt": "Show 5 videos per row on the YouTube home page and channel video grids.",
+  "details": "YouTube lays out the home page, subscriptions and a channel's Videos tab with the same grid, and sizes it from CSS variables it sets as the window resizes. The script overrides them with CSS so every row holds 5 videos, whatever the window width.\n\nTo use another number, edit `const PER_ROW = 5;` at the top of the script.\n\nThe check loads a channel's Videos tab; the home page and subscriptions use the same grid but are not loaded by the check. Shorts shelves and search results keep their own layout.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Zoom out",
+      "body": "Press Ctrl and minus (Cmd and minus on a Mac) to zoom the page to 80% or 67%. YouTube then sees a wider window and fits more videos per row, with smaller text."
+    },
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filter",
+      "body": "Add this under *My filters* in uBlock Origin. It sets the same widths as the script; our check runs the script, not this filter.\n\n```\nwww.youtube.com##ytd-rich-grid-renderer > #contents > ytd-rich-item-renderer:style(width: calc(20% - 16px) !important; min-width: 0 !important)\n```"
+    }
+  ],
+  "related": [
+    "youtube/hide-shorts",
+    "youtube/block-channels"
+  ],
+  "demand": {
+    "score": 80,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/533051",
+        "note": "修改YouTube首页布局 (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/kehjfphhkfppnnjhdfhanmehkegdppho",
+        "note": "YouTube Row Fixer (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20more%20videos%20per%20row",
+        "note": "returns the query; suggestions: youtube more videos per row | youtube more videos per row extension | youtube more videos per row extension firefox | youtube more videos per row firefox | youtube more videos per row ublock"
+      },
+      {
+        "type": "thread",
+        "url": "https://webapps.stackexchange.com/questions/182369",
+        "note": "Is it possible to return to the old YouTube interface of 4 videos per row?"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.youtube.com/@YouTube/videos"
+    ],
+    "loggedOut": true,
+    "waitFor": "ytd-rich-grid-renderer ytd-rich-item-renderer",
+    "settleMs": 4000,
+    "baseline": "(() => { const items = [...document.querySelectorAll('ytd-rich-grid-renderer > #contents > ytd-rich-item-renderer')].filter((e) => e.checkVisibility()); return items.length >= 10 && items.filter((e) => Math.round(e.getBoundingClientRect().top) === Math.round(items[0].getBoundingClientRect().top)).length < 5; })()",
+    "expect": "(() => { const items = [...document.querySelectorAll('ytd-rich-grid-renderer > #contents > ytd-rich-item-renderer')].filter((e) => e.checkVisibility()); const tops = items.slice(0, 10).map((e) => Math.round(e.getBoundingClientRect().top)); return items.length >= 10 && tops.slice(0, 5).every((t) => t === tops[0]) && tops.slice(5, 10).every((t) => t === tops[5]) && tops[5] > tops[0]; })()",
+    "intact": "(() => { const items = [...document.querySelectorAll('ytd-rich-grid-renderer > #contents > ytd-rich-item-renderer')].filter((e) => e.checkVisibility()); return items.length >= 10 && items.slice(0, 10).every((e) => e.getBoundingClientRect().width > 150 && e.querySelector('a[href^=\"/watch\"] img')); })()"
+  }
+}

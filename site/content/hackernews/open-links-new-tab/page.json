@@ -1,0 +1,56 @@
+{
+  "slug": "open-links-new-tab",
+  "title": "Open Hacker News links in new tabs",
+  "question": "How do I make Hacker News open links in a new tab?",
+  "answer": "Hacker News has no setting to open links in a new tab; every link opens in the same tab. The usermods script on this page makes story title links, the \"N comments\" link under each story and links inside comments and Ask HN posts open in a new tab, so the front page stays where you left it. Install it with usermods or any userscript manager. Without a userscript, middle-click a link, or Ctrl-click (Cmd-click on a Mac), to open it in a new tab.",
+  "prompt": "Make Hacker News open story links and comment links in a new tab.",
+  "details": "The script sets `target=\"_blank\"` and `rel=\"noopener\"` on story title links, on the \"N comments\" link in the line under each story, and on links inside comment text and Ask HN post text. It runs once when the page has loaded; Hacker News builds its pages on the server, so nothing arrives later.\n\nNavigation links (new, past, More, user names, \"parent\" and \"next\") still open in the same tab. The check loads the front page, which has story and comments links; links inside comments get the same treatment but the check doesn't load a comment page.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Middle-click or Ctrl-click",
+      "body": "Middle-click a link, or Ctrl-click it (Cmd-click on a Mac), to open it in a new background tab."
+    }
+  ],
+  "related": [
+    "hackernews/collapse-comments",
+    "hackernews/dark-mode",
+    "hackernews/larger-font"
+  ],
+  "demand": {
+    "score": 38,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/7209",
+        "note": "Hacker news open links in new tab (161 total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/3974",
+        "note": "HN New Tab (148 total installs)"
+      },
+      {
+        "type": "forum",
+        "url": "https://news.ycombinator.com/item?id=36492067",
+        "note": "Is there any extension which enables to open Hacker News posts in a new tab?"
+      },
+      {
+        "type": "forum",
+        "url": "https://news.ycombinator.com/item?id=24862743",
+        "note": "Ask HN: Why doesn't Hacker News open links in a new tab?"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://news.ycombinator.com/"
+    ],
+    "loggedOut": true,
+    "waitFor": ".titleline",
+    "settleMs": 1000,
+    "baseline": "(() => { const l = [...document.querySelectorAll('.titleline > a')]; return l.length >= 25 && l.every((a) => a.target !== '_blank'); })()",
+    "expect": "(() => { const t = [...document.querySelectorAll('.titleline > a')]; const c = [...document.querySelectorAll('.subline a[href^=\"item?id=\"]')].filter((a) => /comment|discuss/i.test(a.textContent)); return t.length >= 25 && c.length >= 10 && [...t, ...c].every((a) => a.target === '_blank' && a.rel.includes('noopener')) && [...document.querySelectorAll('.pagetop a')].every((a) => a.target !== '_blank'); })()",
+    "intact": "[...document.querySelectorAll('tr.athing')].filter((r) => r.checkVisibility()).length >= 25"
+  }
+}

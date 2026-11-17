@@ -1,0 +1,56 @@
+{
+  "slug": "hide-hot-network-questions",
+  "title": "Hide Hot Network Questions on Stack Overflow",
+  "question": "How do I hide Hot Network Questions on Stack Exchange?",
+  "answer": "With an account, open Settings, then Preferences, and turn on the option to hide Hot Network Questions. Logged out there is no switch. The usermods script on this page hides the Hot Network Questions list in the Stack Overflow sidebar for everyone, with or without an account, and leaves the rest of the sidebar, including linked and related questions, in place. A uBlock Origin filter with the same selector also works.",
+  "prompt": "Hide the Hot Network Questions list on Stack Overflow.",
+  "details": "The list has a fixed id, `#hot-network-questions`, so one CSS rule hides it before it shows. The script runs on stackoverflow.com; other Stack Exchange sites use the same id, but the script does not match them.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Preferences",
+      "body": "Logged in: **Settings** > **Preferences**, then the option to hide the Hot Network Questions. It applies to that site's account."
+    },
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filter",
+      "body": "Works on every Stack Exchange site. Our check runs the script, not this filter.\n\n```\n###hot-network-questions\n```"
+    }
+  ],
+  "related": [
+    "stackoverflow/hide-cookie-banner",
+    "stackoverflow/hide-sidebar",
+    "stackoverflow/dark-mode"
+  ],
+  "check": {
+    "urls": [
+      "https://stackoverflow.com/questions/11227809/why-is-processing-a-sorted-array-faster-than-processing-an-unsorted-array"
+    ],
+    "loggedOut": true,
+    "waitFor": "#question",
+    "settleMs": 4000,
+    "baseline": "(() => { const h = document.querySelector('#hot-network-questions'); return !!h && h.checkVisibility() && /Hot Network Questions/.test(h.textContent); })()",
+    "expect": "(() => { const h = document.querySelector('#hot-network-questions'); const related = document.querySelector('#sidebar .sidebar-related'); return !!h && /Hot Network Questions/.test(h.textContent) && !h.checkVisibility() && !!related && related.checkVisibility(); })()",
+    "intact": "(() => { const q = document.querySelector('#question .s-prose'); const answers = [...document.querySelectorAll('#answers .answer')].filter((a) => a.checkVisibility()); return !!q && q.checkVisibility() && answers.length >= 5; })()"
+  },
+  "demand": {
+    "score": 33,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/10540",
+        "note": "Greasy Fork total installs: \"Cold Network Questions\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "forum",
+        "url": "https://superuser.com/questions/1157967/how-to-block-hot-network-questions-in-the-sidebar-of-stack-exchange-network",
+        "note": "Super User: how to block Hot Network Questions in the sidebar"
+      },
+      {
+        "type": "forum",
+        "url": "https://news.ycombinator.com/item?id=20512714",
+        "note": "Hacker News: users share uBlock rules to hide HNQ"
+      }
+    ]
+  }
+}

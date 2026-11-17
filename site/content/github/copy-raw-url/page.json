@@ -1,0 +1,44 @@
+{
+  "slug": "copy-raw-url",
+  "title": "Copy the raw URL of a GitHub file",
+  "question": "How do I get the raw link to a file on GitHub quickly?",
+  "answer": "On a GitHub file page, right-click the Raw button and copy the link; it goes through a redirect to raw.githubusercontent.com. GitHub's own copy button next to Raw copies the file's contents, not its address. The usermods script on this page adds a Copy URL button to that group that copies the direct raw.githubusercontent.com address of the file in one click. Without an extension, the right-click on Raw or editing the URL by hand are the ways.",
+  "prompt": "Add a button next to Raw on GitHub file pages that copies the file's raw URL.",
+  "details": "The address is built from the Raw button's own link: `github.com/<owner>/<repo>/raw/<ref>/<path>` becomes `raw.githubusercontent.com/<owner>/<repo>/<ref>/<path>`, the address GitHub redirects to. The button reads the link when you click, so it stays right after you move to another file without a page load.\n\nFor private repositories the copied address needs a token to open, as GitHub's own raw links do.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Right-click Raw",
+      "body": "Right-click **Raw** on the file page and choose **Copy Link Address**. The link is a `github.com/.../raw/...` address that redirects to raw.githubusercontent.com."
+    },
+    {
+      "kind": "other",
+      "title": "Edit the URL",
+      "body": "Change `github.com` to `raw.githubusercontent.com` and remove `/blob` from a file's address: `github.com/react/react/blob/main/README.md` becomes `raw.githubusercontent.com/react/react/main/README.md`."
+    }
+  ],
+  "related": [
+    "github/open-in-github1s",
+    "github/image-preview",
+    "github/wrap-code-lines"
+  ],
+  "check": {
+    "urls": [
+      "https://github.com/react/react/blob/main/packages/react/src/ReactHooks.js"
+    ],
+    "loggedOut": true,
+    "waitFor": "a[data-testid=\"raw-button\"]",
+    "settleMs": 3000,
+    "actions": "window.__copied = null; navigator.clipboard.writeText = (text) => { window.__copied = text; return Promise.resolve(); }; const b = [...document.querySelectorAll('button')].find((e) => /Copy URL/.test(e.textContent)); if (b) { b.click(); await new Promise((r) => setTimeout(r, 300)); }",
+    "baseline": "(() => { const raw = document.querySelector('a[data-testid=\"raw-button\"]'); const group = raw && raw.closest('[data-component=\"ButtonGroup\"]'); return !!raw && raw.checkVisibility() && /\\/raw\\//.test(raw.href) && !!group && ![...group.querySelectorAll('button, a')].some((e) => /Copy URL/.test(e.textContent)) && window.__copied === null; })()",
+    "expect": "(() => { const b = document.getElementById('usermods-copy-raw-url'); return !!b && b.checkVisibility() && !!b.closest('[data-component=\"ButtonGroup\"]')?.querySelector('a[data-testid=\"raw-button\"]') && window.__copied === 'https://raw.githubusercontent.com/react/react/refs/heads/main/packages/react/src/ReactHooks.js' && /Copied/.test(b.textContent); })()",
+    "intact": "(() => { const raw = document.querySelector('a[data-testid=\"raw-button\"]'); const copy = document.querySelector('[data-testid=\"copy-raw-button\"]'); return !!raw && raw.checkVisibility() && !!copy && copy.checkVisibility() && /resolveDispatcher/.test(document.body.innerText); })()"
+  },
+  "demand": {
+    "score": 47,
+    "evidence": [
+      { "type": "greasyfork", "url": "https://greasyfork.org/en/scripts/505501", "note": "Greasy Fork total installs, \"Github Copy Raw File URL and Download File\", 641 (api.greasyfork.org)" },
+      { "type": "autocomplete", "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=github%20raw%20url", "note": "Google suggests \"github raw url\" and \"github raw link\"" }
+    ]
+  }
+}

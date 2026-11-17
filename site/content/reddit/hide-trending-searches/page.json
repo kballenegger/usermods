@@ -1,0 +1,34 @@
+{
+  "slug": "hide-trending-searches",
+  "title": "Hide trending searches on Reddit",
+  "question": "How do I hide 'Trending today' in Reddit search?",
+  "answer": "Logged-out visitors can't turn off the trending list in Reddit's search box: \"Trending\" searches and \"Trending Communities\" appear as soon as they click it. The usermods script on this page hides both lists, so clicking the search box opens only the input. Suggestions that appear once you start typing are left alone. Install it with usermods or any userscript manager. If you have an account, you can turn off \"Show trending searches\" in Settings > Preferences instead.",
+  "prompt": "Hide the Trending and Trending Communities lists that pop up when I click Reddit's search box.",
+  "details": "Reddit's search box is a `reddit-search-large` element that draws its dropdown inside a shadow root, which page CSS and ordinary uBlock cosmetic filters don't reach. The script adds a style sheet to that shadow root which hides `#reddit-trending-searches-partial-container` while it holds the trending heading. Once you type, Reddit shows its suggestions in a separate list, which the script leaves alone.\n\nThe check opens the home page logged out and clicks into the search box. Logged-in accounts get trending searches unless the Preferences toggle is off; the check doesn't cover logged-in pages.",
+  "related": [
+    "reddit/hide-promoted",
+    "reddit/remove-sidebar"
+  ],
+  "demand": {
+    "score": 5,
+    "evidence": [
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=reddit%20hide%20trending%20today",
+        "note": "suggestions: reddit hide trending today, reddit remove trending today, reddit turn off trending today"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.reddit.com/"
+    ],
+    "loggedOut": true,
+    "waitFor": "reddit-search-large",
+    "settleMs": 3000,
+    "actions": "const input = document.querySelector('reddit-search-large')?.shadowRoot?.querySelector('faceplate-search-input')?.shadowRoot?.querySelector('textarea'); input?.focus(); input?.click(); await new Promise((r) => setTimeout(r, 3000));",
+    "baseline": "(() => { const ul = document.querySelector('reddit-search-large')?.shadowRoot?.querySelector('#reddit-trending-searches-partial-container'); return !!ul && ul.checkVisibility() && !!ul.querySelector('[id*=\"trending_query\"]') && ul.querySelectorAll('li').length >= 3; })()",
+    "expect": "(() => { const ul = document.querySelector('reddit-search-large')?.shadowRoot?.querySelector('#reddit-trending-searches-partial-container'); return !!ul && !!ul.querySelector('[id*=\"trending_query\"]') && ul.querySelectorAll('li').length >= 3 && !ul.checkVisibility(); })()",
+    "intact": "[...document.querySelectorAll('shreddit-post')].filter((p) => p.checkVisibility()).length >= 3 && document.querySelector('reddit-search-large').checkVisibility()"
+  }
+}

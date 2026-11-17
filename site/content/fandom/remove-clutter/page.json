@@ -1,0 +1,60 @@
+{
+  "slug": "remove-clutter",
+  "title": "Remove clutter from Fandom wikis",
+  "question": "How do I make Fandom wiki pages readable?",
+  "answer": "Fandom has no reader mode or setting that removes its extras. The usermods script on this page hides the ad slots, the video player at the top of articles, the right rail, the Fandom bar on the left, pop-up notices and the recommendation grid under the article, and lets the article use the freed width. The wiki's own header, navigation and article text stay. Without an extension, your browser's reader view shows the article text alone.",
+  "prompt": "On Fandom wikis, hide the ads, the video player, the right sidebar, the left Fandom bar and the pop-ups so only the article is left.",
+  "details": "The script injects CSS before the page draws, so nothing flashes on screen. It hides:\n\n- the ad slots: the leaderboard above the wiki header, in-article and bottom slots, and the sticky ad at the bottom of the window\n- the featured video player\n- the right rail\n- the Fandom-wide bar on the left (Home, Explore, Fandom Four)\n- pop-up notices such as \"Welcome to the wiki\"\n- the \"Fan Feed\" recommendations under the article\n\nIt keeps the wiki's header and menus, the page tools on the left of the article, infoboxes, comments and the footer. Hiding ad slots does not stop the ad scripts from loading; a content blocker does that. The check loads one Harry Potter Wiki article.",
+  "alternatives": [
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filters",
+      "body": "uBlock Origin blocks Fandom's ads with its default lists. These cosmetic filters hide the same parts as the script. Our check runs the script, not these filters.\n\n```\nfandom.com##.top-ads-container\nfandom.com##.bottom-ads-container\nfandom.com###featured-video__player-container\nfandom.com##.page__right-rail\nfandom.com###global-explore-navigation\nfandom.com##.notifications-placeholder\nfandom.com###mixed-content-footer\n```"
+    },
+    {
+      "kind": "other",
+      "title": "Reader view or the independent wiki",
+      "body": "Your browser's reader view shows only the article text. Many game wikis have moved off Fandom; the independent version usually has fewer ads."
+    }
+  ],
+  "related": [
+    "fandom/redirect-to-independent-wiki",
+    "fandom/remove-ads"
+  ],
+  "check": {
+    "urls": [
+      "https://harrypotter.fandom.com/wiki/Harry_Potter"
+    ],
+    "loggedOut": true,
+    "waitFor": ".mw-parser-output p",
+    "settleMs": 5000,
+    "baseline": "['.top-ads-container', '.page__right-rail', '#global-explore-navigation'].every((s) => { const e = document.querySelector(s); return e && e.checkVisibility(); })",
+    "expect": "(() => { const els = ['.top-ads-container', '.page__right-rail', '#global-explore-navigation', '#featured-video__player-container', '.notifications-placeholder'].map((s) => document.querySelector(s)).filter(Boolean); return els.length >= 3 && els.every((e) => !e.checkVisibility()); })()",
+    "intact": "document.querySelector('#firstHeading').checkVisibility() && document.querySelector('.community-header-wrapper').checkVisibility() && [...document.querySelectorAll('.mw-parser-output > p')].filter((p) => p.checkVisibility() && p.textContent.trim().length > 50).length >= 10"
+  },
+  "demand": {
+    "score": 60,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/431706",
+        "note": "Greasy Fork total installs: \"Fandom.com --- Cleaner Wikis Userscript\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/403111",
+        "note": "Greasy Fork total installs: \"Fandom - Remove Garbage\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "forum",
+        "url": "https://news.ycombinator.com/item?id=37635939",
+        "note": "Hacker News 'Minecraft Wiki has decided to leave Fandom': Fandom unusable without blocker"
+      },
+      {
+        "type": "forum",
+        "url": "https://news.ycombinator.com/item?id=33067381",
+        "note": "Hacker News: criticism of Fandom's ads and clutter"
+      }
+    ]
+  }
+}

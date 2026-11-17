@@ -1,0 +1,55 @@
+{
+  "slug": "dark-mode",
+  "title": "Dark mode for Wikipedia",
+  "question": "How do I turn on dark mode on Wikipedia?",
+  "answer": "Wikipedia has a dark mode built in: open the Appearance menu at the top right of an article and pick Dark under Color. Logged out, that choice is kept by your browser for that one language of Wikipedia only, and private windows or cleared site data lose it. The usermods script on this page switches on the same dark theme on every Wikipedia page as it loads, so it never resets and needs no account.",
+  "prompt": "Always show Wikipedia in dark mode, even when I'm logged out.",
+  "details": "The script swaps the theme class on the page's root element from `skin-theme-clientpref-day` to `skin-theme-clientpref-night`, the same switch the Appearance menu makes. The colours are Wikipedia's own, so tables, infoboxes and maps are styled by the site. It keeps the class set while the page loads, because Wikipedia's startup code rewrites it from the saved preference.\n\nWhile the script is on, the Light and Automatic choices in the Appearance menu have no effect. It matches every `*.wikipedia.org` page; the check loads one English article in the desktop layout.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Appearance menu",
+      "body": "On desktop, open **Appearance** at the top right (or in the sidebar) and choose **Dark** under **Color**, or **Automatic** to follow your system setting. Logged in, the choice is saved to your account. Logged out, it is stored in your browser for that language edition only."
+    },
+    {
+      "kind": "other",
+      "title": "Your browser's or system's dark setting",
+      "body": "With **Automatic** picked in the Appearance menu, Wikipedia follows your operating system's dark mode."
+    }
+  ],
+  "related": [
+    "wikipedia/full-width",
+    "wikipedia/old-layout"
+  ],
+  "check": {
+    "urls": [
+      "https://en.wikipedia.org/wiki/Moon"
+    ],
+    "loggedOut": true,
+    "waitFor": "#mw-content-text p",
+    "settleMs": 3000,
+    "baseline": "(() => { const [r, g, b] = getComputedStyle(document.body).backgroundColor.match(/\\d+/g).map(Number); return r + g + b > 600; })()",
+    "expect": "(() => { const [r, g, b] = getComputedStyle(document.body).backgroundColor.match(/\\d+/g).map(Number); const [tr, tg, tb] = getComputedStyle(document.querySelector('#mw-content-text p:not(.mw-empty-elt)')).color.match(/\\d+/g).map(Number); return document.documentElement.classList.contains('skin-theme-clientpref-night') && r + g + b < 150 && tr + tg + tb > 450; })()",
+    "intact": "[...document.querySelectorAll('#mw-content-text p')].filter((p) => p.checkVisibility() && p.textContent.trim().length > 50).length >= 10"
+  },
+  "demand": {
+    "score": 72,
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/wikipedia-night-mode/idhghjodolinkdhibgfgfoceackpcjfl",
+        "note": "Chrome Web Store users: \"Wikipedia night mode\" (2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/382833",
+        "note": "Greasy Fork total installs: \"Wikipedia Dark Theme\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=wikipedia+dark+mode",
+        "note": "suggests \"wikipedia dark mode chrome\""
+      }
+    ]
+  }
+}

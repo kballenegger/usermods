@@ -1,0 +1,60 @@
+{
+  "slug": "file-icons",
+  "title": "Show file type icons on GitHub",
+  "question": "How do I get file type icons in GitHub's file list?",
+  "answer": "GitHub has no setting for file type icons; every file in its file list gets the same plain page icon. The usermods script on this page replaces that icon with a small colored badge for the file type, such as JS, TS, PY, MD or C++, plus badges for names like Dockerfile, Makefile, LICENSE and package.json. Folders and files it doesn't recognise keep GitHub's icon. Without a userscript, extensions like Material Icons for GitHub do the same with fuller icon sets.",
+  "prompt": "Show a colored file type icon next to each file in GitHub's file list.",
+  "details": "The badges are drawn from inline SVG inside the script, so nothing is downloaded. The script tags GitHub's own file icon with the file type and CSS paints the badge over it; it does not add or remove elements on the page.\n\nIt knows about 40 types by extension and a handful of special file names. Unknown types keep the plain icon. It also tags the file tree beside the code view, but the check only loads a repository's file list.",
+  "alternatives": [
+    {
+      "kind": "extension",
+      "title": "Material Icons for GitHub",
+      "body": "The Material Icons for GitHub extension for Chrome and Firefox swaps in the Material icon theme from VS Code, with far more file types than this script."
+    },
+    {
+      "kind": "extension",
+      "title": "File Icons for GitHub and GitLab",
+      "body": "Another extension with Atom-style file icons that also works on GitLab."
+    }
+  ],
+  "related": [
+    "github/translate-interface",
+    "github/full-width"
+  ],
+  "demand": {
+    "score": 70,
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/bggfcpfjbdkhfhfmkjpbhnkhnpjjeomc",
+        "note": "Chrome Web Store users, \"Material Icons for GitHub\""
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/ficfmibkjjnpogdcfhfokmihanoldbfe",
+        "note": "Chrome Web Store users, \"File Icons for GitHub and GitLab\"; count from CWS search page"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/5982",
+        "note": "Greasy Fork total installs, \"GitHub file list beautifier\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=github%20file%20ico",
+        "note": "Google suggests \"github file icons\""
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://github.com/facebook/react"
+    ],
+    "loggedOut": true,
+    "waitFor": "tr.react-directory-row",
+    "settleMs": 4000,
+    "baseline": "(() => { const icons = [...document.querySelectorAll('tr.react-directory-row svg.octicon-file')].filter((s) => s.checkVisibility()); return icons.length >= 10 && icons.every((s) => getComputedStyle(s).backgroundImage === 'none' && s.querySelector('path').checkVisibility()); })()",
+    "expect": "(() => { const icons = [...document.querySelectorAll('tr.react-directory-row svg.octicon-file')].filter((s) => s.checkVisibility()); const badged = icons.filter((s) => s.dataset.usermodsExt && getComputedStyle(s).backgroundImage.includes('data:image/svg+xml') && !s.querySelector('path').checkVisibility()); const row = (n) => [...document.querySelectorAll('tr.react-directory-row')].find((r) => r.querySelector('a[title]')?.title === n && r.checkVisibility()); const ext = (n) => row(n)?.querySelector('svg.octicon-file[data-usermods-ext]')?.dataset.usermodsExt; return badged.length >= 10 && ext('README.md') === 'md' && ext('babel.config.js') === 'js' && ext('package.json') === 'npm'; })()",
+    "intact": "(() => { const rows = [...document.querySelectorAll('tr.react-directory-row')].filter((r) => r.checkVisibility()); const folders = [...document.querySelectorAll('tr.react-directory-row svg.octicon-file-directory-fill')].filter((s) => s.checkVisibility() && !s.dataset.usermodsExt); return rows.length >= 20 && folders.length >= 3 && rows.every((r) => r.querySelector('a[title]')); })()"
+  }
+}

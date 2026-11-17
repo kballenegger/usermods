@@ -1,0 +1,4423 @@
+[
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "hide-ads",
+    "title": "Skip YouTube ads automatically",
+    "question": "How do I make YouTube skip ads automatically?",
+    "queries": [
+      "youtube skip ads automatically",
+      "youtube ad skipper",
+      "youtube ad skip"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/38182",
+        "metric": 132822,
+        "note": "Hide youtube google ad (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/9165",
+        "metric": 94207,
+        "note": "Auto Close YouTube Ads (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/cmedhionkhpnakcndndgjdbohmhepckk",
+        "metric": 11000000,
+        "note": "Adblock for Youtube™ (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/lokpenepehfdekijkebhpnpcjjpngpnd",
+        "metric": 100000,
+        "note": "YouTube Ad Auto-skipper (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20skip%20ads%20automatically",
+        "metric": null,
+        "note": "returns the query; suggestions: youtube skip ads automatically | youtube ad skip auto | youtube tv skip commercials automatically | how to make youtube skip ads automatically | automatically skip youtube ads extension"
+      }
+    ],
+    "score": 100,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    "notes": "Adversarial: YouTube actively fights ad blocking, so a script here will break often. Biggest raw demand in the group."
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "return-dislikes",
+    "title": "Show YouTube dislike counts",
+    "question": "How can I see the dislike count on YouTube videos?",
+    "queries": [
+      "youtube dislike count",
+      "return youtube dislike"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/436115",
+        "metric": 39528,
+        "note": "Return YouTube Dislike (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/gebbhagfogifgggkldgodflihgfeippi",
+        "metric": 5000000,
+        "note": "Return YouTube Dislike (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20dislike%20count",
+        "metric": null,
+        "note": "returns the query; suggestions: youtube dislike counter | youtube dislike count | youtube dislike counter extension | youtube dislike counter firefox | youtube dislike count extension"
+      }
+    ],
+    "score": 100,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    "notes": "Needs a fetch to the Return YouTube Dislike API (returnyoutubedislikeapi.com); counts are estimates."
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "hide-recommendations",
+    "title": "Hide YouTube recommendations",
+    "question": "How do I hide recommended videos on YouTube?",
+    "queries": [
+      "hide youtube recommendations",
+      "youtube hide recommendations"
+    ],
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/khncfooichmfjbepaaaebmommgaepoid",
+        "metric": 1000000,
+        "note": "Unhook - Remove YouTube Recommended & Shorts (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/lcpclaffcdiihapebmfgcmmplphbkjmd",
+        "metric": 30000,
+        "note": "Block YouTube Feed - Homepage, Sidebar Videos (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/cdhdichomdnlaadbndgmagohccgpejae",
+        "metric": 10000,
+        "note": "RYS — Remove YouTube Suggestions (users, read on the store search page for 'hide youtube recommendations')"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=hide%20youtube%20recommendations",
+        "metric": null,
+        "note": "returns the query; suggestions: hide youtube recommendations | hide youtube recommendations extension | hide youtube recommendations firefox | hide youtube recommendations videos | hide youtube recommendations safari"
+      },
+      {
+        "type": "thread",
+        "url": "https://webapps.stackexchange.com/questions/120799",
+        "metric": null,
+        "note": "Hide all recommended videos and channel on homepage in YouTube"
+      }
+    ],
+    "score": 95,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    "notes": "Watch-page sidebar recommendations show logged out."
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "hide-shorts",
+    "title": "Hide YouTube Shorts",
+    "question": "How do I hide YouTube Shorts on desktop?",
+    "queries": [
+      "hide youtube shorts",
+      "hide shorts"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/441709",
+        "metric": 5363,
+        "note": "Youtube Anti Shorts (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/442329",
+        "metric": 4308,
+        "note": "Remove YouTube Shorts (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/mgngbgbhliflggkamjnpdmegbkidiapm",
+        "metric": 300000,
+        "note": "Remove YouTube Shorts (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/jiaopdjbehhjgokpphdfgmapkobbnmjp",
+        "metric": 400000,
+        "note": "Youtube-shorts block (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/oahiolknhkbpcolgnpljehalnhblolkm",
+        "metric": 100000,
+        "note": "ShortsBlocker - Remove Shorts from YouTube (users, read on the store search page for 'hide youtube shorts')"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=hide%20youtube%20shorts",
+        "metric": null,
+        "note": "returns the query; suggestions: hide youtube shorts | hide youtube shorts extension | hide youtube shorts firefox | hide youtube shorts chrome extension | hide youtube shorts extension firefox"
+      },
+      {
+        "type": "thread",
+        "url": "https://forum.network-inventory-advisor.com/t/how-can-i-disable-youtube-shorts/1800",
+        "metric": null,
+        "note": "How can I disable YouTube Shorts?"
+      },
+      {
+        "type": "thread",
+        "url": "https://forums.anandtech.com/threads/how-to-permanently-block-youtube-shorts.2613470/",
+        "metric": null,
+        "note": "How to Permanently Block Youtube Shorts"
+      },
+      {
+        "type": "thread",
+        "url": "https://www.resetera.com/threads/youtube-responds-as-users-demand-return-of-dislikes-for-shorts.1579708/",
+        "metric": null,
+        "note": "thread reply asking how to hide Shorts on desktop"
+      }
+    ],
+    "score": 94,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/results?search_query=minecraft",
+    "notes": "Shorts shelf shows in logged-out search results and on watch-page sidebars."
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "default-playback-speed",
+    "title": "Set a default YouTube playback speed",
+    "question": "How do I make YouTube always play at 1.5x speed?",
+    "queries": [
+      "youtube default playback speed",
+      "youtube playback speed"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/421670",
+        "metric": 9299,
+        "note": "YouTube More Speeds (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/30506",
+        "metric": 7161,
+        "note": "Video Speed Buttons (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/hdannnflhlmdablckfkjpleikpphncik",
+        "metric": 300000,
+        "note": "Youtube Playback Speed Control (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/bcogakegjkeopbkokbkkaopnclmhhfmp",
+        "metric": 3000,
+        "note": "YouTube Default Playback Speed (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20default%20playback%20speed",
+        "metric": null,
+        "note": "returns the query; suggestions: youtube default playback speed | youtube default playback speed firefox | youtube default playback speed extension | youtube default playback speed android | youtube default playback speed change"
+      },
+      {
+        "type": "thread",
+        "url": "https://webapps.stackexchange.com/questions/9948",
+        "metric": null,
+        "note": "Speed up YouTube Playback?"
+      },
+      {
+        "type": "thread",
+        "url": "https://news.ycombinator.com/item?id=37713316",
+        "metric": null,
+        "note": "Ask HN: Automatic YouTube Playback Speed Adjustment Based on Language"
+      }
+    ],
+    "score": 92,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    "notes": ""
+  },
+  {
+    "site": "discord",
+    "siteName": "Discord",
+    "domains": [
+      "discord.com"
+    ],
+    "category": "social",
+    "task": "bulk-delete-messages",
+    "title": "Delete all your Discord messages",
+    "question": "How do I delete all my messages in a Discord DM or channel?",
+    "queries": [
+      "discord delete all messages",
+      "undiscord"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/406540",
+        "metric": 582551,
+        "note": "Undiscord (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/plhdclenpaecffbcefjmpkkbdpkmhhbj",
+        "metric": 100000,
+        "note": "Discrub - Discord Message Manager (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/gkifnediclnjlbaekhnkcnefhppcjepa",
+        "metric": 40000,
+        "note": "UnDiscord - Messages Deleter (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=discord%20delete%20all%20messages",
+        "metric": null,
+        "note": "returns the query; suggestions: discord delete all messages from user in dm | discord delete all messages | discord delete all messages from user in dm on mobile | discord delete all messages from user | discord delete all messages in dm"
+      }
+    ],
+    "score": 91,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Undiscord-style automation against Discord's API with the user's own session; against Discord ToS for self-bots."
+  },
+  {
+    "site": "x",
+    "siteName": "X (Twitter)",
+    "domains": [
+      "x.com",
+      "twitter.com"
+    ],
+    "category": "social",
+    "task": "hide-who-to-follow",
+    "title": "Hide 'Who to follow' on X",
+    "question": "How do I remove Who to follow suggestions on X (Twitter)?",
+    "queries": [
+      "hide who to follow twitter",
+      "twitter who to follow"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/387773",
+        "metric": 14871,
+        "note": "Control Panel for Twitter (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/kpmjjdhbcfebfjgdnpjagcndoelnidfj",
+        "metric": 200000,
+        "note": "Control Panel for Twitter (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=hide%20who%20to%20follow%20twitter",
+        "metric": null,
+        "note": "returns the query; suggestions: hide who to follow twitter | remove who to follow twitter | hide who you follow twitter | remove who to follow suggestions twitter | how to hide who i'm following on twitter"
+      },
+      {
+        "type": "thread",
+        "url": "https://webapps.stackexchange.com/questions/143810",
+        "metric": null,
+        "note": "Hide \"What's Happening\" and \"Who To Follow\""
+      },
+      {
+        "type": "thread",
+        "url": "https://webapps.stackexchange.com/questions/5516",
+        "metric": null,
+        "note": "How to turn off Twitter's Suggestions for you / Who(m) to follow?"
+      }
+    ],
+    "score": 90,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Evidence numbers are from the multi-feature Control Panel for Twitter."
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "hide-home-feed",
+    "title": "Hide the YouTube home feed",
+    "question": "How do I hide the recommended videos on the YouTube home page?",
+    "queries": [
+      "hide youtube home page recommendations",
+      "hide youtube home feed",
+      "youtube hide home feed"
+    ],
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/lcpclaffcdiihapebmfgcmmplphbkjmd",
+        "metric": 30000,
+        "note": "Block YouTube Feed - Homepage, Sidebar Videos (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/khncfooichmfjbepaaaebmommgaepoid",
+        "metric": 1000000,
+        "note": "Unhook - Remove YouTube Recommended & Shorts (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=hide%20youtube%20home%20page%20recommendations",
+        "metric": null,
+        "note": "does not return the exact query; suggestions: "
+      }
+    ],
+    "score": 90,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/",
+    "notes": "Logged out with no watch history YouTube may show an empty home page; test may need Browserbase or a session."
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "resize-player",
+    "title": "Make the YouTube player fill the window",
+    "question": "How do I make the YouTube player wider without full screen?",
+    "queries": [
+      "youtube theater mode full width",
+      "youtube wide player",
+      "youtube resize player"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/811",
+        "metric": 18636,
+        "note": "Resize YT To Window Size (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/10523",
+        "metric": 5739,
+        "note": "YouTube - Always Theater Mode (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/dgognhgbpdoeidccnbfhohblklhbbomh",
+        "metric": 20000,
+        "note": "Theater Mode for YouTube™ (large player view) (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/ponfpcnoihfmfllpaingbgckeeldkhle",
+        "metric": 1000000,
+        "note": "Enhancer for YouTube™ (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20theater%20mode%20full%20width",
+        "metric": null,
+        "note": "does not return the exact query; suggestions: "
+      }
+    ],
+    "score": 90,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    "notes": "Enhancer for YouTube is multi-feature; player resizing is one of its main features."
+  },
+  {
+    "site": "facebook",
+    "siteName": "Facebook",
+    "domains": [
+      "facebook.com",
+      "www.facebook.com"
+    ],
+    "category": "social",
+    "task": "hide-feed",
+    "title": "Hide the Facebook news feed",
+    "question": "How do I hide the Facebook news feed?",
+    "queries": [
+      "facebook hide news feed",
+      "facebook news feed eradicator",
+      "facebook feed"
+    ],
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/fjcldmjmjhkklehbacihaiopjklihlgg",
+        "metric": 200000,
+        "note": "News Feed Eradicator (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=facebook%20hide%20news%20feed",
+        "metric": null,
+        "note": "returns the query; suggestions: facebook hide news feed | facebook disable news feed | facebook hide stories from news feed | facebook hide friends posts from news feed"
+      }
+    ],
+    "score": 85,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": ""
+  },
+  {
+    "site": "facebook",
+    "siteName": "Facebook",
+    "domains": [
+      "facebook.com",
+      "www.facebook.com"
+    ],
+    "category": "social",
+    "task": "hide-suggested-posts",
+    "title": "Hide suggested posts on Facebook",
+    "question": "How do I hide suggested posts in my Facebook feed?",
+    "queries": [
+      "facebook hide suggested posts",
+      "facebook suggested"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/5154",
+        "metric": 6242,
+        "note": "Hide Recommendations on Facebook (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/nmkinhboiljjkhaknpaeaicmdjhagpep",
+        "metric": 100000,
+        "note": "Fluff Busting Purity (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=facebook%20hide%20suggested%20posts",
+        "metric": null,
+        "note": "returns the query; suggestions: facebook hide suggested posts | facebook hide suggested posts extension | facebook turn off suggested posts | facebook turn off suggested posts notification | facebook hide sponsored posts"
+      },
+      {
+        "type": "thread",
+        "url": "https://webapps.stackexchange.com/questions/173657",
+        "metric": null,
+        "note": "How to remove suggested pages from Facebook feed"
+      },
+      {
+        "type": "thread",
+        "url": "https://webapps.stackexchange.com/questions/54836",
+        "metric": null,
+        "note": "How to hide suggested groups in Facebook?"
+      }
+    ],
+    "score": 85,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Fluff Busting Purity is multi-feature."
+  },
+  {
+    "site": "x",
+    "siteName": "X (Twitter)",
+    "domains": [
+      "x.com",
+      "twitter.com"
+    ],
+    "category": "social",
+    "task": "hide-for-you",
+    "title": "Make Following the default tab on X",
+    "question": "How do I make X (Twitter) open on the Following tab instead of For You?",
+    "queries": [
+      "twitter default to following tab",
+      "twitter following tab default",
+      "twitter for you"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/387773",
+        "metric": 14871,
+        "note": "Control Panel for Twitter (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/kpmjjdhbcfebfjgdnpjagcndoelnidfj",
+        "metric": 200000,
+        "note": "Control Panel for Twitter (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/knjkmgpcnbjgbbbbamgmklejjkjfiabb",
+        "metric": 62,
+        "note": "Twitter Following as default (users, read on the store search page for 'twitter following tab default')"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=twitter%20default%20to%20following%20tab",
+        "metric": null,
+        "note": "returns the query; suggestions: twitter default to following tab"
+      }
+    ],
+    "score": 85,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Control Panel for Twitter is multi-feature; defaulting to Following is its headline feature."
+  },
+  {
+    "site": "x",
+    "siteName": "X (Twitter)",
+    "domains": [
+      "x.com",
+      "twitter.com"
+    ],
+    "category": "social",
+    "task": "hide-premium-upsells",
+    "title": "Hide X Premium prompts",
+    "question": "How do I hide X Premium upsells and the Premium button?",
+    "queries": [
+      "hide x premium",
+      "hide twitter premium",
+      "twitter premium"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/387773",
+        "metric": 14871,
+        "note": "Control Panel for Twitter (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/kpmjjdhbcfebfjgdnpjagcndoelnidfj",
+        "metric": 200000,
+        "note": "Control Panel for Twitter (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=hide%20x%20premium",
+        "metric": null,
+        "note": "returns the query; suggestions: hide x premium apk | hide x premium | hide x premium checkmark | remove x premium | can you hide x premium checkmark"
+      }
+    ],
+    "score": 85,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Evidence numbers are from the multi-feature Control Panel for Twitter."
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "force-hd-quality",
+    "title": "Make YouTube always play in HD",
+    "question": "How do I make YouTube always play videos in the highest quality?",
+    "queries": [
+      "youtube always hd",
+      "youtube auto hd quality",
+      "youtube auto hd"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/494",
+        "metric": 52378,
+        "note": "YouTube Auto Buffer & Auto HD (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/23661",
+        "metric": 39996,
+        "note": "Youtube HD (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/fcphghnknhkimeagdglkljinmpbagone",
+        "metric": 200000,
+        "note": "YouTube Auto HD + FPS (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/iaddfgegjgjelgkanamleadckkpnjpjc",
+        "metric": 100000,
+        "note": "Auto Quality for YouTube™ (users, read on the store search page for 'youtube auto hd quality')"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20always%20hd",
+        "metric": null,
+        "note": "returns the query; suggestions: youtube always hd | youtube always hd extension | youtube always highest quality"
+      }
+    ],
+    "score": 85,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    "notes": "Uses the player API (setPlaybackQualityRange); logged out works."
+  },
+  {
+    "site": "twitch",
+    "siteName": "Twitch",
+    "domains": [
+      "twitch.tv",
+      "www.twitch.tv"
+    ],
+    "category": "video",
+    "task": "auto-claim-channel-points",
+    "title": "Claim Twitch channel points automatically",
+    "question": "How do I auto claim channel points on Twitch?",
+    "queries": [
+      "twitch auto claim channel points",
+      "twitch channel points auto claim",
+      "twitch channel points"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/392348",
+        "metric": 45914,
+        "note": "Twitch Auto Channel Points Claimer (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/jdpblpklojajpopllbckephjndibljbc",
+        "metric": 100000,
+        "note": "Twitch Channel Points Auto Clicker (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=twitch%20auto%20claim%20channel%20points",
+        "metric": null,
+        "note": "returns the query; suggestions: twitch auto claim channel points | twitch auto claim channel points extension | twitch auto claim channel points extension firefox | twitch auto claim channel points opera gx | twitch auto claim channel points firefox"
+      }
+    ],
+    "score": 80,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Clicks the bonus chest button; needs a logged-in session to see points."
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "block-channels",
+    "title": "Block channels on YouTube",
+    "question": "How do I block a channel from showing up on YouTube?",
+    "queries": [
+      "block youtube channel",
+      "youtube channel blocker",
+      "youtube block channel"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/11057",
+        "metric": 11293,
+        "note": "Block Youtube Users (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/nfkmalbckemmklibjddenhnofgnfcdfp",
+        "metric": 100000,
+        "note": "Channel Blocker (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/nedcanggplmbbgmlpcjiafgjcpdimpea",
+        "metric": 70000,
+        "note": "YTBlock - Block any content from YouTube™ (users, read on the store search page for 'youtube channel blocker')"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=block%20youtube%20channel",
+        "metric": null,
+        "note": "returns the query; suggestions: block youtube channel | block youtube channel extension | block youtube channels from showing up | block youtube channel on tv | block youtube channel for kids"
+      }
+    ],
+    "score": 80,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/results?search_query=minecraft",
+    "notes": "Script keeps a local channel list and hides matching results."
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "disable-ambient-mode",
+    "title": "Turn off YouTube ambient mode",
+    "question": "How do I disable ambient mode on YouTube desktop?",
+    "queries": [
+      "disable ambient mode youtube",
+      "disable youtube ambient mode",
+      "youtube ambient mode"
+    ],
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/lodcanccmfbpjjpnngindkkmiehimile",
+        "metric": 100000,
+        "note": "Control Panel for YouTube (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=disable%20ambient%20mode%20youtube",
+        "metric": null,
+        "note": "returns the query; suggestions: disable ambient mode youtube | disable ambient mode youtube extension | disable ambient mode youtube permanently | how to disable ambient mode in youtube app | disable ambient mode youtube desktop"
+      }
+    ],
+    "score": 80,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    "notes": "Only multi-feature extensions found (Control Panel for YouTube); dark theme needed for ambient glow."
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "more-videos-per-row",
+    "title": "Show more videos per row on YouTube",
+    "question": "How do I get more videos per row on the YouTube home page?",
+    "queries": [
+      "youtube more videos per row",
+      "youtube videos per row"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/533051",
+        "metric": 1899,
+        "note": "修改YouTube首页布局 (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/kehjfphhkfppnnjhdfhanmehkegdppho",
+        "metric": 100000,
+        "note": "YouTube Row Fixer (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20more%20videos%20per%20row",
+        "metric": null,
+        "note": "returns the query; suggestions: youtube more videos per row | youtube more videos per row extension | youtube more videos per row extension firefox | youtube more videos per row firefox | youtube more videos per row ublock"
+      },
+      {
+        "type": "thread",
+        "url": "https://webapps.stackexchange.com/questions/182369",
+        "metric": null,
+        "note": "Is it possible to return to the old YouTube interface of 4 videos per row?"
+      }
+    ],
+    "score": 80,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/@YouTube/videos",
+    "notes": "Channel video grids use the same rich-grid renderer as home."
+  },
+  {
+    "site": "reddit",
+    "siteName": "Reddit",
+    "domains": [
+      "reddit.com",
+      "www.reddit.com",
+      "old.reddit.com"
+    ],
+    "category": "social",
+    "task": "old-reddit-redirect",
+    "title": "Always open old Reddit",
+    "question": "How do I make Reddit always open old.reddit.com?",
+    "queries": [
+      "old reddit redirect"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/471477",
+        "metric": 6235,
+        "note": "Reddit Old Redirect 🔙 (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/377047",
+        "metric": 2424,
+        "note": "Old Reddit Redirect (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/dneaehbmnbhcippjikoajpoabadpodje",
+        "metric": 80000,
+        "note": "Old Reddit Redirect (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=old%20reddit%20redirect",
+        "metric": null,
+        "note": "returns the query; suggestions: old reddit redirect | old reddit redirect firefox | old reddit redirect extension | old reddit redirect chrome | old reddit redirect permissions"
+      }
+    ],
+    "score": 79,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.reddit.com/r/AskReddit/",
+    "notes": ""
+  },
+  {
+    "site": "pinterest",
+    "siteName": "Pinterest",
+    "domains": [
+      "pinterest.com",
+      "www.pinterest.com"
+    ],
+    "category": "social",
+    "task": "remove-login-popup",
+    "title": "Remove Pinterest's login popup",
+    "question": "How do I browse Pinterest without the login popup?",
+    "queries": [
+      "pinterest without login",
+      "pinterest login"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/438053",
+        "metric": 75918,
+        "note": "Browse your interests without registration (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/21468",
+        "metric": 5926,
+        "note": "Pinterest registration popup killer (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/382612",
+        "metric": 4895,
+        "note": "Pinterest with no registration modal popup (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=pinterest%20without%20login",
+        "metric": null,
+        "note": "returns the query; suggestions: pinterest without login | pinterest without login free | pinterest without login or sign up | pinterest without login reddit | pinterest without login android"
+      }
+    ],
+    "score": 78,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.pinterest.com/ideas/",
+    "notes": ""
+  },
+  {
+    "site": "netflix",
+    "siteName": "Netflix",
+    "domains": [
+      "netflix.com",
+      "www.netflix.com"
+    ],
+    "category": "video",
+    "task": "show-imdb-ratings",
+    "title": "Show IMDb ratings on Netflix",
+    "question": "How can I see IMDb ratings on Netflix?",
+    "queries": [
+      "netflix imdb ratings",
+      "netflix imdb"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/2271",
+        "metric": 2513,
+        "note": "Netflix Ratings (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/389629",
+        "metric": 1610,
+        "note": "Netflix display IMDb ratings (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/lpgajkhkagnpdjklmpgjeplmgffnhhjj",
+        "metric": 50000,
+        "note": "Trim: IMDB Rating on Netflix, Prime & Disney+ (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=netflix%20imdb%20ratings",
+        "metric": null,
+        "note": "returns the query; suggestions: netflix imdb ratings | netflix imdb ratings extension | netflix imdb rating above 8 movies | netflix imdb rating above 8 | netflix imdb rating movies"
+      }
+    ],
+    "score": 75,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Needs an external ratings source (OMDb API key or similar) via fetch; check whether the script can work without a key."
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "disable-autoplay",
+    "title": "Turn off YouTube autoplay",
+    "question": "How do I stop YouTube from autoplaying the next video?",
+    "queries": [
+      "disable autoplay youtube",
+      "disable youtube autoplay",
+      "youtube autoplay"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/399862",
+        "metric": 10544,
+        "note": "Kill YouTube Channel Video Autoplay (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/7893",
+        "metric": 5007,
+        "note": "remove youtube autoplay (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/dinkeiniijmpjehejhedbciaedblhnnk",
+        "metric": 20000,
+        "note": "Disable Autoplay for YouTube™ (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/bhnhbmjfaanopkalgkjoiemhekdnhanh",
+        "metric": 9000,
+        "note": "Stop AutoPlay Next for YouTube™ (users, read on the store search page for 'disable youtube autoplay')"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=disable%20autoplay%20youtube",
+        "metric": null,
+        "note": "returns the query; suggestions: disable autoplay youtube | disable autoplay youtube app | disable autoplay youtube music | disable autoplay youtube playlist | disable autoplay youtube extension"
+      },
+      {
+        "type": "thread",
+        "url": "https://webapps.stackexchange.com/questions/136658",
+        "metric": null,
+        "note": "How do I permanently disable youtube autoplay feature?"
+      },
+      {
+        "type": "thread",
+        "url": "https://webapps.stackexchange.com/questions/75150",
+        "metric": null,
+        "note": "Prevent YouTube autoplay"
+      },
+      {
+        "type": "thread",
+        "url": "https://webapps.stackexchange.com/questions/28297",
+        "metric": null,
+        "note": "How do I disable autoplay on YouTube?"
+      }
+    ],
+    "score": 75,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    "notes": "Logged-out autoplay toggle resets per session, which is the complaint."
+  },
+  {
+    "site": "instagram",
+    "siteName": "Instagram",
+    "domains": [
+      "instagram.com",
+      "www.instagram.com"
+    ],
+    "category": "social",
+    "task": "hide-explore",
+    "title": "Hide Explore on Instagram",
+    "question": "How do I remove the Explore page on Instagram web?",
+    "queries": [
+      "instagram hide explore",
+      "instagram explore"
+    ],
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/igbheapdmolhhmmklmkfjjjncmhihfjh",
+        "metric": 40000,
+        "note": "Antigram - Explore & Reels Blocker (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=instagram%20hide%20explore",
+        "metric": null,
+        "note": "returns the query; suggestions: instagram hide explore page | instagram remove explore page | instagram remove explore | instagram remove explore suggestions | instagram remove explore page reddit"
+      }
+    ],
+    "score": 74,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": ""
+  },
+  {
+    "site": "instagram",
+    "siteName": "Instagram",
+    "domains": [
+      "instagram.com",
+      "www.instagram.com"
+    ],
+    "category": "social",
+    "task": "hide-reels",
+    "title": "Hide Reels on Instagram",
+    "question": "How do I hide Reels on Instagram web?",
+    "queries": [
+      "instagram hide reels",
+      "instagram reels"
+    ],
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/igbheapdmolhhmmklmkfjjjncmhihfjh",
+        "metric": 40000,
+        "note": "Antigram - Explore & Reels Blocker (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/dbbopjndlaginbghfoibbndhlbpdpapd",
+        "metric": 10000,
+        "note": "IGPlus - Hide Instagram Reels, Explore Page (users, read on the store search page for 'instagram hide reels')"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=instagram%20hide%20reels",
+        "metric": null,
+        "note": "returns the query; suggestions: instagram hide reels | instagram hide reels from grid | instagram hide reels from profile | instagram hide reels likes | instagram hide reels views"
+      }
+    ],
+    "score": 74,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": ""
+  },
+  {
+    "site": "twitch",
+    "siteName": "Twitch",
+    "domains": [
+      "twitch.tv",
+      "www.twitch.tv"
+    ],
+    "category": "video",
+    "task": "disable-quality-downscale",
+    "title": "Stop Twitch lowering stream quality",
+    "question": "How do I stop Twitch from lowering the video quality when the tab is in the background?",
+    "queries": [
+      "twitch keeps lowering quality",
+      "twitch quality",
+      "twitch downscale"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/383093",
+        "metric": 34400,
+        "note": "Twitch - Disable automatic video downscale (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/khmgdjbkacbgpcaoenlibdpokgelffkg",
+        "metric": 3000,
+        "note": "Twitch.tv True Quality (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=twitch%20keeps%20lowering%20quality",
+        "metric": null,
+        "note": "returns the query; suggestions: twitch keeps lowering quality | twitch keeps reducing quality | twitch keeps going low quality | why does twitch keep lowering quality | how to stop twitch from changing quality"
+      }
+    ],
+    "score": 73,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.twitch.tv/directory",
+    "notes": "Twitch drops to low quality when the tab is hidden; script spoofs document.hidden/visibilityState."
+  },
+  {
+    "site": "instagram",
+    "siteName": "Instagram",
+    "domains": [
+      "instagram.com",
+      "www.instagram.com"
+    ],
+    "category": "social",
+    "task": "video-controls",
+    "title": "Add video controls to Instagram",
+    "question": "How do I get a progress bar and seek controls on Instagram videos?",
+    "queries": [
+      "instagram video progress bar",
+      "instagram video controls",
+      "instagram video"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/367667",
+        "metric": 2434,
+        "note": "Add Instagram Video Progressbar (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/537876",
+        "metric": 567,
+        "note": "Instagram Video Controls with Persistent UI, Volume, Speed, Boost, Ad Blocker & Downloader (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/ijgmchfimkocepiapjeoehcicfnhhchp",
+        "metric": 30000,
+        "note": "Better Videos for Instagram: Playback & Volume (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=instagram%20video%20progress%20bar",
+        "metric": null,
+        "note": "returns the query; suggestions: instagram video progress bar | instagram video progress bar extension | instagram video progress bar missing | instagram video progress bar firefox | instagram video no progress bar"
+      }
+    ],
+    "score": 72,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.instagram.com/nasa/reels/",
+    "notes": "Logged-out reel pages may hit the login wall."
+  },
+  {
+    "site": "reddit",
+    "siteName": "Reddit",
+    "domains": [
+      "reddit.com",
+      "www.reddit.com",
+      "old.reddit.com"
+    ],
+    "category": "social",
+    "task": "remove-login-popup",
+    "title": "Remove Reddit's login popup",
+    "question": "How do I get rid of the Reddit login popup without an account?",
+    "queries": [
+      "reddit login popup",
+      "reddit login"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/463802",
+        "metric": 14325,
+        "note": "Remove Reddit Login Requirement (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=reddit%20login%20popup",
+        "metric": null,
+        "note": "returns the query; suggestions: reddit login popup | reddit login popup block | reddit login popup won't go away | reddit login popup remove | reddit login popup disable"
+      },
+      {
+        "type": "thread",
+        "url": "https://news.ycombinator.com/item?id=49289942",
+        "metric": null,
+        "note": "Ask HN: New Reddit also requiring login?"
+      },
+      {
+        "type": "thread",
+        "url": "https://news.ycombinator.com/item?id=35753527",
+        "metric": null,
+        "note": "Ask HN: Why does Reddit force you login to disable auto play?"
+      }
+    ],
+    "score": 72,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.reddit.com/r/AskReddit/",
+    "notes": "Popup appears after scrolling or opening a few posts."
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "auto-continue-watching",
+    "title": "Skip YouTube's 'Continue watching?' pause",
+    "question": "How do I stop YouTube asking 'Video paused. Continue watching?'",
+    "queries": [
+      "youtube video paused continue watching",
+      "youtube are you still watching",
+      "youtube continue watching"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/398142",
+        "metric": 11589,
+        "note": "youtube continue play (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/gichhbklgekhbgilgeeioochjppcjamj",
+        "metric": 30000,
+        "note": "NonStop Youtube - Auto Continue Watching (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20video%20paused%20continue%20watching",
+        "metric": null,
+        "note": "returns the query; suggestions: youtube video paused continue watching disable | youtube video paused continue watching | youtube video paused continue watching after every video | youtube video paused continue watching disable android | youtube video paused continue watching disable extension"
+      },
+      {
+        "type": "thread",
+        "url": "https://news.ycombinator.com/item?id=25243562",
+        "metric": null,
+        "note": "Ask HN: Continue Watching for YouTube?"
+      }
+    ],
+    "score": 72,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    "notes": "Dialog appears after inactivity; check needs to inject the dialog or wait."
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "hide-end-screens",
+    "title": "Remove YouTube end screen cards",
+    "question": "How do I remove the end screen cards on YouTube videos?",
+    "queries": [
+      "remove youtube end screen",
+      "youtube end screen"
+    ],
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/mfengiknfnndchbhjmgjjffjndklkpcm",
+        "metric": 30000,
+        "note": "Remove YouTube End Cards & End Screen Videos (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/jinenhpepbpkepablpjjchejlabbpken",
+        "metric": 10000,
+        "note": "Hide Labels and End Cards on Youtube (users, read on the store search page for 'remove youtube end screen')"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=remove%20youtube%20end%20screen",
+        "metric": null,
+        "note": "returns the query; suggestions: remove youtube end screen | youtube remove end screen cards | disable youtube end screen overlay | disable youtube end screen | youtube+disable end screen cards"
+      }
+    ],
+    "score": 72,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    "notes": "Seek near the end of a video that has end cards to test."
+  },
+  {
+    "site": "discord",
+    "siteName": "Discord",
+    "domains": [
+      "discord.com"
+    ],
+    "category": "social",
+    "task": "toggle-channel-list",
+    "title": "Hide the Discord channel list",
+    "question": "How do I hide the channel list on Discord?",
+    "queries": [
+      "discord hide channel list",
+      "discord channel list"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/380613",
+        "metric": 649,
+        "note": "Discord Toggle Channels List (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/419227",
+        "metric": 409,
+        "note": "Hide Discord sidebars (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/kaaohmdnmbdagpnenakakpkinddjmenp",
+        "metric": 20000,
+        "note": "Hide Discord Sidebar (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=discord%20hide%20channel%20list",
+        "metric": null,
+        "note": "returns the query; suggestions: discord hide channel list | discord remove channel list | discord hide server channel list | discord app hide channel list | discord hide member list in channel"
+      }
+    ],
+    "score": 70,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": ""
+  },
+  {
+    "site": "reddit",
+    "siteName": "Reddit",
+    "domains": [
+      "reddit.com",
+      "www.reddit.com",
+      "old.reddit.com"
+    ],
+    "category": "social",
+    "task": "hide-promoted",
+    "title": "Hide promoted posts on Reddit",
+    "question": "How do I hide promoted posts on Reddit?",
+    "queries": [
+      "reddit hide promoted posts",
+      "reddit promoted"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/382572",
+        "metric": 1934,
+        "note": "Hide Reddit's promoted posts (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/405756",
+        "metric": 1128,
+        "note": "Reddit Promotion Blocker (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/mmnhjecbajmgkapcinkhdnjabclcnfpg",
+        "metric": 20000,
+        "note": "Reddit Promoted Ad Blocker (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=reddit%20hide%20promoted%20posts",
+        "metric": null,
+        "note": "returns the query; suggestions: reddit hide promoted posts | reddit remove promoted posts | reddit block promoted posts | reddit hide sponsored posts | block reddit promoted posts mobile"
+      }
+    ],
+    "score": 70,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.reddit.com/r/AskReddit/",
+    "notes": ""
+  },
+  {
+    "site": "x",
+    "siteName": "X (Twitter)",
+    "domains": [
+      "x.com",
+      "twitter.com"
+    ],
+    "category": "social",
+    "task": "original-images",
+    "title": "Open full-size original images on X",
+    "question": "How do I view the original full-size image on X (Twitter)?",
+    "queries": [
+      "twitter view original image",
+      "twitter original image"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/392845",
+        "metric": 1129,
+        "note": "Twitter Original Image Link (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/387918",
+        "metric": 16704,
+        "note": "Twitter image viewing enhancement (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/abhahfjacodgcpjmnofopebllmgmdlef",
+        "metric": 1000,
+        "note": "X Original Images (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=twitter%20view%20original%20image",
+        "metric": null,
+        "note": "returns the query; suggestions: twitter view original image | twitter view original images extension | twitter view original images chrome | twitter view original images firefox | twitter image specs"
+      }
+    ],
+    "score": 68,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://x.com/NASA",
+    "notes": "Rewrite pbs.twimg.com name= param to orig. Logged-out profile view is limited and varies."
+  },
+  {
+    "site": "facebook",
+    "siteName": "Facebook",
+    "domains": [
+      "facebook.com",
+      "www.facebook.com"
+    ],
+    "category": "social",
+    "task": "hide-sponsored",
+    "title": "Hide sponsored posts on Facebook",
+    "question": "How do I hide sponsored posts on Facebook?",
+    "queries": [
+      "facebook hide sponsored posts",
+      "facebook sponsored"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/431970",
+        "metric": 13520,
+        "note": "FB - Clean my feeds (5.02) (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/22380",
+        "metric": 4022,
+        "note": "Hide Facebook Ads (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/njcnnfelhkehnacoabhefefkbmloakkf",
+        "metric": 10000,
+        "note": "F.Block Sponsored (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=facebook%20hide%20sponsored%20posts",
+        "metric": null,
+        "note": "returns the query; suggestions: facebook hide sponsored posts | facebook hide suggested posts | facebook block sponsored posts | facebook remove sponsored posts | facebook hide sponsored ads"
+      },
+      {
+        "type": "thread",
+        "url": "https://webapps.stackexchange.com/questions/125037",
+        "metric": null,
+        "note": "Is it possible to block Facebook's sponsored ads using uBlock?"
+      }
+    ],
+    "score": 67,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Facebook obfuscates the 'Sponsored' label; detection is the hard part."
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "hide-sign-in-prompt",
+    "title": "Dismiss YouTube's sign-in prompt",
+    "question": "How do I get rid of the YouTube sign in popup?",
+    "queries": [
+      "youtube sign in popup",
+      "youtube dismiss sign-in"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/412178",
+        "metric": 13596,
+        "note": "Youtube - dismiss sign-in (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20sign%20in%20popup",
+        "metric": null,
+        "note": "returns the query; suggestions: youtube sign in popup | youtube sign in on tv popup | youtube sign in tv pop up | youtube please sign in pop up | how to get rid of youtube sign in popup"
+      }
+    ],
+    "score": 67,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    "notes": "Logged-out only by definition."
+  },
+  {
+    "site": "netflix",
+    "siteName": "Netflix",
+    "domains": [
+      "netflix.com",
+      "www.netflix.com"
+    ],
+    "category": "video",
+    "task": "auto-next-episode",
+    "title": "Play the next Netflix episode right away",
+    "question": "How do I make Netflix start the next episode automatically?",
+    "queries": [
+      "netflix auto play next episode",
+      "netflix auto next episode",
+      "netflix marathon"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/420475",
+        "metric": 11342,
+        "note": "Netflix Marathon (Pausable) (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/26108",
+        "metric": 413,
+        "note": "Netflix play next episode (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=netflix%20auto%20play%20next%20episode",
+        "metric": null,
+        "note": "returns the query; suggestions: netflix auto play next episode | netflix auto start next episode | netflix stop auto play next episode | netflix won't autoplay next episode | can netflix automatically play next episode"
+      }
+    ],
+    "score": 66,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Also covers dismissing 'Are you still watching?'."
+  },
+  {
+    "site": "pinterest",
+    "siteName": "Pinterest",
+    "domains": [
+      "pinterest.com",
+      "www.pinterest.com"
+    ],
+    "category": "social",
+    "task": "open-original-image",
+    "title": "Open the original image on Pinterest",
+    "question": "How do I view the original full-size image on Pinterest?",
+    "queries": [
+      "pinterest original image",
+      "pinterest original"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/370410",
+        "metric": 10273,
+        "note": "Pinterest - Open Original Image (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/387050",
+        "metric": 2223,
+        "note": "Pinterest - Save Original Image (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=pinterest%20original%20image",
+        "metric": null,
+        "note": "returns the query; suggestions: pinterest original image | pinterest original image extension | pinterest original image download | pinterest original image finder | pinterest real images"
+      }
+    ],
+    "score": 65,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.pinterest.com/ideas/",
+    "notes": "Rewrite i.pinimg.com/<size>/ to /originals/."
+  },
+  {
+    "site": "reddit",
+    "siteName": "Reddit",
+    "domains": [
+      "reddit.com",
+      "www.reddit.com",
+      "old.reddit.com"
+    ],
+    "category": "social",
+    "task": "delete-comment-history",
+    "title": "Delete all your Reddit comments",
+    "question": "How do I delete all my Reddit comments at once?",
+    "queries": [
+      "reddit delete all comments",
+      "reddit delete comments"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/1870",
+        "metric": 7580,
+        "note": "delete all reddit comments (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/nbfdoajmaaohkohdnbpjakamhcaaleco",
+        "metric": 10000,
+        "note": "Bulk Delete Reddits Posts & Comments Extension (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=reddit%20delete%20all%20comments",
+        "metric": null,
+        "note": "returns the query; suggestions: reddit delete all comments | reddit delete all comments and posts | reddit delete all comments at once | reddit delete all comments in a sub | reddit delete all comments extension"
+      }
+    ],
+    "score": 65,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Automation on the user's own profile page; slow, must respect rate limits."
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "hide-comments",
+    "title": "Hide YouTube comments",
+    "question": "How do I hide the comments on YouTube videos?",
+    "queries": [
+      "hide youtube comments",
+      "youtube hide comments"
+    ],
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/bnbnjkiglooccambmgnmbepaofnjjjpl",
+        "metric": 10000,
+        "note": "Turn Off YouTube Comments & Live Chat (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/bgeoifdgcnafonfffcmlcjbeldhocnpd",
+        "metric": 1000,
+        "note": "Hide YouTube Comments (users, read on the store search page for 'hide youtube comments')"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=hide%20youtube%20comments",
+        "metric": null,
+        "note": "returns the query; suggestions: hide youtube comments | hide youtube comments extension | hide youtube comments firefox | hide youtube comments extension firefox | hide youtube comments chrome extension"
+      },
+      {
+        "type": "thread",
+        "url": "https://webapps.stackexchange.com/questions/41340",
+        "metric": null,
+        "note": "How do you show/hide comments on videos?"
+      }
+    ],
+    "score": 65,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    "notes": ""
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "hide-live-chat",
+    "title": "Hide YouTube live chat",
+    "question": "How do I hide live chat on YouTube streams?",
+    "queries": [
+      "hide youtube live chat",
+      "youtube hide chat"
+    ],
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/bnbnjkiglooccambmgnmbepaofnjjjpl",
+        "metric": 10000,
+        "note": "Turn Off YouTube Comments & Live Chat (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=hide%20youtube%20live%20chat",
+        "metric": null,
+        "note": "returns the query; suggestions: hide youtube live chat | hide youtube live chat extension | turn off youtube live chat | remove youtube live chat | youtube hide live chat by default"
+      },
+      {
+        "type": "thread",
+        "url": "https://webapps.stackexchange.com/questions/122414",
+        "metric": null,
+        "note": "Can I permanently hide the YouTube chat window?"
+      }
+    ],
+    "score": 65,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/@LofiGirl/live",
+    "notes": ""
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "redirect-shorts",
+    "title": "Open YouTube Shorts in the normal player",
+    "question": "How do I watch YouTube Shorts in the regular video player?",
+    "queries": [
+      "youtube shorts redirect to normal video",
+      "youtube shorts to normal video",
+      "youtube shorts redirect"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/439993",
+        "metric": 20311,
+        "note": "Youtube shorts redirect (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/504848",
+        "metric": 4071,
+        "note": "YouTube Shorts To Normal Video (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/cmhmepchidgajcngdkpdchbdboheihgi",
+        "metric": 10000,
+        "note": "Shorts to Normal player (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20shorts%20redirect%20to%20normal%20video",
+        "metric": null,
+        "note": "does not return the exact query; suggestions: "
+      }
+    ],
+    "score": 65,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/shorts/tPEE9ZwTmy0",
+    "notes": "Rewrite /shorts/<id> to /watch?v=<id>."
+  },
+  {
+    "site": "tiktok",
+    "siteName": "TikTok",
+    "domains": [
+      "tiktok.com",
+      "www.tiktok.com"
+    ],
+    "category": "video",
+    "task": "auto-scroll",
+    "title": "Auto-scroll to the next TikTok",
+    "question": "How do I make TikTok web go to the next video automatically?",
+    "queries": [
+      "tiktok auto scroll",
+      "tiktok autoscroll"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/408321",
+        "metric": 2124,
+        "note": "TikTok Autoscroll (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/nhkmnjhhbdfjjjgmconlgohfneeghilm",
+        "metric": 8000,
+        "note": "Auto Scroller for Reels, Shorts & TikTok (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=tiktok%20auto%20scroll",
+        "metric": null,
+        "note": "returns the query; suggestions: tiktok auto scroll | tiktok auto scroll iphone | tiktok auto scroll extension | tiktok auto scroll on someone's profile | tiktok auto scroll android"
+      }
+    ],
+    "score": 64,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.tiktok.com/foryou",
+    "notes": ""
+  },
+  {
+    "site": "instagram",
+    "siteName": "Instagram",
+    "domains": [
+      "instagram.com",
+      "www.instagram.com"
+    ],
+    "category": "social",
+    "task": "remove-login-popup",
+    "title": "Remove Instagram's login popup",
+    "question": "How do I view Instagram without the login popup?",
+    "queries": [
+      "instagram without login",
+      "instagram login"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/414656",
+        "metric": 7458,
+        "note": "Browse Instagram Without Logging In (Removes login/register Pop-up and opens up links) (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/414034",
+        "metric": 6365,
+        "note": "View Instagram Without Login (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/535373",
+        "metric": 850,
+        "note": "Remove Instagram login popup (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=instagram%20without%20login",
+        "metric": null,
+        "note": "returns the query; suggestions: instagram without login | instagram without login open | instagram without login reels | instagram without login viewer | instagram without login website"
+      }
+    ],
+    "score": 63,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.instagram.com/nasa/",
+    "notes": ""
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "hide-watched-videos",
+    "title": "Hide watched videos on YouTube",
+    "question": "How do I hide videos I've already watched on YouTube?",
+    "queries": [
+      "hide watched videos youtube",
+      "youtube hide watched"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/13040",
+        "metric": 7335,
+        "note": "YouTube: Hide Watched Videos (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/ekcdnnkolgkikkhbbjcabcjdibfbafbl",
+        "metric": 4000,
+        "note": "Hide Youtube Watched Videos (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=hide%20watched%20videos%20youtube",
+        "metric": null,
+        "note": "returns the query; suggestions: hide watched videos youtube | hide watched videos youtube extension | hide watched videos youtube firefox | remove watched videos youtube | remove watched videos youtube extension"
+      }
+    ],
+    "score": 63,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Needs watch history (resume bar) to see an effect."
+  },
+  {
+    "site": "facebook",
+    "siteName": "Facebook",
+    "domains": [
+      "facebook.com",
+      "www.facebook.com"
+    ],
+    "category": "social",
+    "task": "hide-reels",
+    "title": "Hide Reels on Facebook",
+    "question": "How do I remove Reels from my Facebook feed?",
+    "queries": [
+      "facebook hide reels",
+      "facebook reels"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/552339",
+        "metric": 1204,
+        "note": "FB - Clean my feeds (6.5.0) (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/ilebchhcbmejmeakfnmmmhjneobllhpn",
+        "metric": 6000,
+        "note": "Facebook Reels Blocker (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=facebook%20hide%20reels",
+        "metric": null,
+        "note": "returns the query; suggestions: facebook hide reels | facebook hide reels tab | facebook hide reels not working | facebook hide reels from feed | facebook hide reels extension"
+      }
+    ],
+    "score": 62,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": ""
+  },
+  {
+    "site": "instagram",
+    "siteName": "Instagram",
+    "domains": [
+      "instagram.com",
+      "www.instagram.com"
+    ],
+    "category": "social",
+    "task": "open-full-size-image",
+    "title": "Open full-size Instagram images",
+    "question": "How do I view Instagram photos in full size?",
+    "queries": [
+      "instagram full size image",
+      "instagram full size"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/25380",
+        "metric": 2718,
+        "note": "Big Instagram Images (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/396337",
+        "metric": 3430,
+        "note": "Instagram full-size media scroll wall (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/eanpijghoobafibemccmoleollpjhcgg",
+        "metric": 6000,
+        "note": "Full Size Images for IG (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=instagram%20full%20size%20image",
+        "metric": null,
+        "note": "returns the query; suggestions: instagram full size image | instagram full size image downloader | instagram full size image viewer | instagram full size image url | instagram full size image upload"
+      }
+    ],
+    "score": 62,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.instagram.com/nasa/",
+    "notes": ""
+  },
+  {
+    "site": "linkedin",
+    "siteName": "LinkedIn",
+    "domains": [
+      "linkedin.com",
+      "www.linkedin.com"
+    ],
+    "category": "social",
+    "task": "hide-promoted-jobs",
+    "title": "Hide promoted jobs on LinkedIn",
+    "question": "How do I hide promoted job listings on LinkedIn?",
+    "queries": [
+      "linkedin hide promoted jobs",
+      "linkedin promoted jobs"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/451712",
+        "metric": 124,
+        "note": "Hide promoted results in jobs search (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/529050",
+        "metric": 70,
+        "note": "Remove LinkedIn Promoted Jobs (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/agghbaheofcoecndkbflbnggdjcmiaml",
+        "metric": 6000,
+        "note": "Hide n' Seek: Hide Promoted Jobs & Companies (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=linkedin%20hide%20promoted%20jobs",
+        "metric": null,
+        "note": "returns the query; suggestions: linkedin hide promoted jobs | linkedin remove promoted jobs | linkedin block promoted jobs | linkedin remove promoted jobs reddit | linkedin stop seeing promoted jobs"
+      }
+    ],
+    "score": 62,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.linkedin.com/jobs/search?keywords=engineer",
+    "notes": "Guest job search may show fewer promoted listings than logged in."
+  },
+  {
+    "site": "facebook",
+    "siteName": "Facebook",
+    "domains": [
+      "facebook.com",
+      "www.facebook.com"
+    ],
+    "category": "social",
+    "task": "sort-most-recent",
+    "title": "Show Facebook's feed in most recent order",
+    "question": "How do I make Facebook always sort my feed by most recent?",
+    "queries": [
+      "facebook sort by most recent",
+      "facebook most recent feed",
+      "facebook most recent"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/19220",
+        "metric": 2039,
+        "note": "Sort Facebook NewsFeed by Most Recent (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/15261",
+        "metric": 1012,
+        "note": "Facebook Sort Recent NewsFeed by Default (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=facebook%20sort%20by%20most%20recent",
+        "metric": null,
+        "note": "returns the query; suggestions: facebook sort by most recent | facebook sort by most recent in group | facebook order by most recent | facebook sort feed by most recent | facebook sort posts by most recent"
+      },
+      {
+        "type": "thread",
+        "url": "https://webapps.stackexchange.com/questions/14939",
+        "metric": null,
+        "note": "Default to filter by Most Recent on Facebook"
+      },
+      {
+        "type": "thread",
+        "url": "https://webapps.stackexchange.com/questions/50624",
+        "metric": null,
+        "note": "Facebook reverts back to Top Stories even after changing to Most Recent"
+      }
+    ],
+    "score": 60,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Redirect home to /?sk=h_chr."
+  },
+  {
+    "site": "linkedin",
+    "siteName": "LinkedIn",
+    "domains": [
+      "linkedin.com",
+      "www.linkedin.com"
+    ],
+    "category": "social",
+    "task": "hide-feed",
+    "title": "Hide the LinkedIn feed",
+    "question": "How do I hide the LinkedIn news feed?",
+    "queries": [
+      "linkedin hide feed",
+      "linkedin feed blocker",
+      "linkedin feed"
+    ],
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/dijpdmknlincdehpemajfobhfcmjkhof",
+        "metric": 2000,
+        "note": "LinkedIn Feed Blocker (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=linkedin%20hide%20feed",
+        "metric": null,
+        "note": "returns the query; suggestions: linkedin hide feed | linkedin hide feed extension | hide linkedin feed chrome extension | linkedin remove feed | remove linkedin feed extension"
+      },
+      {
+        "type": "thread",
+        "url": "https://webapps.stackexchange.com/questions/142399",
+        "metric": null,
+        "note": "Is there any tool to filter out LinkedIn home feed posts?"
+      },
+      {
+        "type": "thread",
+        "url": "https://webapps.stackexchange.com/questions/89128",
+        "metric": null,
+        "note": "Hide Pulse posts from LinkedIn feed"
+      }
+    ],
+    "score": 60,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": ""
+  },
+  {
+    "site": "linkedin",
+    "siteName": "LinkedIn",
+    "domains": [
+      "linkedin.com",
+      "www.linkedin.com"
+    ],
+    "category": "social",
+    "task": "hide-viewed-jobs",
+    "title": "Hide viewed and applied jobs on LinkedIn",
+    "question": "How do I hide jobs I've already viewed or applied to on LinkedIn?",
+    "queries": [
+      "linkedin hide viewed jobs",
+      "linkedin viewed jobs"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/567795",
+        "metric": 62,
+        "note": "LinkedIn Hide Viewed Jobs (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/jkoegkdeggghnoenfgjoklfkmihkighf",
+        "metric": 5000,
+        "note": "Hide Applied Jobs LinkedIn (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=linkedin%20hide%20viewed%20jobs",
+        "metric": null,
+        "note": "returns the query; suggestions: linkedin hide viewed jobs | linkedin remove viewed jobs | can you hide jobs on linkedin | how to hide view on linkedin | how to hide jobs on linkedin"
+      }
+    ],
+    "score": 60,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "The CWS extension hides applied jobs; GF script hides viewed."
+  },
+  {
+    "site": "pinterest",
+    "siteName": "Pinterest",
+    "domains": [
+      "pinterest.com",
+      "www.pinterest.com"
+    ],
+    "category": "social",
+    "task": "hide-promoted-pins",
+    "title": "Hide promoted pins on Pinterest",
+    "question": "How do I hide promoted pins on Pinterest?",
+    "queries": [
+      "pinterest hide promoted pins",
+      "pinterest hide promoted",
+      "pinterest promoted"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/418205",
+        "metric": 876,
+        "note": "Promoted pins remover (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/19631",
+        "metric": 579,
+        "note": "Pinterest - Remove Picked For You and Sponsored Pins (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/hbfldjieomfelhamhaejfplgkikabanh",
+        "metric": 10000,
+        "note": "Pinterest Ads & Promo Remover (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=pinterest%20hide%20promoted%20pins",
+        "metric": null,
+        "note": "does not return the exact query; suggestions: "
+      }
+    ],
+    "score": 60,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.pinterest.com/ideas/",
+    "notes": "No exact autocomplete hit."
+  },
+  {
+    "site": "x",
+    "siteName": "X (Twitter)",
+    "domains": [
+      "x.com",
+      "twitter.com"
+    ],
+    "category": "social",
+    "task": "hide-promoted",
+    "title": "Hide promoted posts on X",
+    "question": "How do I hide ads and promoted tweets on X?",
+    "queries": [],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/458669",
+        "metric": 978,
+        "note": "Remove ads and promoted tweets on Twitter (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/bapmhjebfdbdpjjfafnkfidijkjlkakf",
+        "metric": 10000,
+        "note": "Hide X.com Ads (users, read on the detail page)"
+      }
+    ],
+    "score": 60,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "No autocomplete query fetched."
+  },
+  {
+    "site": "facebook",
+    "siteName": "Facebook",
+    "domains": [
+      "facebook.com",
+      "www.facebook.com"
+    ],
+    "category": "social",
+    "task": "remove-login-popup",
+    "title": "Remove Facebook's login popup",
+    "question": "How do I browse Facebook pages without the login popup?",
+    "queries": [
+      "facebook login popup",
+      "facebook login"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/548145",
+        "metric": 3755,
+        "note": "Facebook Login Wall Remover (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/37436",
+        "metric": 2121,
+        "note": "Remove Facebook Login Nag (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=facebook%20login%20popup",
+        "metric": null,
+        "note": "returns the query; suggestions: facebook login popup blocker | facebook login popup | facebook login popup remove | facebook login popup ublock | facebook login popup block"
+      }
+    ],
+    "score": 59,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.facebook.com/NASA",
+    "notes": ""
+  },
+  {
+    "site": "reddit",
+    "siteName": "Reddit",
+    "domains": [
+      "reddit.com",
+      "www.reddit.com",
+      "old.reddit.com"
+    ],
+    "category": "social",
+    "task": "expand-threads",
+    "title": "Expand all Reddit comments",
+    "question": "How do I expand all comments on a Reddit thread?",
+    "queries": [
+      "reddit expand all comments",
+      "reddit continue this thread"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/5578",
+        "metric": 4155,
+        "note": "Reddit - Load 'Continue this thread' inline (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/njmimaecgocggclbecipdimilidimlpl",
+        "metric": 4000,
+        "note": "Reddit Comment Collapser (users, read on the store search page for 'reddit expand all comments')"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=reddit%20expand%20all%20comments",
+        "metric": null,
+        "note": "returns the query; suggestions: reddit expand all comments | reddit expand all comments extension | reddit expand all comments by default | reddit show all comments | reddit open all comments"
+      }
+    ],
+    "score": 59,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.reddit.com/r/AskReddit/top/",
+    "notes": "Open any top post with deep threads. CWS evidence is Reddit Comment Collapser (the inverse control), a weak proxy."
+  },
+  {
+    "site": "reddit",
+    "siteName": "Reddit",
+    "domains": [
+      "reddit.com",
+      "www.reddit.com",
+      "old.reddit.com"
+    ],
+    "category": "social",
+    "task": "remove-sidebar",
+    "title": "Hide the Reddit sidebar",
+    "question": "How do I hide the right sidebar on Reddit?",
+    "queries": [
+      "reddit hide sidebar",
+      "reddit sidebar"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/7307",
+        "metric": 1416,
+        "note": "Reddit - Hide sidebar (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/dgllcfdfcgnocdmmglnpbpoalhpdfckg",
+        "metric": 4000,
+        "note": "Distraction Free Reddit (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=reddit%20hide%20sidebar",
+        "metric": null,
+        "note": "returns the query; suggestions: reddit hide sidebar | reddit hide sidebar chrome | reddit hide sidebar right | reddit hide sidebar firefox | reddit hide sidebar extension"
+      }
+    ],
+    "score": 59,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.reddit.com/r/AskReddit/",
+    "notes": "Distraction Free Reddit is multi-feature."
+  },
+  {
+    "site": "reddit",
+    "siteName": "Reddit",
+    "domains": [
+      "reddit.com",
+      "www.reddit.com",
+      "old.reddit.com"
+    ],
+    "category": "social",
+    "task": "unblur-spoilers",
+    "title": "Reveal Reddit spoilers automatically",
+    "question": "How do I unblur spoilers on Reddit?",
+    "queries": [
+      "reddit unblur spoilers",
+      "reddit spoiler"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/416091",
+        "metric": 4160,
+        "note": "Reddit spoiler blur remover (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=reddit%20unblur%20spoilers",
+        "metric": null,
+        "note": "returns the query; suggestions: reddit unblur spoilers | how to unblur an image on reddit | reddit remove spoiler blur"
+      }
+    ],
+    "score": 59,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.reddit.com/r/movies/",
+    "notes": "Spoiler-tagged posts and inline spoilers."
+  },
+  {
+    "site": "reddit",
+    "siteName": "Reddit",
+    "domains": [
+      "reddit.com",
+      "www.reddit.com",
+      "old.reddit.com"
+    ],
+    "category": "social",
+    "task": "highlight-new-comments",
+    "title": "Highlight new Reddit comments",
+    "question": "How do I see which Reddit comments are new since my last visit?",
+    "queries": [
+      "reddit highlight new comments",
+      "reddit new comments"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/1868",
+        "metric": 2986,
+        "note": "Reddit highlight newest comments (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/1522",
+        "metric": 1754,
+        "note": "Reddit New Comment Highlighting (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=reddit%20highlight%20new%20comments",
+        "metric": null,
+        "note": "returns the query; suggestions: reddit highlight new comments | reddit show new comments | reddit enhancement suite highlight new comments | how to highlight a comment on reddit | why are some reddit comments highlighted red"
+      }
+    ],
+    "score": 57,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.reddit.com/r/AskReddit/top/",
+    "notes": "Store last-visit time per thread in localStorage."
+  },
+  {
+    "site": "tiktok",
+    "siteName": "TikTok",
+    "domains": [
+      "tiktok.com",
+      "www.tiktok.com"
+    ],
+    "category": "video",
+    "task": "video-controls",
+    "title": "Add video controls to TikTok web",
+    "question": "How do I get seek and volume controls on TikTok in a browser?",
+    "queries": [
+      "tiktok video controls"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/400793",
+        "metric": 3028,
+        "note": "Tiktok Video Controls (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/375074",
+        "metric": 1483,
+        "note": "Tiktok Web Player Controls (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=tiktok%20video%20controls",
+        "metric": null,
+        "note": "returns the query; suggestions: tiktok video controls | tiktok video controls extension | tiktok video controls firefox | tiktok video player | tiktok video player online"
+      }
+    ],
+    "score": 57,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.tiktok.com/@nasa",
+    "notes": ""
+  },
+  {
+    "site": "x",
+    "siteName": "X (Twitter)",
+    "domains": [
+      "x.com",
+      "twitter.com"
+    ],
+    "category": "social",
+    "task": "hide-retweets",
+    "title": "Hide reposts on X",
+    "question": "How do I hide retweets in my X (Twitter) timeline?",
+    "queries": [
+      "hide retweets twitter",
+      "hide retweets",
+      "twitter retweet"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/384702",
+        "metric": 2995,
+        "note": "Twitter: Hide Retweet (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/529450",
+        "metric": 660,
+        "note": "Hide Reposts on Twitter/X (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/ijdlekbecdkklcfacindbhbcigddfenj",
+        "metric": 1000,
+        "note": "Hide Reposts for X (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=hide%20retweets%20twitter",
+        "metric": null,
+        "note": "returns the query; suggestions: hide retweets twitter | remove retweets twitter | turn off retweets twitter | twitter hide retweets on profile | twitter hide retweets extension"
+      },
+      {
+        "type": "thread",
+        "url": "https://webapps.stackexchange.com/questions/14351",
+        "metric": null,
+        "note": "Turn off Twitter retweets in bulk"
+      }
+    ],
+    "score": 57,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": ""
+  },
+  {
+    "site": "x",
+    "siteName": "X (Twitter)",
+    "domains": [
+      "x.com",
+      "twitter.com"
+    ],
+    "category": "social",
+    "task": "hide-view-counts",
+    "title": "Hide view counts on X",
+    "question": "How do I hide view counts on X (Twitter)?",
+    "queries": [
+      "hide view count twitter",
+      "hide twitter view count",
+      "twitter views"
+    ],
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/mmefeobjcchickbjelledfhagoddcklp",
+        "metric": 1000,
+        "note": "Hide View Count (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/abcocamcgfjfdcpfopgpadihhbjbdcem",
+        "metric": 3000,
+        "note": "Twitter Demetricator (users, read on the store search page for 'hide who to follow twitter')"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=hide%20view%20count%20twitter",
+        "metric": null,
+        "note": "returns the query; suggestions: hide view count twitter | can you hide view count on youtube | how to hide view count on facebook"
+      }
+    ],
+    "score": 57,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": ""
+  },
+  {
+    "site": "instagram",
+    "siteName": "Instagram",
+    "domains": [
+      "instagram.com",
+      "www.instagram.com"
+    ],
+    "category": "social",
+    "task": "dark-mode",
+    "title": "Use dark mode on Instagram web",
+    "question": "How do I turn on dark mode on Instagram in a browser?",
+    "queries": [
+      "instagram dark mode web",
+      "instagram dark mode",
+      "instagram dark"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/389845",
+        "metric": 2423,
+        "note": "Instagram Dark Mode (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/438688",
+        "metric": 933,
+        "note": "Instagram Dark Theme (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=instagram%20dark%20mode%20web",
+        "metric": null,
+        "note": "returns the query; suggestions: instagram dark mode web | instagram dark mode website | instagram dark mode web browser | ig dark mode web | dark theme in instagram web"
+      }
+    ],
+    "score": 56,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.instagram.com/nasa/",
+    "notes": "Instagram web honours the OS theme now; demand is for forcing it."
+  },
+  {
+    "site": "instagram",
+    "siteName": "Instagram",
+    "domains": [
+      "instagram.com",
+      "www.instagram.com"
+    ],
+    "category": "social",
+    "task": "keyboard-shortcuts",
+    "title": "Add keyboard shortcuts to Instagram",
+    "question": "Does Instagram web have keyboard shortcuts?",
+    "queries": [
+      "instagram keyboard shortcuts",
+      "instagram keyboard"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/31638",
+        "metric": 2338,
+        "note": "Instagram Keyboard Shortcuts (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/395616",
+        "metric": 633,
+        "note": "Instagram Keyboard Shortcuts for Power User (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=instagram%20keyboard%20shortcuts",
+        "metric": null,
+        "note": "returns the query; suggestions: instagram keyboard shortcuts | instagram keyboard shortcuts pc | instagram keyboard shortcuts chrome | instagram keyboard shortcuts mac | instagram key shortcuts"
+      }
+    ],
+    "score": 56,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": ""
+  },
+  {
+    "site": "x",
+    "siteName": "X (Twitter)",
+    "domains": [
+      "x.com",
+      "twitter.com"
+    ],
+    "category": "social",
+    "task": "hide-sidebar",
+    "title": "Hide the X sidebar",
+    "question": "How do I hide the right sidebar on X (Twitter)?",
+    "queries": [
+      "hide twitter sidebar",
+      "twitter hide sidebar",
+      "twitter sidebar"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/497647",
+        "metric": 1936,
+        "note": "X/Twitter Clean menu and sidebar (Supports multiple language) (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/bkjfgbniifclpfjdpbjcebndlimfkkeg",
+        "metric": 2000,
+        "note": "Hide X Twitter Elements (users, read on the store search page for 'hide who to follow twitter')"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=hide%20twitter%20sidebar",
+        "metric": null,
+        "note": "returns the query; suggestions: hide twitter sidebar | remove twitter sidebar | hide twitter feed extension | hide twitter feed | how to hide sidebar"
+      }
+    ],
+    "score": 55,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": ""
+  },
+  {
+    "site": "linkedin",
+    "siteName": "LinkedIn",
+    "domains": [
+      "linkedin.com",
+      "www.linkedin.com"
+    ],
+    "category": "social",
+    "task": "hide-promoted",
+    "title": "Hide promoted posts on LinkedIn",
+    "question": "How do I hide promoted posts in my LinkedIn feed?",
+    "queries": [
+      "linkedin hide promoted posts",
+      "linkedin promoted"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/379003",
+        "metric": 1742,
+        "note": "LinkedIn unsponsored (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/386859",
+        "metric": 779,
+        "note": "LinkedInNoPromoted (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=linkedin%20hide%20promoted%20posts",
+        "metric": null,
+        "note": "returns the query; suggestions: linkedin hide promoted posts | linkedin remove promoted posts | linkedin hide promoted jobs | linkedin remove promoted jobs | linkedin block promoted jobs"
+      }
+    ],
+    "score": 54,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": ""
+  },
+  {
+    "site": "x",
+    "siteName": "X (Twitter)",
+    "domains": [
+      "x.com",
+      "twitter.com"
+    ],
+    "category": "social",
+    "task": "media-only",
+    "title": "Show only media posts on X",
+    "question": "How do I filter my X timeline to show only posts with images or video?",
+    "queries": [
+      "twitter media only filter",
+      "twitter media only"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/39130",
+        "metric": 1871,
+        "note": "Twitter media-only filter toggle. (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=twitter%20media%20only%20filter",
+        "metric": null,
+        "note": "returns the query; suggestions: twitter media only filter toggle | how to turn off filter on twitter"
+      }
+    ],
+    "score": 54,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": ""
+  },
+  {
+    "site": "facebook",
+    "siteName": "Facebook",
+    "domains": [
+      "facebook.com",
+      "www.facebook.com"
+    ],
+    "category": "social",
+    "task": "hide-right-sidebar",
+    "title": "Hide the Facebook right sidebar",
+    "question": "How do I hide the right sidebar on Facebook?",
+    "queries": [
+      "facebook hide right sidebar",
+      "facebook hide sidebar",
+      "facebook sidebar"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/23676",
+        "metric": 1509,
+        "note": "hide the right div on facebook app page (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=facebook%20hide%20right%20sidebar",
+        "metric": null,
+        "note": "returns the query; suggestions: facebook hide right sidebar"
+      },
+      {
+        "type": "thread",
+        "url": "https://webapps.stackexchange.com/questions/22724",
+        "metric": null,
+        "note": "How to hide the chat sidebar in Facebook automatically?"
+      }
+    ],
+    "score": 53,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": ""
+  },
+  {
+    "site": "instagram",
+    "siteName": "Instagram",
+    "domains": [
+      "instagram.com",
+      "www.instagram.com"
+    ],
+    "category": "social",
+    "task": "enable-right-click",
+    "title": "Allow right-click on Instagram images",
+    "question": "How do I right-click and save images on Instagram?",
+    "queries": [],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/18295",
+        "metric": 3394,
+        "note": "instagram_allow_saveimage (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/424063",
+        "metric": 1976,
+        "note": "Instagram - Allow right click on images (total installs)"
+      }
+    ],
+    "score": 53,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.instagram.com/nasa/",
+    "notes": "No autocomplete query fetched."
+  },
+  {
+    "site": "netflix",
+    "siteName": "Netflix",
+    "domains": [
+      "netflix.com",
+      "www.netflix.com"
+    ],
+    "category": "video",
+    "task": "disable-autoplay-previews",
+    "title": "Stop Netflix autoplaying previews",
+    "question": "How do I stop Netflix from autoplaying trailers while I browse?",
+    "queries": [
+      "netflix disable autoplay previews",
+      "netflix preview"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/372614",
+        "metric": 737,
+        "note": "Netflix - Disable Auto-Preview (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/371328",
+        "metric": 734,
+        "note": "Mute Netflix Autoplay Trailers (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/18097",
+        "metric": 548,
+        "note": "Netflix Disable Billboard Video (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=netflix%20disable%20autoplay%20previews",
+        "metric": null,
+        "note": "returns the query; suggestions: netflix disable autoplay previews | netflix disable autoplay trailer | netflix turn off autoplay preview on tv | netflix turn off autoplay trailer | netflix stop autoplay trailers"
+      },
+      {
+        "type": "thread",
+        "url": "https://webapps.stackexchange.com/questions/126743",
+        "metric": null,
+        "note": "How to prevent Netflix from showing preview trailers on the overview?"
+      },
+      {
+        "type": "thread",
+        "url": "https://community.radarro.com/threads/how-to-stop-autoplay-on-netflix.148/",
+        "metric": null,
+        "note": "How to Stop Autoplay on Netflix?"
+      }
+    ],
+    "score": 53,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Netflix has a per-profile setting; script covers billboard and hover previews that still play."
+  },
+  {
+    "site": "tiktok",
+    "siteName": "TikTok",
+    "domains": [
+      "tiktok.com",
+      "www.tiktok.com"
+    ],
+    "category": "video",
+    "task": "remove-login-popup",
+    "title": "Remove TikTok's login popup",
+    "question": "How do I watch TikTok in a browser without the login popup?",
+    "queries": [
+      "tiktok without login",
+      "tiktok login popup",
+      "tiktok login"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/487053",
+        "metric": 1386,
+        "note": "Contourner la connexion TikTok (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=tiktok%20without%20login",
+        "metric": null,
+        "note": "returns the query; suggestions: tiktok without login | tiktok without login website | tiktok without login reddit | tiktok without login online | tiktok without login app"
+      }
+    ],
+    "score": 52,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.tiktok.com/@nasa",
+    "notes": ""
+  },
+  {
+    "site": "discord",
+    "siteName": "Discord",
+    "domains": [
+      "discord.com"
+    ],
+    "category": "social",
+    "task": "hide-blocked-messages",
+    "title": "Hide blocked users' messages on Discord",
+    "question": "How do I completely hide messages from blocked users on Discord?",
+    "queries": [
+      "discord hide blocked messages",
+      "discord blocked"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/396059",
+        "metric": 1094,
+        "note": "Hide block messages on discord (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/407896",
+        "metric": 284,
+        "note": "RemoveBlockedMessages (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/ogpfnafglealngcpbnafcpcbolipmjmn",
+        "metric": 987,
+        "note": "Hide Blocked Messages on Discord (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=discord%20hide%20blocked%20messages",
+        "metric": null,
+        "note": "returns the query; suggestions: discord hide blocked messages | discord hide blocked messages plugin | discord hide blocked messages extension | discord hide blocked messages completely | discord hide blocked messages mobile"
+      }
+    ],
+    "score": 51,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": ""
+  },
+  {
+    "site": "netflix",
+    "siteName": "Netflix",
+    "domains": [
+      "netflix.com",
+      "www.netflix.com"
+    ],
+    "category": "video",
+    "task": "auto-select-profile",
+    "title": "Skip the Netflix profile picker",
+    "question": "How do I make Netflix open my profile automatically?",
+    "queries": [],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/28542",
+        "metric": 2623,
+        "note": "Netflix Auto Account Selection (total installs)"
+      }
+    ],
+    "score": 51,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "No autocomplete query fetched."
+  },
+  {
+    "site": "netflix",
+    "siteName": "Netflix",
+    "domains": [
+      "netflix.com",
+      "www.netflix.com"
+    ],
+    "category": "video",
+    "task": "skip-intro",
+    "title": "Skip Netflix intros automatically",
+    "question": "How do I make Netflix skip intros automatically?",
+    "queries": [
+      "netflix auto skip intro",
+      "netflix skip intro"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/26110",
+        "metric": 1164,
+        "note": "Skip netflix intro (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/40176",
+        "metric": 619,
+        "note": "Netflix skip intro and outro (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/397009",
+        "metric": 465,
+        "note": "NetFlix Auto-Skip Intro (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=netflix%20auto%20skip%20intro",
+        "metric": null,
+        "note": "returns the query; suggestions: netflix auto skip intro | netflix auto skip intro extension | netflix auto skip intro and next episode | netflix auto skip intro android | netflix auto skip intro and recap"
+      },
+      {
+        "type": "thread",
+        "url": "https://webapps.stackexchange.com/questions/87165",
+        "metric": null,
+        "note": "Is there an easy way to skip episode intros in Netflix?"
+      }
+    ],
+    "score": 51,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Clicks the Skip Intro/Recap button when it appears."
+  },
+  {
+    "site": "twitch",
+    "siteName": "Twitch",
+    "domains": [
+      "twitch.tv",
+      "www.twitch.tv"
+    ],
+    "category": "video",
+    "task": "scroll-volume",
+    "title": "Change Twitch volume with the scroll wheel",
+    "question": "How do I control Twitch volume with the mouse wheel?",
+    "queries": [
+      "twitch scroll wheel volume",
+      "twitch scroll volume"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/420862",
+        "metric": 1139,
+        "note": "Twitch Scroll Wheel Volume (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=twitch%20scroll%20wheel%20volume",
+        "metric": null,
+        "note": "returns the query; suggestions: twitch scroll wheel volume | why does my scroll wheel change volume"
+      }
+    ],
+    "score": 51,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.twitch.tv/directory",
+    "notes": ""
+  },
+  {
+    "site": "discord",
+    "siteName": "Discord",
+    "domains": [
+      "discord.com"
+    ],
+    "category": "social",
+    "task": "amoled-theme",
+    "title": "Use a pure black theme on Discord web",
+    "question": "How do I get an AMOLED black theme on Discord?",
+    "queries": [
+      "discord amoled theme",
+      "discord amoled"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/423585",
+        "metric": 1023,
+        "note": "Discord AMOLED Dark Theme (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/437959",
+        "metric": 456,
+        "note": "Discord Darkest Dark (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=discord%20amoled%20theme",
+        "metric": null,
+        "note": "returns the query; suggestions: discord amoled theme | discord amoled theme pc | better discord amoled theme | discord screen turns black mobile | discord theme ideas"
+      }
+    ],
+    "score": 50,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": ""
+  },
+  {
+    "site": "linkedin",
+    "siteName": "LinkedIn",
+    "domains": [
+      "linkedin.com",
+      "www.linkedin.com"
+    ],
+    "category": "social",
+    "task": "filter-jobs",
+    "title": "Hide LinkedIn jobs from chosen companies",
+    "question": "How do I filter out jobs from certain companies on LinkedIn?",
+    "queries": [
+      "linkedin filter jobs by company",
+      "linkedin job filter"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/380954",
+        "metric": 388,
+        "note": "LinkedIn Job Search Result Filter (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/koghjidfidodgjbmnoiokfdgbfkmmgib",
+        "metric": 1000,
+        "note": "LinkedIn Jobs Filter (users, read on the store search page for 'linkedin hide viewed jobs')"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=linkedin%20filter%20jobs%20by%20company",
+        "metric": null,
+        "note": "returns the query; suggestions: linkedin filter jobs by company size | can you filter linkedin jobs by company size | linkedin jobs filter by salary | linkedin filter jobs by location | how to filter linkedin jobs"
+      },
+      {
+        "type": "thread",
+        "url": "https://webapps.stackexchange.com/questions/10328",
+        "metric": null,
+        "note": "How to filter out job offers from Bangalore/India in LinkedIn?"
+      }
+    ],
+    "score": 50,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.linkedin.com/jobs/search?keywords=engineer",
+    "notes": ""
+  },
+  {
+    "site": "x",
+    "siteName": "X (Twitter)",
+    "domains": [
+      "x.com",
+      "twitter.com"
+    ],
+    "category": "social",
+    "task": "wide-layout",
+    "title": "Widen the X timeline",
+    "question": "How do I make the X (Twitter) timeline wider?",
+    "queries": [
+      "twitter wider timeline",
+      "twitter wide layout",
+      "twitter wide"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/545419",
+        "metric": 1896,
+        "note": "X/Twitter Clean-up & Wide Layout Display (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=twitter%20wider%20timeline",
+        "metric": null,
+        "note": "does not return the exact query; suggestions: "
+      }
+    ],
+    "score": 49,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "No exact autocomplete hit."
+  },
+  {
+    "site": "reddit",
+    "siteName": "Reddit",
+    "domains": [
+      "reddit.com",
+      "www.reddit.com",
+      "old.reddit.com"
+    ],
+    "category": "social",
+    "task": "wide-layout",
+    "title": "Widen the Reddit layout",
+    "question": "How do I make Reddit use the full width of the screen?",
+    "queries": [
+      "reddit wider layout",
+      "reddit wide mode",
+      "reddit wide"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/405073",
+        "metric": 1576,
+        "note": "Wide new reddit | Userscript (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=reddit%20wider%20layout",
+        "metric": null,
+        "note": "does not return the exact query; suggestions: "
+      }
+    ],
+    "score": 48,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.reddit.com/r/AskReddit/",
+    "notes": "No exact autocomplete hit."
+  },
+  {
+    "site": "twitch",
+    "siteName": "Twitch",
+    "domains": [
+      "twitch.tv",
+      "www.twitch.tv"
+    ],
+    "category": "video",
+    "task": "disable-autoplay",
+    "title": "Stop Twitch autoplaying on the front page",
+    "question": "How do I stop the Twitch front page from autoplaying a stream?",
+    "queries": [
+      "twitch disable autoplay front page",
+      "twitch disable autoplay",
+      "twitch autoplay"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/406877",
+        "metric": 1680,
+        "note": "Anti-Autoplay on Twitch (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/378068",
+        "metric": 471,
+        "note": "Twitch Stop Autoplay (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/ellafikcjlakbpanbejcpcgacedleoeo",
+        "metric": 817,
+        "note": "twitch stop autolay (users, read on the store search page for 'twitch disable autoplay')"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=twitch%20disable%20autoplay%20front%20page",
+        "metric": null,
+        "note": "does not return the exact query; suggestions: twitch stop autoplay front page"
+      },
+      {
+        "type": "thread",
+        "url": "https://webapps.stackexchange.com/questions/106764",
+        "metric": null,
+        "note": "Can I mute or disable autoplay for Twitch's featured streams?"
+      }
+    ],
+    "score": 48,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.twitch.tv/",
+    "notes": ""
+  },
+  {
+    "site": "twitch",
+    "siteName": "Twitch",
+    "domains": [
+      "twitch.tv",
+      "www.twitch.tv"
+    ],
+    "category": "video",
+    "task": "hide-sidebar",
+    "title": "Hide the Twitch sidebar",
+    "question": "How do I hide recommended channels in the Twitch sidebar?",
+    "queries": [
+      "twitch hide recommended channels",
+      "twitch hide sidebar",
+      "twitch sidebar"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/404887",
+        "metric": 612,
+        "note": "Hide Twitch SideBar (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/ljimojeoadeiidhochpjmkpaccmkboei",
+        "metric": 711,
+        "note": "Twitch Hide Recommended (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=twitch%20hide%20recommended%20channels",
+        "metric": null,
+        "note": "returns the query; suggestions: twitch hide recommended channels | twitch remove recommended channels | twitch remove recommended channels from sidebar | twitch hide suggested channels | twitch remove suggested channels"
+      }
+    ],
+    "score": 48,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.twitch.tv/directory",
+    "notes": ""
+  },
+  {
+    "site": "tiktok",
+    "siteName": "TikTok",
+    "domains": [
+      "tiktok.com",
+      "www.tiktok.com"
+    ],
+    "category": "video",
+    "task": "background-play",
+    "title": "Keep TikTok playing in a background tab",
+    "question": "How do I keep TikTok playing when I switch tabs?",
+    "queries": [],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/461392",
+        "metric": 1361,
+        "note": "TikTok Play in Background (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/524301",
+        "metric": 475,
+        "note": "TikTok Background Playback (total installs)"
+      }
+    ],
+    "score": 47,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.tiktok.com/foryou",
+    "notes": "No autocomplete query fetched."
+  },
+  {
+    "site": "hackernews",
+    "siteName": "Hacker News",
+    "domains": [
+      "news.ycombinator.com"
+    ],
+    "category": "news",
+    "task": "dark-mode",
+    "title": "Use dark mode on Hacker News",
+    "question": "How do I get dark mode on Hacker News?",
+    "queries": [
+      "hacker news dark mode",
+      "hacker news dark"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/439101",
+        "metric": 177,
+        "note": "Hacker News Dark Mode + QoL (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/447218",
+        "metric": 89,
+        "note": "Auto dark mode HN (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/abpjflhoidbeaacggmdjoahiakcledna",
+        "metric": 533,
+        "note": "HN Dark Mode (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=hacker%20news%20dark%20mode",
+        "metric": null,
+        "note": "returns the query; suggestions: hacker news dark mode | hacker news dark mode firefox | hacker news dark mode extension | hacker news dark mode mobile | hacker news dark mode ios"
+      }
+    ],
+    "score": 46,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://news.ycombinator.com/",
+    "notes": ""
+  },
+  {
+    "site": "tiktok",
+    "siteName": "TikTok",
+    "domains": [
+      "tiktok.com",
+      "www.tiktok.com"
+    ],
+    "category": "video",
+    "task": "larger-video",
+    "title": "Make TikTok videos bigger on desktop",
+    "question": "How do I make TikTok videos larger in a browser?",
+    "queries": [],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/455388",
+        "metric": 1220,
+        "note": "TikTok Larger Video + Mouse Volume Control (total installs)"
+      }
+    ],
+    "score": 46,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.tiktok.com/foryou",
+    "notes": "No autocomplete query fetched."
+  },
+  {
+    "site": "twitch",
+    "siteName": "Twitch",
+    "domains": [
+      "twitch.tv",
+      "www.twitch.tv"
+    ],
+    "category": "video",
+    "task": "hide-chat",
+    "title": "Hide Twitch chat",
+    "question": "How do I hide chat on Twitch?",
+    "queries": [
+      "twitch hide chat"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/403168",
+        "metric": 510,
+        "note": "Remover Chat da Twitch (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=twitch%20hide%20chat",
+        "metric": null,
+        "note": "returns the query; suggestions: twitch hide chat | twitch hide chat mobile | twitch hide chat replay | twitch hide chat shortcut | twitch hide.chat.overlay"
+      }
+    ],
+    "score": 46,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.twitch.tv/directory",
+    "notes": "Pick any live channel from the directory."
+  },
+  {
+    "site": "linkedin",
+    "siteName": "LinkedIn",
+    "domains": [
+      "linkedin.com",
+      "www.linkedin.com"
+    ],
+    "category": "social",
+    "task": "hide-news",
+    "title": "Hide LinkedIn News",
+    "question": "How do I hide the LinkedIn News panel?",
+    "queries": [
+      "linkedin hide linkedin news",
+      "linkedin hide news",
+      "linkedin news"
+    ],
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/kigfnbfbpfpgphbocdkmeablbgdbpfke",
+        "metric": 1000,
+        "note": "Distraction Free for LinkedIn™ (users, read on the store search page for 'linkedin hide news')"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=linkedin%20hide%20linkedin%20news",
+        "metric": null,
+        "note": "does not return the exact query; suggestions: "
+      },
+      {
+        "type": "thread",
+        "url": "https://webapps.stackexchange.com/questions/57040",
+        "metric": null,
+        "note": "How can I remove the Pulse news feature from my LinkedIn homepage?"
+      }
+    ],
+    "score": 45,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Weak evidence."
+  },
+  {
+    "site": "hackernews",
+    "siteName": "Hacker News",
+    "domains": [
+      "news.ycombinator.com"
+    ],
+    "category": "news",
+    "task": "larger-font",
+    "title": "Make Hacker News text bigger",
+    "question": "How do I increase the font size on Hacker News?",
+    "queries": [
+      "hacker news font size",
+      "hacker news font"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/405014",
+        "metric": 181,
+        "note": "Increase HN Font Size (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/397613",
+        "metric": 183,
+        "note": "Hacker News (ycombinator) more readable (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=hacker%20news%20font%20size",
+        "metric": null,
+        "note": "returns the query; suggestions: hacker news font size"
+      },
+      {
+        "type": "thread",
+        "url": "https://news.ycombinator.com/item?id=12928513",
+        "metric": null,
+        "note": "Increase Hacker News Font Size?"
+      },
+      {
+        "type": "thread",
+        "url": "https://news.ycombinator.com/item?id=12036162",
+        "metric": null,
+        "note": "Why is the font on Hacker News so small?"
+      }
+    ],
+    "score": 44,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://news.ycombinator.com/",
+    "notes": ""
+  },
+  {
+    "site": "netflix",
+    "siteName": "Netflix",
+    "domains": [
+      "netflix.com",
+      "www.netflix.com"
+    ],
+    "category": "video",
+    "task": "keyboard-shortcuts",
+    "title": "Add keyboard shortcuts to Netflix",
+    "question": "What are Netflix keyboard shortcuts and can I add more?",
+    "queries": [
+      "netflix keyboard shortcuts",
+      "netflix keyboard"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/420603",
+        "metric": 407,
+        "note": "Netflix keyboard shortcuts (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=netflix%20keyboard%20shortcuts",
+        "metric": null,
+        "note": "returns the query; suggestions: netflix keyboard shortcuts | netflix keyboard shortcuts extension | netflix keyboard shortcuts next episode | netflix keyboard shortcuts playback speed | netflix keyboard shortcuts subtitles"
+      },
+      {
+        "type": "thread",
+        "url": "https://webapps.stackexchange.com/questions/6093",
+        "metric": null,
+        "note": "Netflix keyboard shortcuts"
+      }
+    ],
+    "score": 44,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": ""
+  },
+  {
+    "site": "netflix",
+    "siteName": "Netflix",
+    "domains": [
+      "netflix.com",
+      "www.netflix.com"
+    ],
+    "category": "video",
+    "task": "disable-hover-zoom",
+    "title": "Stop Netflix tiles zooming on hover",
+    "question": "How do I stop Netflix thumbnails expanding when I hover?",
+    "queries": [],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/12118",
+        "metric": 719,
+        "note": "Remove Netflix's Zoom on Hover (total installs)"
+      }
+    ],
+    "score": 43,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "No autocomplete query fetched."
+  },
+  {
+    "site": "twitch",
+    "siteName": "Twitch",
+    "domains": [
+      "twitch.tv",
+      "www.twitch.tv"
+    ],
+    "category": "video",
+    "task": "theater-mode",
+    "title": "Open Twitch in theater mode by default",
+    "question": "How do I make Twitch always open in theater mode?",
+    "queries": [],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/431429",
+        "metric": 744,
+        "note": "Twitch - Auto Theatre (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/396372",
+        "metric": 500,
+        "note": "TrueTheaterMode - twitch.tv (total installs)"
+      }
+    ],
+    "score": 43,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.twitch.tv/directory",
+    "notes": "No autocomplete query fetched for this one."
+  },
+  {
+    "site": "hackernews",
+    "siteName": "Hacker News",
+    "domains": [
+      "news.ycombinator.com"
+    ],
+    "category": "news",
+    "task": "collapse-comments",
+    "title": "Collapse Hacker News comment threads",
+    "question": "How do I collapse all comments on Hacker News?",
+    "queries": [
+      "hacker news collapse all comments",
+      "hacker news collapse comments",
+      "hacker news collapse"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/18066",
+        "metric": 258,
+        "note": "Comments Owl for Hacker News (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/12493",
+        "metric": 235,
+        "note": "Hacker News - Folding Subtrees (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=hacker%20news%20collapse%20all%20comments",
+        "metric": null,
+        "note": "does not return the exact query; suggestions: "
+      },
+      {
+        "type": "thread",
+        "url": "https://news.ycombinator.com/item?id=10539731",
+        "metric": null,
+        "note": "How do you collapse comments in Hacker news threads?"
+      },
+      {
+        "type": "thread",
+        "url": "https://news.ycombinator.com/item?id=23823923",
+        "metric": null,
+        "note": "Ask HN: Hacker News Bug? I can not collapse comments"
+      }
+    ],
+    "score": 41,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://news.ycombinator.com/best",
+    "notes": "No exact autocomplete hit."
+  },
+  {
+    "site": "bluesky",
+    "siteName": "Bluesky",
+    "domains": [
+      "bsky.app"
+    ],
+    "category": "social",
+    "task": "stop-video-loop",
+    "title": "Stop Bluesky videos looping",
+    "question": "How do I stop videos looping on Bluesky?",
+    "queries": [
+      "bluesky video loop",
+      "bluesky loop"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/474877",
+        "metric": 489,
+        "note": "Stop videos looping (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=bluesky%20video%20loop",
+        "metric": null,
+        "note": "does not return the exact query; suggestions: blue sky video loop | bluesky looping video | bluesky rules"
+      }
+    ],
+    "score": 40,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://bsky.app/",
+    "notes": "GF script is one multi-site script."
+  },
+  {
+    "site": "tiktok",
+    "siteName": "TikTok",
+    "domains": [
+      "tiktok.com",
+      "www.tiktok.com"
+    ],
+    "category": "video",
+    "task": "stop-video-loop",
+    "title": "Stop TikTok videos looping",
+    "question": "How do I stop TikTok videos from looping in a browser?",
+    "queries": [
+      "tiktok stop video loop",
+      "tiktok stop loop",
+      "tiktok loop"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/474877",
+        "metric": 489,
+        "note": "Stop videos looping (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=tiktok%20stop%20video%20loop",
+        "metric": null,
+        "note": "does not return the exact query; suggestions: "
+      }
+    ],
+    "score": 40,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.tiktok.com/@nasa",
+    "notes": "GF script is one multi-site script (X, Bluesky, TikTok, Instagram)."
+  },
+  {
+    "site": "x",
+    "siteName": "X (Twitter)",
+    "domains": [
+      "x.com",
+      "twitter.com"
+    ],
+    "category": "social",
+    "task": "hide-trending",
+    "title": "Hide trending on X",
+    "question": "How do I hide trends on X (Twitter)?",
+    "queries": [
+      "hide trending on twitter",
+      "hide twitter trends",
+      "twitter trending"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/399025",
+        "metric": 381,
+        "note": "Twitter Remove Trends Panel (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=hide%20trending%20on%20twitter",
+        "metric": null,
+        "note": "does not return the exact query; suggestions: remove trending twitter | how to hide trending topics on twitter"
+      }
+    ],
+    "score": 39,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": ""
+  },
+  {
+    "site": "hackernews",
+    "siteName": "Hacker News",
+    "domains": [
+      "news.ycombinator.com"
+    ],
+    "category": "news",
+    "task": "open-links-new-tab",
+    "title": "Open Hacker News links in new tabs",
+    "question": "How do I make Hacker News open links in a new tab?",
+    "queries": [
+      "hacker news open links in new tab",
+      "hacker news new tab"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/7209",
+        "metric": 161,
+        "note": "Hacker news open links in new tab (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/3974",
+        "metric": 148,
+        "note": "HN New Tab (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=hacker%20news%20open%20links%20in%20new%20tab",
+        "metric": null,
+        "note": "does not return the exact query; suggestions: "
+      },
+      {
+        "type": "thread",
+        "url": "https://news.ycombinator.com/item?id=36492067",
+        "metric": null,
+        "note": "Is there any extension which enables to open Hacker News posts in a new tab?"
+      },
+      {
+        "type": "thread",
+        "url": "https://news.ycombinator.com/item?id=24862743",
+        "metric": null,
+        "note": "Ask HN: Why doesn't Hacker News open links in a new tab?"
+      }
+    ],
+    "score": 38,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://news.ycombinator.com/",
+    "notes": "No exact autocomplete hit."
+  },
+  {
+    "site": "bluesky",
+    "siteName": "Bluesky",
+    "domains": [
+      "bsky.app"
+    ],
+    "category": "social",
+    "task": "full-size-images",
+    "title": "Open full-size images on Bluesky",
+    "question": "How do I view the original full-size image on Bluesky?",
+    "queries": [
+      "bluesky full size image",
+      "bluesky full res"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/513189",
+        "metric": 142,
+        "note": "BSKY Replace Thumbnail with Full Res Image (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=bluesky%20full%20size%20image",
+        "metric": null,
+        "note": "returns the query; suggestions: bluesky full size image | bluesky original image size"
+      }
+    ],
+    "score": 37,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://bsky.app/profile/bsky.app",
+    "notes": ""
+  },
+  {
+    "site": "hackernews",
+    "siteName": "Hacker News",
+    "domains": [
+      "news.ycombinator.com"
+    ],
+    "category": "news",
+    "task": "highlight-new-comments",
+    "title": "Highlight new Hacker News comments",
+    "question": "How do I see new comments since my last visit on Hacker News?",
+    "queries": [
+      "hacker news new comments",
+      "hacker news highlight new comments"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/18066",
+        "metric": 258,
+        "note": "Comments Owl for Hacker News (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/kpoggabejgbenjahggloahnnaolmfock",
+        "metric": 279,
+        "note": "Comments Owl for Hacker News (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=hacker%20news%20new%20comments",
+        "metric": null,
+        "note": "does not return the exact query; suggestions: "
+      },
+      {
+        "type": "thread",
+        "url": "https://news.ycombinator.com/item?id=29790353",
+        "metric": null,
+        "note": "Ask HN: Following a Hacker News thread for new comments"
+      }
+    ],
+    "score": 37,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://news.ycombinator.com/best",
+    "notes": ""
+  },
+  {
+    "site": "threads",
+    "siteName": "Threads",
+    "domains": [
+      "threads.com",
+      "www.threads.com",
+      "threads.net"
+    ],
+    "category": "social",
+    "task": "default-video-volume",
+    "title": "Set a default video volume on Threads",
+    "question": "How do I stop Threads videos playing loud?",
+    "queries": [],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/534078",
+        "metric": 105,
+        "note": "Threads-Volume (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/553160",
+        "metric": 82,
+        "note": "Threads 影片音量控制增強 (total installs)"
+      }
+    ],
+    "score": 30,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.threads.com/",
+    "notes": "No autocomplete query fetched."
+  },
+  {
+    "site": "bluesky",
+    "siteName": "Bluesky",
+    "domains": [
+      "bsky.app"
+    ],
+    "category": "social",
+    "task": "hide-reposts",
+    "title": "Hide reposts on Bluesky",
+    "question": "How do I hide reposts in my Bluesky feed?",
+    "queries": [
+      "bluesky hide reposts",
+      "bluesky repost"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/518654",
+        "metric": 38,
+        "note": "Bluesky Repost Hider (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=bluesky%20hide%20reposts",
+        "metric": null,
+        "note": "returns the query; suggestions: bluesky hide reposts | bluesky hide reposts from user | bluesky remove reposts | bluesky hidden repost"
+      }
+    ],
+    "score": 29,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://bsky.app/profile/bsky.app",
+    "notes": "Profile pages show reposts logged out; Following feed needs login."
+  },
+  {
+    "site": "bluesky",
+    "siteName": "Bluesky",
+    "domains": [
+      "bsky.app"
+    ],
+    "category": "social",
+    "task": "add-mute-button",
+    "title": "Add a mute button to Bluesky posts",
+    "question": "How do I mute someone on Bluesky quickly?",
+    "queries": [],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/507929",
+        "metric": 74,
+        "note": "Add Mute User Button to Bluesky Posts Menu (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/519195",
+        "metric": 23,
+        "note": "Add \"Mute User\" Button to Bluesky Posts (total installs)"
+      }
+    ],
+    "score": 28,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "No autocomplete query fetched."
+  },
+  {
+    "site": "bluesky",
+    "siteName": "Bluesky",
+    "domains": [
+      "bsky.app"
+    ],
+    "category": "social",
+    "task": "multi-column",
+    "title": "Use a multi-column layout on Bluesky",
+    "question": "Can I use Bluesky in multiple columns like TweetDeck?",
+    "queries": [
+      "bluesky multi column",
+      "bluesky deck",
+      "bluesky column"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/520439",
+        "metric": 74,
+        "note": "Bluesky Multi-Column (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=bluesky%20multi%20column",
+        "metric": null,
+        "note": "does not return the exact query; suggestions: "
+      }
+    ],
+    "score": 28,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "No exact autocomplete hit."
+  },
+  {
+    "site": "threads",
+    "siteName": "Threads",
+    "domains": [
+      "threads.com",
+      "www.threads.com",
+      "threads.net"
+    ],
+    "category": "social",
+    "task": "keyword-filter",
+    "title": "Hide Threads posts by keyword",
+    "question": "How do I filter out posts with certain words on Threads?",
+    "queries": [
+      "threads mute words",
+      "threads filter"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/545432",
+        "metric": 24,
+        "note": "Keyword-based Tweet Filtering for Threads (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/552340",
+        "metric": 17,
+        "note": "Bobbin Threads Filter (1.0.0) (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=threads%20mute%20words",
+        "metric": null,
+        "note": "returns the query; suggestions: threads mute words | what does muted threads mean | what are muted threads in email | how to mute a thread"
+      }
+    ],
+    "score": 26,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.threads.com/",
+    "notes": "Logged-out home feed is visible."
+  },
+  {
+    "site": "threads",
+    "siteName": "Threads",
+    "domains": [
+      "threads.com",
+      "www.threads.com",
+      "threads.net"
+    ],
+    "category": "social",
+    "task": "hide-for-you",
+    "title": "Hide the For You feed on Threads",
+    "question": "How do I make Threads show only accounts I follow?",
+    "queries": [
+      "threads following feed default",
+      "threads following feed",
+      "threads for you"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/530523",
+        "metric": 5,
+        "note": "Hide \"For You\" feed (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=threads%20following%20feed%20default",
+        "metric": null,
+        "note": "does not return the exact query; suggestions: "
+      }
+    ],
+    "score": 10,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Weak evidence."
+  },
+  {
+    "site": "discord",
+    "siteName": "Discord",
+    "domains": [
+      "discord.com"
+    ],
+    "category": "social",
+    "task": "hide-nitro-upsells",
+    "title": "Hide Nitro buttons on Discord",
+    "question": "How do I remove the Nitro gift button on Discord?",
+    "queries": [
+      "discord hide nitro button",
+      "discord hide nitro",
+      "discord nitro"
+    ],
+    "evidence": [
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=discord%20hide%20nitro%20button",
+        "metric": null,
+        "note": "returns the query; suggestions: discord hide nitro button | discord remove nitro button | discord hide gift nitro button | discord remove nitro gift button | how to remove nitro from discord"
+      }
+    ],
+    "score": 5,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Only autocomplete evidence."
+  },
+  {
+    "site": "facebook",
+    "siteName": "Facebook",
+    "domains": [
+      "facebook.com",
+      "www.facebook.com"
+    ],
+    "category": "social",
+    "task": "hide-stories",
+    "title": "Hide Stories on Facebook",
+    "question": "How do I hide the Stories bar on Facebook?",
+    "queries": [
+      "facebook hide stories",
+      "facebook stories"
+    ],
+    "evidence": [
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=facebook%20hide%20stories",
+        "metric": null,
+        "note": "returns the query; suggestions: facebook hide stories | facebook hide stories from friend | facebook hide stories bar | facebook hide stories from news feed | facebook hide stories from someone"
+      }
+    ],
+    "score": 5,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Only autocomplete evidence."
+  },
+  {
+    "site": "instagram",
+    "siteName": "Instagram",
+    "domains": [
+      "instagram.com",
+      "www.instagram.com"
+    ],
+    "category": "social",
+    "task": "hide-suggested-posts",
+    "title": "Hide suggested posts on Instagram",
+    "question": "How do I hide suggested posts in my Instagram feed?",
+    "queries": [
+      "instagram hide suggested posts",
+      "instagram suggested"
+    ],
+    "evidence": [
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=instagram%20hide%20suggested%20posts",
+        "metric": null,
+        "note": "returns the query; suggestions: instagram hide suggested posts | instagram hide suggested posts extension | instagram hide suggested posts in feed | instagram turn off suggested posts | instagram stop suggested posts"
+      }
+    ],
+    "score": 5,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Only autocomplete evidence."
+  },
+  {
+    "site": "pinterest",
+    "siteName": "Pinterest",
+    "domains": [
+      "pinterest.com",
+      "www.pinterest.com"
+    ],
+    "category": "social",
+    "task": "hide-ai-pins",
+    "title": "Hide AI-generated pins on Pinterest",
+    "question": "How do I hide AI-generated images on Pinterest?",
+    "queries": [
+      "pinterest hide ai images",
+      "pinterest hide ai",
+      "pinterest ai"
+    ],
+    "evidence": [
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=pinterest%20hide%20ai%20images",
+        "metric": null,
+        "note": "returns the query; suggestions: pinterest hide ai images | hide ai generated images pinterest | why my pinterest is not showing images | can you hide your profile on pinterest | are pictures in pinterest free"
+      }
+    ],
+    "score": 5,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.pinterest.com/search/pins/?q=kitchen",
+    "notes": "Only autocomplete evidence. Feasible only via Pinterest's own 'AI modified' label."
+  },
+  {
+    "site": "reddit",
+    "siteName": "Reddit",
+    "domains": [
+      "reddit.com",
+      "www.reddit.com",
+      "old.reddit.com"
+    ],
+    "category": "social",
+    "task": "disable-translation",
+    "title": "Stop Reddit auto-translating posts",
+    "question": "How do I stop Reddit auto-translating posts into my language?",
+    "queries": [
+      "reddit disable auto translate",
+      "reddit translate"
+    ],
+    "evidence": [
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=reddit%20disable%20auto%20translate",
+        "metric": null,
+        "note": "returns the query; suggestions: reddit disable auto translate | reddit disable auto translate app | reddit disable auto translate extension | reddit disable auto translate google | reddit disable auto translate mobile"
+      },
+      {
+        "type": "thread",
+        "url": "https://news.ycombinator.com/item?id=40941113",
+        "metric": null,
+        "note": "Ask HN: Am I the only one annoyed by the Auto-Translated Reddit?"
+      }
+    ],
+    "score": 5,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.reddit.com/r/de/?tl=en",
+    "notes": "Strip the ?tl= parameter and redirect. Only autocomplete plus one thread."
+  },
+  {
+    "site": "reddit",
+    "siteName": "Reddit",
+    "domains": [
+      "reddit.com",
+      "www.reddit.com",
+      "old.reddit.com"
+    ],
+    "category": "social",
+    "task": "hide-trending-searches",
+    "title": "Hide trending searches on Reddit",
+    "question": "How do I hide 'Trending today' in Reddit search?",
+    "queries": [
+      "reddit hide trending today",
+      "reddit hide trending",
+      "reddit trending"
+    ],
+    "evidence": [
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=reddit%20hide%20trending%20today",
+        "metric": null,
+        "note": "returns the query; suggestions: reddit hide trending today | reddit remove trending today | reddit turn off trending today | reddit app hide trending today | reddit app turn off trending today"
+      }
+    ],
+    "score": 5,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.reddit.com/",
+    "notes": "Only autocomplete evidence. Panel shows when focusing the search box."
+  }
+]

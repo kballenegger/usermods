@@ -1,0 +1,7 @@
+# Root build context: send only site/, minus local output.
+*
+!site/
+site/dist/
+site/.data/
+site/data/check-logs/
+site/test/

@@ -1,0 +1,56 @@
+{
+  "slug": "hide-end-screens",
+  "title": "Remove YouTube end screen cards",
+  "question": "How do I remove the end screen cards on YouTube videos?",
+  "answer": "YouTube has no setting that turns end screen cards off for every video. The usermods script on this page hides the end screen cards that cover the last seconds of a video, the info card teasers that slide in during it, and the grid of suggested videos after it ends. The video keeps playing normally. Install it with usermods or any userscript manager. Without an extension, the Hide button at the top right of the player hides the cards on the video you are watching.",
+  "prompt": "Hide the end screen cards that cover the end of YouTube videos.",
+  "details": "The script is CSS only. The player draws every end screen card (video, playlist, channel and link cards) the same way, so one rule hides them on every video, including after in-page navigation.\n\nThe check plays a video, jumps to its last 15 seconds and confirms the end screen cards are there without the script and hidden with it. The info card teaser and the after-video suggestion grid are not covered by the check. YouTube's own Hide button at the top right of the player stays visible during the end screen.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "The Hide button",
+      "body": "When end screen cards appear, a **Hide** button shows at the top right of the player. It hides the cards on that video only."
+    },
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filters",
+      "body": "Add these under *My filters* in uBlock Origin. They use the same selectors as the script; our check runs the script, not these filters.\n\n```\nwww.youtube.com###movie_player .ytp-ce-element\nwww.youtube.com###movie_player .ytp-cards-teaser\nwww.youtube.com###movie_player .ytp-endscreen-content\n```"
+    }
+  ],
+  "related": [
+    "youtube/disable-autoplay",
+    "youtube/hide-recommendations"
+  ],
+  "demand": {
+    "score": 72,
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/mfengiknfnndchbhjmgjjffjndklkpcm",
+        "note": "Remove YouTube End Cards & End Screen Videos (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/jinenhpepbpkepablpjjchejlabbpken",
+        "note": "Hide Labels and End Cards on Youtube (users, read on the store search page for 'remove youtube end screen')"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=remove%20youtube%20end%20screen",
+        "note": "returns the query; suggestions: remove youtube end screen | youtube remove end screen cards | disable youtube end screen overlay | disable youtube end screen | youtube+disable end screen cards"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    ],
+    "loggedOut": true,
+    "waitFor": "#movie_player video",
+    "settleMs": 3000,
+    "actions": "const p = document.querySelector('#movie_player'); p.mute(); p.playVideo(); await new Promise((r) => setTimeout(r, 2000)); p.seekTo(p.getDuration() - 15, true); await new Promise((r) => setTimeout(r, 5000));",
+    "baseline": "[...document.querySelectorAll('#movie_player .ytp-ce-element')].filter((e) => e.checkVisibility()).length >= 2",
+    "expect": "(() => { const l = [...document.querySelectorAll('#movie_player .ytp-ce-element')]; return l.length >= 2 && l.every((e) => !e.checkVisibility()); })()",
+    "intact": "(() => { const p = document.querySelector('#movie_player'); const v = p.querySelector('video'); return v.checkVisibility() && p.getPlayerState() === 1 && v.currentTime > p.getDuration() - 15; })()"
+  }
+}

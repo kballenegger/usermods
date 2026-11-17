@@ -1,0 +1,34 @@
+{
+  "slug": "series-primary-works",
+  "title": "Show only the main books in a Goodreads series",
+  "question": "How do I hide novellas and companion books on a Goodreads series page?",
+  "answer": "Goodreads series pages have no filter: they list every work, including novellas numbered 1.5, omnibus editions and split volumes, even though the header counts the \"primary works\" separately. The usermods script on this page hides every entry whose number is not a whole number, so only Book 1, Book 2 and so on remain. A button next to the work count brings the full list back. Without a script, the only option is to skip the extra entries by eye.",
+  "prompt": "On Goodreads series pages, hide everything except the books numbered with whole numbers, with a button to show all.",
+  "details": "Goodreads calls a book a primary work when its series position is a whole number. The script reads the \"Book N\" label above each entry and hides entries labelled with decimals (\"Book 1.5\"), ranges (\"Book 1-4\"), parts (\"Book 3 part 1/2\") or no number. The button next to \"N primary works • M total works\" switches between main books only and all works; the choice is not remembered between pages.\n\nThe page is not reordered, and nothing is fetched.",
+  "related": [
+    "goodreads/sort-list-by-rating",
+    "goodreads/library-links",
+    "goodreads/declutter"
+  ],
+  "demand": {
+    "score": 30,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/370050",
+        "note": "Goodreads, show only the \"primary works\" in a series on series pages (95 total installs)"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.goodreads.com/series/66175-the-lord-of-the-rings"
+    ],
+    "loggedOut": true,
+    "waitFor": ".listWithDividers__item",
+    "settleMs": 2000,
+    "baseline": "(() => { const lab = (i) => (i.querySelector(':scope > h3')?.textContent || '').trim(); const vis = [...document.querySelectorAll('.listWithDividers__item')].filter((i) => i.checkVisibility()); return vis.length >= 10 && vis.some((i) => /^Book\\s+\\d+$/.test(lab(i))) && vis.filter((i) => !/^Book\\s+\\d+$/.test(lab(i))).length >= 5; })()",
+    "expect": "(() => { const lab = (i) => (i.querySelector(':scope > h3')?.textContent || '').trim(); const all = [...document.querySelectorAll('.listWithDividers__item')]; const vis = all.filter((i) => i.checkVisibility()); const primary = parseInt((document.querySelector('.responsiveSeriesHeader__subtitle')?.textContent.match(/(\\d+)\\s+primary works/) || [])[1], 10); const btn = document.querySelector('.um-primary-toggle'); return all.length >= 10 && vis.length === primary && vis.every((i) => /^Book\\s+\\d+$/.test(lab(i))) && all.length - vis.length >= 5 && !!btn && btn.checkVisibility(); })()",
+    "intact": "(() => { const vis = [...document.querySelectorAll('.listWithDividers__item')].filter((i) => i.checkVisibility()); return document.querySelector('h1').checkVisibility() && vis.length >= 4 && vis.every((i) => { const a = i.querySelector('a[href*=\"/book/show/\"]'); return a && a.checkVisibility(); }); })()"
+  }
+}

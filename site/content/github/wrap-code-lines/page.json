@@ -1,0 +1,44 @@
+{
+  "slug": "wrap-code-lines",
+  "title": "Wrap long lines in GitHub code views",
+  "question": "How do I turn on word wrap when viewing code on GitHub?",
+  "answer": "In GitHub's file view, open the menu with three dots at the top right of the file and turn on Wrap lines. Code blocks in READMEs, markdown files, issues and comments have no such switch and scroll sideways instead. The usermods script on this page wraps long lines in those code blocks so the whole command or snippet is visible without scrolling, keeping its indentation and line breaks. Without an extension, the Wrap lines switch only covers the file view.",
+  "prompt": "Wrap long lines in code blocks on GitHub instead of making me scroll sideways.",
+  "details": "The script is one CSS rule: fenced code blocks in rendered markdown get `white-space: pre-wrap`, and long URLs or tokens without spaces break where they need to. Indentation and existing line breaks stay as they are.\n\nThe file view is left to GitHub's own **Wrap lines** switch. The check loads a README; issues, pull request comments and markdown files use the same markup, but the check does not load them.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Wrap lines in the file view",
+      "body": "On a file page, open the **...** menu at the top right of the file and tick **Wrap lines** under View options. It does not affect code blocks in READMEs or comments."
+    },
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filter",
+      "body": "The same rule as a cosmetic style filter. Our check runs the script, not this filter.\n\n```\ngithub.com##.markdown-body pre:style(white-space: pre-wrap !important; overflow-wrap: anywhere !important)\n```"
+    }
+  ],
+  "related": [
+    "github/full-width",
+    "github/readme-toc",
+    "github/copy-raw-url"
+  ],
+  "check": {
+    "urls": [
+      "https://github.com/nvm-sh/nvm"
+    ],
+    "loggedOut": true,
+    "waitFor": "article.markdown-body pre",
+    "settleMs": 3000,
+    "baseline": "[...document.querySelectorAll('article.markdown-body pre')].filter((p) => p.checkVisibility() && p.scrollWidth > p.clientWidth + 20).length >= 5",
+    "expect": "(() => { const pres = [...document.querySelectorAll('article.markdown-body pre')].filter((p) => p.checkVisibility()); const tall = pres.filter((p) => p.querySelectorAll('br').length === 0 && p.textContent.trim().split('\\n').length === 1 && p.textContent.length > 120); return pres.length >= 50 && pres.every((p) => p.scrollWidth <= p.clientWidth + 1) && tall.length >= 1 && tall.every((p) => p.getBoundingClientRect().height > 60); })()",
+    "intact": "(() => { const a = document.querySelector('article.markdown-body'); const pres = [...a.querySelectorAll('pre')].filter((p) => p.checkVisibility() && p.textContent.trim().length > 0); return a.checkVisibility() && pres.length >= 50 && a.getBoundingClientRect().width < window.innerWidth; })()"
+  },
+  "demand": {
+    "score": 43,
+    "evidence": [
+      { "type": "greasyfork", "url": "https://greasyfork.org/en/scripts/18789", "note": "Greasy Fork total installs, \"GitHub Toggle Code Wrap\", 325 (api.greasyfork.org)" },
+      { "type": "greasyfork", "url": "https://greasyfork.org/en/scripts/10284", "note": "Greasy Fork total installs, \"Github Word Wrapping for CODE blocks\", 44 (api.greasyfork.org)" },
+      { "type": "autocomplete", "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=github%20word%20wrap", "note": "Google suggests \"github word wrap\", \"github word wrap code\" and \"github line wrap\"" }
+    ]
+  }
+}

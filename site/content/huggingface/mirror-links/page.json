@@ -1,0 +1,35 @@
+{
+  "slug": "mirror-links",
+  "title": "Rewrite Hugging Face links to a mirror",
+  "question": "How do I download Hugging Face models through hf-mirror?",
+  "answer": "For the command line, set the environment variable HF_ENDPOINT=https://hf-mirror.com before running hf download or any huggingface_hub code, and downloads go through the mirror. In the browser, the usermods script on this page changes the download links in Hugging Face file lists and file pages to the same paths on hf-mirror.com, so you can browse huggingface.co and fetch files from the mirror. hf-mirror.com is run by a third party, not by Hugging Face.",
+  "prompt": "Make the file download links on Hugging Face go to hf-mirror.com instead.",
+  "details": "Every link with `/resolve/` in its path, which is how Hugging Face serves raw files, is rewritten from `huggingface.co/<repo>/resolve/...` to `hf-mirror.com/<repo>/resolve/...`. Models, datasets and Spaces use the same layout. Page links, the model card and the rest of the site stay on huggingface.co, so the page itself still has to load. If huggingface.co does not load at all where you are, open hf-mirror.com directly instead.\n\nThe mirror address is the `MIRROR` constant at the top of the script. The check loads a model's file list and confirms every download link points at the mirror with the same path; it does not download from the mirror.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "HF_ENDPOINT",
+      "body": "The `hf` CLI and the `huggingface_hub` Python library read the `HF_ENDPOINT` environment variable:\n\n```\nexport HF_ENDPOINT=https://hf-mirror.com\nhf download openai-community/gpt2\n```"
+    }
+  ],
+  "related": [
+    "huggingface/copy-download-command",
+    "huggingface/dark-mode"
+  ],
+  "demand": {
+    "score": 35,
+    "evidence": [
+      { "type": "greasyfork", "url": "https://greasyfork.org/en/scripts/519323", "note": "HF Mirror Redirect (total installs)" },
+      { "type": "autocomplete", "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=huggingface%20mirror", "note": "returns \"huggingface mirror\"; suggestions: huggingface mirror | huggingface mirror china | huggingface mirror site | huggingface mirror download | huggingface mirror iran" }
+    ]
+  },
+  "check": {
+    "urls": ["https://huggingface.co/openai-community/gpt2/tree/main"],
+    "loggedOut": true,
+    "waitFor": "a[href*=\"/resolve/\"]",
+    "settleMs": 3000,
+    "baseline": "(() => { const l = [...document.querySelectorAll('a[href*=\"/resolve/\"]')]; return l.length >= 10 && l.every((a) => a.href.startsWith('https://huggingface.co/openai-community/gpt2/resolve/main/')); })()",
+    "expect": "(() => { const l = [...document.querySelectorAll('a[href*=\"/resolve/\"]')]; return l.length >= 10 && l.every((a) => a.href.startsWith('https://hf-mirror.com/openai-community/gpt2/resolve/main/')) && l.some((a) => a.href === 'https://hf-mirror.com/openai-community/gpt2/resolve/main/config.json?download=true'); })()",
+    "intact": "(() => { const files = [...document.querySelectorAll('a[href*=\"/blob/main/\"]')].filter((a) => a.checkVisibility()); const tabs = document.querySelector('a[href=\"/openai-community/gpt2\"]'); return files.length >= 10 && files.every((a) => a.href.startsWith('https://huggingface.co/')) && !!tabs; })()"
+  }
+}

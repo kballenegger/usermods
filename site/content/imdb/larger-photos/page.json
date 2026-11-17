@@ -1,0 +1,55 @@
+{
+  "slug": "larger-photos",
+  "title": "Open full-size photos on IMDb",
+  "question": "How do I see an IMDb photo at full resolution?",
+  "answer": "IMDb's photo viewer loads the original image but scales it to the window and covers it with a swipe layer, so right-click \"Open image in new tab\" does not work. The usermods script on this page adds a \"Full size\" button to the viewer that opens the original file in a new tab and follows along as you page through the gallery. Without an extension, copy an image address from m.media-amazon.com and delete everything between \"._V1_\" and \".jpg\".",
+  "prompt": "Add a button to IMDb's photo viewer that opens the current photo at full size in a new tab.",
+  "details": "IMDb image addresses end in resize and crop instructions after `._V1_`, for example `._V1_QL75_UX190_CR0,2,190,281_.jpg`. The original upload is the same address ending in `._V1_.jpg`. The script reads the image the viewer is showing, builds that address and puts it on a yellow button in the viewer's top bar, next to Home. It only appears in the photo viewer (`/mediaviewer/` pages). Thumbnails on title and name pages are not changed.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Edit the image address",
+      "body": "An image at `https://m.media-amazon.com/images/M/<id>._V1_QL75_UX190_.jpg` is the original at `https://m.media-amazon.com/images/M/<id>._V1_.jpg`."
+    }
+  ],
+  "related": [
+    "imdb/show-actor-age",
+    "imdb/external-links"
+  ],
+  "check": {
+    "urls": [
+      "https://www.imdb.com/title/tt0111161/mediaviewer/rm2971500544/"
+    ],
+    "loggedOut": true,
+    "waitFor": "[data-testid=\"media-viewer\"] img",
+    "settleMs": 4000,
+    "baseline": "(() => { const img = document.querySelector('[data-testid=\"media-viewer\"] img'); return !!img && img.checkVisibility() && /^https:\\/\\/m\\.media-amazon\\.com\\/images\\/M\\//.test(img.src) && !document.querySelector('a[href^=\"https://m.media-amazon.com/images/\"]'); })()",
+    "expect": "(() => { const img = [...document.querySelectorAll('[data-testid=\"media-viewer\"] img')].find((i) => i.checkVisibility() && i.getBoundingClientRect().width > 200); const a = document.querySelector('a.usermods-fullsize'); if (!img || !a || !a.checkVisibility()) return false; const base = (img.currentSrc || img.src).split('.').slice(0, -1).join('.').replace(/\\._V1_.*$/, ''); return a.href === base + '._V1_.jpg' && a.target === '_blank'; })()",
+    "intact": "(() => { const img = [...document.querySelectorAll('[data-testid=\"media-viewer\"] img')].find((i) => i.checkVisibility() && i.getBoundingClientRect().width > 400); const bar = document.querySelector('[data-testid=\"action-bar\"]'); return !!img && !!bar && bar.checkVisibility(); })()"
+  },
+  "demand": {
+    "score": 40,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/10863",
+        "note": "IMDb Face Cake - Get a better look at actor images! (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/8844",
+        "note": "IMDB UTE: IMDB Ultimate Thumbnail Expander (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/jamdlbhbakiojceimbalabbcoigaceag",
+        "note": "IMDB Gallery Downloader (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=imdb%20full%20size%20image",
+        "note": "does not return the query; suggestions: "
+      }
+    ]
+  }
+}

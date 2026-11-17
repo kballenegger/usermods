@@ -1,0 +1,7 @@
+{
+  "slug": "imdb",
+  "name": "IMDb",
+  "domains": ["imdb.com", "www.imdb.com"],
+  "category": "reference",
+  "intro": "Userscripts for IMDb's title and name pages: add the facts the pages leave out."
+}

@@ -1,0 +1,45 @@
+{
+  "slug": "full-width",
+  "title": "Make Wikipedia full width",
+  "question": "How do I make Wikipedia use the full screen width?",
+  "answer": "Wikipedia's Appearance menu has a Width setting: pick Wide to drop the limit on line length. Logged out, that choice is kept by your browser for one language of Wikipedia only, and the contents and appearance panels still take space at the sides. The usermods script on this page turns on Wide on every page and moves those two panels into their menus, so the article text fills the window. Logged in, the same choices are saved to your account.",
+  "prompt": "Make Wikipedia articles use the full width of my screen, with the table of contents and appearance panels tucked away.",
+  "details": "The script sets three of Vector 2022's own layout switches on every page as it loads: Width set to Wide, the Contents panel unpinned (it becomes a button next to the article title) and the Appearance panel unpinned (it stays in the Appearance menu at the top right). Nothing is restyled; the layout is the site's own.\n\nWide only changes anything on windows wider than about 1600 pixels, so on smaller screens the gain comes from moving the panels. While the script is on, pinning a panel back lasts until you open another page. It has no effect on the old Vector skin or the mobile site. The check loads one English article in a 1366 pixel wide window.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Appearance menu and panel buttons",
+      "body": "Open **Appearance** at the top right and choose **Wide** under **Width**. Click **hide** next to the **Contents** and **Appearance** panel headings to move them out of the sides. Logged in, these are saved to your account; logged out, your browser keeps them for that language edition."
+    }
+  ],
+  "related": [
+    "wikipedia/dark-mode",
+    "wikipedia/old-layout"
+  ],
+  "check": {
+    "urls": [
+      "https://en.wikipedia.org/wiki/Moon"
+    ],
+    "loggedOut": true,
+    "waitFor": "#mw-content-text p",
+    "settleMs": 3000,
+    "baseline": "(() => { const toc = document.querySelector('#vector-toc-pinned-container'); const p = document.querySelector('#mw-content-text p:not(.mw-empty-elt)'); return toc && toc.checkVisibility() && p.getBoundingClientRect().width < 900; })()",
+    "expect": "(() => { const toc = document.querySelector('#vector-toc-pinned-container'); const p = document.querySelector('#mw-content-text p:not(.mw-empty-elt)'); const h = document.documentElement.classList; return (!toc || !toc.checkVisibility()) && h.contains('vector-feature-limited-width-clientpref-0') && p.getBoundingClientRect().width > 1000; })()",
+    "intact": "document.querySelector('#firstHeading').checkVisibility() && [...document.querySelectorAll('#mw-content-text p')].filter((p) => p.checkVisibility() && p.textContent.trim().length > 50).length >= 10 && document.querySelector('#vector-page-titlebar-toc').checkVisibility()"
+  },
+  "demand": {
+    "score": 25,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/547924",
+        "note": "Greasy Fork total installs: \"Wikipedia Large Wide Dark\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=wikipedia+full+width",
+        "note": "suggests \"wikipedia full width\""
+      }
+    ]
+  }
+}

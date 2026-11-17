@@ -1,0 +1,2606 @@
+[
+  {
+    "site": "whatsapp",
+    "siteName": "WhatsApp Web",
+    "domains": [
+      "web.whatsapp.com"
+    ],
+    "category": "social",
+    "task": "privacy-blur",
+    "title": "Blur chats in WhatsApp Web",
+    "question": "How do I blur my chats and names on WhatsApp Web?",
+    "queries": [
+      "whatsapp web blur",
+      "whatsapp web privacy"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/jbojhlhhggfmmkpefknmbdhlaghehini",
+        "metric": 1000000,
+        "note": "Chrome Web Store users, \"Privacy Extension For WhatsApp Web\""
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/mbcghjiodcjankhkllfohcgnckhdbkmi",
+        "metric": 300000,
+        "note": "Chrome Web Store users, \"Privacy Extension For WhatsApp Web - WABULK\""
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/35966",
+        "metric": 1106,
+        "note": "Greasy Fork total installs, \"Whatsapp Web Privacy Mode\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/425969",
+        "metric": 269,
+        "note": "Greasy Fork total installs, \"WhatsApp privacity blur filter\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=whatsapp%20web%20bl",
+        "metric": null,
+        "note": "Google suggests \"whatsapp web blur\""
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=whatsapp%20web%20priva",
+        "metric": null,
+        "note": "Google suggests \"whatsapp web privacy\""
+      }
+    ],
+    "score": 95,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Login is by phone QR, so no logged-out check. Pure CSS blur with hover reveal."
+  },
+  {
+    "site": "google-docs",
+    "siteName": "Google Docs",
+    "domains": [
+      "docs.google.com"
+    ],
+    "category": "work",
+    "task": "dark-mode",
+    "title": "Dark mode for Google Docs",
+    "question": "How do I use dark mode in Google Docs on desktop?",
+    "queries": [
+      "google docs dark mode"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/lgjhepbpjcmfmjlpkkdjlbgomamkgonb",
+        "metric": 900000,
+        "note": "Chrome Web Store users, \"Google Docs Dark Mode\""
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/pihphjfnfjmdbhakhjifipfdgbpenobg",
+        "metric": 200000,
+        "note": "Chrome Web Store users, \"DocsAfterDark\""
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/16883",
+        "metric": 1014,
+        "note": "Greasy Fork total installs, \"Nighty-night Google Docs\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/420470",
+        "metric": 889,
+        "note": "Greasy Fork total installs, \"Google Docs Night Mode\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=google%20docs%20dark%20mo",
+        "metric": null,
+        "note": "Google suggests \"google docs dark mode\""
+      },
+      {
+        "type": "forum",
+        "url": "https://forum.pocketpcmag.com/t/how-to-enable-google-docs-dark-mode/2207",
+        "metric": null,
+        "note": "Forum thread on Docs dark mode"
+      }
+    ],
+    "score": 94,
+    "loginRequired": false,
+    "loggedOutTestUrl": null,
+    "notes": "Any doc shared 'anyone with the link can view' opens logged out; builder must pick a stable public doc. Docs renders on canvas, so invert-filter approach."
+  },
+  {
+    "site": "github",
+    "siteName": "GitHub",
+    "domains": [
+      "github.com"
+    ],
+    "category": "work",
+    "task": "mirror-downloads",
+    "title": "Speed up GitHub downloads through a mirror",
+    "question": "How do I download GitHub releases faster from China?",
+    "queries": [
+      "github download slow"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/412245",
+        "metric": 902976,
+        "note": "Greasy Fork total installs, \"Github Enhancement - High Speed Download\" (api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 89,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://github.com/torvalds/linux",
+    "notes": "Biggest per-site script on Greasy Fork for github.com, mostly Chinese users. Rewrites links to third-party mirror hosts: client-side, but the page would send users to third parties. Orchestrator call."
+  },
+  {
+    "site": "spotify",
+    "siteName": "Spotify",
+    "domains": [
+      "open.spotify.com"
+    ],
+    "category": "other",
+    "task": "block-ads",
+    "title": "Block ads in the Spotify web player",
+    "question": "How do I block ads on the Spotify web player?",
+    "queries": [
+      "spotify web ad blocker"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/nfmlkliedggdodlbgghmmchhgckjoaml",
+        "metric": 400000,
+        "note": "Chrome Web Store users, \"Blockify: Ad Blocker for Spotify, YouTube, & more!\""
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/mghhlojofjipigjobacbjdngmjafdeim",
+        "metric": 100000,
+        "note": "Chrome Web Store users, \"SpotiAds - Ads remover for Spotify\""
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/466185",
+        "metric": 8034,
+        "note": "Greasy Fork total installs, \"Spotify ad skipper\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/390418",
+        "metric": 3588,
+        "note": "Greasy Fork total installs, \"remove spotify web ad\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=spotify%20web%20ad%20block",
+        "metric": null,
+        "note": "Google suggests \"spotify web ad blocker\""
+      }
+    ],
+    "score": 89,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Audio ads need a free logged-in account to appear. Banner ads may show logged out. Mute-during-ad is the userscript-feasible version."
+  },
+  {
+    "site": "chatgpt",
+    "siteName": "ChatGPT",
+    "domains": [
+      "chatgpt.com"
+    ],
+    "category": "work",
+    "task": "ctrl-enter-to-send",
+    "title": "Send ChatGPT messages with Ctrl+Enter",
+    "question": "How do I make Enter add a new line in ChatGPT instead of sending?",
+    "queries": [
+      "chatgpt ctrl enter",
+      "chatgpt enter to send"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/gbncgdhklmnckojlibfhdadpfbcdbnch",
+        "metric": 100000,
+        "note": "Chrome Web Store users, \"Chat AI Ctrl+Enter Sender\""
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/llifnfdbmdcpjfnlhpombbadbhfghdao",
+        "metric": 2000,
+        "note": "Chrome Web Store users, \"ChatGPT EnterControl\"; count from CWS search page"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=chatgpt%20ctrl%20ent",
+        "metric": null,
+        "note": "Google suggests \"chatgpt ctrl enter\""
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=chatgpt%20enter%20to%20se",
+        "metric": null,
+        "note": "Google suggests \"chatgpt enter to send\""
+      },
+      {
+        "type": "forum",
+        "url": "https://community.openai.com/t/toggle-for-ctrl-enter-enter-to-send/788209",
+        "metric": null,
+        "note": "OpenAI forum: toggle for Ctrl-Enter / Enter to send"
+      },
+      {
+        "type": "forum",
+        "url": "https://community.openai.com/t/feature-request-option-to-disable-enter-to-send/1393238",
+        "metric": null,
+        "note": "OpenAI forum: option to disable Enter to send"
+      },
+      {
+        "type": "forum",
+        "url": "https://community.openai.com/t/bug-custom-send-keyboard-combo-still-results-in-immediate-send-with-enter/1411081/11",
+        "metric": null,
+        "note": "OpenAI forum: custom send combo still sends on Enter (Nov 2026)"
+      }
+    ],
+    "score": 85,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://chatgpt.com/",
+    "notes": "A native keyboard setting exists but forum reports say Enter still sends on the web app. Composer renders logged out."
+  },
+  {
+    "site": "chatgpt",
+    "siteName": "ChatGPT",
+    "domains": [
+      "chatgpt.com"
+    ],
+    "category": "work",
+    "task": "export-chat",
+    "title": "Export a ChatGPT conversation",
+    "question": "How do I export a ChatGPT chat to Markdown or PDF?",
+    "queries": [
+      "chatgpt export chat",
+      "chatgpt export to pdf"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/ilmdofdhpnhffldihboadndccenlnfll",
+        "metric": 200000,
+        "note": "Chrome Web Store users, \"ChatGPT Exporter - ChatGPT to PDF, MD, and more\""
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/mjdmggegbkookpcmbdllcnbfboikcbop",
+        "metric": 100000,
+        "note": "Chrome Web Store users, \"ChatGPT to Word or PDF\""
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/456055",
+        "metric": 26512,
+        "note": "Greasy Fork total installs, \"ChatGPT Exporter\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=chatgpt%20export%20ch",
+        "metric": null,
+        "note": "Google suggests \"chatgpt export chat\""
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=chatgpt%20export%20to%20p",
+        "metric": null,
+        "note": "Google suggests \"chatgpt export to pdf\""
+      }
+    ],
+    "score": 85,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://chatgpt.com/",
+    "notes": "Shared conversation pages (chatgpt.com/share/<id>) render logged out and are the stable test target; export reads the DOM and downloads a Blob."
+  },
+  {
+    "site": "claude",
+    "siteName": "Claude",
+    "domains": [
+      "claude.ai"
+    ],
+    "category": "work",
+    "task": "export-chat",
+    "title": "Export a Claude conversation",
+    "question": "How do I export a Claude chat to Markdown or PDF?",
+    "queries": [
+      "claude export chat"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/elhmfakncmnghlnabnolalcjkdpfjnin",
+        "metric": 100000,
+        "note": "Chrome Web Store users, \"AI Chat Exporter: Save Claude as PDF, MD and more\""
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/490399",
+        "metric": 598,
+        "note": "Greasy Fork total installs, \"Claude.ai Ultimate Chat Exporter\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=claude%20export%20ch",
+        "metric": null,
+        "note": "Google suggests \"claude export chat\""
+      }
+    ],
+    "score": 80,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "claude.ai returned 403 to curl; shared chat pages may render logged out, unverified."
+  },
+  {
+    "site": "gmail",
+    "siteName": "Gmail",
+    "domains": [
+      "mail.google.com"
+    ],
+    "category": "work",
+    "task": "hide-gemini",
+    "title": "Hide Gemini in Gmail",
+    "question": "How do I hide the Gemini button in Gmail?",
+    "queries": [
+      "hide gemini in gmail",
+      "remove gemini from gmail"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/ggneoaeoplbpehkojnifancipajnhcbp",
+        "metric": 80000,
+        "note": "Chrome Web Store users, \"Hide Gemini and Google AI\""
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/gbeddlehlaadbddmbjbllnobooffbcfn",
+        "metric": 30000,
+        "note": "Chrome Web Store users, \"Hide Google AI - Bye Bye Gemini\""
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/hlbobnmcldcogdfkofmpggbkflbkahjm",
+        "metric": 159,
+        "note": "Chrome Web Store users, \"Hide Gemini in Gmail\"; count from CWS search page"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=hide%20gemini%20in%20gma",
+        "metric": null,
+        "note": "Google suggests \"hide gemini in gmail\""
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=remove%20gemini%20from%20gma",
+        "metric": null,
+        "note": "Google suggests \"remove gemini from gmail\""
+      },
+      {
+        "type": "search",
+        "url": "https://tech.yahoo.com/general/articles/rid-gemini-gmail-155002252.html",
+        "metric": null,
+        "note": "Article: turning off smart features leaves Gemini icons visible"
+      }
+    ],
+    "score": 79,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Smart-features toggle exists but leaves buttons; the top CWS extensions also cover Google Search AI."
+  },
+  {
+    "site": "github",
+    "siteName": "GitHub",
+    "domains": [
+      "github.com"
+    ],
+    "category": "work",
+    "task": "translate-interface",
+    "title": "Translate the GitHub interface",
+    "question": "How do I use GitHub in Chinese?",
+    "queries": [
+      "github chinese"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/407485",
+        "metric": 148791,
+        "note": "Greasy Fork total installs, \"GitHub Internationalization\" (api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 78,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://github.com/torvalds/linux",
+    "notes": "Dictionary-based UI translation, mostly zh-CN. Large but language-specific."
+  },
+  {
+    "site": "notion",
+    "siteName": "Notion",
+    "domains": [
+      "www.notion.so",
+      "notion.so",
+      "notion.site"
+    ],
+    "category": "work",
+    "task": "full-width",
+    "title": "Make every Notion page full width",
+    "question": "How do I make all Notion pages full width by default?",
+    "queries": [
+      "notion full width"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/eciepnnimnjaojlkcpdpcgbfkpcagahd",
+        "metric": 70000,
+        "note": "Chrome Web Store users, \"Notion Boost\"; multi-feature, full width by default is its headline"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/404704",
+        "metric": 161,
+        "note": "Greasy Fork total installs, \"Notion Full-Width Pages in Narrow Viewport\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=notion%20full%20wid",
+        "metric": null,
+        "note": "Google suggests \"notion full width\""
+      },
+      {
+        "type": "github",
+        "url": "https://github.com/notion-enhancer/notion-enhancer/issues/139",
+        "metric": null,
+        "note": "notion-enhancer issue: default full width for all pages"
+      }
+    ],
+    "score": 78,
+    "loginRequired": false,
+    "loggedOutTestUrl": null,
+    "notes": "Public notion.site pages render the same page frame logged out; builder needs a stable public page."
+  },
+  {
+    "site": "gmail",
+    "siteName": "Gmail",
+    "domains": [
+      "mail.google.com"
+    ],
+    "category": "work",
+    "task": "show-full-date",
+    "title": "Show full dates in the Gmail inbox",
+    "question": "How do I show the full date and time for every email in Gmail?",
+    "queries": [
+      "gmail show full date"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/jgjaapljoafhkohbnfigoekjgdfddnnn",
+        "metric": 60000,
+        "note": "Chrome Web Store users, \"Gmail Show Time\""
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/26848",
+        "metric": 462,
+        "note": "Greasy Fork total installs, \"Gmail - show full date and time in mail list\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=gmail%20show%20full%20da",
+        "metric": null,
+        "note": "Google suggests \"gmail show full date\""
+      }
+    ],
+    "score": 77,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Date strings live in the title attribute of the list rows; script copies them into the cell."
+  },
+  {
+    "site": "chatgpt",
+    "siteName": "ChatGPT",
+    "domains": [
+      "chatgpt.com"
+    ],
+    "category": "work",
+    "task": "wide-chat",
+    "title": "Make the ChatGPT chat wider",
+    "question": "How do I make the ChatGPT conversation use the full width of the screen?",
+    "queries": [
+      "chatgpt wide mode",
+      "chatgpt full width"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/apadogadaahdjhhmbdhkmdecbobijoed",
+        "metric": 20000,
+        "note": "Chrome Web Store users, \"Roomy: Wide Mode for Gemini, ChatGPT, Claude & DeepSeek\""
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/499377",
+        "metric": 3104,
+        "note": "Greasy Fork total installs, \"Wider AI Chat\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/461206",
+        "metric": 2036,
+        "note": "Greasy Fork total installs, \"ChatGPT / Gemini / Claude Width\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=chatgpt%20wide%20mo",
+        "metric": null,
+        "note": "Google suggests \"chatgpt wide mode\""
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=chatgpt%20full%20wid",
+        "metric": null,
+        "note": "Google suggests \"chatgpt full width\""
+      },
+      {
+        "type": "forum",
+        "url": "https://community.openai.com/t/allow-users-to-customize-chat-window-width-in-chatgpt/958512",
+        "metric": null,
+        "note": "OpenAI forum feature request: customize chat window width"
+      },
+      {
+        "type": "forum",
+        "url": "https://community.openai.com/t/wider-conversation-view-adapting-to-main-windows-width/484180",
+        "metric": null,
+        "note": "OpenAI forum feature request: wider conversation view"
+      }
+    ],
+    "score": 75,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://chatgpt.com/",
+    "notes": "Test on a chatgpt.com/share/<id> page so there are messages to measure."
+  },
+  {
+    "site": "gmail",
+    "siteName": "Gmail",
+    "domains": [
+      "mail.google.com"
+    ],
+    "category": "work",
+    "task": "simplify-layout",
+    "title": "Simplify the Gmail layout",
+    "question": "How do I declutter Gmail and make it look simpler?",
+    "queries": [
+      "gmail compact view"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/pbmlfaiicoikhdbjagjbglnbfcbcojpj",
+        "metric": 30000,
+        "note": "Chrome Web Store users, \"Simplify Gmail\""
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=gmail%20compact%20vi",
+        "metric": null,
+        "note": "Google suggests \"gmail compact view\""
+      }
+    ],
+    "score": 72,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Native density setting exists; demand is for hiding chrome (side rail, header extras)."
+  },
+  {
+    "site": "notion",
+    "siteName": "Notion",
+    "domains": [
+      "www.notion.so",
+      "notion.so",
+      "notion.site"
+    ],
+    "category": "work",
+    "task": "floating-toc",
+    "title": "Pin a table of contents beside Notion pages",
+    "question": "How do I show a floating table of contents in Notion?",
+    "queries": [
+      "notion table of contents"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/406498",
+        "metric": 2390,
+        "note": "Greasy Fork total installs, \"Notion Fixed TOC\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/dndcmiicjbkfcbpjincpefjkagflbbnl",
+        "metric": 30000,
+        "note": "Chrome Web Store users, \"notion-enhancer\"; multi-feature"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=notion%20table%20of%20conten",
+        "metric": null,
+        "note": "Google suggests \"notion table of contents\""
+      }
+    ],
+    "score": 72,
+    "loginRequired": false,
+    "loggedOutTestUrl": null,
+    "notes": "Built from the page's heading blocks; works on public notion.site pages."
+  },
+  {
+    "site": "claude",
+    "siteName": "Claude",
+    "domains": [
+      "claude.ai"
+    ],
+    "category": "work",
+    "task": "wide-chat",
+    "title": "Make the Claude chat wider",
+    "question": "How do I make Claude's chat use the full width of the screen?",
+    "queries": [
+      "claude wide mode",
+      "claude full width"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/apadogadaahdjhhmbdhkmdecbobijoed",
+        "metric": 20000,
+        "note": "Chrome Web Store users, \"Roomy: Wide Mode for Gemini, ChatGPT, Claude & DeepSeek\""
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/461206",
+        "metric": 2036,
+        "note": "Greasy Fork total installs, \"ChatGPT / Gemini / Claude Width\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/493303",
+        "metric": 51,
+        "note": "Greasy Fork total installs, \"Claude.ai Full Screen Chat\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=claude%20wide%20mo",
+        "metric": null,
+        "note": "Google suggests \"claude wide mode\""
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=claude%20full%20wid",
+        "metric": null,
+        "note": "Google suggests \"claude full width\""
+      }
+    ],
+    "score": 70,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Roomy count is shared with ChatGPT/Gemini."
+  },
+  {
+    "site": "github",
+    "siteName": "GitHub",
+    "domains": [
+      "github.com"
+    ],
+    "category": "work",
+    "task": "file-icons",
+    "title": "Show file type icons on GitHub",
+    "question": "How do I get file type icons in GitHub's file list?",
+    "queries": [
+      "github file icons"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/bggfcpfjbdkhfhfmkjpbhnkhnpjjeomc",
+        "metric": 20000,
+        "note": "Chrome Web Store users, \"Material Icons for GitHub\""
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/ficfmibkjjnpogdcfhfokmihanoldbfe",
+        "metric": 10000,
+        "note": "Chrome Web Store users, \"File Icons for GitHub and GitLab\"; count from CWS search page"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/5982",
+        "metric": 1193,
+        "note": "Greasy Fork total installs, \"GitHub file list beautifier\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=github%20file%20ico",
+        "metric": null,
+        "note": "Google suggests \"github file icons\""
+      }
+    ],
+    "score": 70,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://github.com/torvalds/linux",
+    "notes": "Icons must be inline SVG/CSS in the script (no remote fetch)."
+  },
+  {
+    "site": "google-maps",
+    "siteName": "Google Maps",
+    "domains": [
+      "www.google.com/maps",
+      "maps.google.com"
+    ],
+    "category": "reference",
+    "task": "dark-mode",
+    "title": "Dark mode for Google Maps on desktop",
+    "question": "How do I use dark mode in Google Maps on a computer?",
+    "queries": [
+      "google maps dark mode"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/aogldndldipgagdpmlgpplfdjdlgahke",
+        "metric": 10000,
+        "note": "Chrome Web Store users, \"Dark Google Maps\""
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/dpgomlnlopaohpdnmohphlcgonkdgcif",
+        "metric": 2000,
+        "note": "Chrome Web Store users, \"Google Maps Dark Mode Desktop\"; count from CWS search page"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=google%20maps%20dark%20mo",
+        "metric": null,
+        "note": "Google suggests \"google maps dark mode\""
+      },
+      {
+        "type": "forum",
+        "url": "https://support.google.com/maps/thread/360583298/request-for-native-dark-mode-support-in-google-maps-on-desktop-chromium?hl=en",
+        "metric": null,
+        "note": "Google Maps community: request native dark mode on desktop"
+      },
+      {
+        "type": "forum",
+        "url": "https://eileenslounge.com/viewtopic.php?style=24&t=41444",
+        "metric": null,
+        "note": "Eileen's Lounge: Google Maps dark mode on Windows needs an extension"
+      }
+    ],
+    "score": 70,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.google.com/maps",
+    "notes": "Map is canvas/WebGL; invert filter with hue-rotate. Consent wall in EU."
+  },
+  {
+    "site": "google-meet",
+    "siteName": "Google Meet",
+    "domains": [
+      "meet.google.com"
+    ],
+    "category": "work",
+    "task": "push-to-talk",
+    "title": "Push to talk in Google Meet",
+    "question": "How do I use push to talk in Google Meet?",
+    "queries": [
+      "google meet push to talk"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/acejpfahoednmngaoeimoekcepchkmlp",
+        "metric": 20000,
+        "note": "Chrome Web Store users, \"Push To Talk for Google Meet\""
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/402134",
+        "metric": 471,
+        "note": "Greasy Fork total installs, \"Google Push to Talk\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=google%20meet%20push%20to%20ta",
+        "metric": null,
+        "note": "Google suggests \"google meet push to talk\""
+      }
+    ],
+    "score": 70,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Hold space to unmute by clicking the mic button."
+  },
+  {
+    "site": "google-drive",
+    "siteName": "Google Drive",
+    "domains": [
+      "drive.google.com"
+    ],
+    "category": "work",
+    "task": "direct-download-links",
+    "title": "Get direct download links from Google Drive",
+    "question": "How do I get a direct download link for a Google Drive file?",
+    "queries": [
+      "google drive direct download link"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/10052",
+        "metric": 11490,
+        "note": "Greasy Fork total installs, \"Google Drive Direct Links\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/ebfajbnnlkjdogmocghbakjbncbgiljb",
+        "metric": 7000,
+        "note": "Chrome Web Store users, \"Google Drive Direct Link Generator\"; count from CWS search page"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=google%20drive%20direct%20download%20li",
+        "metric": null,
+        "note": "Google suggests \"google drive direct download link\""
+      }
+    ],
+    "score": 66,
+    "loginRequired": false,
+    "loggedOutTestUrl": null,
+    "notes": "Works on public file pages: rewrite to drive.google.com/uc?export=download&id=. Needs a stable public file for the check."
+  },
+  {
+    "site": "chatgpt",
+    "siteName": "ChatGPT",
+    "domains": [
+      "chatgpt.com"
+    ],
+    "category": "work",
+    "task": "folders",
+    "title": "Organize ChatGPT chats into folders",
+    "question": "How do I put ChatGPT chats into folders?",
+    "queries": [
+      "chatgpt folders"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/lapefebfdhoomaehglkomljbpfbjcham",
+        "metric": 10000,
+        "note": "Chrome Web Store users, \"ChatGPT Folders\""
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=chatgpt%20folde",
+        "metric": null,
+        "note": "Google suggests \"chatgpt folders\""
+      }
+    ],
+    "score": 65,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Needs chat history; native Projects partly covers it."
+  },
+  {
+    "site": "gmail",
+    "siteName": "Gmail",
+    "domains": [
+      "mail.google.com"
+    ],
+    "category": "work",
+    "task": "dark-mode",
+    "title": "Make Gmail fully dark",
+    "question": "How do I make Gmail dark mode include email bodies?",
+    "queries": [
+      "gmail dark mode"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/pmdghmdjjojjeajflmpgnambocpnpiea",
+        "metric": 10000,
+        "note": "Chrome Web Store users, \"Gmail Dark Mode\""
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/402539",
+        "metric": 418,
+        "note": "Greasy Fork total installs, \"Gmail Dark Theme\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=gmail%20dark%20mo",
+        "metric": null,
+        "note": "Google suggests \"gmail dark mode\""
+      }
+    ],
+    "score": 65,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Gmail has a dark theme but message bodies stay white (autocomplete also suggests 'gmail dark mode emails still white')."
+  },
+  {
+    "site": "outlook",
+    "siteName": "Outlook",
+    "domains": [
+      "outlook.live.com",
+      "outlook.office.com"
+    ],
+    "category": "work",
+    "task": "remove-ads",
+    "title": "Remove ads from Outlook.com",
+    "question": "How do I remove the ads in Outlook.com?",
+    "queries": [
+      "outlook remove ads"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/hpgeocgakdijfphkiakppebifapgclkc",
+        "metric": 5000,
+        "note": "Chrome Web Store users, \"Outlook Ad Blocker\""
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/29965",
+        "metric": 2567,
+        "note": "Greasy Fork total installs, \"Hide Outlook ads\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/426935",
+        "metric": 682,
+        "note": "Greasy Fork total installs, \"cleanLiveMailAds\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=outlook%20remove%20a",
+        "metric": null,
+        "note": "Google suggests \"outlook remove ads\""
+      },
+      {
+        "type": "forum",
+        "url": "https://learn.microsoft.com/en-us/answers/questions/4467673/in-outlook-how-do-i-get-rid-of-righthand-side-adve",
+        "metric": null,
+        "note": "Microsoft Q&A: get rid of right-hand advertising pane"
+      },
+      {
+        "type": "forum",
+        "url": "https://learn.microsoft.com/en-us/answers/questions/4527362/how-do-i-get-rid-of-the-side-panel-ads-sponsored-s?forum=outlook_com-all",
+        "metric": null,
+        "note": "Microsoft Q&A: side panel sponsored ads"
+      },
+      {
+        "type": "forum",
+        "url": "https://answers.microsoft.com/en-us/outlook_com/forum/all/how-to-remove-or-hide-the-right-hand-advertising/d47e63bf-5c9b-4061-9d76-ec3b9349c0c7",
+        "metric": null,
+        "note": "Microsoft answers: hide right-hand ad column"
+      }
+    ],
+    "score": 65,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Greasy Fork live.com list has 15+ separate Outlook ad scripts."
+  },
+  {
+    "site": "claude",
+    "siteName": "Claude",
+    "domains": [
+      "claude.ai"
+    ],
+    "category": "work",
+    "task": "enter-key",
+    "title": "Make Enter add a new line in Claude",
+    "question": "How do I stop Enter from sending my message in Claude?",
+    "queries": [
+      "claude enter key"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/nllncjgkdkcabkomghcfgfaplgdnlcjo",
+        "metric": 5000,
+        "note": "Chrome Web Store users, \"Enter Key Control for ChatGPT, Claude, Gemini, DeepSeek & more\"; count from CWS search page"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/odnbnplcfenobhmghdpiebbjdgchinjm",
+        "metric": 2000,
+        "note": "Chrome Web Store users, \"Fix Claude's Enter Key\""
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=claude%20enter%20k",
+        "metric": null,
+        "note": "Google suggests \"claude enter key\""
+      }
+    ],
+    "score": 60,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": ""
+  },
+  {
+    "site": "jira",
+    "siteName": "Jira",
+    "domains": [
+      "atlassian.net"
+    ],
+    "category": "work",
+    "task": "dark-mode",
+    "title": "Dark mode for Jira",
+    "question": "How do I turn on dark mode in Jira?",
+    "queries": [
+      "jira dark mode"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/nlgcogdbamhmdbpaabmpklojolokodaa",
+        "metric": 5000,
+        "note": "Chrome Web Store users, \"Night Mode for Jira\""
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/kceiicckemdanfancjeiddjkedhdicgo",
+        "metric": 4000,
+        "note": "Chrome Web Store users, \"Jira Black - Dark Mode\""
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=jira%20dark%20mo",
+        "metric": null,
+        "note": "Google suggests \"jira dark mode\""
+      }
+    ],
+    "score": 60,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Jira Cloud now has a native dark theme; extensions predate it."
+  },
+  {
+    "site": "trello",
+    "siteName": "Trello",
+    "domains": [
+      "trello.com"
+    ],
+    "category": "work",
+    "task": "count-cards",
+    "title": "Show card counts on Trello lists",
+    "question": "How do I see how many cards are in each Trello list?",
+    "queries": [
+      "trello card count"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/ggamggchfpnmhmkeicjgpedgjcllcefp",
+        "metric": 10000,
+        "note": "Chrome Web Store users, \"Original Card Counter for Trello\""
+      }
+    ],
+    "score": 60,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://trello.com/b/nC8QJJoZ/trello-development-roadmap",
+    "notes": "Public board URL returned 200 to curl; confirm it renders lists logged out."
+  },
+  {
+    "site": "google-calendar",
+    "siteName": "Google Calendar",
+    "domains": [
+      "calendar.google.com"
+    ],
+    "category": "work",
+    "task": "shade-weekends",
+    "title": "Shade weekends in Google Calendar",
+    "question": "How do I highlight weekends in Google Calendar?",
+    "queries": [
+      "google calendar shade weekends"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/pdbcjcpinemooahpfnncddnmjgjhcfod",
+        "metric": 9000,
+        "note": "Chrome Web Store users, \"Google Calendar Weekend Highlighter\""
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/7322",
+        "metric": 389,
+        "note": "Greasy Fork total installs, \"Google Calendar with colored weekend days\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "forum",
+        "url": "https://productforums.google.com/forum/?_escaped_fragment_=msg%2Fcalendar%2FnF8FbVeTBko%2FQdLU-vobBAAJ",
+        "metric": null,
+        "note": "Google product forum: shading Saturday and Sunday, no option"
+      }
+    ],
+    "score": 59,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Hiding weekends is native; shading is not. Public embed calendars show logged out but use a different UI."
+  },
+  {
+    "site": "slack",
+    "siteName": "Slack",
+    "domains": [
+      "app.slack.com",
+      "slack.com"
+    ],
+    "category": "work",
+    "task": "open-in-browser",
+    "title": "Open Slack links in the browser, not the app",
+    "question": "How do I stop Slack links from opening the desktop app?",
+    "queries": [
+      "slack open in browser"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/jkgehijlkoolgcjifalbiicaomkngakb",
+        "metric": 4000,
+        "note": "Chrome Web Store users, \"Open Slack in Browser, not App\""
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=slack%20open%20in%20brows",
+        "metric": null,
+        "note": "Google suggests \"slack open in browser\""
+      },
+      {
+        "type": "search",
+        "url": "https://slack.green/en/blog/slack-keeps-opening-in-browser",
+        "metric": null,
+        "note": "Explains the yourteam.slack.com handoff page vs app.slack.com"
+      }
+    ],
+    "score": 59,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Redirect the handoff page to app.slack.com/client/...; the handoff page itself may render before login."
+  },
+  {
+    "site": "github",
+    "siteName": "GitHub",
+    "domains": [
+      "github.com"
+    ],
+    "category": "work",
+    "task": "dark-mode",
+    "title": "Dark mode for GitHub",
+    "question": "How do I turn on dark mode on GitHub?",
+    "queries": [
+      "github dark mode"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/15562",
+        "metric": 3445,
+        "note": "Greasy Fork total installs, \"GitHub Dark Script\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/ebpfohnniggcgdadnghbkdopcpfcdmgh",
+        "metric": 458,
+        "note": "Chrome Web Store users, \"GitHub Dark\""
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=github%20dark%20mo",
+        "metric": null,
+        "note": "Google suggests \"github dark mode\""
+      }
+    ],
+    "score": 58,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://github.com/torvalds/linux",
+    "notes": "Native theme setting exists for logged-in users; logged out follows the OS."
+  },
+  {
+    "site": "google-calendar",
+    "siteName": "Google Calendar",
+    "domains": [
+      "calendar.google.com"
+    ],
+    "category": "work",
+    "task": "dark-mode",
+    "title": "Dark mode for Google Calendar",
+    "question": "How do I turn on dark mode for Google Calendar on desktop?",
+    "queries": [
+      "google calendar dark mode"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/nbefdmllbjackokegljnjidmebhojghn",
+        "metric": 3000,
+        "note": "Chrome Web Store users, \"Google Calendar Dark Mode\""
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=google%20calendar%20dark%20mo",
+        "metric": null,
+        "note": "Google suggests \"google calendar dark mode\""
+      }
+    ],
+    "score": 57,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "No native dark theme on desktop web."
+  },
+  {
+    "site": "trello",
+    "siteName": "Trello",
+    "domains": [
+      "trello.com"
+    ],
+    "category": "work",
+    "task": "show-card-numbers",
+    "title": "Show card numbers in Trello",
+    "question": "How do I show card numbers on Trello cards?",
+    "queries": [
+      "trello show card numbers"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/ncibjlmfhjcjnphnpphgphbflpdpliei",
+        "metric": 3000,
+        "note": "Chrome Web Store users, \"Trello Card Numbers Plus\"; count from CWS search page"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/17188",
+        "metric": 216,
+        "note": "Greasy Fork total installs, \"Trello Card Number\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=trello%20card%20numbe",
+        "metric": null,
+        "note": "Google suggests \"trello show card numbers\""
+      }
+    ],
+    "score": 57,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://trello.com/b/nC8QJJoZ/trello-development-roadmap",
+    "notes": "Card number is in the card URL slug."
+  },
+  {
+    "site": "notion",
+    "siteName": "Notion",
+    "domains": [
+      "www.notion.so",
+      "notion.so",
+      "notion.site"
+    ],
+    "category": "work",
+    "task": "word-count",
+    "title": "Show a word count in Notion",
+    "question": "How do I see the word count of a Notion page?",
+    "queries": [
+      "notion word count"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/406251",
+        "metric": 2187,
+        "note": "Greasy Fork total installs, \"Notion Page Words Counter\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=notion%20word%20cou",
+        "metric": null,
+        "note": "Google suggests \"notion word count\""
+      }
+    ],
+    "score": 55,
+    "loginRequired": false,
+    "loggedOutTestUrl": null,
+    "notes": ""
+  },
+  {
+    "site": "spotify",
+    "siteName": "Spotify",
+    "domains": [
+      "open.spotify.com"
+    ],
+    "category": "other",
+    "task": "copy-track-info",
+    "title": "Copy track info from Spotify web",
+    "question": "How do I copy song title and artist from the Spotify web player?",
+    "queries": [
+      "spotify copy song name"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/36788",
+        "metric": 4728,
+        "note": "Greasy Fork total installs, \"Spotify Web - Copy track info to clipboard\" (api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 55,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://open.spotify.com/",
+    "notes": "Context menu entry on track rows, which render logged out on album and playlist pages."
+  },
+  {
+    "site": "trello",
+    "siteName": "Trello",
+    "domains": [
+      "trello.com"
+    ],
+    "category": "work",
+    "task": "collapse-lists",
+    "title": "Collapse lists in Trello",
+    "question": "How do I collapse a list in Trello?",
+    "queries": [
+      "trello collapse list"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/egdkjinldbenhgdaodmdcdgknjnljihf",
+        "metric": 2000,
+        "note": "Chrome Web Store users, \"Trello Folds (Kanban for Trello)\""
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/6777",
+        "metric": 374,
+        "note": "Greasy Fork total installs, \"Trello - minimize lists\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=trello%20collapse%20lis",
+        "metric": null,
+        "note": "Google suggests \"trello collapse list\""
+      }
+    ],
+    "score": 55,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://trello.com/b/nC8QJJoZ/trello-development-roadmap",
+    "notes": "Trello added native list collapse in 2024 for some plans."
+  },
+  {
+    "site": "whatsapp",
+    "siteName": "WhatsApp Web",
+    "domains": [
+      "web.whatsapp.com"
+    ],
+    "category": "social",
+    "task": "hide-chat-list",
+    "title": "Hide the chat list in WhatsApp Web",
+    "question": "How do I hide the chat list in WhatsApp Web?",
+    "queries": [
+      "whatsapp web hide chat list"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/meoojinhimemkeehlhbojjhnchhgpbak",
+        "metric": 2000,
+        "note": "Chrome Web Store users, \"WhatsApp Web Sidebar Toggle\""
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/dhchpgahkaanlehjcdddphegjpopicge",
+        "metric": 1000,
+        "note": "Chrome Web Store users, \"Hide contacts in Whatsapp Web\""
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/411388",
+        "metric": 421,
+        "note": "Greasy Fork total installs, \"Whatsapp Sidebar Hider\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=whatsapp%20web%20hide%20chat%20li",
+        "metric": null,
+        "note": "Google suggests \"whatsapp web hide chat list\""
+      }
+    ],
+    "score": 55,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": ""
+  },
+  {
+    "site": "github",
+    "siteName": "GitHub",
+    "domains": [
+      "github.com"
+    ],
+    "category": "work",
+    "task": "old-feed",
+    "title": "Restore the old GitHub home feed",
+    "question": "How do I get the old GitHub dashboard feed back?",
+    "queries": [
+      "github old feed"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/474728",
+        "metric": 1748,
+        "note": "Greasy Fork total installs, \"Github Old Feed\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/171",
+        "metric": 309,
+        "note": "Greasy Fork total installs, \"Github News Feed Filter\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=github%20old%20fe",
+        "metric": null,
+        "note": "Google suggests \"github old feed\""
+      }
+    ],
+    "score": 54,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "The original script fetches the old feed; a CSS-only version can only hide recommendations."
+  },
+  {
+    "site": "spotify",
+    "siteName": "Spotify",
+    "domains": [
+      "open.spotify.com"
+    ],
+    "category": "other",
+    "task": "hide-upgrade-prompts",
+    "title": "Hide Premium upsells in Spotify web",
+    "question": "How do I hide the Upgrade to Premium prompts on Spotify web?",
+    "queries": [
+      "spotify hide upgrade button"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/522592",
+        "metric": 3696,
+        "note": "Greasy Fork total installs, \"Spotify AdBlocker (banners, premium prompts)\" (api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 54,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://open.spotify.com/",
+    "notes": "Logged out shows a sign-up banner; logged-in free shows Explore Premium. open.spotify.com returned 200."
+  },
+  {
+    "site": "gmail",
+    "siteName": "Gmail",
+    "domains": [
+      "mail.google.com"
+    ],
+    "category": "work",
+    "task": "remove-ads",
+    "title": "Remove ads from Gmail",
+    "question": "How do I remove the sponsored ads in Gmail?",
+    "queries": [
+      "gmail remove ads"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/37967",
+        "metric": 1316,
+        "note": "Greasy Fork total installs, \"Webmail Ad Blocker\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=gmail%20remove%20a",
+        "metric": null,
+        "note": "Google suggests \"gmail remove ads\""
+      },
+      {
+        "type": "search",
+        "url": "https://www.androidauthority.com/disable-ads-gmail-inbox-3565883/",
+        "metric": null,
+        "note": "Article: disabling categories removes sponsored rows"
+      }
+    ],
+    "score": 52,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Sponsored rows sit at the top of Promotions/Social tabs; CSS can hide them."
+  },
+  {
+    "site": "gmail",
+    "siteName": "Gmail",
+    "domains": [
+      "mail.google.com"
+    ],
+    "category": "work",
+    "task": "unread-count-favicon",
+    "title": "Show the unread count on the Gmail tab",
+    "question": "How do I show the Gmail unread count in the browser tab?",
+    "queries": [
+      "gmail unread count in tab"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/kmnilibailnabapaolahfacmnapamkhg",
+        "metric": 3000,
+        "note": "Chrome Web Store users, \"Gmail Taskbar Unread Badge\"; count from CWS search page"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=gmail%20unread%20count%20in%20t",
+        "metric": null,
+        "note": "\"gmail unread count in tab\" not suggested; got: gmail unread messages on top; gmail unread badge won t go away; how to see how many unread emails in gmail"
+      }
+    ],
+    "score": 52,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Gmail has a native 'Unread message icon' setting under Advanced; low priority."
+  },
+  {
+    "site": "google-drive",
+    "siteName": "Google Drive",
+    "domains": [
+      "drive.google.com"
+    ],
+    "category": "work",
+    "task": "skip-preview-download",
+    "title": "Download Drive files without the preview",
+    "question": "How do I download Google Drive files without opening the preview?",
+    "queries": [
+      "google drive download without preview"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/380394",
+        "metric": 2953,
+        "note": "Greasy Fork total installs, \"Google Drive Auto Download (without preview)\" (api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 52,
+    "loginRequired": false,
+    "loggedOutTestUrl": null,
+    "notes": "Public file page; redirect to the download URL."
+  },
+  {
+    "site": "github",
+    "siteName": "GitHub",
+    "domains": [
+      "github.com"
+    ],
+    "category": "work",
+    "task": "filter-search",
+    "title": "Filter repos out of GitHub search",
+    "question": "How do I hide specific repositories from GitHub search results?",
+    "queries": [
+      "github search block repository"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/473912",
+        "metric": 2577,
+        "note": "Greasy Fork total installs, \"Github Search Purification\" (api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 51,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Code search needs login; repo search works logged out."
+  },
+  {
+    "site": "outlook",
+    "siteName": "Outlook",
+    "domains": [
+      "outlook.live.com",
+      "outlook.office.com"
+    ],
+    "category": "work",
+    "task": "wider-reading-pane",
+    "title": "Widen the Outlook reading pane",
+    "question": "How do I make the Outlook.com reading pane wider?",
+    "queries": [
+      "outlook wider reading pane"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/9587",
+        "metric": 2017,
+        "note": "Greasy Fork total installs, \"Outlook Extend Panel\" (api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 50,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": ""
+  },
+  {
+    "site": "chatgpt",
+    "siteName": "ChatGPT",
+    "domains": [
+      "chatgpt.com"
+    ],
+    "category": "work",
+    "task": "amoled-dark",
+    "title": "Pure black dark mode for ChatGPT",
+    "question": "How do I make ChatGPT dark mode pure black?",
+    "queries": [
+      "chatgpt dark mode"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/aglfigeheodccgeodjbimolajpjfaoge",
+        "metric": 878,
+        "note": "Chrome Web Store users, \"Amoled Dark Mode for ChatGPT\"; count from CWS search page"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/492365",
+        "metric": 510,
+        "note": "Greasy Fork total installs, \"Better ChatGPT Dark Theme\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=chatgpt%20dark%20mo",
+        "metric": null,
+        "note": "Google suggests \"chatgpt dark mode\""
+      }
+    ],
+    "score": 49,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://chatgpt.com/",
+    "notes": "Native dark theme exists; demand is for darker or custom colours."
+  },
+  {
+    "site": "notion",
+    "siteName": "Notion",
+    "domains": [
+      "www.notion.so",
+      "notion.so",
+      "notion.site"
+    ],
+    "category": "work",
+    "task": "rtl-text",
+    "title": "Right-to-left text in Notion",
+    "question": "How do I write right-to-left text in Notion?",
+    "queries": [
+      "notion rtl"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/398348",
+        "metric": 1828,
+        "note": "Greasy Fork total installs, \"Notion.so RTL support for written text\" (api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 49,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Needs editing, so login."
+  },
+  {
+    "site": "github",
+    "siteName": "GitHub",
+    "domains": [
+      "github.com"
+    ],
+    "category": "work",
+    "task": "absolute-dates",
+    "title": "Show absolute dates on GitHub",
+    "question": "How do I show real dates instead of '3 days ago' on GitHub?",
+    "queries": [
+      "github absolute dates"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/fmceohllpeampmclkldblmkhippchgck",
+        "metric": 615,
+        "note": "Chrome Web Store users, \"Absolute Dates Plugin for GitHub\"; count from CWS search page"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=github%20absolute%20dat",
+        "metric": null,
+        "note": "Google suggests \"github absolute dates\""
+      },
+      {
+        "type": "search",
+        "url": "https://gist.github.com/jftuga/5b552b008c24860c73a14d5c0f36b2c5",
+        "metric": null,
+        "note": "Bookmarklet gist for absolute dates"
+      },
+      {
+        "type": "search",
+        "url": "https://shanedowling.com/posts/github-userscript-absolute-dates/",
+        "metric": null,
+        "note": "Blog post with a userscript for absolute dates"
+      }
+    ],
+    "score": 47,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://github.com/torvalds/linux/pulls",
+    "notes": "<relative-time> elements carry the datetime attribute."
+  },
+  {
+    "site": "google-docs",
+    "siteName": "Google Docs",
+    "domains": [
+      "docs.google.com"
+    ],
+    "category": "work",
+    "task": "word-count",
+    "title": "Always show word count in Google Docs",
+    "question": "How do I keep the word count visible in Google Docs?",
+    "queries": [
+      "google docs word count"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/22057",
+        "metric": 657,
+        "note": "Greasy Fork total installs, \"Google Docs Wordcount\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/pkmpgkafldocbllmpjafigafihimehnh",
+        "metric": 543,
+        "note": "Chrome Web Store users, \"Google Docs Word Counter\"; count from CWS search page"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=google%20docs%20word%20cou",
+        "metric": null,
+        "note": "Google suggests \"google docs word count\""
+      }
+    ],
+    "score": 47,
+    "loginRequired": false,
+    "loggedOutTestUrl": null,
+    "notes": "Docs has a native 'display word count while typing' option, only while editing."
+  },
+  {
+    "site": "spotify",
+    "siteName": "Spotify",
+    "domains": [
+      "open.spotify.com"
+    ],
+    "category": "other",
+    "task": "download-cover",
+    "title": "Download full-size Spotify cover art",
+    "question": "How do I download album cover art from Spotify?",
+    "queries": [
+      "spotify download cover art"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/498854",
+        "metric": 1110,
+        "note": "Greasy Fork total installs, \"Spotify Web - Download Cover\" (api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 46,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://open.spotify.com/",
+    "notes": "Cover URLs are on i.scdn.co; script links to the largest size."
+  },
+  {
+    "site": "whatsapp",
+    "siteName": "WhatsApp Web",
+    "domains": [
+      "web.whatsapp.com"
+    ],
+    "category": "social",
+    "task": "dark-mode",
+    "title": "Dark mode for WhatsApp Web",
+    "question": "How do I turn on dark mode in WhatsApp Web?",
+    "queries": [
+      "whatsapp web dark mode"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/476479",
+        "metric": 550,
+        "note": "Greasy Fork total installs, \"WhatsApp Web Neon\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/403440",
+        "metric": 219,
+        "note": "Greasy Fork total installs, \"Whatsapp Web dark theme enabler\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=whatsapp%20web%20dark%20mo",
+        "metric": null,
+        "note": "Google suggests \"whatsapp web dark mode\""
+      }
+    ],
+    "score": 46,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Native dark theme exists; autocomplete shows 'not working' variants."
+  },
+  {
+    "site": "gmail",
+    "siteName": "Gmail",
+    "domains": [
+      "mail.google.com"
+    ],
+    "category": "work",
+    "task": "hide-upgrade-button",
+    "title": "Hide the Google One upgrade button",
+    "question": "How do I hide the upgrade storage button in Gmail and Drive?",
+    "queries": [
+      "hide upgrade button gmail"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/flakajdfnklpgiefoffmecgbfbckmpcb",
+        "metric": 1000,
+        "note": "Chrome Web Store users, \"Hide Upgrade Button for Gmail, Drive & Docs\""
+      }
+    ],
+    "score": 45,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": ""
+  },
+  {
+    "site": "google-meet",
+    "siteName": "Google Meet",
+    "domains": [
+      "meet.google.com"
+    ],
+    "category": "work",
+    "task": "join-muted",
+    "title": "Join Google Meet with mic and camera off",
+    "question": "How do I join Google Meet with my camera and mic off by default?",
+    "queries": [
+      "google meet join muted"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/407347",
+        "metric": 999,
+        "note": "Greasy Fork total installs, \"Google Meet helper\" (api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 45,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": ""
+  },
+  {
+    "site": "whatsapp",
+    "siteName": "WhatsApp Web",
+    "domains": [
+      "web.whatsapp.com"
+    ],
+    "category": "social",
+    "task": "boss-key",
+    "title": "Hide WhatsApp Web with one key",
+    "question": "How do I quickly hide WhatsApp Web at work?",
+    "queries": [
+      "whatsapp web hide screen"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/7609",
+        "metric": 1039,
+        "note": "Greasy Fork total installs, \"WhatsApp Web Boss\" (api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 45,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Overlap with privacy-blur; could be one page."
+  },
+  {
+    "site": "google-maps",
+    "siteName": "Google Maps",
+    "domains": [
+      "www.google.com/maps",
+      "maps.google.com"
+    ],
+    "category": "reference",
+    "task": "copy-coordinates",
+    "title": "Copy coordinates from Google Maps",
+    "question": "How do I copy GPS coordinates from Google Maps?",
+    "queries": [
+      "google maps copy coordinates"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/bepccpkaangcaemdmhadifefccidkgbe",
+        "metric": 387,
+        "note": "Chrome Web Store users, \"Google Maps Coordinate Copier\"; count from CWS search page"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/378597",
+        "metric": 300,
+        "note": "Greasy Fork total installs, \"Google Maps Coordinates Grabber\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=google%20maps%20copy%20coordinat",
+        "metric": null,
+        "note": "Google suggests \"google maps copy coordinates\""
+      }
+    ],
+    "score": 44,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.google.com/maps",
+    "notes": "Coordinates are in the URL @lat,lng."
+  },
+  {
+    "site": "whatsapp",
+    "siteName": "WhatsApp Web",
+    "domains": [
+      "web.whatsapp.com"
+    ],
+    "category": "social",
+    "task": "full-width",
+    "title": "Use the full window in WhatsApp Web",
+    "question": "How do I make WhatsApp Web fill my wide screen?",
+    "queries": [
+      "whatsapp web full width"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/403560",
+        "metric": 818,
+        "note": "Greasy Fork total installs, \"WhatsApp like it should be: no whitespace!\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=whatsapp%20web%20full%20wid",
+        "metric": null,
+        "note": "\"whatsapp web full width\" not suggested; got: "
+      }
+    ],
+    "score": 44,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": ""
+  },
+  {
+    "site": "chatgpt",
+    "siteName": "ChatGPT",
+    "domains": [
+      "chatgpt.com"
+    ],
+    "category": "work",
+    "task": "hide-sidebar",
+    "title": "Hide the ChatGPT sidebar",
+    "question": "How do I hide the sidebar in ChatGPT?",
+    "queries": [
+      "chatgpt hide sidebar"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/jaklicmecioibaalhgiagacghdjeelhk",
+        "metric": 331,
+        "note": "Chrome Web Store users, \"Hide ChatGPT Sidebar\""
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/njjbddahcnfghpcpjlnaphfemmaaojpe",
+        "metric": 183,
+        "note": "Chrome Web Store users, \"ChatGPT Sidebar - Hide Unnecessary Sections\"; count from CWS search page"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=chatgpt%20hide%20sideb",
+        "metric": null,
+        "note": "Google suggests \"chatgpt hide sidebar\""
+      }
+    ],
+    "score": 43,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://chatgpt.com/",
+    "notes": ""
+  },
+  {
+    "site": "outlook",
+    "siteName": "Outlook",
+    "domains": [
+      "outlook.live.com",
+      "outlook.office.com"
+    ],
+    "category": "work",
+    "task": "dark-mode",
+    "title": "Dark mode for Outlook.com",
+    "question": "How do I make Outlook on the web fully dark?",
+    "queries": [
+      "outlook dark mode"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/kjfbefcenipnnpbcbbklcidpjiamlcpl",
+        "metric": 360,
+        "note": "Chrome Web Store users, \"Dark Mode for Outlook\""
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=outlook%20dark%20mo",
+        "metric": null,
+        "note": "Google suggests \"outlook dark mode\""
+      }
+    ],
+    "score": 43,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Native dark mode exists; autocomplete also shows 'outlook dark mode with white reading pane'."
+  },
+  {
+    "site": "slack",
+    "siteName": "Slack",
+    "domains": [
+      "app.slack.com",
+      "slack.com"
+    ],
+    "category": "work",
+    "task": "hide-workspace-sidebar",
+    "title": "Hide the Slack workspace sidebar",
+    "question": "How do I hide the left sidebar in Slack in the browser?",
+    "queries": [
+      "slack hide sidebar"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/475463",
+        "metric": 321,
+        "note": "Greasy Fork total installs, \"Slack Layout UI Restore\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=slack%20hide%20sideb",
+        "metric": null,
+        "note": "Google suggests \"slack hide left sidebar\""
+      }
+    ],
+    "score": 43,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Slack's 2023 redesign added a tab rail; people want it gone."
+  },
+  {
+    "site": "github",
+    "siteName": "GitHub",
+    "domains": [
+      "github.com"
+    ],
+    "category": "work",
+    "task": "full-width",
+    "title": "Make GitHub pages full width",
+    "question": "How do I make GitHub use the full width of my screen?",
+    "queries": [
+      "github full width"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/1711",
+        "metric": 273,
+        "note": "Greasy Fork total installs, \"Make GitHub Pull Request, Commit, and Blob pages full width\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/hohnneiphpemlbhmiiipkfjnfhmnobpo",
+        "metric": 242,
+        "note": "Chrome Web Store users, \"Wide GitHub\""
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=github%20full%20wid",
+        "metric": null,
+        "note": "Google suggests \"github full width\""
+      }
+    ],
+    "score": 42,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://github.com/torvalds/linux/pulls",
+    "notes": ""
+  },
+  {
+    "site": "google-calendar",
+    "siteName": "Google Calendar",
+    "domains": [
+      "calendar.google.com"
+    ],
+    "category": "work",
+    "task": "show-event-duration",
+    "title": "Show event durations in Google Calendar",
+    "question": "How do I show how long each event is in Google Calendar?",
+    "queries": [
+      "google calendar show event duration"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/pefipdhbcfmfncaiopkegoonbncfcaej",
+        "metric": 304,
+        "note": "Chrome Web Store users, \"Event & Meeting Duration for Google Calendar\"; count from CWS search page"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/5883",
+        "metric": 162,
+        "note": "Greasy Fork total installs, \"Google Calendar Time Box Duration\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=google%20calendar%20show%20event%20durati",
+        "metric": null,
+        "note": "Google suggests \"google calendar show event duration\""
+      }
+    ],
+    "score": 42,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Duration derived from the event chip's time text."
+  },
+  {
+    "site": "notion",
+    "siteName": "Notion",
+    "domains": [
+      "www.notion.so",
+      "notion.so",
+      "notion.site"
+    ],
+    "category": "work",
+    "task": "plain-done-todos",
+    "title": "Stop Notion striking through done to-dos",
+    "question": "How do I stop Notion from crossing out checked to-dos?",
+    "queries": [
+      "notion checkbox strikethrough"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/379011",
+        "metric": 356,
+        "note": "Greasy Fork total installs, \"Notion.so Clean Todo Lists - no strikethrough or fading\" (api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 38,
+    "loginRequired": false,
+    "loggedOutTestUrl": null,
+    "notes": ""
+  },
+  {
+    "site": "slack",
+    "siteName": "Slack",
+    "domains": [
+      "app.slack.com",
+      "slack.com"
+    ],
+    "category": "work",
+    "task": "mute-user",
+    "title": "Hide messages from a user in Slack",
+    "question": "How do I hide messages from one person in a Slack channel?",
+    "queries": [
+      "slack ignore user"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/10042",
+        "metric": 290,
+        "note": "Greasy Fork total installs, \"Ignore Slack User\" (api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 37,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": ""
+  },
+  {
+    "site": "github",
+    "siteName": "GitHub",
+    "domains": [
+      "github.com"
+    ],
+    "category": "work",
+    "task": "hide-copilot",
+    "title": "Hide Copilot on GitHub",
+    "question": "How do I remove the Copilot buttons from GitHub?",
+    "queries": [
+      "github hide copilot"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/ojbhpfpfmcjengfkpipogphebmghofgh",
+        "metric": 24,
+        "note": "Chrome Web Store users, \"Hide Copilot for GitHub, remove AI chat and upsells\""
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=github%20hide%20copil",
+        "metric": null,
+        "note": "Google suggests \"github hide copilot\""
+      },
+      {
+        "type": "github",
+        "url": "https://github.com/orgs/community/discussions/147437",
+        "metric": null,
+        "note": "GitHub community: How do I disable Copilot? (uBlock filters in replies)"
+      },
+      {
+        "type": "github",
+        "url": "https://github.com/orgs/community/discussions/141033",
+        "metric": null,
+        "note": "GitHub community: Hide Copilot Button"
+      },
+      {
+        "type": "github",
+        "url": "https://github.com/orgs/community/discussions/161600",
+        "metric": null,
+        "note": "GitHub community: disable Copilot so it doesn't pollute the UI"
+      },
+      {
+        "type": "github",
+        "url": "https://github.com/orgs/community/discussions/156613",
+        "metric": null,
+        "note": "GitHub community: Agent Mode button shows with Copilot disabled"
+      }
+    ],
+    "score": 31,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Some Copilot entry points may show logged out; check before building."
+  },
+  {
+    "site": "confluence",
+    "siteName": "Confluence",
+    "domains": [
+      "atlassian.net"
+    ],
+    "category": "work",
+    "task": "dark-mode",
+    "title": "Dark mode for Confluence",
+    "question": "How do I use dark mode in Confluence?",
+    "queries": [
+      "confluence dark mode"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/dclkgagjlophpmmmjhpmkhlmedkfgckn",
+        "metric": 5,
+        "note": "Chrome Web Store users, \"JMS Dark for Jira & Confluence\"; count from CWS search page"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=confluence%20dark%20mo",
+        "metric": null,
+        "note": "Google suggests \"confluence dark mode\""
+      }
+    ],
+    "score": 15,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": ""
+  },
+  {
+    "site": "confluence",
+    "siteName": "Confluence",
+    "domains": [
+      "atlassian.net"
+    ],
+    "category": "work",
+    "task": "full-width",
+    "title": "Make Confluence pages full width",
+    "question": "How do I make Confluence pages full width?",
+    "queries": [
+      "confluence full width"
+    ],
+    "evidence": [
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=confluence%20full%20wid",
+        "metric": null,
+        "note": "Google suggests \"confluence full width\""
+      },
+      {
+        "type": "forum",
+        "url": "https://community.atlassian.com/forums/Confluence-questions/Default-Page-Layout-Confluence-Cloud/qaq-p/1135353",
+        "metric": null,
+        "note": "Atlassian community: default page layout"
+      },
+      {
+        "type": "forum",
+        "url": "https://community.atlassian.com/forums/Confluence-questions/Get-Full-Width-Pages-in-New-Editor/qaq-p/1101990",
+        "metric": null,
+        "note": "Atlassian community: full width in new editor"
+      },
+      {
+        "type": "forum",
+        "url": "https://jira.atlassian.com/browse/CONFCLOUD-67503",
+        "metric": null,
+        "note": "Atlassian ticket: default new pages to full width"
+      }
+    ],
+    "score": 10,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Native default applies to new pages only; a script can widen any page view. Public Confluence spaces exist but none verified."
+  },
+  {
+    "site": "jira",
+    "siteName": "Jira",
+    "domains": [
+      "atlassian.net"
+    ],
+    "category": "work",
+    "task": "hide-sidebar",
+    "title": "Keep the Jira sidebar collapsed",
+    "question": "How do I keep the Jira sidebar hidden?",
+    "queries": [
+      "jira hide sidebar"
+    ],
+    "evidence": [
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=jira%20hide%20sideb",
+        "metric": null,
+        "note": "Google suggests \"jira hide sidebar\""
+      },
+      {
+        "type": "forum",
+        "url": "https://community.atlassian.com/forums/Jira-questions/How-do-I-disable-the-auto-expand-for-quot-left-navigation/qaq-p/3202112",
+        "metric": null,
+        "note": "Atlassian community: disable sidebar auto-expand, no setting"
+      },
+      {
+        "type": "forum",
+        "url": "https://community.atlassian.com/forums/Jira-questions/Can-you-remove-hide-the-sidebar-when-a-user-is-viewing-an-issue/qaq-p/681197",
+        "metric": null,
+        "note": "Atlassian community: hide sidebar on issue view"
+      },
+      {
+        "type": "forum",
+        "url": "https://community.atlassian.com/forums/Jira-questions/In-the-issue-view-how-can-I-hide-minimize-the-right-hand-pane/qaq-p/1659463",
+        "metric": null,
+        "note": "Atlassian community: hide right-hand pane in issue view"
+      }
+    ],
+    "score": 10,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": ""
+  },
+  {
+    "site": "notion",
+    "siteName": "Notion",
+    "domains": [
+      "www.notion.so",
+      "notion.so",
+      "notion.site"
+    ],
+    "category": "work",
+    "task": "hide-ai",
+    "title": "Hide Notion AI buttons",
+    "question": "How do I hide Notion AI?",
+    "queries": [
+      "notion hide ai"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/hoofdoojdjdilfeknbjblhecmeoneine",
+        "metric": 5,
+        "note": "Chrome Web Store users, \"Purify for Notion - AI Blocker & Clean UI\""
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=notion%20hide%20",
+        "metric": null,
+        "note": "\"notion hide ai\" not suggested; got: notion hide comments; notion hide new page button; notion hide database title"
+      }
+    ],
+    "score": 10,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Weak evidence so far."
+  },
+  {
+    "site": "outlook",
+    "siteName": "Outlook",
+    "domains": [
+      "outlook.live.com",
+      "outlook.office.com"
+    ],
+    "category": "work",
+    "task": "hide-copilot",
+    "title": "Hide Copilot in Outlook on the web",
+    "question": "How do I remove the Copilot button from Outlook on the web?",
+    "queries": [
+      "outlook hide copilot"
+    ],
+    "evidence": [
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=outlook%20hide%20copil",
+        "metric": null,
+        "note": "Google suggests \"outlook hide copilot\""
+      },
+      {
+        "type": "forum",
+        "url": "https://learn.microsoft.com/en-us/answers/questions/5858848/how-to-remove-copilot-from-outlook",
+        "metric": null,
+        "note": "Microsoft Q&A: remove Copilot from Outlook"
+      },
+      {
+        "type": "forum",
+        "url": "https://learn.microsoft.com/en-us/answers/questions/5450921/stop-copilot-pop-ups-and-icons",
+        "metric": null,
+        "note": "Microsoft Q&A: stop Copilot pop-ups and icons"
+      },
+      {
+        "type": "forum",
+        "url": "https://learn.microsoft.com/en-nz/answers/questions/6045777/i-want-to-have-copilot-available-to-me-in-outlook",
+        "metric": null,
+        "note": "Microsoft Q&A: keep Copilot but hide the compose icon"
+      }
+    ],
+    "score": 10,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Work accounts with a Copilot licence cannot turn it off natively."
+  },
+  {
+    "site": "gitlab",
+    "siteName": "GitLab",
+    "domains": [
+      "gitlab.com"
+    ],
+    "category": "work",
+    "task": "dark-mode",
+    "title": "Dark mode for GitLab",
+    "question": "How do I use dark mode on GitLab?",
+    "queries": [
+      "gitlab dark mode"
+    ],
+    "evidence": [
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=gitlab%20dark%20mo",
+        "metric": null,
+        "note": "Google suggests \"gitlab dark mode\""
+      }
+    ],
+    "score": 5,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://gitlab.com/gitlab-org/gitlab/-/issues/14560",
+    "notes": "Native setting for logged-in users only."
+  },
+  {
+    "site": "gmail",
+    "siteName": "Gmail",
+    "domains": [
+      "mail.google.com"
+    ],
+    "category": "work",
+    "task": "hide-chat-meet",
+    "title": "Hide Chat and Meet in Gmail",
+    "question": "How do I hide the Chat and Meet buttons in Gmail?",
+    "queries": [
+      "gmail hide chat",
+      "gmail hide meet button"
+    ],
+    "evidence": [
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=gmail%20hide%20ch",
+        "metric": null,
+        "note": "Google suggests \"gmail hide chat\""
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=gmail%20hide%20me",
+        "metric": null,
+        "note": "Google suggests \"gmail hide meet button\""
+      }
+    ],
+    "score": 5,
+    "loginRequired": true,
+    "loggedOutTestUrl": null,
+    "notes": "Native setting exists under Chat and Meet; autocomplete shows people still look for it."
+  },
+  {
+    "site": "google-maps",
+    "siteName": "Google Maps",
+    "domains": [
+      "www.google.com/maps",
+      "maps.google.com"
+    ],
+    "category": "reference",
+    "task": "hide-sidebar",
+    "title": "Hide the Google Maps side panel",
+    "question": "How do I hide the left panel in Google Maps?",
+    "queries": [
+      "google maps hide sidebar"
+    ],
+    "evidence": [
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=google%20maps%20hide%20sideb",
+        "metric": null,
+        "note": "Google suggests \"google maps hide sidebar\""
+      }
+    ],
+    "score": 5,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.google.com/maps",
+    "notes": "Native collapse arrow exists; autocomplete also suggests 'google maps remove left sidebar'."
+  },
+  {
+    "site": "google-maps",
+    "siteName": "Google Maps",
+    "domains": [
+      "www.google.com/maps",
+      "maps.google.com"
+    ],
+    "category": "reference",
+    "task": "remove-labels",
+    "title": "Remove labels from Google Maps",
+    "question": "How do I turn off labels in Google Maps?",
+    "queries": [
+      "google maps remove labels"
+    ],
+    "evidence": [
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=google%20maps%20remove%20labe",
+        "metric": null,
+        "note": "Google suggests \"google maps remove labels\""
+      }
+    ],
+    "score": 5,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.google.com/maps",
+    "notes": "Native in satellite view only; map tiles are canvas so a script cannot strip baked-in labels. Likely not doable client-side for the default map; keep for reference."
+  }
+]

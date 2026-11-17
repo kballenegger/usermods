@@ -1,0 +1,66 @@
+{
+  "slug": "force-hd-quality",
+  "title": "Make YouTube always play in HD",
+  "question": "How do I make YouTube always play videos in the highest quality?",
+  "answer": "YouTube has no desktop setting that locks every video to its top resolution. It picks a quality from your window size and connection, and the Quality option under the gear icon only changes the video you are watching. The usermods script on this page sets each video to the highest quality it offers, such as 1080p or 4K, as soon as it starts playing. Install it with usermods or any userscript manager.",
+  "prompt": "Make every YouTube video play at the highest quality it has.",
+  "details": "The script uses the YouTube player's own quality controls. The first time each video plays, it reads the list of qualities that video has and picks the top one. After that it leaves the video alone, so if you choose a lower quality from the gear menu, your choice sticks until the next video.\n\nIt waits until an ad has finished before it sets the quality. On a slow connection the top quality can make the video stop to buffer. The check plays a 4K video and confirms the player switched to 2160p.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "The gear menu",
+      "body": "Click the gear icon on the player, open **Quality** and pick a resolution. It applies to the video you are watching."
+    },
+    {
+      "kind": "extension",
+      "title": "Auto quality extensions",
+      "body": "Extensions such as **Auto Quality for YouTube** and **YouTube Auto HD + FPS** set a preferred quality for every video, with options for frame rate and per-window choices."
+    }
+  ],
+  "related": [
+    "youtube/disable-autoplay",
+    "youtube/hide-recommendations"
+  ],
+  "demand": {
+    "score": 85,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/494",
+        "note": "YouTube Auto Buffer & Auto HD (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/23661",
+        "note": "Youtube HD (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/fcphghnknhkimeagdglkljinmpbagone",
+        "note": "YouTube Auto HD + FPS (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/iaddfgegjgjelgkanamleadckkpnjpjc",
+        "note": "Auto Quality for YouTube\u2122 (users, read on the store search page for 'youtube auto hd quality')"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20always%20hd",
+        "note": "returns the query; suggestions: youtube always hd | youtube always hd extension | youtube always highest quality"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.youtube.com/watch?v=aqz-KE-bpKQ"
+    ],
+    "loggedOut": true,
+    "waitFor": "#movie_player video",
+    "settleMs": 3000,
+    "actions": "const p = document.querySelector('#movie_player'); p.mute(); p.playVideo(); await new Promise((r) => setTimeout(r, 8000));",
+    "baseline": "(() => { const p = document.querySelector('#movie_player'); const best = p.getAvailableQualityLevels()[0]; return p.getPlayerState() === 1 && best === 'hd2160' && p.getPlaybackQuality() !== best; })()",
+    "expect": "(() => { const p = document.querySelector('#movie_player'); return p.getAvailableQualityLevels()[0] === 'hd2160' && p.getPlaybackQuality() === 'hd2160' && document.querySelector('#movie_player video').videoHeight >= 2160; })()",
+    "intact": "(() => { const p = document.querySelector('#movie_player'); return p.getPlayerState() === 1 && document.querySelector('#movie_player video').currentTime > 1; })()"
+  }
+}

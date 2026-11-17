@@ -1,0 +1,35 @@
+{
+  "slug": "hide-shorts",
+  "title": "Hide YouTube Shorts",
+  "question": "How do I hide YouTube Shorts on desktop?",
+  "answer": "YouTube has no setting that turns Shorts off on desktop. Its \"Not interested\" button only hides a shelf for a while. The usermods script on this page hides Shorts shelves, single Shorts mixed into search results and feeds, and the Shorts entry in the left sidebar. Install it with usermods or any userscript manager. Without an extension, the X on a Shorts shelf hides that shelf for 30 days.",
+  "prompt": "Hide every YouTube Short: the Shorts shelves, Shorts in search results and feeds, and the Shorts link in the sidebar.",
+  "details": "The script is CSS only and loads before YouTube draws the page, so Shorts never flash on screen and it keeps working as you move between pages without a reload.\n\nIt hides:\n\n- Shorts shelves on search, home and subscriptions\n- Single Shorts in search results, feeds and the list beside a video\n- The Shorts entry in the full and collapsed left sidebar\n\nIt also hides the Shorts tab on channel pages, which the check does not cover. It leaves regular videos, the search filter chips and youtube.com/shorts/ links alone. If you open a Short directly, it still plays.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Not interested on a Shorts shelf",
+      "body": "Click the X at the top right of a Shorts shelf and choose **Not interested**. YouTube hides that shelf for 30 days, then it comes back. It does nothing for Shorts inside search results."
+    },
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filters",
+      "body": "Add these under *My filters* in uBlock Origin. They use the same selectors as the script; our check runs the script, not these filters.\n\n```\nwww.youtube.com##grid-shelf-view-model:has(ytm-shorts-lockup-view-model)\nwww.youtube.com##ytd-reel-shelf-renderer\nwww.youtube.com##ytd-rich-shelf-renderer[is-shorts]\nwww.youtube.com##ytd-video-renderer:has(a[href^=\"/shorts/\"])\nwww.youtube.com##ytd-rich-item-renderer:has(a[href^=\"/shorts/\"])\nwww.youtube.com##ytd-guide-entry-renderer:has(a[title=\"Shorts\"])\nwww.youtube.com##ytd-mini-guide-entry-renderer[aria-label=\"Shorts\"]\n```"
+    }
+  ],
+  "related": [
+    "youtube/disable-autoplay",
+    "youtube/hide-comments"
+  ],
+  "check": {
+    "urls": [
+      "https://www.youtube.com/results?search_query=minecraft"
+    ],
+    "loggedOut": true,
+    "waitFor": "ytd-video-renderer",
+    "settleMs": 4000,
+    "baseline": "[...document.querySelectorAll('a[href^=\"/shorts/\"]')].some((a) => a.checkVisibility())",
+    "expect": "(() => { const shorts = [...document.querySelectorAll('a[href^=\"/shorts/\"]')]; const guide = [...document.querySelectorAll('ytd-guide-entry-renderer, ytd-mini-guide-entry-renderer')].filter((e) => e.innerText.trim() === 'Shorts'); return shorts.length > 0 && shorts.every((a) => !a.checkVisibility()) && guide.every((e) => !e.checkVisibility()); })()",
+    "intact": "[...document.querySelectorAll('ytd-video-renderer')].filter((v) => v.checkVisibility() && !v.querySelector('a[href^=\"/shorts/\"]')).length >= 5"
+  }
+}

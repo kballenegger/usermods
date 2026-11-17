@@ -1,0 +1,34 @@
+{
+  "slug": "dark-mode",
+  "title": "Use dark mode on weather.com",
+  "question": "Does weather.com have a dark mode on desktop?",
+  "answer": "No. The weather.com website has no dark mode or theme setting on desktop, and it doesn't follow your system's dark setting. The usermods script on this page inverts the page colours, so white blocks turn near black and grey text turns light, while chart lines, weather icons and temperatures keep their colours. Photos, the radar map and video are flipped back so they look normal. Without a userscript, a browser-wide dark mode extension such as Dark Reader also darkens weather.com.",
+  "prompt": "Make weather.com dark: dark background and light text, with the radar map and photos unchanged.",
+  "details": "The script applies `filter: invert(0.92) hue-rotate(180deg)` to the page, which turns light into dark while keeping hues, and applies the opposite filter to images, video, canvas and frames so they come out unchanged. CSS is injected before the page draws, so there is no white flash.\n\nThe dark blue current-conditions card turns light, since it is inverted with everything else. The check loads the Today page for New York and confirms the page is dark, the forecast text is light and images are not inverted. The Hourly, 10 Day and radar pages get the same rule but the check doesn't load them.",
+  "alternatives": [
+    {
+      "kind": "extension",
+      "title": "Dark Reader",
+      "body": "Dark Reader darkens every site, weather.com included, by computing a dark palette from the page's own colours."
+    }
+  ],
+  "related": [
+    "weather/declutter"
+  ],
+  "demand": {
+    "score": 12,
+    "evidence": [
+      { "type": "greasyfork", "url": "https://greasyfork.org/en/scripts/599599", "note": "Weather.com Dark 2026 (3 total installs)" },
+      { "type": "autocomplete", "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=weather.com%20dark%20mode", "note": "suggestions: weather.com dark mode, weather com dark mode desktop, weather channel dark mode website, weather channel dark mode pc" }
+    ]
+  },
+  "check": {
+    "urls": ["https://weather.com/weather/today/l/40.71,-74.01"],
+    "loggedOut": true,
+    "waitFor": "section[data-testid=\"daily-forecast\"]",
+    "settleMs": 4000,
+    "baseline": "(() => { const lum = (c) => { const [r, g, b] = c.match(/[\\d.]+/g).map(Number); return 0.2126 * r + 0.7152 * g + 0.0722 * b; }; const h = document.querySelector('section[data-testid=\"daily-forecast\"] h2'); return !/invert/.test(getComputedStyle(document.documentElement).filter) && lum(getComputedStyle(document.body).backgroundColor) > 230 && lum(getComputedStyle(h).color) < 80; })()",
+    "expect": "(() => { const lum = (c) => { const [r, g, b] = c.match(/[\\d.]+/g).map(Number); return 0.2126 * r + 0.7152 * g + 0.0722 * b; }; const f = getComputedStyle(document.documentElement).filter.match(/invert\\(([\\d.]+)\\)/); if (!f) return false; const k = Number(f[1]); const shown = (c) => lum(c) + k * (255 - 2 * lum(c)); const h = document.querySelector('section[data-testid=\"daily-forecast\"] h2'); const imgs = [...document.querySelectorAll('main img')].filter((i) => i.checkVisibility()); return shown(getComputedStyle(document.body).backgroundColor) < 40 && shown(getComputedStyle(h).color) > 180 && imgs.length > 0 && imgs.every((i) => /invert\\(1\\)/.test(getComputedStyle(i).filter)); })()",
+    "intact": "[...document.querySelectorAll('section[data-testid=\"daily-forecast\"] [data-testid=\"TemperatureValue\"]')].filter((e) => e.checkVisibility()).length >= 10 && !!document.querySelector('section[data-testid=\"current-conditions\"]')?.checkVisibility()"
+  }
+}

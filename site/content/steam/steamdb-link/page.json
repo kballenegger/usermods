@@ -1,0 +1,53 @@
+{
+  "slug": "steamdb-link",
+  "title": "Add a SteamDB link to Steam store pages",
+  "question": "How do I jump from a Steam game page to SteamDB?",
+  "answer": "Steam store pages have no SteamDB link, but SteamDB uses the same app id as Steam, so a userscript can add one. The usermods script on this page puts a SteamDB button next to the Community Hub button at the top of every Steam store game page. It opens steamdb.info/app/ with the game's id. Without a script, copy the number after /app/ in the store URL and open steamdb.info/app/ followed by that number.",
+  "prompt": "Add a button to Steam store game pages that opens the same game on SteamDB.",
+  "details": "The app id comes from the page URL (`/app/292030/...`), and the button reuses Steam's own button style. The script adds nothing else and makes no requests to SteamDB.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Edit the URL",
+      "body": "Take the number after `/app/` in the store URL and open `https://steamdb.info/app/<number>/`."
+    },
+    {
+      "kind": "extension",
+      "title": "SteamDB extension",
+      "body": "SteamDB's own browser extension adds the link along with prices, lowest-price history and other data on Steam pages. It does much more than this script."
+    }
+  ],
+  "related": [
+    "steam/review-percentage",
+    "steam/direct-links"
+  ],
+  "demand": {
+    "score": 52,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/23564",
+        "note": "Greasy Fork total installs: \"Add SteamDB info\" (1,397)"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/kdbmhfkmnlmbkgbabkdealhhbfhlmmon",
+        "note": "Chrome Web Store users: \"SteamDB\" (700,000), a multi-purpose extension"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=steamdb%20extension",
+        "note": "Google suggests: steamdb extension, steamdb extension chrome, steamdb extension for steam"
+      }
+    ]
+  },
+  "check": {
+    "urls": ["https://store.steampowered.com/app/292030/"],
+    "loggedOut": true,
+    "waitFor": ".apphub_OtherSiteInfo",
+    "settleMs": 3000,
+    "baseline": "(() => { const box = document.querySelector('.apphub_OtherSiteInfo'); return box.checkVisibility() && /Community Hub/.test(box.textContent) && !document.querySelector('a[href*=\"steamdb.info\"]'); })()",
+    "expect": "(() => { const a = document.querySelector('.apphub_OtherSiteInfo a[href=\"https://steamdb.info/app/292030/\"]'); return !!a && a.checkVisibility() && a.textContent.trim() === 'SteamDB'; })()",
+    "intact": "(() => { const hub = [...document.querySelectorAll('.apphub_OtherSiteInfo a')].find((a) => /Community Hub/.test(a.textContent)); const p = document.querySelector('#game_area_purchase'); return !!hub && hub.checkVisibility() && !!p && p.checkVisibility(); })()"
+  }
+}

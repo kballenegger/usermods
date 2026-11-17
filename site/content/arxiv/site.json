@@ -1,0 +1,7 @@
+{
+  "slug": "arxiv",
+  "name": "arXiv",
+  "domains": ["arxiv.org"],
+  "category": "reference",
+  "intro": "Userscripts for arxiv.org abstract pages: links to other readers for the same paper and a dark theme."
+}

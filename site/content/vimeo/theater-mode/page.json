@@ -1,0 +1,42 @@
+{
+  "slug": "theater-mode",
+  "title": "Make the Vimeo player fill the window",
+  "question": "Does Vimeo have a theater mode?",
+  "answer": "No. Vimeo has full screen but no theater mode, and on a video page it caps the player's height well below the window, so a 16:9 video on a laptop screen shows with wide empty bands at the sides. The usermods script on this page lets the player grow to the full height of the window below the Vimeo header, so the video is as large as the window allows while the page, comments and controls stay in place. Without an extension, full screen is the only larger view.",
+  "prompt": "Make the video player on Vimeo video pages as big as my browser window, like a theater mode.",
+  "details": "The script changes the height limit on the two boxes around Vimeo's player; the player then scales the video to fit, keeping its shape. The title, description and comments move down below it. On a 1366 by 900 window the picture grows from about 1060 to 1366 pixels wide.\n\nThe player's width still follows Vimeo's page layout, which stops at 1536 pixels on very wide windows. Embedded Vimeo players on other sites are not changed.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Full screen",
+      "body": "The full screen button at the right end of the player's control bar fills the whole screen."
+    },
+    {
+      "kind": "extension",
+      "title": "Theater Mode Everywhere",
+      "body": "The Theater Mode Everywhere extension for Chrome adds a theater view to video players on many sites."
+    }
+  ],
+  "related": [
+    "vimeo/playback-speed"
+  ],
+  "check": {
+    "urls": [
+      "https://vimeo.com/76979871"
+    ],
+    "loggedOut": true,
+    "waitFor": "video",
+    "settleMs": 4000,
+    "baseline": "(() => { const v = document.querySelector('video'); const p = document.querySelector('.vh-player-area'); if (!v || !p || !v.videoWidth) return false; const box = v.getBoundingClientRect(); const shown = Math.min(box.width, box.height * v.videoWidth / v.videoHeight); return p.getBoundingClientRect().height < window.innerHeight - 200 && shown < window.innerWidth - 200; })()",
+    "expect": "(() => { const v = document.querySelector('video'); const p = document.querySelector('.vh-player-area'); if (!v || !p || !v.videoWidth) return false; const box = v.getBoundingClientRect(); const shown = Math.min(box.width, box.height * v.videoWidth / v.videoHeight); const pr = p.getBoundingClientRect(); return pr.height >= window.innerHeight - 100 && pr.bottom <= window.innerHeight + 1 && shown >= window.innerWidth - 2; })()",
+    "intact": "(() => { const v = document.querySelector('video'); const h1 = document.querySelector('h1'); const header = [...document.querySelectorAll('input')].find((i) => /Search/i.test(i.placeholder || '')); return v.checkVisibility() && v.duration > 30 && !!h1 && h1.checkVisibility() && /Vimeo Player/.test(h1.textContent) && !!header && header.getBoundingClientRect().bottom <= v.getBoundingClientRect().top; })()"
+  },
+  "demand": {
+    "score": 59,
+    "evidence": [
+      { "type": "greasyfork", "url": "https://greasyfork.org/en/scripts/10815", "note": "Greasy Fork total installs, \"Resize Video To Window Size\" (multi-site), 4,055" },
+      { "type": "cws", "url": "https://chromewebstore.google.com/detail/cncfdfheagoagmoeiaecfpbcljncoepe", "note": "Chrome Web Store users, \"Theater Mode Everywhere\" (multi-site), 318" },
+      { "type": "autocomplete", "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=vimeo%20theater%20mode", "note": "Google suggests \"vimeo theater mode\"" }
+    ]
+  }
+}

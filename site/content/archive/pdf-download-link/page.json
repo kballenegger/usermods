@@ -1,0 +1,54 @@
+{
+  "slug": "pdf-download-link",
+  "title": "Add a PDF download button on Internet Archive",
+  "question": "How do I download a book from the Internet Archive as a PDF?",
+  "answer": "On a public book's page, open the Download Options box in the right-hand column and click PDF. Books you can only borrow have no PDF there. The usermods script on this page copies that PDF link into a Download PDF button under the book's title, so you don't have to scroll to the download list. It adds nothing on items without a public PDF, and it changes nothing else on the page.",
+  "prompt": "Add a Download PDF button under the title on Internet Archive book pages.",
+  "details": "The script reads the PDF link that archive.org already puts in **Download Options** and adds a button with the same address under the title. When an item has several PDFs (for example a black-and-white copy), it picks the one labelled plain \"PDF\". Borrow-only books have no PDF in that list, so the script adds nothing on them; it does not get around lending.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Download Options",
+      "body": "Scroll down the right-hand column of the item page to **Download Options** and click **PDF**. **Show all** lists every file in the item."
+    },
+    {
+      "kind": "other",
+      "title": "Direct URL",
+      "body": "Public items serve their files at `https://archive.org/download/<identifier>/`, where the identifier is the last part of the `/details/` address. That page lists every file, PDFs included."
+    }
+  ],
+  "related": [
+    "archive/dark-mode"
+  ],
+  "check": {
+    "urls": [
+      "https://archive.org/details/alicesadventures00carr"
+    ],
+    "loggedOut": true,
+    "waitFor": ".item-download-options a.download-pill",
+    "settleMs": 3000,
+    "baseline": "(() => { const pill = document.querySelector('.item-download-options a.download-pill[href$=\"/alicesadventures00carr.pdf\"]'); return !!pill && pill.getBoundingClientRect().top > window.innerHeight && !document.getElementById('usermods-pdf-download'); })()",
+    "expect": "(() => { const b = document.getElementById('usermods-pdf-download'); const box = document.querySelector('.item-download-options'); return !!b && !!box && b.checkVisibility() && b.href === 'https://archive.org/download/alicesadventures00carr/alicesadventures00carr.pdf' && b.getBoundingClientRect().top < window.innerHeight && b.getBoundingClientRect().top < box.getBoundingClientRect().top; })()",
+    "intact": "(() => { const t = document.querySelector('h1.item-title'); const box = document.querySelector('.item-download-options'); const theatre = document.querySelector('#theatre-ia'); return [t, box, theatre].every((e) => e && e.checkVisibility()); })()"
+  },
+  "demand": {
+    "score": 56,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/447027",
+        "note": "Internet Archive Pdf Download Link (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/cnnfichfhmpmnfabckimnchpgafnakjb",
+        "note": "Archive.org Book Downloader (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=internet%20archive%20download%20pdf",
+        "note": "returns \"internet archive download pdf\"; suggestions: internet archive download pdf | internet archive download pdf free | internet archive download pdf extension | internet archive pdf download chrome extension | web archive download pdf"
+      }
+    ]
+  }
+}

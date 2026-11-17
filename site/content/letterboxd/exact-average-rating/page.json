@@ -1,0 +1,44 @@
+{
+  "slug": "exact-average-rating",
+  "title": "Show the exact Letterboxd average rating",
+  "question": "How do I see a film's exact average rating on Letterboxd?",
+  "answer": "Hover over the average rating next to the ratings histogram on a film page: the tooltip shows the weighted average to two decimals and the number of ratings. The page itself only shows the rounded figure, and there is no setting to change that. The usermods script on this page puts the two-decimal average in place of the rounded one, so a film shows 4.51 instead of 4.5 without hovering.",
+  "prompt": "On Letterboxd film pages, show the exact average rating with two decimals instead of the rounded one.",
+  "details": "Letterboxd loads the ratings histogram after the page. The script waits for it, reads the tooltip text (\"Weighted average of 4.51 based on 6,040,703 ratings\") and writes the number into the rating link. The tooltip, the histogram and the link to the ratings page are unchanged.\n\nFilms with too few ratings have no weighted average; the script leaves those alone.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Hover the rating",
+      "body": "The tooltip on the average rating shows the exact figure and the rating count, logged in or not."
+    }
+  ],
+  "related": [
+    "letterboxd/runtime-hours"
+  ],
+  "demand": {
+    "score": 42,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/4634",
+        "note": "Letterboxd Average Rating (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=letterboxd%20average%20rating",
+        "note": "returns \"letterboxd average rating\"; suggestions: letterboxd average rating calculator | letterboxd average rating | letterboxd average rating reddit | average letterboxd rating curve | letterboxd average score"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://letterboxd.com/film/parasite-2019/"
+    ],
+    "loggedOut": true,
+    "waitFor": "a.averagerating",
+    "settleMs": 3000,
+    "baseline": "(() => { const a = document.querySelector('a.averagerating'); if (!a) return false; const m = /average of (\\d\\.\\d\\d)/.exec(a.getAttribute('data-original-title') || a.title || ''); return !!m && /^\\d\\.\\d$/.test(a.textContent.trim()) && a.textContent.trim() !== m[1]; })()",
+    "expect": "(() => { const a = document.querySelector('a.averagerating'); if (!a) return false; const m = /average of (\\d\\.\\d\\d)/.exec(a.getAttribute('data-original-title') || a.title || ''); return !!m && a.textContent.trim() === m[1] && a.checkVisibility(); })()",
+    "intact": "(() => { const h = document.querySelector('.rating-histogram'); const title = document.querySelector('h1.primaryname'); return !!h && h.checkVisibility() && !!title && /Parasite/.test(title.textContent) && document.querySelectorAll('.rating-histogram .barcolumn').length === 10; })()"
+  }
+}

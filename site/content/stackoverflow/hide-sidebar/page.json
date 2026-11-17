@@ -1,0 +1,46 @@
+{
+  "slug": "hide-sidebar",
+  "title": "Hide the Stack Overflow right sidebar",
+  "question": "How do I remove the right sidebar on Stack Overflow?",
+  "answer": "Stack Overflow has no setting that hides the right sidebar. The usermods script on this page hides the whole right-hand column on question pages, with its promotions, blog links, linked and related questions and Hot Network Questions, and lets the question and answers spread into the freed space. The left navigation stays. Without an extension, a narrow browser window moves the sidebar below the answers instead of beside them.",
+  "prompt": "Hide the right sidebar on Stack Overflow and make the question and answers wider.",
+  "details": "The script hides `#sidebar` with one CSS rule and lets `#mainbar` take the full width of the content area instead of its fixed width. Linked and related questions live in that sidebar, so they go too.\n\nThe check loads a question page. The question list pages use the same ids, but the check does not load them.",
+  "alternatives": [
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filters",
+      "body": "The same rules as the script. Our check runs the script, not these filters.\n\n```\nstackoverflow.com###sidebar\nstackoverflow.com###mainbar:style(width: auto !important; float: none !important)\n```"
+    }
+  ],
+  "related": [
+    "stackoverflow/hide-cookie-banner",
+    "stackoverflow/hide-hot-network-questions",
+    "stackoverflow/dark-mode"
+  ],
+  "check": {
+    "urls": [
+      "https://stackoverflow.com/questions/11227809/why-is-processing-a-sorted-array-faster-than-processing-an-unsorted-array"
+    ],
+    "loggedOut": true,
+    "waitFor": "#question",
+    "settleMs": 4000,
+    "baseline": "(() => { const s = document.querySelector('#sidebar'); return !!s && s.checkVisibility() && s.getBoundingClientRect().width > 200 && document.querySelector('#mainbar').getBoundingClientRect().width < 800; })()",
+    "expect": "(() => { const s = document.querySelector('#sidebar'); return !!s && s.children.length > 0 && !s.checkVisibility() && document.querySelector('#mainbar').getBoundingClientRect().width > 950; })()",
+    "intact": "(() => { const q = document.querySelector('#question .s-prose'); const answers = [...document.querySelectorAll('#answers .answer')].filter((a) => a.checkVisibility()); return !!q && q.checkVisibility() && answers.length >= 5; })()"
+  },
+  "demand": {
+    "score": 34,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/382104",
+        "note": "Greasy Fork total installs: \"Remove Stackoverflow Sidebar\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/369524",
+        "note": "Greasy Fork total installs: \"Stackoverflow Right Sidebar Toggler\" (read via api.greasyfork.org, 2026-11-17)"
+      }
+    ]
+  }
+}

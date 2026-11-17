@@ -1,0 +1,9 @@
+User-agent: GPTBot
+Allow: /
+Disallow: /install
+
+User-agent: *
+Allow: /
+Disallow: /install
+
+Sitemap: https://usermods.kennethballenegger.com/sitemap.xml

@@ -1,0 +1,47 @@
+{
+  "slug": "hide-paywall-popup",
+  "title": "Close Medium's sign-up popups",
+  "question": "How do I get rid of Medium's \"become a member\" popups?",
+  "answer": "Medium has no setting to stop them: the popups go away only when you close them or sign in. The usermods script on this page presses the close button on Medium's popups, such as the \"Join Medium for free\" box that opens partway down a story, as soon as they appear, so the page keeps scrolling. Popups that open from your own click, such as Sign in, stay open. It does not unlock member-only stories.",
+  "prompt": "Close Medium's sign-up popups automatically when they appear while I'm reading.",
+  "details": "Medium's popups are modal dialogs with a close button. The script watches the page for one and presses that button, which also gives the page its scroll back. A dialog that opens within two seconds of a click of yours stays open until you close it, so Sign in, Sign up and Share still work. The check scrolls a logged-out story until the \"Join Medium for free\" popup shows and confirms the script closed it. Popups shown to signed-in readers use the same dialog and close button, but the check can't load them.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Close it by hand",
+      "body": "Click the **X** in the popup's top-right corner. It comes back on later stories."
+    }
+  ],
+  "related": [
+    "medium/hide-sticky-bars",
+    "medium/hide-member-only",
+    "medium/dark-mode"
+  ],
+  "demand": {
+    "score": 49,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/386568",
+        "note": "Mute Medium (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=medium%20paywall",
+        "note": "returns the query; suggestions: medium paywall | medium paywall bypass extension | medium paywall bypass online | medium paywall bypass github | do you get paid for medium articles"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://medium.com/@karpathy/software-2-0-a64152b37c35"
+    ],
+    "loggedOut": true,
+    "waitFor": "article p",
+    "settleMs": 3000,
+    "actions": "for (let i = 0; i < 12; i++) { window.scrollBy(0, 700); await new Promise((r) => setTimeout(r, 700)); } await new Promise((r) => setTimeout(r, 2000));",
+    "baseline": "(() => [...document.querySelectorAll('[role=dialog][aria-modal=true]')].filter((d) => d.checkVisibility() && /Join Medium/.test(d.textContent)).length > 0 && getComputedStyle(document.body).overflow === 'hidden')()",
+    "expect": "(() => Number(document.documentElement.dataset.usermodsClosedPopups || 0) >= 1 && [...document.querySelectorAll('[role=dialog][aria-modal=true]')].filter((d) => d.checkVisibility() && /Join Medium/.test(d.textContent)).length === 0 && getComputedStyle(document.body).overflow !== 'hidden')()",
+    "intact": "(() => { const ps = [...document.querySelectorAll('article p')].filter((p) => p.checkVisibility()); const h = document.querySelector('article h1'); return ps.length >= 20 && !!h && h.checkVisibility(); })()"
+  }
+}

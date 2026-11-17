@@ -1,0 +1,46 @@
+{
+  "slug": "wider-content",
+  "title": "Widen the content area on Fandom",
+  "question": "How do I make Fandom wiki pages wider?",
+  "answer": "Fandom's Expand button, on the left edge of the article, widens the page a little and is remembered in your browser, but the width cap and the right rail stay. The usermods script on this page removes the width cap and hides the right rail, so the article fills the browser window. The wiki header, the Fandom bar on the left, the article and its infoboxes stay as they are. Without an extension, the Expand button is the only width control.",
+  "prompt": "Make Fandom wiki articles fill the whole width of the window and hide the right sidebar.",
+  "details": "The script injects CSS before the page draws: it lifts the `max-width` on Fandom's page container, hides the right rail (`.page__right-rail`) and lets the article column take the freed space, leaving room on the left for the page tools. Everything else, ads included, stays; to hide those as well, use the Remove clutter script. The check loads one Harry Potter Wiki article in a 1366 px wide window.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Fandom's Expand button",
+      "body": "The **Expand** button in the tools on the left of the article widens the page. It is stored in your browser's local storage, so it stays on for that wiki. The right rail stays."
+    },
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filters",
+      "body": "Our check runs the script, not these filters.\n\n```\nfandom.com##.page__right-rail\nfandom.com##.resizable-container:style(max-width: none !important)\n```"
+    }
+  ],
+  "related": [
+    "fandom/remove-clutter",
+    "fandom/dark-mode",
+    "wikipedia/full-width"
+  ],
+  "demand": {
+    "score": 31,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/436247",
+        "note": "Greasy Fork total installs: \"Improved Content Width - fandom.com\" (read via api.greasyfork.org, 2026-11-17)"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://harrypotter.fandom.com/wiki/Harry_Potter"
+    ],
+    "loggedOut": true,
+    "waitFor": ".mw-parser-output p",
+    "settleMs": 5000,
+    "baseline": "(() => { const rail = document.querySelector('.page__right-rail'); const main = document.querySelector('.page__main'); return !!rail && rail.checkVisibility() && main.getBoundingClientRect().width < 850; })()",
+    "expect": "(() => { const rail = document.querySelector('.page__right-rail'); const main = document.querySelector('.page__main'); return !!rail && !rail.checkVisibility() && main.getBoundingClientRect().width >= 1100; })()",
+    "intact": "(() => { const nav = document.querySelector('#global-explore-navigation'); const tools = document.querySelector('.page-side-tools'); return document.querySelector('#firstHeading').checkVisibility() && document.querySelector('.community-header-wrapper').checkVisibility() && !!tools && tools.checkVisibility() && tools.getBoundingClientRect().left >= nav.getBoundingClientRect().right && document.querySelector('.mw-parser-output').getBoundingClientRect().width >= 1000 && [...document.querySelectorAll('.mw-parser-output > p')].filter((p) => p.checkVisibility() && p.textContent.trim().length > 50).length >= 10; })()"
+  }
+}

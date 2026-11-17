@@ -1,0 +1,3147 @@
+[
+  {
+    "site": "google-translate",
+    "siteName": "Google Translate",
+    "domains": [
+      "translate.google.com"
+    ],
+    "category": "work",
+    "task": "dark-mode",
+    "title": "Dark mode for Google Translate",
+    "question": "How do I turn on dark mode in Google Translate on the web?",
+    "queries": [
+      "google translate dark mode",
+      "google translate dark mode pc"
+    ],
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/nmcamjpjiefpjagnjmkedchjkmedadhc",
+        "metric": 60000,
+        "note": "Darktheme for google translate (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/ghobnecdmkccjpaecanmpndfjjimhkmg",
+        "metric": 6000,
+        "note": "Dark Mode For Google Translate (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/ikaphgfmnjpnaieoipkclkgbbpkhgjdd",
+        "metric": 437,
+        "note": "Google Translate Dark Mode Switcher (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=google%20translate%20dark%20mode",
+        "metric": null,
+        "note": "returns \"google translate dark mode\"; suggestions: google translate dark mode | google translate dark mode pc | google translate dark mode extension | google translate dark mode firefox | google translate dark mode chrome"
+      }
+    ],
+    "score": 77,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://translate.google.com/",
+    "notes": "Two single-purpose extensions with 60,000 and 6,000 users. Check whether the site already follows the OS theme before building."
+  },
+  {
+    "site": "steam",
+    "siteName": "Steam",
+    "domains": [
+      "store.steampowered.com",
+      "steamcommunity.com"
+    ],
+    "category": "shopping",
+    "task": "direct-links",
+    "title": "Skip Steam's link filter warning",
+    "question": "How do I skip the Steam 'you are leaving Steam' link filter page?",
+    "queries": [
+      "steam linkfilter"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/15857",
+        "metric": 36460,
+        "note": "Direct links out (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/3247",
+        "metric": 1261,
+        "note": "Steam Linkfilter Redirector (/linkredirector/) (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=steam%20linkfilter",
+        "metric": null,
+        "note": "returns \"steam linkfilter\"; suggestions: steam linkfilter"
+      }
+    ],
+    "score": 73,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://steamcommunity.com/app/570",
+    "notes": "Direct links out (15857, 36,460) is multi-site; Steam Linkfilter Redirector (3247, 1,261) is Steam-only."
+  },
+  {
+    "site": "kick",
+    "siteName": "Kick",
+    "domains": [
+      "kick.com"
+    ],
+    "category": "video",
+    "task": "hide-ads",
+    "title": "Block Kick ads",
+    "question": "How do I block ads on Kick?",
+    "queries": [
+      "kick ad blocker",
+      "kick ad blocker extension"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/583836",
+        "metric": 365,
+        "note": "Kick.com Ad Blocker, Viewer Count & Click to Pause (NEW) - OPTIMIZED (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/lgiiimfenkolenocllmondgbmengmbjo",
+        "metric": 30000,
+        "note": "ClearKick - Ad Blocker for Kick (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/mhicbhkhokaocipkioiibmficljoijnf",
+        "metric": 10000,
+        "note": "PureKick - Ad Blocker for Kick (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/cflefhbcniopcomabnpiilionhghdkbk",
+        "metric": 2000,
+        "note": "Kick Adblocker (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=kick%20ad%20blocker",
+        "metric": null,
+        "note": "returns \"kick ad blocker\"; suggestions: kick ad blocker | kick ad blocker firefox | kick ad blocker extension | kick ad blocker reddit | kick ad blocker chrome"
+      }
+    ],
+    "score": 72,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://kick.com/xqc",
+    "notes": "Adversarial. Several single-purpose extensions (30,000, 10,000, 2,000 users). Page is Cloudflare-fronted but returned 200 to curl."
+  },
+  {
+    "site": "soundcloud",
+    "siteName": "SoundCloud",
+    "domains": [
+      "soundcloud.com"
+    ],
+    "category": "other",
+    "task": "dark-mode",
+    "title": "Dark mode for SoundCloud",
+    "question": "How do I get dark mode on SoundCloud in the browser?",
+    "queries": [
+      "soundcloud dark mode",
+      "soundcloud dark theme"
+    ],
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/mefnnonjkpgbkbedlbgcbhkbgddghodn",
+        "metric": 20000,
+        "note": "DarkCloud - SoundCloud Dark Mode (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/hpeignghgkecbjepjeiglkkobolhebob",
+        "metric": 2000,
+        "note": "Soundcloud Darker (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/naebniocckkfbbgefonjeahbbhhfafnj",
+        "metric": 1000,
+        "note": "SoundCloud Dark - Color theme for SoundCloud (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=soundcloud%20dark%20mode",
+        "metric": null,
+        "note": "returns \"soundcloud dark mode\"; suggestions: soundcloud dark mode | soundcloud pc dark mode | soundcloud dark mode extension | soundcloud night mode | soundcloud dark theme"
+      }
+    ],
+    "score": 70,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://soundcloud.com/discover",
+    "notes": "SoundCloud web has no dark theme. CSS-only script."
+  },
+  {
+    "site": "soundcloud",
+    "siteName": "SoundCloud",
+    "domains": [
+      "soundcloud.com"
+    ],
+    "category": "other",
+    "task": "direct-links",
+    "title": "Skip SoundCloud's gate.sc link redirect",
+    "question": "How do I make SoundCloud links go straight to the site instead of gate.sc?",
+    "queries": [
+      "soundcloud gate.sc redirect"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/15857",
+        "metric": 36460,
+        "note": "Direct links out (total installs)"
+      }
+    ],
+    "score": 68,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://soundcloud.com/forss",
+    "notes": "Direct links out (15857) covers many sites, SoundCloud and Steam among them, so its count is not SoundCloud-only. Profile and description links go through gate.sc."
+  },
+  {
+    "site": "arxiv",
+    "siteName": "arXiv",
+    "domains": [
+      "arxiv.org"
+    ],
+    "category": "reference",
+    "task": "open-in-alphaxiv",
+    "title": "Open arXiv papers on alphaXiv",
+    "question": "How do I open an arXiv paper on alphaXiv?",
+    "queries": [
+      "arxiv to alphaxiv"
+    ],
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/liihfcjialakefgidmaadhajjikbjjab",
+        "metric": 30000,
+        "note": "alphaXiv - Understand Research Papers (users, read on the detail page)"
+      }
+    ],
+    "score": 67,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://arxiv.org/abs/1706.03762",
+    "notes": "The alphaXiv extension (30,000 users) mainly adds this button. Link only."
+  },
+  {
+    "site": "vimeo",
+    "siteName": "Vimeo",
+    "domains": [
+      "vimeo.com",
+      "player.vimeo.com"
+    ],
+    "category": "video",
+    "task": "playback-speed",
+    "title": "Change Vimeo playback speed",
+    "question": "How do I speed up Vimeo videos?",
+    "queries": [
+      "vimeo playback speed",
+      "vimeo speed up video"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/30506",
+        "metric": 7161,
+        "note": "Video Speed Buttons (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/25525",
+        "metric": 397,
+        "note": "Vimeo Player Speed Slider (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/cdnjpfijkhabobehbclcaoejipccgplk",
+        "metric": 171,
+        "note": "Vimeo / Bunny Instant Speed (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=vimeo%20playback%20speed",
+        "metric": null,
+        "note": "returns \"vimeo playback speed\"; suggestions: vimeo playback speed | vimeo playback speed not showing | vimeo playback speed shortcut | vimeo playback speed extension | vimeo video speed chrome extension"
+      },
+      {
+        "type": "forum",
+        "url": "https://webapps.stackexchange.com/questions/82220/adjust-playback-speed-on-vimeo-to-watch-videos-faster",
+        "metric": null,
+        "note": "Web Apps SE: \"Adjust playback speed on Vimeo to watch videos faster\" (10,662 views)"
+      }
+    ],
+    "score": 63,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://vimeo.com/76979871",
+    "notes": "Uploaders can hide Vimeo's speed menu; autocomplete shows 'vimeo playback speed not showing'. Video Speed Buttons (30506) is multi-site."
+  },
+  {
+    "site": "bandcamp",
+    "siteName": "Bandcamp",
+    "domains": [
+      "bandcamp.com"
+    ],
+    "category": "other",
+    "task": "volume-control",
+    "title": "Add a volume slider to Bandcamp",
+    "question": "How do I change the volume on Bandcamp's player?",
+    "queries": [
+      "bandcamp volume",
+      "bandcamp volume slider"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/38012",
+        "metric": 1522,
+        "note": "Bandcamp Volume Bar (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/11047",
+        "metric": 678,
+        "note": "Bandcamp Volume Bar (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/399032",
+        "metric": 356,
+        "note": "Bandcamp Volume Bar (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/kihpomglkbgbhdhogikhpbgakniddmfj",
+        "metric": 6000,
+        "note": "Bandcamp Volume (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/lpjafdmpdcnbpjlbnaecnnbaegeedkga",
+        "metric": 233,
+        "note": "Bandcamp Volume (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/lfbhdnmepaoehbppjihkjmoinhehgefd",
+        "metric": 217,
+        "note": "Bandcamp Volume Controller (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=bandcamp%20volume",
+        "metric": null,
+        "note": "returns \"bandcamp volume\"; suggestions: bandcamp volume slider | bandcamp volume | bandcamp volume extension | bandcamp volume slider extension | bandcamp volume firefox"
+      }
+    ],
+    "score": 62,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://radiohead.bandcamp.com/album/in-rainbows",
+    "notes": "Bandcamp's player has no volume control. Several separate scripts and extensions do only this. bandcamp.com/discover returned a client challenge to curl; artist album pages did not."
+  },
+  {
+    "site": "bandcamp",
+    "siteName": "Bandcamp",
+    "domains": [
+      "bandcamp.com"
+    ],
+    "category": "other",
+    "task": "playback-speed",
+    "title": "Change Bandcamp playback speed",
+    "question": "Can I speed up or slow down tracks on Bandcamp?",
+    "queries": [
+      "bandcamp playback speed",
+      "bandcamp tempo"
+    ],
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/iniomjoihcjgakkfaebmcbnhmiobppel",
+        "metric": 10000,
+        "note": "Bandcamp Tempo Adjust (users, read on the detail page)"
+      }
+    ],
+    "score": 60,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://radiohead.bandcamp.com/album/in-rainbows",
+    "notes": "Bandcamp Tempo Adjust (10,000 users) is single-purpose. Uses audio.playbackRate."
+  },
+  {
+    "site": "vimeo",
+    "siteName": "Vimeo",
+    "domains": [
+      "vimeo.com"
+    ],
+    "category": "video",
+    "task": "theater-mode",
+    "title": "Make the Vimeo player fill the window",
+    "question": "Does Vimeo have a theater mode?",
+    "queries": [
+      "vimeo theater mode"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/10815",
+        "metric": 4055,
+        "note": "Resize Video To Window Size (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/cncfdfheagoagmoeiaecfpbcljncoepe",
+        "metric": 318,
+        "note": "Theater Mode Everywhere — One player to rule them all (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=vimeo%20theater%20mode",
+        "metric": null,
+        "note": "returns \"vimeo theater mode\"; suggestions: vimeo theater mode | can you put vimeo on tv"
+      }
+    ],
+    "score": 59,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://vimeo.com/76979871",
+    "notes": "Resize Video To Window Size (10815) and Theater Mode Everywhere are multi-site."
+  },
+  {
+    "site": "dailymotion",
+    "siteName": "Dailymotion",
+    "domains": [
+      "dailymotion.com"
+    ],
+    "category": "video",
+    "task": "full-window-player",
+    "title": "Make the Dailymotion player fill the window",
+    "question": "How do I make Dailymotion videos bigger without going fullscreen?",
+    "queries": [
+      "dailymotion full screen"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/10815",
+        "metric": 4055,
+        "note": "Resize Video To Window Size (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=dailymotion%20full%20screen",
+        "metric": null,
+        "note": "returns \"dailymotion full screen\"; suggestions: dailymotion full screen not working | dailymotion full screen | dailymotion full screen android | dailymotion full screen shortcut' | dailymotion full screen iphone"
+      }
+    ],
+    "score": 59,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.dailymotion.com/video/x7tgad0",
+    "notes": "Resize Video To Window Size (10815) is multi-site."
+  },
+  {
+    "site": "goodreads",
+    "siteName": "Goodreads",
+    "domains": [
+      "goodreads.com"
+    ],
+    "category": "social",
+    "task": "library-links",
+    "title": "Search your library from Goodreads",
+    "question": "How do I check if my library has a book I'm looking at on Goodreads?",
+    "queries": [
+      "goodreads library extension"
+    ],
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/gclnfffacbjpclfenjgefpfnafmjghhk",
+        "metric": 4000,
+        "note": "Available Reads (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/jehnphgljiclcngoamjmckillljaohko",
+        "metric": 25,
+        "note": "Goodreads Library Links (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=goodreads%20library%20extension",
+        "metric": null,
+        "note": "returns \"goodreads library extension\"; suggestions: goodreads library extension | most read books on goodreads"
+      }
+    ],
+    "score": 59,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.goodreads.com/book/show/5907.The_Hobbit",
+    "notes": "Client-side version adds search links (Libby, WorldCat); it cannot check availability without a network call."
+  },
+  {
+    "site": "soundcloud",
+    "siteName": "SoundCloud",
+    "domains": [
+      "soundcloud.com"
+    ],
+    "category": "other",
+    "task": "download-cover-art",
+    "title": "Download full-size SoundCloud cover art",
+    "question": "How do I download the full-size cover art of a SoundCloud track?",
+    "queries": [
+      "soundcloud artwork downloader",
+      "soundcloud download album art"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/14591",
+        "metric": 2857,
+        "note": "Soundcloud Album Art Downloader (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/20771",
+        "metric": 3654,
+        "note": "Stig's Art Grabr (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/ggplcohodggmdfpopelnpplhgfjclomi",
+        "metric": 10000,
+        "note": "SoundCloud Enhanced Pro (users, read on the detail page); multi-purpose extension, not counted in the score"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=soundcloud%20artwork%20download",
+        "metric": null,
+        "note": "returns \"soundcloud artwork downloader\"; suggestions: soundcloud artwork downloader | soundcloud artwork downloader extension | soundcloud image downloader | soundcloud song artwork downloader | soundcloud cover art downloader extension"
+      }
+    ],
+    "score": 58,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://soundcloud.com/forss/flickermood",
+    "notes": "Artwork URLs end in -t500x500; swapping to -original gives the upload. Link only, no fetch. Stig's Art Grabr (20771) is multi-site."
+  },
+  {
+    "site": "steam",
+    "siteName": "Steam",
+    "domains": [
+      "store.steampowered.com"
+    ],
+    "category": "shopping",
+    "task": "skip-age-check",
+    "title": "Skip the Steam age check",
+    "question": "How do I stop Steam asking for my birthday on every mature game?",
+    "queries": [
+      "steam age check",
+      "steam age checker"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/18450",
+        "metric": 3571,
+        "note": "Steam: Bypass age confirmation prompts (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/1519",
+        "metric": 2043,
+        "note": "Automatically Bypass Steam Age Verification (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=steam%20age%20check",
+        "metric": null,
+        "note": "returns \"steam age check\"; suggestions: steam age check | steam age checker | steam age check not working | steam age check australia | steam age check broken"
+      }
+    ],
+    "score": 58,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://store.steampowered.com/agecheck/app/1091500/",
+    "notes": "Two separate scripts. curl was redirected straight to the app page for this URL; the gate may only show in a browser session or for some regions, so confirm in the harness."
+  },
+  {
+    "site": "devto",
+    "siteName": "DEV Community",
+    "domains": [
+      "dev.to"
+    ],
+    "category": "social",
+    "task": "table-of-contents",
+    "title": "Table of contents for DEV articles",
+    "question": "How do I get a table of contents on dev.to articles?",
+    "queries": [
+      "dev.to table of contents"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/406337",
+        "metric": 7038,
+        "note": "Toc Bar, auto-generating table of content (total installs)"
+      }
+    ],
+    "score": 58,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://dev.to/",
+    "notes": "Toc Bar (406337, 7,038) is multi-site; its count is not DEV-only. Test on an article with headings."
+  },
+  {
+    "site": "arxiv",
+    "siteName": "arXiv",
+    "domains": [
+      "arxiv.org"
+    ],
+    "category": "reference",
+    "task": "pdf-title-filename",
+    "title": "Save arXiv PDFs with the paper title",
+    "question": "How do I download arXiv PDFs named after the paper title?",
+    "queries": [
+      "arxiv pdf rename"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/33051",
+        "metric": 176,
+        "note": "arXiv Redirect and Rename (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/482493",
+        "metric": 172,
+        "note": "arXiv PDF Download with Automatic Renaming to Paper Title (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/499672",
+        "metric": 92,
+        "note": "Arxiv PDF Rename & Download (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/mnhdpeipjhhkmlhlcljdjpgmilbmehij",
+        "metric": 6000,
+        "note": "arxiv-utils (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/mjceeaifcoknbgoblkanebjklknnondl",
+        "metric": 7,
+        "note": "arXiv Paper PDF Renamer (users, read on the detail page)"
+      }
+    ],
+    "score": 57,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://arxiv.org/abs/1706.03762",
+    "notes": "Same-origin link, so the download attribute works from the abs page. arxiv-utils (6,000) also retitles the PDF tab. Three separate scripts."
+  },
+  {
+    "site": "imgur",
+    "siteName": "Imgur",
+    "domains": [
+      "imgur.com",
+      "i.imgur.com"
+    ],
+    "category": "social",
+    "task": "direct-image-links",
+    "title": "Open the direct image link on Imgur",
+    "question": "How do I get the direct link to an Imgur image?",
+    "queries": [
+      "imgur direct link",
+      "imgur direct link to image"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/413400",
+        "metric": 1126,
+        "note": "Imgur Direct (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/504414",
+        "metric": 318,
+        "note": "Imgur direct image/media page without HTML (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=imgur%20direct%20link",
+        "metric": null,
+        "note": "returns \"imgur direct link\"; suggestions: imgur direct link | imgur direct link grabber | imgur direct link generator | imgur direct link not working | imgur direct link to image"
+      },
+      {
+        "type": "forum",
+        "url": "https://webapps.stackexchange.com/questions/95883/how-to-get-direct-link-of-images-on-imgur",
+        "metric": null,
+        "note": "Web Apps SE: \"How to get direct link of images on Imgur?\" (score 32, 232,260 views)"
+      },
+      {
+        "type": "forum",
+        "url": "https://webapps.stackexchange.com/questions/84535/has-imgur-stopped-giving-direct-links",
+        "metric": null,
+        "note": "Web Apps SE: \"Has Imgur stopped giving direct links?\" (17,190 views)"
+      }
+    ],
+    "score": 56,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://imgur.com/",
+    "notes": "i.imgur.com links redirect to the HTML page in browsers; scripts rewrite or add the i.imgur.com link. imgur.com returned a 6.7 KB app shell to curl; content renders client-side. Imgur blocks UK visitors."
+  },
+  {
+    "site": "archive",
+    "siteName": "Internet Archive",
+    "domains": [
+      "archive.org",
+      "web.archive.org"
+    ],
+    "category": "reference",
+    "task": "pdf-download-link",
+    "title": "Add a PDF download button on Internet Archive",
+    "question": "How do I download a book from the Internet Archive as a PDF?",
+    "queries": [
+      "internet archive download pdf"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/447027",
+        "metric": 2669,
+        "note": "Internet Archive Pdf Download Link (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/cnnfichfhmpmnfabckimnchpgafnakjb",
+        "metric": 690,
+        "note": "Archive.org Book Downloader (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=internet%20archive%20download%20pdf",
+        "metric": null,
+        "note": "returns \"internet archive download pdf\"; suggestions: internet archive download pdf | internet archive download pdf free | internet archive download pdf extension | internet archive pdf download chrome extension | web archive download pdf"
+      }
+    ],
+    "score": 56,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://archive.org/details/alice_in_wonderland_librivox",
+    "notes": "Only public items have PDFs; lending-library books do not. Pick a public text item for the check."
+  },
+  {
+    "site": "archive",
+    "siteName": "Internet Archive",
+    "domains": [
+      "archive.org",
+      "web.archive.org"
+    ],
+    "category": "reference",
+    "task": "fix-wayback-images",
+    "title": "Fix missing images in the Wayback Machine",
+    "question": "Why are images not loading in the Wayback Machine?",
+    "queries": [
+      "wayback machine images not loading"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/12860",
+        "metric": 1933,
+        "note": "Wayback Machine Image Fixer (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=wayback%20machine%20images%20not%20loading",
+        "metric": null,
+        "note": "returns \"wayback machine images not loading\"; suggestions: wayback machine images not loading | wayback machine images not showing | wayback machine not loading | wayback machine not working | wayback machine not loading page"
+      }
+    ],
+    "score": 54,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://web.archive.org/web/2005/http://www.google.com/",
+    "notes": "Rewrites broken image URLs to Wayback image URLs; no fetch."
+  },
+  {
+    "site": "bandcamp",
+    "siteName": "Bandcamp",
+    "domains": [
+      "bandcamp.com"
+    ],
+    "category": "other",
+    "task": "download-cover-art",
+    "title": "Download full-size Bandcamp album art",
+    "question": "How do I get the full-size album cover from Bandcamp?",
+    "queries": [
+      "bandcamp album art full size"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/20771",
+        "metric": 3654,
+        "note": "Stig's Art Grabr (total installs)"
+      }
+    ],
+    "score": 53,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://radiohead.bandcamp.com/album/in-rainbows",
+    "notes": "Stig's Art Grabr is multi-site. Swapping the image suffix to _0 gives the original; link only."
+  },
+  {
+    "site": "dailymotion",
+    "siteName": "Dailymotion",
+    "domains": [
+      "dailymotion.com"
+    ],
+    "category": "video",
+    "task": "unblur-thumbnails",
+    "title": "Unblur Dailymotion thumbnails",
+    "question": "Why are Dailymotion thumbnails blurred and how do I unblur them?",
+    "queries": [
+      "dailymotion blurred thumbnails"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/4960",
+        "metric": 3016,
+        "note": "Dailymotion Fix Sexy Images (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/6692",
+        "metric": 899,
+        "note": "Dailymotion Preview Unblur (total installs)"
+      }
+    ],
+    "score": 52,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.dailymotion.com/",
+    "notes": "Two separate scripts (3,016 and 899 installs). Blur is CSS on age-flagged thumbnails; needs a flagged result to test."
+  },
+  {
+    "site": "imgur",
+    "siteName": "Imgur",
+    "domains": [
+      "imgur.com"
+    ],
+    "category": "social",
+    "task": "slideshow",
+    "title": "View Imgur albums as a slideshow",
+    "question": "How do I view an Imgur album as a slideshow?",
+    "queries": [
+      "imgur slideshow"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/16645",
+        "metric": 1394,
+        "note": "Imgur - Load albums in fullscreen slideshow (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/26477",
+        "metric": 809,
+        "note": "slideshow (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/28640",
+        "metric": 501,
+        "note": "Imgur Album Slideshow (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=imgur%20slideshow",
+        "metric": null,
+        "note": "returns \"imgur slideshow\"; suggestions: imgur slideshow"
+      }
+    ],
+    "score": 52,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://imgur.com/",
+    "notes": "Three separate scripts."
+  },
+  {
+    "site": "steam",
+    "siteName": "Steam",
+    "domains": [
+      "store.steampowered.com"
+    ],
+    "category": "shopping",
+    "task": "steamdb-link",
+    "title": "Add a SteamDB link to Steam store pages",
+    "question": "How do I jump from a Steam game page to SteamDB?",
+    "queries": [
+      "steamdb extension"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/23564",
+        "metric": 1397,
+        "note": "Add SteamDB info (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/kdbmhfkmnlmbkgbabkdealhhbfhlmmon",
+        "metric": 700000,
+        "note": "SteamDB (users, read on the detail page); multi-purpose extension, not counted in the score"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=steamdb%20extension",
+        "metric": null,
+        "note": "returns \"steamdb extension\"; suggestions: steamdb extension | steamdb extension for steam app | steamdb extension firefox | steamdb extension chrome | steamdb extension for steam"
+      }
+    ],
+    "score": 52,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://store.steampowered.com/app/292030/",
+    "notes": "The SteamDB extension (700,000 users) does much more than the link, so it is not counted."
+  },
+  {
+    "site": "kick",
+    "siteName": "Kick",
+    "domains": [
+      "kick.com"
+    ],
+    "category": "video",
+    "task": "force-quality",
+    "title": "Force 1080p on Kick",
+    "question": "How do I make Kick always play at the highest quality?",
+    "queries": [
+      "kick quality",
+      "kick 1080p"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/482255",
+        "metric": 454,
+        "note": "Kick.com - Auto select best quality FIXED (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/539772",
+        "metric": 248,
+        "note": "Kick.com Auto Select 1080p60 Quality [2025 Working!] (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/561879",
+        "metric": 223,
+        "note": "Kick.com - Force 1080p, No Throttle & Auto-Confirm Mature (self-healing) (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/573540",
+        "metric": 218,
+        "note": "Force 1080p on Twitch & Kick / Proper version of Kacper Wawer (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/582537",
+        "metric": 168,
+        "note": "Kick - Force 1080p HLS (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/ebbnoanfkddbmlhmldlpjdjpfodkimco",
+        "metric": 1000,
+        "note": "Kick Quality Enforcer (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/imjkfkoenleopknoemimnopgjcdklfeh",
+        "metric": 997,
+        "note": "Kick Video Quality Controller (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=kick%20quality",
+        "metric": null,
+        "note": "returns \"kick quality\"; suggestions: kick quality enforcer | kick quality | kick quality extension | kick quality enforcer firefox | kick quality settings"
+      }
+    ],
+    "score": 50,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://kick.com/xqc",
+    "notes": "At least five separate Greasy Fork scripts do only this. Autocomplete also suggests 'kick quality enforcer'."
+  },
+  {
+    "site": "steam",
+    "siteName": "Steam",
+    "domains": [
+      "store.steampowered.com"
+    ],
+    "category": "shopping",
+    "task": "review-percentage",
+    "title": "Show the review percentage on Steam",
+    "question": "How do I see the exact positive review percentage on Steam?",
+    "queries": [
+      "steam review percentages"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/24113",
+        "metric": 1033,
+        "note": "MoreSteamRatings (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=steam%20review%20percentage",
+        "metric": null,
+        "note": "returns \"steam review percentages\"; suggestions: steam review percentages | steam review percentage thresholds | steam review rate | steam mixed reviews percentage | steam rating percentages"
+      }
+    ],
+    "score": 50,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://store.steampowered.com/app/292030/",
+    "notes": "The percentage is in the review summary tooltip; the script puts it inline. MoreSteamRatings (24113) may do more than this."
+  },
+  {
+    "site": "deepl",
+    "siteName": "DeepL",
+    "domains": [
+      "deepl.com",
+      "www.deepl.com"
+    ],
+    "category": "work",
+    "task": "dark-mode",
+    "title": "Dark mode for DeepL Translator",
+    "question": "Does the DeepL website have dark mode?",
+    "queries": [
+      "deepl dark mode"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/595324",
+        "metric": 17,
+        "note": "DeepL Black Theme (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/lgldkcjfjjfbbfdibpnloponileegnbd",
+        "metric": 1000,
+        "note": "Dark Mode for DeepL (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=deepl%20dark%20mode",
+        "metric": null,
+        "note": "returns \"deepl dark mode\"; suggestions: deepl dark mode | deepl dark mode extension | deepl website dark mode | deepl dark mode firefox | deepl browser dark mode"
+      }
+    ],
+    "score": 50,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.deepl.com/en/translator",
+    "notes": ""
+  },
+  {
+    "site": "soundcloud",
+    "siteName": "SoundCloud",
+    "domains": [
+      "soundcloud.com"
+    ],
+    "category": "other",
+    "task": "disable-autoplay",
+    "title": "Stop SoundCloud autoplaying the next track",
+    "question": "How do I stop SoundCloud from playing related tracks after a song ends?",
+    "queries": [
+      "soundcloud stop autoplay",
+      "soundcloud disable autoplay"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/6988",
+        "metric": 771,
+        "note": "Stop Automatic Recommendations on Soundcloud (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=soundcloud%20stop%20autoplay",
+        "metric": null,
+        "note": "returns \"soundcloud stop autoplay\"; suggestions: soundcloud stop autoplay | stop soundcloud autoplay bluetooth | stop soundcloud autoplay bluetooth android | stop soundcloud autoplay bluetooth iphone | stop soundcloud autoplay android"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=soundcloud%20disable%20autoplay",
+        "metric": null,
+        "note": "returns \"soundcloud disable autoplay\"; suggestions: soundcloud disable autoplay | soundcloud disable autoplay station | stop soundcloud autoplay bluetooth | stop soundcloud autoplay bluetooth android | stop soundcloud autoplay bluetooth iphone"
+      },
+      {
+        "type": "forum",
+        "url": "https://webapps.stackexchange.com/questions/92090/soundcloud-disable-autoplay",
+        "metric": null,
+        "note": "Web Apps SE: \"SoundCloud disable autoplay\" (score 7, 3,711 views)"
+      }
+    ],
+    "score": 48,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://soundcloud.com/forss/flickermood",
+    "notes": "Autoplay station starts after the queue ends; works logged out. Test needs playback to end, so check that the queue control is switched off rather than waiting."
+  },
+  {
+    "site": "dailymotion",
+    "siteName": "Dailymotion",
+    "domains": [
+      "dailymotion.com"
+    ],
+    "category": "video",
+    "task": "disable-autoplay",
+    "title": "Stop Dailymotion autoplay",
+    "question": "How do I turn off autoplay on Dailymotion?",
+    "queries": [
+      "dailymotion disable autoplay",
+      "dailymotion autoplay off"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/33276",
+        "metric": 774,
+        "note": "Dailymotion disable autoplay (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=dailymotion%20disable%20autoplay",
+        "metric": null,
+        "note": "returns \"dailymotion disable autoplay\"; suggestions: dailymotion disable autoplay | dailymotion embed disable autoplay | turn off autoplay"
+      }
+    ],
+    "score": 48,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.dailymotion.com/video/x7tgad0",
+    "notes": ""
+  },
+  {
+    "site": "dailymotion",
+    "siteName": "Dailymotion",
+    "domains": [
+      "dailymotion.com"
+    ],
+    "category": "video",
+    "task": "force-quality",
+    "title": "Set Dailymotion video quality",
+    "question": "How do I make Dailymotion play in higher quality by default?",
+    "queries": [
+      "dailymotion quality settings",
+      "dailymotion higher quality"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/3666",
+        "metric": 682,
+        "note": "Dailymotion: \"Playback Quality Control\" Feature (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=dailymotion%20quality",
+        "metric": null,
+        "note": "returns \"dailymotion quality\"; suggestions: dailymotion quality settings | dailymotion quality | dailymotion video quality | dailymotion low quality | dailymotion higher quality"
+      }
+    ],
+    "score": 48,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.dailymotion.com/video/x7tgad0",
+    "notes": "Player is in an iframe on geo.dailymotion.com; @match must cover it."
+  },
+  {
+    "site": "goodreads",
+    "siteName": "Goodreads",
+    "domains": [
+      "goodreads.com"
+    ],
+    "category": "social",
+    "task": "sort-list-by-rating",
+    "title": "Sort Goodreads lists by rating",
+    "question": "Can I sort a Goodreads list by average rating?",
+    "queries": [
+      "goodreads sort list by rating"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/11620",
+        "metric": 631,
+        "note": "Goodreads - Sort lists by rating or votes (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=goodreads%20sort%20list%20by%20rating",
+        "metric": null,
+        "note": "returns \"goodreads sort list by rating\"; suggestions: goodreads sort list by rating | goodreads top rated all time | goodreads sort by number of ratings | goodreads average rating"
+      }
+    ],
+    "score": 47,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.goodreads.com/list/show/1.Best_Books_Ever",
+    "notes": "Sorts the books on the current page only."
+  },
+  {
+    "site": "imgur",
+    "siteName": "Imgur",
+    "domains": [
+      "imgur.com"
+    ],
+    "category": "social",
+    "task": "load-all-images",
+    "title": "Load every image in an Imgur album",
+    "question": "How do I make Imgur show all images in an album without clicking 'load more'?",
+    "queries": [
+      "imgur load more images"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/12444",
+        "metric": 1105,
+        "note": "IMGUR Load \"remaining images\" AUTOMATICALLY (total installs)"
+      }
+    ],
+    "score": 46,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://imgur.com/",
+    "notes": "Needs an album with more images than the first batch."
+  },
+  {
+    "site": "genius",
+    "siteName": "Genius",
+    "domains": [
+      "genius.com"
+    ],
+    "category": "other",
+    "task": "copy-lyrics",
+    "title": "Copy lyrics from Genius",
+    "question": "How do I copy lyrics from Genius without the annotations?",
+    "queries": [
+      "genius copy lyrics",
+      "genius lyrics copy and paste"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/519795",
+        "metric": 109,
+        "note": "Copy Genius Lyrics (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/549204",
+        "metric": 30,
+        "note": "Genius Lyrics Copy (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/583788",
+        "metric": 28,
+        "note": "Genius Lyrics Copier (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/554582",
+        "metric": 24,
+        "note": "Genius Lyrics Copier (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/ckpfkpjmipfmhfionkleogokbgmhcioa",
+        "metric": 566,
+        "note": "Genius Lyrics Copier (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=genius%20copy%20lyrics",
+        "metric": null,
+        "note": "returns \"genius copy lyrics\"; suggestions: genius copy lyrics | genius lyrics copy and paste | genius lyrics copy extension"
+      }
+    ],
+    "score": 46,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://genius.com/Adele-hello-lyrics",
+    "notes": "Four separate Greasy Fork scripts plus an extension. Genius returned a Cloudflare 403 to curl over HTTP/2 and 200 over HTTP/1.1; check in the harness."
+  },
+  {
+    "site": "archive",
+    "siteName": "Internet Archive",
+    "domains": [
+      "web.archive.org"
+    ],
+    "category": "reference",
+    "task": "hide-wayback-toolbar",
+    "title": "Hide the Wayback Machine toolbar",
+    "question": "How do I hide the Wayback Machine toolbar on archived pages?",
+    "queries": [
+      "wayback machine toolbar"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/401753",
+        "metric": 547,
+        "note": "Wayback Machine - toolbar toggler (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/461213",
+        "metric": 262,
+        "note": "Wayback Machine Toolbar Remover (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=wayback%20machine%20toolbar",
+        "metric": null,
+        "note": "returns \"wayback machine toolbar\"; suggestions: wayback machine toolbar | can you search the wayback machine | wayback machine not working | how to access the wayback machine"
+      }
+    ],
+    "score": 46,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://web.archive.org/web/2005/http://www.google.com/",
+    "notes": "Two separate scripts."
+  },
+  {
+    "site": "kick",
+    "siteName": "Kick",
+    "domains": [
+      "kick.com"
+    ],
+    "category": "video",
+    "task": "keyboard-seek",
+    "title": "Seek Kick videos with the arrow keys",
+    "question": "How do I skip forward and back on Kick VODs with the keyboard?",
+    "queries": [
+      "kick seek arrow keys"
+    ],
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/dpjfgkgjcdhfiblanbnnmnlmkekmdijk",
+        "metric": 1000,
+        "note": "Kick Video Seek & Skip Controller (users, read on the detail page)"
+      }
+    ],
+    "score": 45,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://kick.com/xqc",
+    "notes": "Single-purpose extension, 1,000 users. Test on a VOD URL from the channel page."
+  },
+  {
+    "site": "bandcamp",
+    "siteName": "Bandcamp",
+    "domains": [
+      "bandcamp.com"
+    ],
+    "category": "other",
+    "task": "dark-mode",
+    "title": "Dark mode for Bandcamp",
+    "question": "How do I get dark mode on Bandcamp?",
+    "queries": [
+      "bandcamp dark mode"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/406919",
+        "metric": 260,
+        "note": "Bandcamp Dark (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/feoijckkhibpknghpfnoclcedbdgpbfm",
+        "metric": 429,
+        "note": "Dark Bandcamp (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=bandcamp%20dark%20mode",
+        "metric": null,
+        "note": "returns \"bandcamp dark mode\"; suggestions: bandcamp dark mode | bandcamp dark mode app | bandcamp dark mode extension | bandcamp dark mode firefox | bandcamp dark mode browser"
+      }
+    ],
+    "score": 44,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://radiohead.bandcamp.com/album/in-rainbows",
+    "notes": "Artist pages use per-artist colors, so a dark theme must override inline styles."
+  },
+  {
+    "site": "imgur",
+    "siteName": "Imgur",
+    "domains": [
+      "imgur.com"
+    ],
+    "category": "social",
+    "task": "minimal-layout",
+    "title": "A minimal Imgur layout",
+    "question": "How do I remove the clutter around images on Imgur?",
+    "queries": [
+      "imgur minimal"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/398960",
+        "metric": 879,
+        "note": "Imgur - Minimal Design for non-Imgurians (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/9677",
+        "metric": 648,
+        "note": "IMGUR - Minimal Redesign (total installs)"
+      }
+    ],
+    "score": 44,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://imgur.com/",
+    "notes": "Two separate scripts."
+  },
+  {
+    "site": "arxiv",
+    "siteName": "arXiv",
+    "domains": [
+      "arxiv.org"
+    ],
+    "category": "reference",
+    "task": "html-version-link",
+    "title": "Link arXiv papers to their HTML version",
+    "question": "How do I read an arXiv paper as HTML instead of PDF?",
+    "queries": [
+      "arxiv html version"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/440850",
+        "metric": 253,
+        "note": "HTML5 for arXiv (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/440019",
+        "metric": 100,
+        "note": "ar25iv (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/466894",
+        "metric": 31,
+        "note": "HTML5 for arXiv (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/ledhlnbblmkmfdckpmolbpocibcanfda",
+        "metric": 362,
+        "note": "arxiv -> ar5iv (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=arxiv%20html%20version",
+        "metric": null,
+        "note": "returns \"arxiv html version\"; suggestions: arxiv html version"
+      }
+    ],
+    "score": 43,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://arxiv.org/abs/1706.03762",
+    "notes": "arXiv now has its own HTML for many papers; the script points to it or to ar5iv."
+  },
+  {
+    "site": "dailymotion",
+    "siteName": "Dailymotion",
+    "domains": [
+      "dailymotion.com"
+    ],
+    "category": "video",
+    "task": "skip-ads",
+    "title": "Skip Dailymotion ads",
+    "question": "How do I skip ads on Dailymotion?",
+    "queries": [
+      "dailymotion ad blocker"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/509767",
+        "metric": 305,
+        "note": "Enhanced Corrupt Dailymotion Ads (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/okhjhbpkfhifnidmbpleooalhobhpdaj",
+        "metric": 59,
+        "note": "Dailymotion Ad Skipper: Skip Ads (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=dailymotion%20ad%20blocker",
+        "metric": null,
+        "note": "returns \"dailymotion ad blocker\"; suggestions: dailymotion ad blocker | dailymotion ad blocker extension | dailymotion ad blocker chrome | dailymotion ad blocker iphone | dailymotion ad blocker detected"
+      }
+    ],
+    "score": 42,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.dailymotion.com/video/x7tgad0",
+    "notes": "Adversarial; autocomplete also shows 'dailymotion ad blocker detected'."
+  },
+  {
+    "site": "letterboxd",
+    "siteName": "Letterboxd",
+    "domains": [
+      "letterboxd.com"
+    ],
+    "category": "social",
+    "task": "exact-average-rating",
+    "title": "Show the exact Letterboxd average rating",
+    "question": "How do I see a film's exact average rating on Letterboxd?",
+    "queries": [
+      "letterboxd average rating"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/4634",
+        "metric": 273,
+        "note": "Letterboxd Average Rating (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=letterboxd%20average%20rating",
+        "metric": null,
+        "note": "returns \"letterboxd average rating\"; suggestions: letterboxd average rating calculator | letterboxd average rating | letterboxd average rating reddit | average letterboxd rating curve | letterboxd average score"
+      }
+    ],
+    "score": 42,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://letterboxd.com/film/parasite-2019/",
+    "notes": "The two-decimal average is in the histogram tooltip; the script shows it inline. MoreMovieRatings (7687, 72,784 installs) is the bigger demand but needs network calls to other sites, so it is not listed."
+  },
+  {
+    "site": "yahoo",
+    "siteName": "Yahoo",
+    "domains": [
+      "yahoo.com",
+      "search.yahoo.com",
+      "www.yahoo.com"
+    ],
+    "category": "search",
+    "task": "direct-search-links",
+    "title": "Remove Yahoo search redirect links",
+    "question": "How do I make Yahoo search results link straight to the site?",
+    "queries": [
+      "yahoo search direct links"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/8764",
+        "metric": 629,
+        "note": "Yahoo direct non-tracking search (total installs)"
+      }
+    ],
+    "score": 42,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://search.yahoo.com/search?p=greasemonkey",
+    "notes": "Results go through r.search.yahoo.com. Autocomplete for 'yahoo search redirect' is about browser hijacks, so not counted."
+  },
+  {
+    "site": "bandcamp",
+    "siteName": "Bandcamp",
+    "domains": [
+      "bandcamp.com"
+    ],
+    "category": "other",
+    "task": "album-duration",
+    "title": "Show the total length of a Bandcamp album",
+    "question": "How long is this Bandcamp album in total?",
+    "queries": [
+      "bandcamp album length"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/416888",
+        "metric": 204,
+        "note": "Bandcamp Total Duration (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=bandcamp%20album%20length",
+        "metric": null,
+        "note": "returns \"bandcamp album length\"; suggestions: bandcamp album length calculator | bandcamp album length | bandcamp track length limit | bandcamp album size | bandcamp album time calculator"
+      }
+    ],
+    "score": 40,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://radiohead.bandcamp.com/album/in-rainbows",
+    "notes": "Sums the track times in the track table."
+  },
+  {
+    "site": "bandcamp",
+    "siteName": "Bandcamp",
+    "domains": [
+      "bandcamp.com"
+    ],
+    "category": "other",
+    "task": "show-release-date",
+    "title": "Show the release date at the top of Bandcamp albums",
+    "question": "Where is the release date on a Bandcamp album page?",
+    "queries": [
+      "bandcamp release date"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/420662",
+        "metric": 232,
+        "note": "Bandcamp: Show publish date (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=bandcamp%20release%20date",
+        "metric": null,
+        "note": "returns \"bandcamp release date\"; suggestions: bandcamp release date | bandcamp set release date | bandcamp future release date | bandcamp change release date | bandcamp publish before release date"
+      }
+    ],
+    "score": 40,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://radiohead.bandcamp.com/album/in-rainbows",
+    "notes": "Autocomplete also catches artists asking how to set a date, so the query is mixed."
+  },
+  {
+    "site": "kick",
+    "siteName": "Kick",
+    "domains": [
+      "kick.com"
+    ],
+    "category": "video",
+    "task": "theater-mode",
+    "title": "Theater mode on Kick by default",
+    "question": "How do I open Kick streams in theater mode?",
+    "queries": [
+      "kick theater mode",
+      "kick theatre mode"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/530130",
+        "metric": 225,
+        "note": "Replace Kick Embed with Channel Page and Enable Theatre Mode (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/dpicnonffkfkjlaapggkbfbddnmlkcdn",
+        "metric": 130,
+        "note": "Kick Advanced Player (users, read on the detail page); multi-purpose extension, not counted in the score"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=kick%20theater%20mode",
+        "metric": null,
+        "note": "returns \"kick theater mode\"; suggestions: kick theater mode | kick theatre mode | what is movement in theatre"
+      }
+    ],
+    "score": 40,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://kick.com/xqc",
+    "notes": ""
+  },
+  {
+    "site": "genius",
+    "siteName": "Genius",
+    "domains": [
+      "genius.com"
+    ],
+    "category": "other",
+    "task": "old-song-page",
+    "title": "Go back to the old Genius song page",
+    "question": "How do I get the old Genius song page layout back?",
+    "queries": [
+      "genius old song page"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/443365",
+        "metric": 203,
+        "note": "Anti New Song Page (Genius) (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/452774",
+        "metric": 68,
+        "note": "Genius Instant Old (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/450983",
+        "metric": 53,
+        "note": "Genius: Back to The Original Page Layout (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/449176",
+        "metric": 25,
+        "note": "Genius Auto Old Song Page (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/473140",
+        "metric": 24,
+        "note": "Genius - Bring Back Old Song Page (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=genius%20old%20song%20page",
+        "metric": null,
+        "note": "returns \"genius old song page\"; suggestions: genius old song page"
+      }
+    ],
+    "score": 40,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://genius.com/Adele-hello-lyrics",
+    "notes": "Five separate scripts. Whether an old layout is still served is unverified; may end up as a CSS restyle."
+  },
+  {
+    "site": "yahoo",
+    "siteName": "Yahoo",
+    "domains": [
+      "yahoo.com",
+      "www.yahoo.com"
+    ],
+    "category": "news",
+    "task": "block-news-sources",
+    "title": "Hide news sources on Yahoo News",
+    "question": "How do I block a publisher from Yahoo News?",
+    "queries": [
+      "yahoo news block source"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/5384",
+        "metric": 438,
+        "note": "Purge Huffington Post from Yahoo News feed (total installs)"
+      }
+    ],
+    "score": 40,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.yahoo.com/news/",
+    "notes": "Original script hides HuffPost only; a general version takes a list."
+  },
+  {
+    "site": "weather",
+    "siteName": "Weather.com",
+    "domains": [
+      "weather.com"
+    ],
+    "category": "news",
+    "task": "declutter",
+    "title": "Remove ads and clutter from weather.com",
+    "question": "How do I see just the forecast on weather.com?",
+    "queries": [
+      "weather.com ad blocker"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/428121",
+        "metric": 205,
+        "note": "IBM-Weather-UI (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/462267",
+        "metric": 33,
+        "note": "Weather only view (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=weather.com%20ad%20blocker",
+        "metric": null,
+        "note": "returns \"weather.com ad blocker\"; suggestions: weather.com ad blocker"
+      }
+    ],
+    "score": 40,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://weather.com/weather/today/l/40.71,-74.01",
+    "notes": "Two separate scripts."
+  },
+  {
+    "site": "python-docs",
+    "siteName": "Python docs",
+    "domains": [
+      "docs.python.org"
+    ],
+    "category": "reference",
+    "task": "latest-version-redirect",
+    "title": "Redirect old Python docs to the current version",
+    "question": "How do I always land on the Python 3 docs instead of Python 2?",
+    "queries": [
+      "python 3 docs",
+      "python docs latest version"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/27249",
+        "metric": 188,
+        "note": "Lastest Doc Redirector (python, django, ruby) (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/3400",
+        "metric": 169,
+        "note": "Show Python 3 documentation by default (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/26235",
+        "metric": 25,
+        "note": "Py3Direct (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/nomnkbngkijpffepcgbbofhcnafpkiep",
+        "metric": 24,
+        "note": "DocVersionRedirector (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=python%203%20docs",
+        "metric": null,
+        "note": "returns \"python 3 docs\"; suggestions: python 3 docs | python 3 docstring | python 3 docstring best practices | python 3 documentation | python 3 documentation pdf"
+      },
+      {
+        "type": "forum",
+        "url": "https://webapps.stackexchange.com/questions/85170/how-do-i-tell-google-that-i-prefer-python3-results",
+        "metric": null,
+        "note": "Web Apps SE: \"How do I tell Google that I prefer Python3 results?\" (asks to land on Python 3 docs)"
+      }
+    ],
+    "score": 39,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://docs.python.org/2/library/os.html",
+    "notes": "Three separate scripts. Search results still link to docs.python.org/2/."
+  },
+  {
+    "site": "soundcloud",
+    "siteName": "SoundCloud",
+    "domains": [
+      "soundcloud.com"
+    ],
+    "category": "other",
+    "task": "hide-reposts",
+    "title": "Hide reposts on SoundCloud",
+    "question": "How do I hide reposts on a SoundCloud profile or feed?",
+    "queries": [
+      "soundcloud hide reposts",
+      "soundcloud remove reposts"
+    ],
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/mnfcpieidcneompnhaamejajfodlclal",
+        "metric": 161,
+        "note": "SoundCloud Feed Filter Extended (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=soundcloud%20hide%20reposts",
+        "metric": null,
+        "note": "returns \"soundcloud hide reposts\"; suggestions: soundcloud hide reposts | soundcloud remove reposts | can you hide your likes on soundcloud"
+      }
+    ],
+    "score": 38,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://soundcloud.com/forss",
+    "notes": "The feed needs a login; profile pages show reposts logged out, so test there."
+  },
+  {
+    "site": "imgur",
+    "siteName": "Imgur",
+    "domains": [
+      "imgur.com"
+    ],
+    "category": "social",
+    "task": "keyboard-navigation",
+    "title": "Keyboard shortcuts for Imgur albums",
+    "question": "Can I scroll through Imgur album images with the keyboard?",
+    "queries": [
+      "imgur keyboard shortcuts"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/10420",
+        "metric": 319,
+        "note": "imgur scroll to gallery images keyboard shortcuts (total installs)"
+      }
+    ],
+    "score": 38,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://imgur.com/",
+    "notes": ""
+  },
+  {
+    "site": "genius",
+    "siteName": "Genius",
+    "domains": [
+      "genius.com"
+    ],
+    "category": "other",
+    "task": "lyrics-columns",
+    "title": "Show Genius lyrics in columns",
+    "question": "How do I see a whole song's lyrics on one screen on Genius?",
+    "queries": [
+      "genius lyrics full screen"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/416932",
+        "metric": 321,
+        "note": "* Lyric FullScreen Columnizer (total installs)"
+      }
+    ],
+    "score": 38,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://genius.com/Adele-hello-lyrics",
+    "notes": "Lyric FullScreen Columnizer is multi-site."
+  },
+  {
+    "site": "arxiv",
+    "siteName": "arXiv",
+    "domains": [
+      "arxiv.org"
+    ],
+    "category": "reference",
+    "task": "copy-bibtex",
+    "title": "Copy BibTeX from an arXiv page",
+    "question": "How do I get the BibTeX for an arXiv paper?",
+    "queries": [
+      "arxiv bibtex"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/538531",
+        "metric": 164,
+        "note": "DOI & BibTeX & PDF Plugin (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/kjmnnblmnegnbffojgbephmfcbhehedk",
+        "metric": 96,
+        "note": "Autobib — Export Published BibTeX (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/gmgbapjblmljcgjlgfhkgjnhajghonnj",
+        "metric": 8,
+        "note": "Minimal BibTeX Copier (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=arxiv%20bibtex",
+        "metric": null,
+        "note": "returns \"arxiv bibtex\"; suggestions: arxiv bibtex | arxiv bibtex citation | arxiv bibtex generator | arxiv bibtex not working | arxiv bibtex format"
+      }
+    ],
+    "score": 38,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://arxiv.org/abs/1706.03762",
+    "notes": "Built from the citation_* meta tags; no fetch."
+  },
+  {
+    "site": "kick",
+    "siteName": "Kick",
+    "domains": [
+      "kick.com"
+    ],
+    "category": "video",
+    "task": "click-to-pause",
+    "title": "Click the Kick player to pause",
+    "question": "How do I pause a Kick stream by clicking the video?",
+    "queries": [
+      "kick click to pause"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/479899",
+        "metric": 146,
+        "note": "Click Video To Pause (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=kick%20click%20to%20pause",
+        "metric": null,
+        "note": "returns \"kick click to pause\"; suggestions: kick click to pause | pause play keyboard shortcuts | how long to pause on pause squats"
+      }
+    ],
+    "score": 37,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://kick.com/xqc",
+    "notes": ""
+  },
+  {
+    "site": "letterboxd",
+    "siteName": "Letterboxd",
+    "domains": [
+      "letterboxd.com"
+    ],
+    "category": "social",
+    "task": "hide-ads",
+    "title": "Hide ads on Letterboxd",
+    "question": "How do I remove the ads on Letterboxd without a paid account?",
+    "queries": [
+      "letterboxd ad blocker"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/474851",
+        "metric": 135,
+        "note": "Debloat Letterboxd (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=letterboxd%20ad%20blocker",
+        "metric": null,
+        "note": "returns \"letterboxd ad blocker\"; suggestions: letterboxd ad blocker | letterboxd ad blocker message | letterboxd ad blocker reddit"
+      }
+    ],
+    "score": 37,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://letterboxd.com/film/parasite-2019/",
+    "notes": "Autocomplete shows 'letterboxd ad blocker message', so expect an anti-adblock notice."
+  },
+  {
+    "site": "archive",
+    "siteName": "Internet Archive",
+    "domains": [
+      "web.archive.org"
+    ],
+    "category": "reference",
+    "task": "original-link",
+    "title": "Open the original page from the Wayback Machine",
+    "question": "How do I jump from a Wayback Machine snapshot to the live page?",
+    "queries": [
+      "wayback machine original url"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/17108",
+        "metric": 291,
+        "note": "Wayback Machine Original Button (total installs)"
+      }
+    ],
+    "score": 37,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://web.archive.org/web/2005/http://www.google.com/",
+    "notes": ""
+  },
+  {
+    "site": "huggingface",
+    "siteName": "Hugging Face",
+    "domains": [
+      "huggingface.co"
+    ],
+    "category": "work",
+    "task": "copy-download-command",
+    "title": "Copy the download command for a Hugging Face model",
+    "question": "How do I download all files of a Hugging Face model?",
+    "queries": [
+      "hugging face download all files",
+      "huggingface cli download"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/472223",
+        "metric": 140,
+        "note": "HF model downloader (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/578741",
+        "metric": 26,
+        "note": "HF Model Downloader (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/oenlbadegmeopjnafiadgmdlnpemplii",
+        "metric": 1000,
+        "note": "Hugging Face — Download Repo as ZIP (users, read on the detail page); multi-purpose extension, not counted in the score"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=hugging%20face%20download%20all%20files",
+        "metric": null,
+        "note": "returns \"hugging face download all files\"; suggestions: hugging face download all files | hugging face download files"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=huggingface%20cli%20download",
+        "metric": null,
+        "note": "returns \"huggingface cli download\"; suggestions: huggingface cli download | huggingface cli download model | huggingface cli download model to local folder | huggingface cli download dataset | huggingface cli download specific quantization"
+      }
+    ],
+    "score": 37,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://huggingface.co/openai-community/gpt2/tree/main",
+    "notes": "The client-side version copies an hf download command; zipping the repo in the page needs fetches, so the ZIP extension is not counted."
+  },
+  {
+    "site": "dailymotion",
+    "siteName": "Dailymotion",
+    "domains": [
+      "dailymotion.com"
+    ],
+    "category": "video",
+    "task": "subtitle-size",
+    "title": "Make Dailymotion subtitles bigger",
+    "question": "How do I increase the subtitle size on Dailymotion?",
+    "queries": [
+      "dailymotion subtitle size"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/17048",
+        "metric": 255,
+        "note": "Daily Motion Subtitle Size Increaser (total installs)"
+      }
+    ],
+    "score": 36,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.dailymotion.com/video/x7tgad0",
+    "notes": "Needs a video with captions to test."
+  },
+  {
+    "site": "deepl",
+    "siteName": "DeepL",
+    "domains": [
+      "deepl.com",
+      "www.deepl.com"
+    ],
+    "category": "work",
+    "task": "declutter",
+    "title": "Remove clutter and upsells from DeepL",
+    "question": "How do I hide the DeepL Pro banners and extra panels?",
+    "queries": [
+      "deepl remove popup"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/556995",
+        "metric": 220,
+        "note": "DeepL Unlimited - UI Cleaner Only (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/441609",
+        "metric": 216,
+        "note": "clean up deepl.com (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/441547",
+        "metric": 197,
+        "note": "Deepl Interface cleanup (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/479043",
+        "metric": 53,
+        "note": "RemovePopUp For Un-Formal - deepl.com (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/576776",
+        "metric": 30,
+        "note": "DeepL Minimal UI (total installs)"
+      }
+    ],
+    "score": 35,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.deepl.com/en/translator",
+    "notes": "Five separate cleanup scripts."
+  },
+  {
+    "site": "google-translate",
+    "siteName": "Google Translate",
+    "domains": [
+      "translate.google.com"
+    ],
+    "category": "work",
+    "task": "swap-languages-shortcut",
+    "title": "Keyboard shortcut to swap languages in Google Translate",
+    "question": "Is there a keyboard shortcut for Google Translate's swap languages button?",
+    "queries": [
+      "google translate swap languages shortcut"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/503407",
+        "metric": 47,
+        "note": "Google, DeepL, Bing, Papago And Yandex Translate Swap Languages And Copy Translation Hotkeys (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=google%20translate%20shortcut%20swap%20languages",
+        "metric": null,
+        "note": "returns \"google translate swap languages shortcut\"; suggestions: google translate extension change language | google translate swap languages shortcut | how to translate text into another language | how to change language shortcut"
+      },
+      {
+        "type": "forum",
+        "url": "https://webapps.stackexchange.com/questions/117046/keyboard-shortcut-for-google-translates-swap-languages-button",
+        "metric": null,
+        "note": "Web Apps SE: \"Keyboard shortcut for Google Translate's 'Swap languages' button\" (3,057 views)"
+      },
+      {
+        "type": "forum",
+        "url": "https://webapps.stackexchange.com/questions/50150/are-there-any-shortcut-keys-for-google-translate-web-interface",
+        "metric": null,
+        "note": "Web Apps SE: \"Are there any shortcut keys for Google Translate web interface?\" (score 30, 41,312 views)"
+      }
+    ],
+    "score": 35,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://translate.google.com/",
+    "notes": "Google Translate has Ctrl+Shift+S on some builds; the SE answers disagree, so confirm before building."
+  },
+  {
+    "site": "huggingface",
+    "siteName": "Hugging Face",
+    "domains": [
+      "huggingface.co"
+    ],
+    "category": "work",
+    "task": "mirror-links",
+    "title": "Rewrite Hugging Face links to a mirror",
+    "question": "How do I download Hugging Face models through hf-mirror?",
+    "queries": [
+      "huggingface mirror"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/519323",
+        "metric": 95,
+        "note": "HF Mirror Redirect (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/bgcoplbffjbnpdkihimffcblcookojhf",
+        "metric": 89,
+        "note": "Wayback Machine Quick-Access (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=huggingface%20mirror",
+        "metric": null,
+        "note": "returns \"huggingface mirror\"; suggestions: huggingface mirror | huggingface mirror china | huggingface mirror site | huggingface mirror download | huggingface mirror iran"
+      }
+    ],
+    "score": 35,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://huggingface.co/openai-community/gpt2/tree/main",
+    "notes": "Mostly for users in China ('huggingface mirror china')."
+  },
+  {
+    "site": "archive",
+    "siteName": "Internet Archive",
+    "domains": [
+      "archive.org"
+    ],
+    "category": "reference",
+    "task": "direct-download-links",
+    "title": "Direct download links on Internet Archive",
+    "question": "How do I see all download files and sizes on an Internet Archive item?",
+    "queries": [
+      "archive.org direct download"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/541164",
+        "metric": 187,
+        "note": "Archive.org Direct Download Links with Sizes & Sort (total installs)"
+      }
+    ],
+    "score": 34,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://archive.org/details/alice_in_wonderland_librivox",
+    "notes": ""
+  },
+  {
+    "site": "craigslist",
+    "siteName": "Craigslist",
+    "domains": [
+      "craigslist.org"
+    ],
+    "category": "shopping",
+    "task": "hide-listings",
+    "title": "Hide listings on Craigslist",
+    "question": "How do I hide or block certain posts on Craigslist?",
+    "queries": [
+      "craigslist hide post"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/29453",
+        "metric": 80,
+        "note": "Craig's Unlister (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/1746",
+        "metric": 78,
+        "note": "Craiglist hide items (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/423272",
+        "metric": 18,
+        "note": "Craigslist Search Hide All (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=craigslist%20hide%20posts",
+        "metric": null,
+        "note": "returns \"craigslist hide post\"; suggestions: craigslist hide post | craigslist hidden post | craigslist show hidden posts | how to find hidden posts on craigslist"
+      }
+    ],
+    "score": 34,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://sfbay.craigslist.org/search/sss",
+    "notes": "Craigslist has its own per-post hide; scripts add keyword and poster filters. Three separate scripts."
+  },
+  {
+    "site": "craigslist",
+    "siteName": "Craigslist",
+    "domains": [
+      "craigslist.org"
+    ],
+    "category": "shopping",
+    "task": "dark-mode",
+    "title": "Dark mode for Craigslist",
+    "question": "How do I get dark mode on Craigslist?",
+    "queries": [
+      "craigslist dark mode"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/448573",
+        "metric": 82,
+        "note": "Craigslist dark theme (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=craigslist%20dark%20mode",
+        "metric": null,
+        "note": "returns \"craigslist dark mode\"; suggestions: craigslist dark mode | craigslist dark mode chrome | craigslist dark mode firefox | craigslist night mode | craigslist dark theme"
+      }
+    ],
+    "score": 34,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://sfbay.craigslist.org/search/sss",
+    "notes": ""
+  },
+  {
+    "site": "goodreads",
+    "siteName": "Goodreads",
+    "domains": [
+      "goodreads.com"
+    ],
+    "category": "social",
+    "task": "wide-layout",
+    "title": "Wider Goodreads pages",
+    "question": "How do I make Goodreads use the full width of the screen?",
+    "queries": [
+      "goodreads wide layout"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/385620",
+        "metric": 156,
+        "note": "Wider Goodreads (total installs)"
+      }
+    ],
+    "score": 33,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.goodreads.com/book/show/5907.The_Hobbit",
+    "notes": ""
+  },
+  {
+    "site": "letterboxd",
+    "siteName": "Letterboxd",
+    "domains": [
+      "letterboxd.com"
+    ],
+    "category": "social",
+    "task": "runtime-hours",
+    "title": "Show Letterboxd runtimes in hours and minutes",
+    "question": "How do I see film runtimes in hours on Letterboxd?",
+    "queries": [
+      "letterboxd runtime in hours"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/465414",
+        "metric": 153,
+        "note": "Letterboxd runtime in hours and minutes (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/509860",
+        "metric": 112,
+        "note": "Letterboxd Runtime (total installs)"
+      }
+    ],
+    "score": 33,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://letterboxd.com/film/parasite-2019/",
+    "notes": "Two separate scripts."
+  },
+  {
+    "site": "goodreads",
+    "siteName": "Goodreads",
+    "domains": [
+      "goodreads.com"
+    ],
+    "category": "social",
+    "task": "declutter",
+    "title": "Remove ads and clutter from Goodreads",
+    "question": "How do I clean up Goodreads book pages?",
+    "queries": [
+      "goodreads ad blocker"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/372914",
+        "metric": 117,
+        "note": "Cleanreads (total installs)"
+      }
+    ],
+    "score": 31,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.goodreads.com/book/show/5907.The_Hobbit",
+    "notes": "Cleanreads (372914)."
+  },
+  {
+    "site": "goodreads",
+    "siteName": "Goodreads",
+    "domains": [
+      "goodreads.com"
+    ],
+    "category": "social",
+    "task": "series-primary-works",
+    "title": "Show only the main books in a Goodreads series",
+    "question": "How do I hide novellas and companion books on a Goodreads series page?",
+    "queries": [
+      "goodreads series primary works"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/370050",
+        "metric": 95,
+        "note": "Goodreads, show only the \"primary works\" in a series on series pages (total installs)"
+      }
+    ],
+    "score": 30,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.goodreads.com/series/66175-the-lord-of-the-rings",
+    "notes": ""
+  },
+  {
+    "site": "devto",
+    "siteName": "DEV Community",
+    "domains": [
+      "dev.to"
+    ],
+    "category": "social",
+    "task": "hide-sidebars",
+    "title": "Hide the sidebars on DEV",
+    "question": "How do I read dev.to without the sidebars?",
+    "queries": [
+      "dev.to zen mode"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/542170",
+        "metric": 101,
+        "note": "Blog Widescreen Responsive (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/378054",
+        "metric": 16,
+        "note": "DEV Zen mode (total installs)"
+      }
+    ],
+    "score": 30,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://dev.to/",
+    "notes": "Blog Widescreen Responsive (542170) is multi-site."
+  },
+  {
+    "site": "npm",
+    "siteName": "npm",
+    "domains": [
+      "npmjs.com",
+      "www.npmjs.com"
+    ],
+    "category": "work",
+    "task": "bundle-size-link",
+    "title": "Show a bundle size link on npm packages",
+    "question": "How do I check an npm package's bundle size from its page?",
+    "queries": [
+      "npm bundle size"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/436941",
+        "metric": 14,
+        "note": "NPM Package Size from BundlePhobia (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/jaedaejebjlfbaphjkiolgkgfkljdaoa",
+        "metric": 42,
+        "note": "Bundle Size Analyzer (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=npm%20bundle%20size",
+        "metric": null,
+        "note": "returns \"npm bundle size\"; suggestions: npm bundle size | npm bundle size analyzer | npm bundle size checker | npm bundle size calculator | npm bundle size check"
+      }
+    ],
+    "score": 29,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.npmjs.com/package/react",
+    "notes": "Link to bundlephobia only; showing the number would need a network call."
+  },
+  {
+    "site": "wiktionary",
+    "siteName": "Wiktionary",
+    "domains": [
+      "wiktionary.org",
+      "en.wiktionary.org"
+    ],
+    "category": "reference",
+    "task": "filter-languages",
+    "title": "Show only your languages on Wiktionary",
+    "question": "How do I hide other languages on a Wiktionary entry?",
+    "queries": [
+      "wiktionary english only"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/13178",
+        "metric": 70,
+        "note": "WikiLang (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/405881",
+        "metric": 29,
+        "note": "Auto-WikiLang (AWL) (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/460178",
+        "metric": 17,
+        "note": "Wiktionary: Filter & Flags (total installs)"
+      }
+    ],
+    "score": 28,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://en.wiktionary.org/wiki/set",
+    "notes": "Three separate scripts. 'set' has dozens of language sections, a good test."
+  },
+  {
+    "site": "npm",
+    "siteName": "npm",
+    "domains": [
+      "npmjs.com",
+      "www.npmjs.com"
+    ],
+    "category": "work",
+    "task": "install-command-variants",
+    "title": "Show pnpm, yarn and bun install commands on npm",
+    "question": "How do I copy the yarn or pnpm install command from npmjs.com?",
+    "queries": [
+      "npm yarn pnpm install command"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/425544",
+        "metric": 61,
+        "note": "NPM - More Install Button (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/419384",
+        "metric": 37,
+        "note": "Replace 'npm i' with 'yarn add' in npmjs.com (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/587470",
+        "metric": 4,
+        "note": "NPM - More Install Buttons (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/mfoglkcghiimpnaijhdeckcpinlfojke",
+        "metric": 14,
+        "note": "yarnpm (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/mgjpfigpnikmdfegpdnmnpjpmmhdfgpi",
+        "metric": 9,
+        "note": "Yarn for NPMJS (users, read on the detail page)"
+      }
+    ],
+    "score": 27,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.npmjs.com/package/react",
+    "notes": "Three separate scripts and two extensions, all small."
+  },
+  {
+    "site": "guardian",
+    "siteName": "The Guardian",
+    "domains": [
+      "theguardian.com",
+      "www.theguardian.com"
+    ],
+    "category": "news",
+    "task": "hide-comments",
+    "title": "Hide comments on the Guardian",
+    "question": "How do I hide the comments section on Guardian articles?",
+    "queries": [
+      "guardian hide comments"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/258",
+        "metric": 61,
+        "note": "Don't Read Below the Line (total installs)"
+      }
+    ],
+    "score": 27,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.theguardian.com/film/2026/nov/16/robert-pattinson-james-bond-career",
+    "notes": "Don't Read Below the Line."
+  },
+  {
+    "site": "guardian",
+    "siteName": "The Guardian",
+    "domains": [
+      "theguardian.com",
+      "www.theguardian.com"
+    ],
+    "category": "news",
+    "task": "hide-support-asks",
+    "title": "Hide the Guardian's support banners",
+    "question": "How do I hide the Guardian's 'support us' banners and asks?",
+    "queries": [
+      "guardian support banner"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/560333",
+        "metric": 54,
+        "note": "The Guardian Cleaner (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/533050",
+        "metric": 35,
+        "note": "The Guardian Nag Nullifier (total installs)"
+      }
+    ],
+    "score": 26,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.theguardian.com/film/2026/nov/16/robert-pattinson-james-bond-career",
+    "notes": "Two small scripts. Asks show at the end of articles and as a bottom banner."
+  },
+  {
+    "site": "deepl",
+    "siteName": "DeepL",
+    "domains": [
+      "deepl.com",
+      "www.deepl.com"
+    ],
+    "category": "work",
+    "task": "swap-languages-shortcut",
+    "title": "Keyboard shortcut to swap languages on DeepL",
+    "question": "Is there a shortcut to swap languages on DeepL?",
+    "queries": [
+      "deepl swap languages shortcut"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/503407",
+        "metric": 47,
+        "note": "Google, DeepL, Bing, Papago And Yandex Translate Swap Languages And Copy Translation Hotkeys (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/452326",
+        "metric": 29,
+        "note": "语言切换快捷键｜适配大部分在线翻译网站 (total installs)"
+      }
+    ],
+    "score": 25,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.deepl.com/en/translator",
+    "notes": "Both scripts are multi-site (Google, DeepL, Bing and others)."
+  },
+  {
+    "site": "guardian",
+    "siteName": "The Guardian",
+    "domains": [
+      "theguardian.com",
+      "www.theguardian.com"
+    ],
+    "category": "news",
+    "task": "remove-sign-in-gate",
+    "title": "Close the Guardian sign-in prompt",
+    "question": "How do I get past the Guardian's sign-in prompt?",
+    "queries": [
+      "guardian sign in wall"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/520528",
+        "metric": 22,
+        "note": "Remove sign in gate on The Guardian (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=guardian%20sign%20in",
+        "metric": null,
+        "note": "returns \"guardian sign in wall\"; suggestions: guardian sign in | guardian sign in page | guardian sign in wall | guardian sign in application | guardian sign in reddit"
+      }
+    ],
+    "score": 25,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.theguardian.com/film/2026/nov/16/robert-pattinson-james-bond-career",
+    "notes": "The gate is dismissible and appears after a few articles, so the harness may not trigger it."
+  },
+  {
+    "site": "huggingface",
+    "siteName": "Hugging Face",
+    "domains": [
+      "huggingface.co"
+    ],
+    "category": "work",
+    "task": "spaces-fullscreen",
+    "title": "Full-screen Hugging Face Spaces",
+    "question": "How do I make a Hugging Face Space fill the window?",
+    "queries": [
+      "huggingface spaces full screen"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/488343",
+        "metric": 48,
+        "note": "Spaces Full Screener (total installs)"
+      }
+    ],
+    "score": 25,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://huggingface.co/openai-community/gpt2/tree/main",
+    "notes": "Test on a Space URL, not the model page."
+  },
+  {
+    "site": "wiktionary",
+    "siteName": "Wiktionary",
+    "domains": [
+      "wiktionary.org",
+      "en.wiktionary.org"
+    ],
+    "category": "reference",
+    "task": "dark-mode",
+    "title": "Dark mode for Wiktionary",
+    "question": "Does Wiktionary have dark mode?",
+    "queries": [
+      "wiktionary dark mode"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/564037",
+        "metric": 23,
+        "note": "Force Wikimedia dark mode (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=wiktionary%20dark%20mode",
+        "metric": null,
+        "note": "returns \"wiktionary dark mode\"; suggestions: wiktionary dark mode | dark mode on or off | turn on dark mode word | enable dark mode word | opposite of dark mode"
+      }
+    ],
+    "score": 25,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://en.wiktionary.org/wiki/set",
+    "notes": "Wikipedia Dark Theme (382833, 4,467) also covers Wiktionary but is multi-wiki and not listed. Check whether Wiktionary's Vector 2022 already offers a dark theme."
+  },
+  {
+    "site": "npm",
+    "siteName": "npm",
+    "domains": [
+      "npmjs.com",
+      "www.npmjs.com"
+    ],
+    "category": "work",
+    "task": "dark-mode",
+    "title": "Dark mode for npmjs.com",
+    "question": "Does the npm website have dark mode?",
+    "queries": [
+      "npm dark mode",
+      "npmjs dark mode"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/527054",
+        "metric": 10,
+        "note": "NpmJS.com – Dark [Ath] (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/jhmcghofblklgoofcjhbdjdgignehhgi",
+        "metric": 13,
+        "note": "NPM Dark Mode (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/fiiibgkhaogdhokjdidapnflgkcbdbmb",
+        "metric": 8,
+        "note": "NPM Darkmode (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=npm%20dark%20mode",
+        "metric": null,
+        "note": "returns \"npm dark mode\"; suggestions: npm dark mode | npm dark theme | npm storybook dark mode | npm website dark mode | npm use dark mode"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=npmjs%20dark%20mode",
+        "metric": null,
+        "note": "returns \"npmjs dark mode\"; suggestions: npmjs dark mode | npm dark mode | npmjs dark theme | npm storybook dark mode | npm website dark mode"
+      }
+    ],
+    "score": 22,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.npmjs.com/package/react",
+    "notes": "npmjs.com returned a Cloudflare 'Just a moment' 403 to curl over HTTP/2 and 200 over HTTP/1.1; confirm in the harness."
+  },
+  {
+    "site": "weather",
+    "siteName": "Weather.com",
+    "domains": [
+      "weather.com"
+    ],
+    "category": "news",
+    "task": "dark-mode",
+    "title": "Dark mode for weather.com",
+    "question": "Does weather.com have a dark mode on desktop?",
+    "queries": [
+      "weather.com dark mode"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/599599",
+        "metric": 3,
+        "note": "Weather.com Dark 2026 (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=weather.com%20dark%20mode",
+        "metric": null,
+        "note": "returns \"weather.com dark mode\"; suggestions: weather.com dark mode | weather com dark mode desktop | weather channel dark mode | weather channel dark mode website | weather channel dark mode pc"
+      }
+    ],
+    "score": 12,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://weather.com/weather/today/l/40.71,-74.01",
+    "notes": ""
+  },
+  {
+    "site": "vimeo",
+    "siteName": "Vimeo",
+    "domains": [
+      "vimeo.com"
+    ],
+    "category": "video",
+    "task": "disable-autoplay",
+    "title": "Turn off Vimeo autoplay of the next video",
+    "question": "How do I stop Vimeo from autoplaying the next video?",
+    "queries": [
+      "vimeo disable autoplay",
+      "vimeo turn off autoplay"
+    ],
+    "evidence": [
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=vimeo%20disable%20autoplay",
+        "metric": null,
+        "note": "returns \"vimeo disable autoplay\"; suggestions: vimeo disable autoplay | vimeo turn off autoplay next video | vimeo turn off autoplay"
+      }
+    ],
+    "score": 5,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://vimeo.com/76979871",
+    "notes": "Autocomplete only."
+  },
+  {
+    "site": "kick",
+    "siteName": "Kick",
+    "domains": [
+      "kick.com"
+    ],
+    "category": "video",
+    "task": "hide-chat",
+    "title": "Hide chat on Kick",
+    "question": "How do I hide the chat on Kick?",
+    "queries": [
+      "kick hide chat",
+      "kick remove chat"
+    ],
+    "evidence": [
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=kick%20hide%20chat",
+        "metric": null,
+        "note": "returns \"kick hide chat\"; suggestions: kick hide chat | how to disable chat on kik | kick remove chat | how to hide chat on kik app | kick mobile hide chat"
+      }
+    ],
+    "score": 5,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://kick.com/xqc",
+    "notes": "Autocomplete only."
+  },
+  {
+    "site": "goodreads",
+    "siteName": "Goodreads",
+    "domains": [
+      "goodreads.com"
+    ],
+    "category": "social",
+    "task": "dark-mode",
+    "title": "Dark mode for Goodreads",
+    "question": "Does the Goodreads website have dark mode?",
+    "queries": [
+      "goodreads dark mode"
+    ],
+    "evidence": [
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=goodreads%20dark%20mode",
+        "metric": null,
+        "note": "returns \"goodreads dark mode\"; suggestions: goodreads dark mode | goodreads dark mode iphone | goodreads dark mode ios | goodreads dark mode extension | goodreads dark mode not working"
+      }
+    ],
+    "score": 5,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.goodreads.com/book/show/5907.The_Hobbit",
+    "notes": "Autocomplete only; the CWS search found no single-purpose extension."
+  },
+  {
+    "site": "archive",
+    "siteName": "Internet Archive",
+    "domains": [
+      "archive.org"
+    ],
+    "category": "reference",
+    "task": "dark-mode",
+    "title": "Dark mode for archive.org",
+    "question": "Does archive.org have a dark mode?",
+    "queries": [
+      "archive.org dark mode"
+    ],
+    "evidence": [
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=archive.org%20dark%20mode",
+        "metric": null,
+        "note": "returns \"archive.org dark mode\"; suggestions: archive.org dark mode | archive. org dark theme | does archive.org have dark mode | is there a dark mode for archive of our own | does archive of our own have dark mode"
+      }
+    ],
+    "score": 5,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://archive.org/details/alice_in_wonderland_librivox",
+    "notes": "Autocomplete only; suggestions mix in AO3 (Archive of Our Own)."
+  },
+  {
+    "site": "arxiv",
+    "siteName": "arXiv",
+    "domains": [
+      "arxiv.org"
+    ],
+    "category": "reference",
+    "task": "dark-mode",
+    "title": "Dark mode for arXiv",
+    "question": "Does arXiv have a dark mode?",
+    "queries": [
+      "arxiv dark mode"
+    ],
+    "evidence": [
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=arxiv%20dark%20mode",
+        "metric": null,
+        "note": "returns \"arxiv dark mode\"; suggestions: arxiv dark mode | arxiv dark theme | dark mode vs dark theme | shadows in dark mode"
+      }
+    ],
+    "score": 5,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://arxiv.org/abs/1706.03762",
+    "notes": "Autocomplete only."
+  },
+  {
+    "site": "devto",
+    "siteName": "DEV Community",
+    "domains": [
+      "dev.to"
+    ],
+    "category": "social",
+    "task": "dark-mode",
+    "title": "Dark mode on DEV without logging in",
+    "question": "How do I use dark mode on dev.to without an account?",
+    "queries": [
+      "dev to dark mode"
+    ],
+    "evidence": [
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=dev.to%20dark%20mode",
+        "metric": null,
+        "note": "returns \"dev to dark mode\"; suggestions: dev to dark mode | developers dark mode | dev c++ how to dark mode | dev tools dark mode | dev azure dark mode"
+      }
+    ],
+    "score": 5,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://dev.to/",
+    "notes": "The theme setting is in account settings, so logged-out readers get light only. Autocomplete only."
+  },
+  {
+    "site": "guardian",
+    "siteName": "The Guardian",
+    "domains": [
+      "theguardian.com",
+      "www.theguardian.com"
+    ],
+    "category": "news",
+    "task": "dark-mode",
+    "title": "Dark mode for the Guardian website",
+    "question": "Does the Guardian website have dark mode on desktop?",
+    "queries": [
+      "guardian dark mode",
+      "guardian dark mode desktop"
+    ],
+    "evidence": [
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=guardian%20dark%20mode",
+        "metric": null,
+        "note": "returns \"guardian dark mode\"; suggestions: guardian dark mode | guardian dark mode desktop | guardian dark mode website | guardian night mode | guardian dark theme"
+      }
+    ],
+    "score": 5,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.theguardian.com/international",
+    "notes": "Autocomplete only; suggestions include 'guardian dark mode desktop' and 'guardian dark mode website'."
+  },
+  {
+    "site": "yahoo",
+    "siteName": "Yahoo",
+    "domains": [
+      "yahoo.com",
+      "www.yahoo.com"
+    ],
+    "category": "news",
+    "task": "hide-ads",
+    "title": "Hide ads on Yahoo",
+    "question": "How do I remove ads on the Yahoo homepage and news?",
+    "queries": [
+      "yahoo ad blocker"
+    ],
+    "evidence": [
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=yahoo%20ad%20blocker",
+        "metric": null,
+        "note": "returns \"yahoo ad blocker\"; suggestions: yahoo ad blocker | yahoo ad blocker message | yahoo ad blocker chrome | yahoo ad blocker firefox | yahoo ad blocker reddit"
+      }
+    ],
+    "score": 5,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.yahoo.com/news/",
+    "notes": "Autocomplete only; suggestions include 'yahoo ad blocker message'."
+  },
+  {
+    "site": "huggingface",
+    "siteName": "Hugging Face",
+    "domains": [
+      "huggingface.co"
+    ],
+    "category": "work",
+    "task": "dark-mode",
+    "title": "Dark mode on Hugging Face without logging in",
+    "question": "How do I use dark mode on Hugging Face?",
+    "queries": [
+      "huggingface dark mode"
+    ],
+    "evidence": [
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=huggingface%20dark%20mode",
+        "metric": null,
+        "note": "returns \"huggingface dark mode\"; suggestions: huggingface dark mode | huggingface dark theme | huggingface model list | how to use huggingface models | how to download huggingface model"
+      }
+    ],
+    "score": 5,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://huggingface.co/openai-community/gpt2/tree/main",
+    "notes": "Autocomplete only. The theme setting is an account setting; check what logged-out visitors get."
+  }
+]

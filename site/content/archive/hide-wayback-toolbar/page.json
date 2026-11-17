@@ -1,0 +1,60 @@
+{
+  "slug": "hide-wayback-toolbar",
+  "title": "Hide the Wayback Machine toolbar",
+  "question": "How do I hide the Wayback Machine toolbar on archived pages?",
+  "answer": "There is no setting that turns it off for good; the X at the toolbar's right end closes it on the page you are viewing. The usermods script on this page hides the Wayback Machine toolbar on every snapshot, along with the space it takes at the top, so the archived page starts at the top of the window. Without an extension, add if_ after the timestamp in the snapshot URL to load the page without the toolbar.",
+  "prompt": "Hide the Wayback Machine toolbar on archived pages.",
+  "details": "The Wayback Machine puts its toolbar in an element with the id `wm-ipp-base` at the top of each snapshot. One CSS rule hides it before it shows. The archived page itself, and the Wayback Machine's link rewriting, are left as they are. To get the toolbar back for one page, turn the script off in your userscript manager.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "The close button",
+      "body": "Click the **X** at the right end of the toolbar to close it on the page you are viewing."
+    },
+    {
+      "kind": "other",
+      "title": "The if_ URL suffix",
+      "body": "Add `if_` straight after the timestamp: `https://web.archive.org/web/20051231235657if_/http://www.google.com/` shows the same snapshot without the toolbar."
+    },
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filter",
+      "body": "Our check runs the script, not this filter.\n\n```\nweb.archive.org###wm-ipp-base\n```"
+    }
+  ],
+  "related": [
+    "archive/original-link",
+    "archive/dark-mode"
+  ],
+  "check": {
+    "urls": [
+      "https://web.archive.org/web/2005/http://www.google.com/"
+    ],
+    "loggedOut": true,
+    "waitFor": "#wm-ipp-base",
+    "settleMs": 4000,
+    "baseline": "(() => { const t = document.getElementById('wm-ipp-base'); return !!t && t.checkVisibility() && t.getBoundingClientRect().height > 40; })()",
+    "expect": "(() => { const t = document.getElementById('wm-ipp-base'); const logo = [...document.images].find((i) => /logo/.test(i.getAttribute('src') || '')); return !!t && !t.checkVisibility() && !!logo && logo.getBoundingClientRect().top < 60; })()",
+    "intact": "(() => { const logo = [...document.images].find((i) => /logo/.test(i.getAttribute('src') || '')); const q = document.querySelector('input[name=q]'); return !!logo && logo.checkVisibility() && logo.naturalWidth > 0 && !!q && q.checkVisibility(); })()"
+  },
+  "demand": {
+    "score": 46,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/401753",
+        "note": "Wayback Machine - toolbar toggler (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/461213",
+        "note": "Wayback Machine Toolbar Remover (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=wayback%20machine%20toolbar",
+        "note": "returns \"wayback machine toolbar\"; suggestions: wayback machine toolbar | can you search the wayback machine | wayback machine not working | how to access the wayback machine"
+      }
+    ]
+  }
+}

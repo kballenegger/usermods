@@ -1,0 +1,55 @@
+{
+  "slug": "hide-people-also-ask",
+  "title": "Hide 'People also ask' in Google Search",
+  "question": "How do I remove the People also ask box from Google?",
+  "answer": "Google has no setting that removes the People also ask box. The usermods script on this page hides that box of expandable questions from Google Search results, including when it loads after the rest of the page, and leaves the ordinary results in place. Install it with usermods or any userscript manager. Without an extension, the Web tab (add udm=14 to the search URL) shows plain links with no People also ask box.",
+  "prompt": "Hide the People also ask box on Google search results.",
+  "details": "The box has no stable id, so the script finds it by its heading text and hides the result block (`[data-rpos]`) that holds it. A MutationObserver catches a box that loads late.\n\nIt matches the English heading \"People also ask\", so it needs Google's interface in English. It does not touch the AI Overview or the related searches at the bottom of the page.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "The Web tab",
+      "body": "Click **Web** under the search box (it can sit behind **More**), or add `&udm=14` to the search URL. That tab shows plain links without People also ask."
+    },
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filter",
+      "body": "A procedural filter that finds the same heading and hides its block. Our check runs the script, not this filter.\n\n```\nwww.google.com##[data-rpos]:has([role=\"heading\"]:has-text(/^People also ask$/))\n```"
+    }
+  ],
+  "related": [
+    "google/remove-ai-overview",
+    "google/hide-sponsored"
+  ],
+  "demand": {
+    "score": 57,
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/hide-people-also-asked-re/iebjhhajphjcmnjknbblnfidbeddpnnd",
+        "note": "Chrome Web Store users: \"Hide \"People Also Asked\" Results\" (2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=hide+people+also+ask+google",
+        "note": "suggests \"remove people also ask google\""
+      },
+      {
+        "type": "forum",
+        "url": "https://news.ycombinator.com/item?id=31693287",
+        "note": "Hacker News: user asks how to hide the box that shifts results when going back"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.google.com/search?q=how+to+bake+bread&hl=en&gl=us"
+    ],
+    "loggedOut": true,
+    "waitFor": "#rso",
+    "settleMs": 4000,
+    "baseline": "[...document.querySelectorAll('[role=\"heading\"]')].some((h) => h.textContent.trim() === 'People also ask' && h.checkVisibility())",
+    "expect": "(() => { const hs = [...document.querySelectorAll('[role=\"heading\"]')].filter((h) => h.textContent.trim() === 'People also ask'); return hs.length > 0 && hs.every((h) => !h.checkVisibility()); })()",
+    "intact": "[...document.querySelectorAll('#rso a h3')].filter((h) => h.checkVisibility() && !h.closest('[data-text-ad]')).length >= 5"
+  }
+}

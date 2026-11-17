@@ -1,0 +1,60 @@
+{
+  "slug": "web-results-only",
+  "title": "Always use Google's Web results (udm=14)",
+  "question": "How do I make Google show only web results without AI?",
+  "answer": "Google's Web tab shows a plain list of links with no AI Overview, and adding udm=14 to a search URL opens it. The usermods script on this page adds udm=14 to every Google search that doesn't already name a tab, so searches land on the Web tab before the page draws. Install it with usermods or any userscript manager. Without a script, set your browser's search engine to https://www.google.com/search?q=%s&udm=14.",
+  "prompt": "Always open Google searches on the Web tab with udm=14.",
+  "details": "The script runs before the page loads. If the address has no `udm` or `tbm` parameter, it reloads the same search with `udm=14`. Searches on Images, News, Videos and the other tabs carry their own parameter and are left alone.\n\nA search with no tab parameter always goes to the Web tab, so if the All tab's link carries none, clicking All lands on the Web tab too. Turn the script off to see the All tab with its AI Overview and other panels.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "A custom search engine",
+      "body": "In Chrome, open **Settings > Search engine > Manage search engines**, add one with the URL `https://www.google.com/search?q=%s&udm=14` and make it the default. Searches from the address bar then open on the Web tab."
+    }
+  ],
+  "related": [
+    "google/remove-ai-overview",
+    "google/hide-ai-mode"
+  ],
+  "demand": {
+    "score": 55,
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/google-udm-14-web-search/ilepebamdbjfokacbdamigokejjdlknb",
+        "note": "Chrome Web Store users: \"Google UDM 14 Web search mode (no AI)\" (2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/497815",
+        "note": "Greasy Fork total installs: \"Google udm14\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=google+udm=14",
+        "note": "suggests \"google udm=14 url\""
+      },
+      {
+        "type": "forum",
+        "url": "https://news.ycombinator.com/item?id=40427979",
+        "note": "Hacker News: 'How to use Google Search without AI: the udm=14 work around'"
+      },
+      {
+        "type": "forum",
+        "url": "https://news.ycombinator.com/item?id=42446995",
+        "note": "Hacker News: users share udm=14 defaults"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.google.com/search?q=how+to+bake+bread&hl=en&gl=us"
+    ],
+    "loggedOut": true,
+    "waitFor": "#rso",
+    "settleMs": 4000,
+    "baseline": "!new URLSearchParams(location.search).has('udm') && [...document.querySelectorAll('[role=\"heading\"]')].some((h) => h.textContent.trim() === 'AI Overview' && h.checkVisibility())",
+    "expect": "new URLSearchParams(location.search).get('udm') === '14' && new URLSearchParams(location.search).get('q') === 'how to bake bread' && ![...document.querySelectorAll('[role=\"heading\"]')].some((h) => h.textContent.trim() === 'AI Overview' && h.checkVisibility())",
+    "intact": "[...document.querySelectorAll('#rso a h3')].filter((h) => h.checkVisibility() && !h.closest('[data-text-ad]')).length >= 5"
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "slug": "hide-sidebar",
+  "title": "Hide the ChatGPT sidebar",
+  "question": "How do I hide the sidebar in ChatGPT?",
+  "answer": "Click the sidebar icon at the top left of ChatGPT, labelled Close sidebar. ChatGPT remembers the choice, but it leaves a narrow rail of icons down the left edge. The usermods script on this page closes the sidebar when the page loads and hides that rail as well, so the header, the conversation and the message box start at the left edge of the window. Without an extension, the Close sidebar button gets you most of the way.",
+  "prompt": "Hide the ChatGPT sidebar completely, including the strip of icons, so the chat uses the whole window.",
+  "details": "When the page loads, the script presses ChatGPT's own Close sidebar button if the sidebar is open. Once ChatGPT marks the sidebar as collapsed, a few CSS rules hide the icon rail and move the header, the chat column and the message box to the left edge.\n\nWith the rail hidden there is no button to open the sidebar again, so turn the script off when you want your chat history. The check runs logged out on the start page; the signed-in app uses the same sidebar markup, but the check does not cover it.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Close sidebar button",
+      "body": "The icon at the top left of the sidebar collapses it to a rail of icons. ChatGPT keeps it collapsed on later visits."
+    }
+  ],
+  "related": [
+    "chatgpt/wide-chat",
+    "chatgpt/ctrl-enter-to-send",
+    "chatgpt/export-chat"
+  ],
+  "demand": {
+    "score": 43,
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/jaklicmecioibaalhgiagacghdjeelhk",
+        "note": "Chrome Web Store users, \"Hide ChatGPT Sidebar\""
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/njjbddahcnfghpcpjlnaphfemmaaojpe",
+        "note": "Chrome Web Store users, \"ChatGPT Sidebar - Hide Unnecessary Sections\"; count from CWS search page"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=chatgpt%20hide%20sideb",
+        "note": "Google suggests \"chatgpt hide sidebar\""
+      }
+    ]
+  },
+  "check": {
+    "urls": ["https://chatgpt.com/"],
+    "loggedOut": true,
+    "waitFor": "aside#ds-sidebar",
+    "settleMs": 6000,
+    "baseline": "(() => { const a = document.querySelector('aside#ds-sidebar'); const m = document.querySelector('main[data-slot=\"conversation\"]'); return !!a && a.checkVisibility() && a.getBoundingClientRect().width >= 200 && !!m && m.getBoundingClientRect().left >= 200; })()",
+    "expect": "(() => { const a = document.querySelector('aside#ds-sidebar'); const r = document.querySelector('nav[data-slot=\"sidebar-rail\"]'); const m = document.querySelector('main[data-slot=\"conversation\"]'); const h = document.querySelector('header[data-slot=\"header\"]'); return !!a && !a.checkVisibility() && !!r && !r.checkVisibility() && !!m && Math.abs(m.getBoundingClientRect().left) < 2 && m.getBoundingClientRect().width >= innerWidth - 20 && !!h && h.getBoundingClientRect().left < 2; })()",
+    "intact": "(() => { const c = document.querySelector('[data-slot=\"composer\"]'); const box = document.querySelector('[data-slot=\"composer\"] [contenteditable=\"true\"], [data-slot=\"composer\"] textarea'); return !!c && c.checkVisibility() && !!box && box.checkVisibility() && c.getBoundingClientRect().left > 100; })()"
+  }
+}

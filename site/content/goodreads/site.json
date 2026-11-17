@@ -1,0 +1,7 @@
+{
+  "slug": "goodreads",
+  "name": "Goodreads",
+  "domains": ["goodreads.com", "www.goodreads.com"],
+  "category": "social",
+  "intro": "Userscripts for Goodreads book, list and series pages: library links, sorting, layout and clutter."
+}

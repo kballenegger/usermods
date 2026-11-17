@@ -1,0 +1,7 @@
+{
+  "slug": "python-docs",
+  "name": "Python docs",
+  "domains": ["docs.python.org"],
+  "category": "reference",
+  "intro": "Userscripts for the official Python documentation at docs.python.org, checked against the live site."
+}

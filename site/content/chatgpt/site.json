@@ -1,0 +1,7 @@
+{
+  "slug": "chatgpt",
+  "name": "ChatGPT",
+  "domains": ["chatgpt.com"],
+  "category": "work",
+  "intro": "Userscripts for the ChatGPT web app: change how the message box behaves and how the chat is laid out."
+}

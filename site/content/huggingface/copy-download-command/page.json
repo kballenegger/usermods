@@ -1,0 +1,37 @@
+{
+  "slug": "copy-download-command",
+  "title": "Copy the download command for a Hugging Face model",
+  "question": "How do I download all files of a Hugging Face model?",
+  "answer": "Install the hf command line tool and run hf download followed by the repo name, for example hf download openai-community/gpt2; Hugging Face shows this under the three-dot menu, then Clone repository. The usermods script on this page puts that command in a copy button right under the name of every model, dataset and Space, with the --repo-type flag added for datasets and Spaces. git clone also works with Git LFS (or git-xet) installed.",
+  "prompt": "On Hugging Face, add a button under the repo name that copies the hf download command for it.",
+  "details": "The script reads the repo path from the name link in the page header and builds the command: `hf download owner/name` for a model, with `--repo-type dataset` or `--repo-type space` added for datasets and Spaces. Clicking the button copies it to the clipboard. The command downloads every file in the repo into the Hugging Face cache; add `--local-dir <folder>` to put the files somewhere else.\n\nThe check loads a model's file list and a dataset page and compares the command on the button with the repo. It does not test the clipboard itself.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Clone repository",
+      "body": "Open the three-dot menu next to **Use this model** and choose **Clone repository**. The dialog shows the `git clone` command and, below it, the `hf download` command with install steps for the CLI."
+    }
+  ],
+  "related": [
+    "huggingface/mirror-links",
+    "huggingface/dark-mode"
+  ],
+  "demand": {
+    "score": 37,
+    "evidence": [
+      { "type": "greasyfork", "url": "https://greasyfork.org/en/scripts/472223", "note": "HF model downloader (total installs)" },
+      { "type": "greasyfork", "url": "https://greasyfork.org/en/scripts/578741", "note": "HF Model Downloader (total installs)" },
+      { "type": "autocomplete", "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=hugging%20face%20download%20all%20files", "note": "returns \"hugging face download all files\"; suggestions: hugging face download all files | hugging face download files" },
+      { "type": "autocomplete", "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=huggingface%20cli%20download", "note": "returns \"huggingface cli download\"; suggestions: huggingface cli download | huggingface cli download model | huggingface cli download model to local folder | huggingface cli download dataset | huggingface cli download specific quantization" }
+    ]
+  },
+  "check": {
+    "urls": ["https://huggingface.co/openai-community/gpt2/tree/main", "https://huggingface.co/datasets/stanfordnlp/imdb"],
+    "loggedOut": true,
+    "waitFor": "h1 a.font-mono[href]",
+    "settleMs": 3000,
+    "baseline": "(() => { const a = document.querySelector('h1 a.font-mono[href]'); return !!a && a.checkVisibility() && /^\\/(datasets\\/)?[\\w.-]+\\/[\\w.-]+$/.test(a.getAttribute('href')) && !document.querySelector('.um-hf-dl'); })()",
+    "expect": "(() => { const b = document.querySelector('h1 + .um-hf-dl'); const want = location.pathname.startsWith('/datasets/') ? 'hf download stanfordnlp/imdb --repo-type dataset' : 'hf download openai-community/gpt2'; return document.querySelectorAll('.um-hf-dl').length === 1 && !!b && b.checkVisibility() && b.dataset.command === want && b.querySelector('code').textContent === want; })()",
+    "intact": "(() => { const h = document.querySelector('h1'); const items = [...document.querySelectorAll('main a[href*=\"/blob/\"], main a[href*=\"/resolve/\"], main table td, main .prose p')].filter((e) => e.checkVisibility()); return !!h && h.checkVisibility() && items.length >= 5; })()"
+  }
+}

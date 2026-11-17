@@ -1,0 +1,38 @@
+{
+  "slug": "mute-users",
+  "title": "Mute users on Hacker News",
+  "question": "Can I block or mute a user on Hacker News?",
+  "answer": "Hacker News has no block, mute or ignore feature, logged in or not. The usermods script on this page adds a mute link to the header of every comment. Click it and that person's comments fold down to a single greyed header line across every thread, with an unmute link to bring them back. The list is kept in your browser and works without an account. Without a script, the only option is collapsing their comments one at a time with [–].",
+  "prompt": "Add a mute button to Hacker News comments that hides everything a user writes.",
+  "details": "The muted names are stored in `localStorage` for news.ycombinator.com, so they stay in the browser where you clicked and are not sent anywhere. You can also put names in the `MUTED` list at the top of the script to mute them in every browser you install it on.\n\nA muted comment keeps its header line, so the thread structure stays readable and replies to it are still shown. Stories submitted by muted users are left alone.\n\nThe check opens a comment thread, clicks mute on one user and confirms both of their comments fold while the other comments stay visible.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Collapse a thread",
+      "body": "Click **[–]** next to a comment to fold it and its replies. It applies to that one comment and its replies, not to the person who wrote it."
+    }
+  ],
+  "related": [
+    "hackernews/collapse-comments",
+    "hackernews/highlight-op",
+    "hackernews/dark-mode"
+  ],
+  "demand": {
+    "score": 36,
+    "evidence": [
+      { "type": "greasyfork", "url": "https://greasyfork.org/en/scripts/18066", "note": "Comments Owl for Hacker News (total installs, read from api.greasyfork.org/en/scripts/by-site)" },
+      { "type": "chrome-web-store", "url": "https://chromewebstore.google.com/detail/dkbnpfgpgljemihbcdmadffanebbjacc", "note": "HN Follow/Block (users, read on the detail page)" },
+      { "type": "autocomplete", "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=hacker%20news%20block%20users", "note": "does not return the query; suggestions: hacker news block user | how can i block a hacker | grey hat hacker vs black hat hacker | code to block hackers" }
+    ]
+  },
+  "check": {
+    "urls": ["https://news.ycombinator.com/item?id=24862743"],
+    "loggedOut": true,
+    "waitFor": "tr.comtr",
+    "settleMs": 2000,
+    "actions": "[...document.querySelectorAll('tr.comtr')].find((r) => r.querySelector('.comhead > a[href=\"user?id=marssaxman\"]'))?.querySelector('.um-mute')?.click();",
+    "baseline": "(() => { const rows = [...document.querySelectorAll('tr.comtr')].filter((r) => r.querySelector('.comhead > a[href=\"user?id=marssaxman\"]')); return rows.length === 2 && rows.every((r) => r.querySelector('.commtext').checkVisibility()) && !document.querySelector('.um-mute'); })()",
+    "expect": "(() => { const rows = [...document.querySelectorAll('tr.comtr')]; const muted = rows.filter((r) => r.querySelector('.comhead > a[href=\"user?id=marssaxman\"]')); const others = rows.filter((r) => !muted.includes(r)); return muted.length === 2 && muted.every((r) => !r.querySelector('.commtext').checkVisibility() && r.querySelector('.comhead').checkVisibility() && r.querySelector('.um-mute').textContent === 'unmute marssaxman') && others.length >= 25 && others.every((r) => r.querySelector('.commtext').checkVisibility() && r.querySelector('.um-mute').textContent === 'mute'); })()",
+    "intact": "(() => { const t = document.querySelector('.fatitem .titleline > a'); const c = [...document.querySelectorAll('.commtext')].filter((e) => e.checkVisibility()); return !!t && t.checkVisibility() && c.length >= 25; })()"
+  }
+}

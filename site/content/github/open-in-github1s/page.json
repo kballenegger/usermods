@@ -1,0 +1,50 @@
+{
+  "slug": "open-in-github1s",
+  "title": "Open a GitHub repo in a VS Code view",
+  "question": "How do I browse a GitHub repo in VS Code in the browser?",
+  "answer": "Replace github.com with github1s.com in the address bar to open any public repository in a read-only VS Code view, with a file tree, tabs and search. The usermods script on this page adds an Open in github1s tab to the repository tab bar on GitHub, next to Insights, that opens the same repository, folder or file there in a new tab. Signed in, pressing the period key on a repository opens GitHub's own web editor, github.dev.",
+  "prompt": "Add a button to GitHub repository pages that opens the current repo, folder or file in github1s.",
+  "details": "The link follows the page you are on: a repository opens its root, a folder opens that folder and a file opens that file at the same branch. Issues, pull requests and other tabs open the repository root. It updates as you move around GitHub without a full page load.\n\ngithub1s.com is a third-party service and only reads public repositories unless you give it a token there.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Edit the URL",
+      "body": "Change `github.com` to `github1s.com` in the address bar, for example `https://github1s.com/react/react`."
+    },
+    {
+      "kind": "site-setting",
+      "title": "github.dev",
+      "body": "Signed in to GitHub, press `.` on a repository or file to open it in github.dev, GitHub's own VS Code in the browser."
+    },
+    {
+      "kind": "extension",
+      "title": "Open in GitHub1s",
+      "body": "The Open in GitHub1s extension for Chrome adds a similar button."
+    }
+  ],
+  "related": [
+    "github/copy-raw-url",
+    "github/readme-toc",
+    "github/file-icons"
+  ],
+  "check": {
+    "urls": [
+      "https://github.com/react/react/blob/main/packages/react/src/ReactHooks.js"
+    ],
+    "loggedOut": true,
+    "waitFor": "nav[aria-label=\"Repository\"] a[href=\"/react/react/pulse\"]",
+    "settleMs": 4000,
+    "baseline": "(() => { const nav = document.querySelector('nav[aria-label=\"Repository\"]'); const insights = nav && [...nav.querySelectorAll('a')].find((a) => /Insights/.test(a.textContent)); return !!insights && insights.checkVisibility() && !document.querySelector('a[href*=\"github1s.com\"]'); })()",
+    "expect": "(() => { const links = [...document.querySelectorAll('nav[aria-label=\"Repository\"] a[href^=\"https://github1s.com/\"]')]; return links.length === 1 && links[0].checkVisibility() && links[0].href === 'https://github1s.com/react/react/blob/main/packages/react/src/ReactHooks.js' && /Open in github1s/.test(links[0].textContent) && links[0].target === '_blank'; })()",
+    "intact": "(() => { const nav = document.querySelector('nav[aria-label=\"Repository\"]'); const tabs = [...nav.querySelectorAll('a[href^=\"/react/react\"]')].filter((a) => a.checkVisibility()); const raw = document.querySelector('[data-testid=\"raw-button\"]'); return tabs.length >= 5 && !!raw && raw.checkVisibility() && /resolveDispatcher/.test(document.body.innerText); })()"
+  },
+  "demand": {
+    "score": 50,
+    "evidence": [
+      { "type": "cws", "url": "https://chromewebstore.google.com/detail/iijaagbkdohcopmmohlgfkcloefoeaoj", "note": "Chrome Web Store users, \"Open in GitHub1s\", 1,000" },
+      { "type": "greasyfork", "url": "https://greasyfork.org/en/scripts/421509", "note": "Greasy Fork total installs, \"Github1s\", 816 (api.greasyfork.org)" },
+      { "type": "cws", "url": "https://chromewebstore.google.com/detail/gfcdbodapcbfckbfpmgeldfkkgjknceo", "note": "Chrome Web Store users, \"shortcut to github1s\", 224" },
+      { "type": "autocomplete", "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=github1s", "note": "Google suggests \"github1s\", \"github1s extension\" and \"github1s vscode web\"" }
+    ]
+  }
+}
