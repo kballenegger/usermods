@@ -76,7 +76,7 @@ ${o.indexable ? '' : '<meta name="robots" content="noindex, follow">\n'}<link re
 <meta property="og:description" content="${esc(o.description)}">
 <meta property="og:url" content="${esc(canonical)}">
 ${o.home
-    ? `<meta property="og:image" content="${esc(o.origin)}/assets/home/banner.webp">\n<meta name="twitter:card" content="summary_large_image">`
+    ? `<meta property="og:image" content="${esc(o.origin)}/assets/home/banner.jpg">\n<meta property="og:image:width" content="1200">\n<meta property="og:image:height" content="400">\n<meta name="twitter:card" content="summary_large_image">\n<meta name="twitter:image" content="${esc(o.origin)}/assets/home/banner.jpg">`
     : `<meta property="og:image" content="${esc(o.origin)}/assets/icon-512.png">\n<meta name="twitter:card" content="summary">`}
 ${ld}
 </head>
