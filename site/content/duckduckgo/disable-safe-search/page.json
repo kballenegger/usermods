@@ -17,7 +17,9 @@
       "body": "Set your browser's search engine to `https://duckduckgo.com/?q=%s&kp=-2`. Searches from the address bar then have SafeSearch off. Searches typed on duckduckgo.com itself don't carry it."
     }
   ],
-  "related": ["duckduckgo/hide-ai", "duckduckgo/declutter"],
+  "related": [
+    "duckduckgo/hide-ai"
+  ],
   "demand": {
     "score": 50,
     "evidence": [

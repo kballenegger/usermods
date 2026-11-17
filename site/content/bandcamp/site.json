@@ -1,0 +1,7 @@
+{
+  "slug": "bandcamp",
+  "name": "Bandcamp",
+  "domains": ["bandcamp.com"],
+  "category": "other",
+  "intro": "Userscripts for Bandcamp album and track pages: player controls the site leaves out, like volume and playback speed, plus small fixes to how album pages show their details."
+}

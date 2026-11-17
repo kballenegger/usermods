@@ -1,0 +1,50 @@
+{
+  "slug": "dark-mode",
+  "title": "Dark mode for Bandcamp",
+  "question": "How do I get dark mode on Bandcamp?",
+  "answer": "Bandcamp has no dark mode setting for listeners; each artist picks the colours of their own pages, and most are white. The usermods script on this page gives artist, album and track pages a near-black background with light grey text and light blue links, whatever palette the artist chose, and darkens the top bar. The artist's banner and cover art stay as they are. Without a userscript, a site-wide extension such as Dark Reader also darkens Bandcamp.",
+  "prompt": "Make Bandcamp pages dark with light text, overriding the artist's colours.",
+  "details": "Bandcamp writes each artist's chosen colours into a style block on the page. The script injects CSS before the page draws, with `!important` rules that override that palette: dark backgrounds for the top bar, the page body and the recommendations below it, light text, grey secondary text and one link colour for every artist. It swaps the dark Bandcamp logo for the white one Bandcamp already ships and lightens the search icon. It also darkens the player's progress bar, track highlight and form fields.\n\nThe artist's background image behind the page is removed so the margins are dark too. The header banner, cover art and photos are not changed. The check loads one album page with a white palette.",
+  "alternatives": [
+    {
+      "kind": "extension",
+      "title": "Dark Reader",
+      "body": "Dark Reader darkens every site, Bandcamp included, by computing a dark palette from the page's own colours."
+    }
+  ],
+  "related": [
+    "bandcamp/volume-control",
+    "bandcamp/show-release-date"
+  ],
+  "demand": {
+    "score": 44,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/406919",
+        "note": "Bandcamp Dark (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/feoijckkhibpknghpfnoclcedbdgpbfm",
+        "note": "Dark Bandcamp (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=bandcamp%20dark%20mode",
+        "note": "returns \"bandcamp dark mode\"; suggestions: bandcamp dark mode | bandcamp dark mode app | bandcamp dark mode extension | bandcamp dark mode firefox | bandcamp dark mode browser"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://radiohead.bandcamp.com/album/in-rainbows"
+    ],
+    "loggedOut": true,
+    "waitFor": "#track_table .track_row_view",
+    "settleMs": 2500,
+    "baseline": "(() => { const lum = (c) => { const [r, g, b] = c.match(/\\d+/g).map(Number); return 0.2126 * r + 0.7152 * g + 0.0722 * b; }; return lum(getComputedStyle(document.getElementById('pgBd')).backgroundColor) > 200 && lum(getComputedStyle(document.getElementById('menubar')).backgroundColor) > 200; })()",
+    "expect": "(() => { const lum = (c) => { const [r, g, b] = c.match(/\\d+/g).map(Number); return 0.2126 * r + 0.7152 * g + 0.0722 * b; }; const bright = (sel) => { const l = [...document.querySelectorAll(sel)]; return l.length > 0 && l.every((e) => lum(getComputedStyle(e).color) > 140); }; return lum(getComputedStyle(document.getElementById('pgBd')).backgroundColor) < 40 && lum(getComputedStyle(document.getElementById('menubar')).backgroundColor) < 40 && lum(getComputedStyle(document.body).backgroundColor) < 40 && bright('#name-section .trackTitle') && bright('#track_table .track-title') && bright('#track_table .time') && bright('.tralbum-credits') && document.querySelector('#menubar .bclogo.white').checkVisibility() && !document.querySelector('#menubar .bclogo.aqua').checkVisibility(); })()",
+    "intact": "(() => { const img = document.querySelector('#tralbumArt img'); return !!img && img.checkVisibility() && [...document.querySelectorAll('#track_table .track_row_view')].filter((r) => r.checkVisibility()).length >= 10; })()"
+  }
+}

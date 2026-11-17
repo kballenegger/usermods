@@ -1,0 +1,61 @@
+{
+  "slug": "video-screenshot",
+  "title": "Take a screenshot of a YouTube video",
+  "question": "How do I save the current YouTube frame as an image?",
+  "answer": "YouTube's desktop player has no screenshot or save-frame button. The usermods script on this page adds a camera button next to the Settings gear; clicking it saves the frame you are on as a PNG at the video's own resolution, with the video title and timestamp in the file name, and no player controls in the picture. Without an extension, pause the video, hide the controls and use your system's screenshot tool, which captures at screen size.",
+  "prompt": "Add a button to the YouTube player that saves the current frame as a PNG.",
+  "details": "The button draws the current video frame onto a canvas the size of the video stream and downloads it. If YouTube is playing 1080p, the image is 1920x1080, whatever the size of the player on screen. Lower the quality in the gear menu and you get a smaller image, so pick the quality you want before you click.\n\nThe file name is the video title followed by the time, for example `Me at the zoo 0m04s.png`. The button is put back if the player rebuilds its controls, so it stays when you move to another video. It works in theater mode and full screen too; the check clicks it on a watch page in the default view.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "System screenshot",
+      "body": "Pause the video, move the mouse off the player so the controls fade, then use your system's screenshot tool (Shift+Cmd+4 on a Mac, Win+Shift+S on Windows). The image is the size the video is shown on screen, not its full resolution."
+    },
+    {
+      "kind": "extension",
+      "title": "Screenshot YouTube",
+      "body": "The Screenshot YouTube extension for Chrome adds a similar button, with options for the image format and copying to the clipboard."
+    }
+  ],
+  "related": [
+    "youtube/loop-video",
+    "youtube/force-hd-quality"
+  ],
+  "demand": {
+    "score": 90,
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/gjoijpfmdhbjkkgnmahganhoinjjpohk",
+        "note": "Screenshot YouTube (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/lnaahdmijnjnmgaalacdgakieangpjgp",
+        "note": "Screenshot YouTube Video (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/ehehmcocpegbmagfhajbmeofolnpdfla",
+        "note": "YouTube Screenshot Button (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20screenshot",
+        "note": "returns the query; suggestions: youtube screenshot | youtube screenshot extension | youtube screenshot generator | youtube screenshot chrome extension | youtube screenshot download"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.youtube.com/watch?v=jNQXAC9IVRw"
+    ],
+    "loggedOut": true,
+    "waitFor": "#movie_player video",
+    "settleMs": 3000,
+    "actions": "const p = document.querySelector('#movie_player'); p.mute(); p.playVideo(); await new Promise((r) => setTimeout(r, 5000)); p.pauseVideo(); window.__saved = []; const click = HTMLAnchorElement.prototype.click; HTMLAnchorElement.prototype.click = function () { if (this.download) { window.__saved.push({ href: this.href, name: this.download }); return; } return click.call(this); }; document.querySelector('#usermods-screenshot-button')?.click(); await new Promise((r) => setTimeout(r, 2000));",
+    "baseline": "(() => { const p = document.querySelector('#movie_player'); const v = p.querySelector('video'); const labels = [...p.querySelectorAll('.ytp-chrome-bottom button')].map((b) => (b.getAttribute('aria-label') || '') + ' ' + (b.title || '')).join(' '); return v.videoWidth > 0 && v.currentTime > 1 && !/screenshot|frame|image/i.test(labels) && window.__saved.length === 0; })()",
+    "expect": "(async () => { const b = document.querySelector('#usermods-screenshot-button'); const v = document.querySelector('#movie_player video'); if (!b || !b.checkVisibility() || window.__saved.length !== 1) return false; const s = window.__saved[0]; const blob = await (await fetch(s.href)).blob(); const img = await createImageBitmap(blob); return blob.type === 'image/png' && /^Me at the zoo \\dm\\d\\ds\\.png$/.test(s.name) && img.width === v.videoWidth && img.height === v.videoHeight; })()",
+    "intact": "(() => { const p = document.querySelector('#movie_player'); return p.querySelector('.ytp-settings-button').checkVisibility() && p.querySelector('.ytp-fullscreen-button').checkVisibility() && p.getPlayerState() === 2 && p.querySelector('video').currentTime > 1; })()"
+  }
+}

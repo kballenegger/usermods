@@ -1,0 +1,47 @@
+{
+  "slug": "hide-member-only",
+  "title": "Hide member-only stories on Medium",
+  "question": "How do I hide member-only stories on Medium?",
+  "answer": "Medium has no setting that filters member-only stories out of its lists; it marks them with a small star and leaves them in. The usermods script on this page hides every story preview that carries the \"Member-only story\" star on Medium's tag pages, search results and other story lists, so only stories you can read without a membership are left. Stories added as you scroll are hidden too. Without an extension, the star next to each title is the only way to tell them apart.",
+  "prompt": "Hide member-only stories from Medium's story lists so I only see ones I can read for free.",
+  "details": "The script is one CSS rule: it hides each story preview (`article[data-testid=\"post-preview\"]`) that contains the button labelled \"Member-only story\". Free stories stay where they are.\n\nIt works on medium.com. Publications on their own domains are not matched. The short \"Popular this week\" and \"Selected by Medium\" lists in the tag page sidebar are not story previews, and the script leaves them alone. The check loads the recommended stories for the JavaScript tag.",
+  "alternatives": [
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filter",
+      "body": "The same rule as a cosmetic filter. Our check runs the script, not this filter.\n\n```\nmedium.com##article[data-testid=\"post-preview\"]:has(button[aria-label=\"Member-only story\"])\n```"
+    },
+    {
+      "kind": "extension",
+      "title": "Medium Member-Only Post Remover",
+      "body": "A Chrome extension that removes member-only posts from Medium feeds."
+    }
+  ],
+  "related": [
+    "medium/hide-sticky-bars"
+  ],
+  "demand": {
+    "score": 43,
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/medium-member-only-post-r/jbejhilkbegomejdgdhaakegbhfabdca",
+        "note": "Chrome Web Store users: \"Medium Member-Only Post Remover\" (2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=medium+hide+member+only+stories",
+        "note": "suggests \"medium hide member only stories\""
+      }
+    ]
+  },
+  "check": {
+    "urls": ["https://medium.com/tag/javascript/recommended"],
+    "loggedOut": true,
+    "waitFor": "article[data-testid=\"post-preview\"]",
+    "settleMs": 3000,
+    "baseline": "[...document.querySelectorAll('article[data-testid=\"post-preview\"]')].filter((a) => a.querySelector('button[aria-label=\"Member-only story\"]') && a.checkVisibility()).length >= 1",
+    "expect": "(() => { const m = [...document.querySelectorAll('article[data-testid=\"post-preview\"]')].filter((a) => a.querySelector('button[aria-label=\"Member-only story\"]')); return m.length >= 1 && m.every((a) => !a.checkVisibility()); })()",
+    "intact": "[...document.querySelectorAll('article[data-testid=\"post-preview\"]')].filter((a) => !a.querySelector('button[aria-label=\"Member-only story\"]') && a.checkVisibility() && a.querySelector('h2') && a.querySelector('h2').checkVisibility()).length >= 2"
+  }
+}

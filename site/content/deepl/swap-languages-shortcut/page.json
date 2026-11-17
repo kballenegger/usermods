@@ -1,0 +1,46 @@
+{
+  "slug": "swap-languages-shortcut",
+  "title": "Swap languages on DeepL with Ctrl+Shift+S",
+  "question": "Is there a shortcut to swap languages on DeepL?",
+  "answer": "DeepL doesn't list a keyboard shortcut for swapping languages on its website; you click the arrows between the two language menus. The usermods script on this page adds Ctrl+Shift+S, the same shortcut Google Translate uses. It presses DeepL's own swap button, so the languages and the text trade places just as they do with a click, and it works while you are typing in a text box. Without an extension, the swap button is the only way.",
+  "prompt": "Add a Ctrl+Shift+S shortcut on DeepL that swaps the source and target languages.",
+  "details": "The script listens for Ctrl+Shift+S on the whole page and clicks the button labelled \"Swap source with target language\". When the source language is set to Detect language, DeepL disables that button and the shortcut does nothing too.\n\nOn a Mac the shortcut is also Ctrl+Shift+S, not Cmd. DeepL's shortcuts for its desktop apps (Ctrl+C+C and so on) are separate and unchanged.",
+  "alternatives": [
+    {
+      "kind": "extension",
+      "title": "DeepL CTRL+SHIFT+S LanguageSwap",
+      "body": "A Firefox add-on that does the same thing with the same shortcut."
+    }
+  ],
+  "related": [
+    "deepl/dark-mode",
+    "deepl/declutter"
+  ],
+  "demand": {
+    "score": 25,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/503407",
+        "note": "Google, DeepL, Bing, Papago And Yandex Translate Swap Languages And Copy Translation Hotkeys (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/452326",
+        "note": "语言切换快捷键｜适配大部分在线翻译网站 (total installs)"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.deepl.com/en/translator#en/de/Good%20morning"
+    ],
+    "loggedOut": true,
+    "waitFor": "[data-testid=\"lmt_language_switch\"]",
+    "settleMs": 4000,
+    "actions": "const box = document.querySelector('[data-testid=\"translator-source-input\"]'); const ed = box.querySelector('[contenteditable=\"true\"]') || box; ed.focus(); ed.dispatchEvent(new KeyboardEvent('keydown', { key: 'S', code: 'KeyS', ctrlKey: true, shiftKey: true, bubbles: true, composed: true, cancelable: true })); await new Promise((r) => setTimeout(r, 3000));",
+    "baseline": "(() => { const src = document.querySelector('[data-testid=\"translator-source-lang-btn\"]').innerText; const tgt = document.querySelector('[data-testid=\"translator-target-lang-btn\"]').innerText; const swap = document.querySelector('[data-testid=\"lmt_language_switch\"]'); return /English/.test(src) && /German/.test(tgt) && !!swap && swap.checkVisibility() && !swap.disabled; })()",
+    "expect": "(() => { const src = document.querySelector('[data-testid=\"translator-source-lang-btn\"]').innerText; const tgt = document.querySelector('[data-testid=\"translator-target-lang-btn\"]').innerText; return /German/.test(src) && /English/.test(tgt) && /Guten Morgen/.test(document.querySelector('[data-testid=\"translator-source-input\"]').innerText); })()",
+    "intact": "(() => { const ids = ['translator-source-input', 'translator-target-input', 'lmt_language_switch']; return ids.every((id) => { const e = document.querySelector('[data-testid=\"' + id + '\"]'); return !!e && e.checkVisibility(); }); })()"
+  }
+}

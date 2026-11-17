@@ -1,0 +1,60 @@
+{
+  "slug": "redirect-to-wikiwand",
+  "title": "Open Wikipedia articles in Wikiwand",
+  "question": "How do I make Wikipedia links open in Wikiwand?",
+  "answer": "Wikipedia has no option to send its articles to Wikiwand; you need an extension or a userscript. The usermods script on this page redirects any Wikipedia article you open, from a search result or a link, to the same article on Wikiwand in the same language, before the Wikipedia page loads. Edit and history pages, talk pages and special pages stay on Wikipedia. Without a userscript, Wikiwand's own browser extension does the redirect and adds more features.",
+  "prompt": "Redirect Wikipedia articles to the same article on Wikiwand.",
+  "details": "The script runs before the page draws and swaps `https://<lang>.wikipedia.org/wiki/<Article>` for `https://www.wikiwand.com/<lang>/<Article>`, keeping the section anchor. It uses `location.replace`, so the Back button skips the Wikipedia page.\n\nIt leaves Wikipedia alone for edit, history, diff and old revision views, the Main Page, and pages in the English non-article namespaces such as Talk:, User:, File: and Special:. On other language editions those namespace names are translated and are sent to Wikiwand too. When the browser reports a wikiwand.com page as the referrer, the script does not redirect, so a link from Wikiwand back to Wikipedia is not sent straight back. The check loads one English article.",
+  "alternatives": [
+    {
+      "kind": "extension",
+      "title": "Wikiwand extension",
+      "body": "Wikiwand's official Chrome extension redirects Wikipedia links to Wikiwand and adds its own features on top."
+    },
+    {
+      "kind": "other",
+      "title": "Change the address by hand",
+      "body": "Replace `en.wikipedia.org/wiki/` with `www.wikiwand.com/en/` in the address bar."
+    }
+  ],
+  "related": [
+    "wikipedia/full-width",
+    "wikipedia/dark-mode"
+  ],
+  "demand": {
+    "score": 80,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/13400",
+        "note": "Wikipedia 2 Wikiwand (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/23047",
+        "note": "Wikipedia 2 Wikiwand (Global) (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/emffkefkbkpkgpdeeooapgaicgmcbolj",
+        "note": "Wikiwand - Wikipedia Modernized (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=wikiwand%20redirect",
+        "note": "does not return the query; suggestions: "
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://en.wikipedia.org/wiki/Moon"
+    ],
+    "loggedOut": true,
+    "waitFor": "h1",
+    "settleMs": 3000,
+    "baseline": "location.hostname === 'en.wikipedia.org' && location.pathname === '/wiki/Moon' && [...document.querySelectorAll('#mw-content-text p')].filter((p) => p.checkVisibility() && p.textContent.trim().length > 50).length >= 10",
+    "expect": "location.hostname === 'www.wikiwand.com' && location.pathname === '/en/Moon' && document.querySelector('h1').textContent.trim() === 'Moon'",
+    "intact": "[...document.querySelectorAll('article p')].filter((p) => p.checkVisibility() && p.textContent.trim().length > 50).length >= 10"
+  }
+}

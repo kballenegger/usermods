@@ -1,0 +1,50 @@
+{
+  "slug": "wide-lists",
+  "title": "Make Trello lists wider",
+  "question": "How do I change the width of Trello lists?",
+  "answer": "Trello has no setting for list width; every list on a board is 272 pixels wide. The usermods script on this page widens each list to 380 pixels, so long card titles wrap onto fewer lines. The number is at the top of the script if you want another width. Collapsed lists stay narrow and the board scrolls sideways as before. Without an extension, the closest built-in option is collapsing the lists you aren't using.",
+  "prompt": "Make every list on my Trello boards 380 pixels wide instead of 272.",
+  "details": "The script sets the width of each list (`[data-testid=\"list-wrapper\"]` and the list box inside it) with CSS injected before the page draws, so it also applies to lists you add or open later. Cards, the add-a-card button and drag and drop keep working; cards simply get wider.\n\nCollapsed lists keep their narrow strip. The check loads a public board logged out and measures the lists; the same CSS applies to your own boards when you are logged in.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Collapse lists",
+      "body": "Each list's header has a collapse button that shrinks it to a thin vertical strip. It doesn't widen the other lists, but more of them fit on screen."
+    }
+  ],
+  "related": [
+    "trello/show-card-numbers",
+    "trello/show-label-text"
+  ],
+  "demand": {
+    "score": 48,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/6777",
+        "note": "Trello - minimize lists (374 total installs)"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/janhkoajdfpnebanjimdbgmenpfjiofh",
+        "note": "Get Wide for Trello (732 users)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=trello%20list%20width",
+        "note": "suggestions: trello list width, trello card width, trello change list width"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://trello.com/b/nC8QJJoZ/trello-development-roadmap"
+    ],
+    "loggedOut": true,
+    "waitFor": "[data-testid=\"list\"]",
+    "settleMs": 3000,
+    "baseline": "(() => { const l = [...document.querySelectorAll('[data-testid=\"list\"]')].filter((e) => e.checkVisibility()); return l.length >= 3 && l.every((e) => Math.round(e.getBoundingClientRect().width) === 272); })()",
+    "expect": "(() => { const l = [...document.querySelectorAll('[data-testid=\"list\"]')].filter((e) => e.checkVisibility()); return l.length >= 3 && l.every((e) => Math.round(e.getBoundingClientRect().width) === 380) && l.every((e) => { const c = e.querySelector('[data-testid=\"list-card\"]'); return !c || c.getBoundingClientRect().width > 300; }); })()",
+    "intact": "[...document.querySelectorAll('[data-testid=\"list-card\"]')].filter((c) => c.checkVisibility()).length >= 20 && [...document.querySelectorAll('[data-testid=\"list-name\"]')].filter((n) => n.checkVisibility()).length >= 3"
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "slug": "remove-redirect-links",
+  "title": "Remove Bing's tracking redirects from results",
+  "question": "How do I get direct links in Bing results instead of bing.com/ck links?",
+  "answer": "Bing has no setting for direct links; every result points at a bing.com/ck/a redirect that logs the click before sending you on. The usermods script on this page decodes the real address from each redirect link and puts it in the link's place, so clicking a result, or copying its address, goes straight to the site. It changes result, title and site-icon links on the results page. Without a script, the ClearURLs extension removes the same redirects.",
+  "prompt": "Make Bing search result links go straight to the site instead of through bing.com/ck.",
+  "details": "Bing encodes the destination in the `u` parameter as `a1` plus base64url. The script decodes it, keeps it only if it is an `http` or `https` URL, and sets it as the link's `href`. A MutationObserver repeats this as results load and as Bing re-renders parts of the page.\n\nLinks whose `u` parameter is missing or in another format are left as they are. Ads use a different redirect (`bing.com/aclick`) and are not changed.",
+  "alternatives": [
+    {
+      "kind": "extension",
+      "title": "ClearURLs",
+      "body": "ClearURLs strips tracking redirects and parameters on many sites, Bing included."
+    }
+  ],
+  "related": [
+    "bing/disable-safe-search",
+    "bing/clean-homepage",
+    "bing/image-download-button"
+  ],
+  "check": {
+    "urls": [
+      "https://www.bing.com/search?q=python+list+comprehension&setlang=en&cc=us"
+    ],
+    "loggedOut": true,
+    "waitFor": "#b_results li.b_algo h2 a",
+    "settleMs": 3000,
+    "baseline": "(() => { const l = [...document.querySelectorAll('#b_results > li.b_algo h2 a')]; return l.length >= 3 && l.filter((a) => a.href.startsWith('https://www.bing.com/ck/a?') && a.href.includes('&u=a1')).length >= 3; })()",
+    "expect": "(() => { const l = [...document.querySelectorAll('#b_results > li.b_algo h2 a')]; return l.length >= 3 && l.every((a) => /^https?:/.test(a.href) && new URL(a.href).hostname !== 'www.bing.com'); })()",
+    "intact": "[...document.querySelectorAll('#b_results > li.b_algo')].filter((l) => l.checkVisibility()).length >= 3"
+  },
+  "demand": {
+    "score": 46,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/490999",
+        "note": "Faster Bing (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/483444",
+        "note": "Bing remove redirect link (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=bing%20redirect%20links",
+        "note": "does not return the query; suggestions: bing redirect link"
+      }
+    ]
+  }
+}

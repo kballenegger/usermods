@@ -1,0 +1,47 @@
+{
+  "slug": "video-screenshot",
+  "title": "Take a screenshot of a Twitch stream",
+  "question": "How do I save a frame from a Twitch stream?",
+  "answer": "Twitch has no screenshot button, and an ordinary screenshot of your screen only captures the video at the size it is shown. The usermods script on this page adds a camera button to the player controls, next to the settings gear. Click it and the current frame downloads as a PNG at the stream's own resolution, without the player controls or chat. Install it with usermods or any userscript manager.",
+  "prompt": "Add a button to the Twitch player that saves the current video frame as a PNG.",
+  "details": "The script draws the current frame of the player's video into a canvas at the video's full resolution and saves it as `<channel>-<date-time>.png`. Nothing is uploaded; the image is made in your browser. The resolution is the quality the player is using, so pick Source in the quality menu first for the sharpest frame.\n\nThe button is re-added when you move to another channel. The check loads a highlight video, clicks the button and confirms that a PNG download starts. Live channels use the same player; the check does not load one.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Screenshot your screen",
+      "body": "Use your operating system's screenshot tool (Shift+Cmd+4 on macOS, Win+Shift+S on Windows) with the player in fullscreen. The image is the size of your screen rather than the stream's own resolution."
+    }
+  ],
+  "related": [
+    "twitch/video-speed",
+    "twitch/theater-mode",
+    "twitch/hide-extensions"
+  ],
+  "demand": {
+    "score": 39,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/473705",
+        "note": "Twitch Screenshot (183 total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=twitch%20screenshot",
+        "note": "suggestions: twitch screenshot | twitch screenshot extension | twitch screenshot notification | screenshot twitch stream | twitch chat screenshot"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.twitch.tv/videos/1627844339"
+    ],
+    "loggedOut": true,
+    "waitFor": ".player-controls__right-control-group",
+    "settleMs": 5000,
+    "actions": "window.__usermodsDownloads = []; HTMLAnchorElement.prototype.click = function () { window.__usermodsDownloads.push(this.download + ' ' + this.href); }; const b = document.querySelector('[data-usermods-screenshot]'); if (b) b.click();",
+    "baseline": "(() => { const v = document.querySelector('video'); const g = document.querySelector('.player-controls__right-control-group'); return !!v && v.checkVisibility() && v.videoWidth > 0 && !!g && !document.querySelector('[data-usermods-screenshot]'); })()",
+    "expect": "new Promise((r) => setTimeout(() => { const b = document.querySelector('.player-controls__right-control-group [data-usermods-screenshot]'); const d = window.__usermodsDownloads || []; r(!!b && d.length === 1 && /^videos-1627844339-[\\d-]+\\.png blob:https:\\/\\/www\\.twitch\\.tv\\//.test(d[0])); }, 2000))",
+    "intact": "(() => { const v = document.querySelector('video'); if (!v || !v.checkVisibility()) return false; const r = v.getBoundingClientRect(); return r.width > 500 && r.height > 250 && !!document.querySelector('[data-a-target=\"player-settings-button\"]'); })()"
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "slug": "wide-layout",
+  "title": "Wider Goodreads pages",
+  "question": "How do I make Goodreads use the full width of the screen?",
+  "answer": "Goodreads has no layout or width setting. Book pages sit in a centred frame capped at 1260 pixels, and the description wraps in a narrower column inside it. The usermods script on this page removes the cap so the page fills the window with a small margin, and lets the description and other text paragraphs run across the whole right-hand column. Without a script, zooming the browser out is the only way to fit more on screen.",
+  "prompt": "Make Goodreads book pages use the full width of the window.",
+  "details": "The script is two CSS rules injected before the page draws. It widens `.PageFrame`, the container Goodreads' newer pages use, and lets the paragraph blocks span the full right-hand grid. The cover and buttons column grows with the page.\n\nOlder Goodreads pages, such as lists, series and shelves, use a different fixed-width layout and are not changed. The check loads a book page.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Browser zoom",
+      "body": "Zooming out (Ctrl or Cmd and minus) shrinks everything, so more fits in the same frame. It does not change the frame's width."
+    }
+  ],
+  "related": [
+    "goodreads/declutter",
+    "goodreads/library-links",
+    "goodreads/sort-list-by-rating"
+  ],
+  "demand": {
+    "score": 33,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/385620",
+        "note": "Wider Goodreads (156 total installs)"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.goodreads.com/book/show/5907.The_Hobbit"
+    ],
+    "loggedOut": true,
+    "waitFor": ".BookPage__rightColumn .DetailsLayoutRightParagraph__widthConstrained",
+    "settleMs": 3000,
+    "baseline": "(() => { const f = document.querySelector('.PageFrame').getBoundingClientRect().width; const d = document.querySelector('[data-testid=\"description\"] .DetailsLayoutRightParagraph__widthConstrained').getBoundingClientRect().width; return f < innerWidth - 120 && d < 0.8 * document.querySelector('.BookPage__mainContent').getBoundingClientRect().width; })()",
+    "expect": "(() => { const frame = document.querySelector('.PageFrame'); const d = document.querySelector('[data-testid=\"description\"] .DetailsLayoutRightParagraph__widthConstrained'); const main = document.querySelector('.BookPage__mainContent'); return frame.getBoundingClientRect().width >= innerWidth - 80 && d.checkVisibility() && d.getBoundingClientRect().width >= 0.95 * main.getBoundingClientRect().width; })()",
+    "intact": "(() => { const h = document.querySelector('h1[data-testid=\"bookTitle\"]'); const cover = document.querySelector('.BookPage__leftColumn .BookCover img'); return !!h && h.checkVisibility() && !!cover && cover.checkVisibility() && document.documentElement.scrollWidth <= innerWidth && [...document.querySelectorAll('.BookPageMetadataSection a')].filter((a) => a.checkVisibility()).length >= 5; })()"
+  }
+}

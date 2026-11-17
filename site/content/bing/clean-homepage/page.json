@@ -17,7 +17,7 @@
       "body": "The same selector as the script. Our check runs the script, not this filter.\n\n```\nwww.bing.com###scroll_cont\n```"
     }
   ],
-  "related": ["bing/remove-copilot"],
+  "related": [],
   "demand": {
     "score": 58,
     "evidence": [

@@ -1,0 +1,45 @@
+{
+  "slug": "sort-tables",
+  "title": "Sort markdown tables on GitHub",
+  "question": "How do I sort a table in a GitHub README by a column?",
+  "answer": "GitHub does not let you sort tables in rendered markdown; they show in the order the author wrote them. The usermods script on this page makes every column header in a README or markdown file table clickable: one click sorts the rows by that column, a second click reverses the order, and an arrow marks the sorted column. Numbers sort by value, so 9.x comes before 10.x. Without an extension, copying the table into a spreadsheet is the usual way.",
+  "prompt": "Let me click the column headers of tables in GitHub READMEs to sort them.",
+  "details": "The script sorts the table's rows in the page; it does not change the file. Empty cells and cells holding only a dash stay at the bottom in both directions. Links inside a header still work as links.\n\nIt works on any rendered markdown on github.com, including issue and pull request comments and wiki pages; the check covers a README.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Copy into a spreadsheet",
+      "body": "Select the table, copy it and paste it into Google Sheets, Numbers or Excel, which keep the columns and can sort them."
+    },
+    {
+      "kind": "extension",
+      "title": "Sortable Tables for GitHub",
+      "body": "The Sortable Tables for GitHub extension for Chrome does the same."
+    }
+  ],
+  "related": [
+    "github/readme-toc",
+    "github/full-width",
+    "github/wrap-code-lines"
+  ],
+  "check": {
+    "urls": [
+      "https://github.com/nodejs/Release"
+    ],
+    "loggedOut": true,
+    "waitFor": "article.markdown-body table thead th",
+    "settleMs": 3000,
+    "actions": "const t = [...document.querySelectorAll('article.markdown-body table')].find((t) => t.tBodies[0] && t.tBodies[0].rows.length >= 20); window.__t = t; window.__before = t && [...t.tBodies[0].rows].map((r) => r.cells[6].textContent.trim()); const th = t && [...t.tHead.rows[0].cells].find((c) => c.textContent.trim() === 'End-of-life'); th && th.click();",
+    "baseline": "(() => { const t = window.__t; if (!t || !t.checkVisibility()) return false; const now = [...t.tBodies[0].rows].map((r) => r.cells[6].textContent.trim()); const named = now.filter((s) => s && s !== '-'); const sorted = [...named].sort((a, b) => a.localeCompare(b)); return now.length >= 20 && now.join() === window.__before.join() && named.join() !== sorted.join(); })()",
+    "expect": "(() => { const t = window.__t; const th = [...t.tHead.rows[0].cells].find((c) => c.textContent.trim() === 'End-of-life'); const now = [...t.tBodies[0].rows].map((r) => r.cells[6].textContent.trim()); const named = now.filter((s) => s && s !== '-'); const sorted = [...named].sort((a, b) => a.localeCompare(b)); const firstEmpty = now.findIndex((s) => !s || s === '-'); const emptiesLast = firstEmpty === -1 || now.slice(firstEmpty).every((s) => !s || s === '-'); return th.getAttribute('aria-sort') === 'ascending' && now.length === window.__before.length && named.length >= 10 && named.join() === sorted.join() && emptiesLast; })()",
+    "intact": "(() => { const t = window.__t; const rows = [...t.tBodies[0].rows].filter((r) => r.checkVisibility()); return rows.length >= 20 && rows.every((r) => r.cells.length === t.tHead.rows[0].cells.length) && document.querySelectorAll('article.markdown-body table').length >= 3; })()"
+  },
+  "demand": {
+    "score": 49,
+    "evidence": [
+      { "type": "greasyfork", "url": "https://greasyfork.org/en/scripts/21373", "note": "Greasy Fork total installs, \"GitHub Sort Content\", 917 (api.greasyfork.org)" },
+      { "type": "cws", "url": "https://chromewebstore.google.com/detail/ekjbdpnpokbkkebdgjgoadgpkegefkab", "note": "Chrome Web Store users, \"Sortable Tables for GitHub\", 34" },
+      { "type": "autocomplete", "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=github%20markdown%20table%20sort", "note": "Google suggests \"github sortable table\" and \"github markdown sortable table\"" }
+    ]
+  }
+}

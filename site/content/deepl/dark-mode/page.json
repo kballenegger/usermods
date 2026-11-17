@@ -1,0 +1,55 @@
+{
+  "slug": "dark-mode",
+  "title": "Use dark mode on DeepL Translator",
+  "question": "Does the DeepL website have dark mode?",
+  "answer": "No. DeepL offers dark mode in its desktop and mobile apps, but the web translator at deepl.com has no theme setting. The usermods script on this page switches deepl.com to the dark colours already built into the site's own stylesheets: a near-black page, dark text boxes with light text, and a dark header and side panel. Without a userscript, a browser-wide dark mode extension such as Dark Reader also works, or you can use the DeepL desktop app.",
+  "prompt": "Make the DeepL translator website use a dark theme.",
+  "details": "DeepL's site sets its colours from a `light` or `dark` class on the `<html>` element, and its stylesheets already contain the dark palette. The script replaces `light` with `dark` before the page draws and keeps it there if the site's theme code switches it back. It also swaps the dark DeepL wordmark in the header for the white version the site already ships.\n\nThe check loads the translator page. The same class controls the rest of deepl.com, but some marketing images and banners keep their light backgrounds.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "DeepL desktop and mobile apps",
+      "body": "The Windows, Mac, iOS and Android apps have a dark mode. On Windows it is under the app's settings; the others follow the system appearance."
+    },
+    {
+      "kind": "extension",
+      "title": "Dark Reader",
+      "body": "Dark Reader darkens every site by computing a dark palette from the page's own colours. It works on deepl.com but doesn't use DeepL's own dark colours."
+    }
+  ],
+  "related": [
+    "deepl/declutter",
+    "deepl/swap-languages-shortcut"
+  ],
+  "demand": {
+    "score": 50,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/595324",
+        "note": "DeepL Black Theme (total installs)"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/lgldkcjfjjfbbfdibpnloponileegnbd",
+        "note": "Dark Mode for DeepL (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=deepl%20dark%20mode",
+        "note": "returns \"deepl dark mode\"; suggestions: deepl dark mode | deepl dark mode extension | deepl website dark mode | deepl dark mode firefox | deepl browser dark mode"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.deepl.com/en/translator#en/de/Good%20morning"
+    ],
+    "loggedOut": true,
+    "waitFor": "[data-testid=\"translator-source-input\"]",
+    "settleMs": 4000,
+    "baseline": "(() => { const lum = (c) => { const [r, g, b] = c.match(/\\d+/g).map(Number); return 0.2126 * r + 0.7152 * g + 0.0722 * b; }; const box = document.querySelector('[data-testid=\"translator-source-input\"]'); return document.documentElement.classList.contains('light') && lum(getComputedStyle(document.body).backgroundColor) > 200 && lum(getComputedStyle(box).backgroundColor) > 200; })()",
+    "expect": "(() => { const lum = (c) => { const [r, g, b] = c.match(/\\d+/g).map(Number); return 0.2126 * r + 0.7152 * g + 0.0722 * b; }; const box = document.querySelector('[data-testid=\"translator-source-input\"]'); const header = document.querySelector('[data-testid=\"dl-header\"]'); return document.documentElement.classList.contains('dark') && lum(getComputedStyle(document.body).backgroundColor) < 50 && lum(getComputedStyle(box).backgroundColor) < 60 && lum(getComputedStyle(box).color) > 200 && lum(getComputedStyle(header).backgroundColor) < 50; })()",
+    "intact": "(() => { const ids = ['translator-source-input', 'translator-target-input', 'translator-source-lang-btn', 'translator-target-lang-btn', 'lmt_language_switch']; return ids.every((id) => { const e = document.querySelector('[data-testid=\"' + id + '\"]'); return !!e && e.checkVisibility(); }) && /Morgen/.test(document.querySelector('[data-testid=\"translator-target-input\"]').innerText); })()"
+  }
+}

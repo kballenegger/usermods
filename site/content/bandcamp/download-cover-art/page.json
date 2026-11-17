@@ -1,0 +1,40 @@
+{
+  "slug": "download-cover-art",
+  "title": "Download full-size Bandcamp album art",
+  "question": "How do I get the full-size album cover from Bandcamp?",
+  "answer": "Clicking the cover on a Bandcamp album page opens a 1200 pixel version, not the original. Changing the end of that image address from _10.jpg to _0.jpg gives the file the artist uploaded, at full size. The usermods script on this page does that for you: it adds a Full-size cover art link under the cover on album and track pages that opens the original image in a new tab, ready to save.",
+  "prompt": "Add a link under the Bandcamp album cover that opens the full-size original image.",
+  "details": "Bandcamp serves each cover in several sizes, picked by a number at the end of the image address: `_2` is the smaller image shown on the page, `_10` is the 1200 pixel version in the pop-up, and `_0` is the original upload. The script reads the pop-up link and swaps the number for `_0`. It makes no network requests of its own.\n\nThe original can be smaller than 1200 pixels when the artist uploaded a small image, and it can be a PNG. The check loads one album page and confirms the linked image is larger than the pop-up version.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Edit the image address by hand",
+      "body": "Click the cover, right-click the large image and open it in a new tab, then change the `_10` before `.jpg` in the address to `_0` and press Enter."
+    }
+  ],
+  "related": [
+    "bandcamp/show-release-date",
+    "bandcamp/album-duration"
+  ],
+  "demand": {
+    "score": 53,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/20771",
+        "note": "Stig's Art Grabr (total installs)"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://radiohead.bandcamp.com/album/in-rainbows"
+    ],
+    "loggedOut": true,
+    "waitFor": "#tralbumArt a.popupImage",
+    "settleMs": 2000,
+    "baseline": "(() => { const a = document.querySelector('#tralbumArt a.popupImage'); return !!a && a.checkVisibility() && /_10\\.jpg$/.test(a.href) && ![...document.querySelectorAll('#tralbumArt a')].some((l) => /_0\\.jpg$/.test(l.href)); })()",
+    "expect": "(async () => { const l = [...document.querySelectorAll('#tralbumArt a')].find((a) => /_0\\.jpg$/.test(a.href)); if (!l || !l.checkVisibility()) return false; const size = (src) => new Promise((r) => { const i = new Image(); i.onload = () => r(i.naturalWidth); i.onerror = () => r(0); i.src = src; }); const full = await size(l.href); const popup = await size(document.querySelector('#tralbumArt a.popupImage').href); return full > popup && popup >= 1200; })()",
+    "intact": "(() => { const img = document.querySelector('#tralbumArt img'); return !!img && img.checkVisibility() && img.naturalWidth > 0 && [...document.querySelectorAll('#track_table .track_row_view')].filter((r) => r.checkVisibility()).length >= 10; })()"
+  }
+}

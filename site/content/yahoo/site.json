@@ -1,0 +1,7 @@
+{
+  "slug": "yahoo",
+  "name": "Yahoo",
+  "domains": ["yahoo.com", "www.yahoo.com"],
+  "category": "news",
+  "intro": "Userscripts for Yahoo's homepage and Yahoo News: hide the publishers you don't want to read."
+}

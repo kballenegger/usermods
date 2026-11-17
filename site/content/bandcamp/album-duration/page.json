@@ -1,0 +1,38 @@
+{
+  "slug": "album-duration",
+  "title": "Show the total length of a Bandcamp album",
+  "question": "How long is this Bandcamp album in total?",
+  "answer": "Bandcamp album pages list the length of each track but never the total running time, so you have to add them up yourself. The usermods script on this page does the sum for you and shows a line such as \"Total length 42:34, 10 tracks\" under the track list. If some tracks have no listed time, the line says how many were left out. There is no Bandcamp setting that shows the total.",
+  "prompt": "Show the total running time of the album under the Bandcamp track list.",
+  "details": "The script reads the time next to each track in the track list, adds them up and writes the total under the list, in minutes and seconds or hours, minutes and seconds for long albums. It runs once when the page loads and makes no network requests.\n\nTracks that can't be streamed have no time on the page, so the total only counts tracks that show one, and the line says how many were skipped. Single track pages have no track list and are left alone. The check loads In Rainbows, whose ten tracks add up to 42:34.",
+  "related": [
+    "bandcamp/show-release-date",
+    "bandcamp/playback-speed"
+  ],
+  "demand": {
+    "score": 40,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/416888",
+        "note": "Bandcamp Total Duration (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=bandcamp%20album%20length",
+        "note": "returns \"bandcamp album length\"; suggestions: bandcamp album length calculator | bandcamp album length | bandcamp track length limit | bandcamp album size | bandcamp album time calculator"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://radiohead.bandcamp.com/album/in-rainbows"
+    ],
+    "loggedOut": true,
+    "waitFor": "#track_table .track_row_view",
+    "settleMs": 2000,
+    "baseline": "(() => { const t = [...document.querySelectorAll('#track_table .track_row_view .time')].filter((e) => /\\d+:\\d{2}/.test(e.textContent)); return t.length === 10 && !document.body.innerText.includes('42:34'); })()",
+    "expect": "(() => { const l = [...document.querySelectorAll('#track_table ~ div')].find((e) => e.textContent.trim() === 'Total length 42:34, 10 tracks'); return !!l && l.checkVisibility(); })()",
+    "intact": "[...document.querySelectorAll('#track_table .track_row_view')].filter((r) => r.checkVisibility()).length >= 10"
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "slug": "rotate-video",
+  "title": "Rotate a YouTube video",
+  "question": "How do I rotate a sideways YouTube video?",
+  "answer": "YouTube's desktop player has no rotate option, so a video filmed sideways plays sideways. The usermods script on this page adds a rotate button next to the Settings gear. Each click turns the video 90 degrees clockwise and scales it to fit the player, and the next video you open starts upright again. Playback, sound and the controls are not affected.",
+  "prompt": "Add a button to the YouTube player that rotates the video 90 degrees.",
+  "details": "The script rotates the video with a CSS transform, so only the picture turns; the progress bar and buttons stay where they are. At 90 and 270 degrees the picture is scaled so the whole frame fits inside the player, which leaves empty space at the sides.\n\nThe rotation is kept when you switch to theater mode or full screen and reset when a new video loads. Four clicks bring it back to upright. The check clicks the button once on a 16:9 video and confirms the picture is turned a quarter and sits inside the player.",
+  "alternatives": [
+    {
+      "kind": "extension",
+      "title": "Rotate that Video Player",
+      "body": "The Rotate that Video Player extension rotates and flips HTML5 videos on any site, YouTube included."
+    }
+  ],
+  "related": [
+    "youtube/resize-player",
+    "youtube/video-screenshot",
+    "youtube/loop-video"
+  ],
+  "demand": {
+    "score": 84,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/375568",
+        "note": "youtube player rotate (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/ijpcmpbcokpgmecfkmehleemljfkeimo",
+        "note": "Rotate that Video Player (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/aealinghcnkgokkhdeijcejdimmeelho",
+        "note": "YouTube Video Rotate (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=rotate%20youtube%20video",
+        "note": "returns the query; suggestions: rotate youtube video | rotate youtube video on tv | rotate youtube video on iphone | rotate youtube video android | rotate youtube video online"
+      },
+      {
+        "type": "forum",
+        "url": "https://superuser.com/questions/1403979/is-it-possible-to-rotate-youtube-videos-while-watching-on-desktop-pc",
+        "note": "superuser.com question: Is it possible to rotate YouTube videos while watching on desktop PC?"
+      },
+      {
+        "type": "forum",
+        "url": "https://superuser.com/questions/1765672/how-can-i-rotate-youtube-videos-as-if-on-a-mirror-not-90degree-rotations-by",
+        "note": "superuser.com question: How can I rotate Youtube videos as if on a mirror? (!!Not 90degree rotations by ctrl+shift+arrow!!)"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.youtube.com/watch?v=aqz-KE-bpKQ"
+    ],
+    "loggedOut": true,
+    "waitFor": "#movie_player video",
+    "settleMs": 3000,
+    "actions": "const p = document.querySelector('#movie_player'); p.mute(); p.playVideo(); await new Promise((r) => setTimeout(r, 4000)); document.querySelector('#usermods-rotate-button')?.click(); await new Promise((r) => setTimeout(r, 1500));",
+    "baseline": "(() => { const p = document.querySelector('#movie_player'); const r = p.querySelector('video').getBoundingClientRect(); const labels = [...p.querySelectorAll('.ytp-chrome-bottom button')].map((b) => b.getAttribute('aria-label') || '').join(' '); return r.width > r.height * 1.5 && !/rotat/i.test(labels); })()",
+    "expect": "(() => { const p = document.querySelector('#movie_player'); const v = p.querySelector('video'); const r = v.getBoundingClientRect(); const pr = p.getBoundingClientRect(); const m = new DOMMatrix(getComputedStyle(v).transform); const b = document.querySelector('#usermods-rotate-button'); return b && b.checkVisibility() && Math.abs(m.a) < 0.001 && m.b > 0 && m.c < 0 && r.height > r.width * 1.5 && r.top >= pr.top - 1 && r.bottom <= pr.bottom + 1 && r.left >= pr.left - 1 && r.right <= pr.right + 1 && r.height > pr.height * 0.95; })()",
+    "intact": "(() => { const p = document.querySelector('#movie_player'); return p.getPlayerState() === 1 && p.querySelector('.ytp-progress-bar').checkVisibility() && p.querySelector('.ytp-settings-button').checkVisibility(); })()"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "slug": "huggingface",
+  "name": "Hugging Face",
+  "domains": ["huggingface.co"],
+  "category": "work",
+  "intro": "Userscripts for huggingface.co: download commands, mirror links, full-window Spaces and a dark theme without an account."
+}

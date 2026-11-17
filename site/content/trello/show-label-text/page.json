@@ -1,0 +1,36 @@
+{
+  "slug": "show-label-text",
+  "title": "Show label names on Trello cards",
+  "question": "How do I show label text on Trello cards instead of colored bars?",
+  "answer": "Click any label on a card: Trello switches every label on the board from a coloured bar to a pill with its name, and remembers that in your browser until you click again or clear site data. The usermods script on this page turns that same switch on each time a Trello page loads, so label names show on cards in every browser and private window where it runs. Trello draws the labels itself; the script changes no layout.",
+  "prompt": "On Trello boards, always show the label names on cards instead of the short coloured bars.",
+  "details": "Trello keeps the label choice in `localStorage` under `labelState`. The script sets `showText` to `true` there before Trello's code runs, and leaves any other values in that entry alone.\n\nIf you click a label to hide the names, they stay hidden until the next page load, when the script turns them back on. The check loads a public board logged out and confirms every label on the cards shows its name; the same setting applies to your own boards.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Click a label",
+      "body": "Click any label on a card front. All labels expand to show their names, and Trello remembers the choice in this browser."
+    }
+  ],
+  "related": [
+    "trello/show-card-numbers",
+    "trello/wide-lists"
+  ],
+  "demand": {
+    "score": 39,
+    "evidence": [
+      { "type": "greasyfork", "url": "https://greasyfork.org/en/scripts/16061", "note": "Trello styles by chapaev.css (197 total installs)" },
+      { "type": "cws", "url": "https://chromewebstore.google.com/detail/pdknjplelficbiepgefgajmaamfimhde", "note": "Trello Legacy Labels (57 users)" },
+      { "type": "autocomplete", "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=trello%20show%20label%20text", "note": "suggestions: trello show label text on card, trello show label text, trello view label text" }
+    ]
+  },
+  "check": {
+    "urls": ["https://trello.com/b/Dj3EzmL9"],
+    "loggedOut": true,
+    "waitFor": "[data-testid=\"compact-card-label\"]",
+    "settleMs": 3000,
+    "baseline": "(() => { const l = [...document.querySelectorAll('[data-testid=\"compact-card-label\"]')].filter((e) => e.checkVisibility()); return l.length >= 5 && l.every((e) => e.dataset.expanded === 'false' && e.getBoundingClientRect().height <= 10 && getComputedStyle(e).color === 'rgba(0, 0, 0, 0)'); })()",
+    "expect": "(() => { const l = [...document.querySelectorAll('[data-testid=\"compact-card-label\"]')].filter((e) => e.checkVisibility()); return l.length >= 5 && l.every((e) => e.dataset.expanded === 'true' && e.textContent.trim().length > 0 && e.getBoundingClientRect().height >= 14 && getComputedStyle(e).color !== 'rgba(0, 0, 0, 0)' && getComputedStyle(e).color !== getComputedStyle(e).backgroundColor); })()",
+    "intact": "[...document.querySelectorAll('[data-testid=\"list-card\"]')].filter((c) => c.checkVisibility()).length >= 5 && [...document.querySelectorAll('[data-testid=\"list-name\"]')].filter((n) => n.checkVisibility()).length >= 3"
+  }
+}

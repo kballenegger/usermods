@@ -1,0 +1,40 @@
+{
+  "slug": "clean-description-links",
+  "title": "Skip YouTube's link redirect page",
+  "question": "How do I stop YouTube links from going through the redirect warning page?",
+  "answer": "YouTube has no setting to turn off its link redirect. Outside links in descriptions and comments point to youtube.com/redirect, which records the click and can show a \"leaving YouTube\" warning before sending you on. The usermods script on this page rewrites each of those links to the address it really points to and opens it directly in a new tab, skipping YouTube's redirect. Without an extension, copy the address shown in the description and paste it into the address bar.",
+  "prompt": "Make links in YouTube descriptions go straight to the site instead of through YouTube's redirect.",
+  "details": "YouTube stores the real address in the `q` parameter of each `youtube.com/redirect` link. The script replaces the link's address with that value, so hovering a link shows where it goes and copying it copies the real address. YouTube opens these links with its own click handler, which would still use the redirect, so the script stops left and middle clicks on rewritten links from reaching that handler and lets the browser open the link in a new tab.\n\nLinks to other YouTube pages, hashtags and timestamps are left alone. The check expands a video description and confirms every visible rewritten link opens in a new tab; comment links use the same code but are not checked.",
+  "related": [
+    "youtube/expand-description",
+    "youtube/hide-comments",
+    "youtube/hide-end-screens"
+  ],
+  "demand": {
+    "score": 68,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/15857",
+        "note": "Direct links out (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20remove%20redirect%20links",
+        "note": "does not return the query; suggestions: "
+      }
+    ]
+  },
+  "check": {
+    "loggedOut": true,
+    "urls": [
+      "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    ],
+    "waitFor": "ytd-watch-metadata a[href*=\"/redirect?\"], ytd-watch-metadata a[data-usermods-direct]",
+    "settleMs": 4000,
+    "baseline": "[...document.querySelectorAll('a')].filter((a) => /^https:\\/\\/www\\.youtube\\.com\\/redirect\\?.*[?&]q=/.test(a.href)).length >= 5",
+    "expect": "(() => { const links = [...document.querySelectorAll('a')]; const direct = links.filter((a) => a.hasAttribute('data-usermods-direct')); const shown = [...document.querySelectorAll('ytd-watch-metadata a[data-usermods-direct]')].filter((a) => a.checkVisibility()); if (direct.length < 5 || shown.length < 5 || !shown.every((a) => a.target === '_blank') || links.some((a) => a.href.includes('/redirect?')) || !direct.every((a) => /^https?:\\/\\//.test(a.href) && !a.href.includes('youtube.com/redirect'))) return false; let reachedYouTube = false; const block = (e) => e.preventDefault(); window.addEventListener('click', block, true); const mark = () => { reachedYouTube = true; }; direct[0].addEventListener('click', mark); direct[0].click(); direct[0].removeEventListener('click', mark); window.removeEventListener('click', block, true); return !reachedYouTube; })()",
+    "intact": "document.querySelector('#movie_player video').checkVisibility() && document.querySelector('ytd-watch-metadata h1').checkVisibility()",
+    "actions": "document.querySelector('ytd-watch-metadata ytd-text-inline-expander #expand').click(); await new Promise((r) => setTimeout(r, 1500));"
+  }
+}

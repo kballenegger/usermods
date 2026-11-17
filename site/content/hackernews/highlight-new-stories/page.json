@@ -1,0 +1,37 @@
+{
+  "slug": "highlight-new-stories",
+  "title": "Highlight stories you have not seen on Hacker News",
+  "question": "How do I mark Hacker News stories I have already seen?",
+  "answer": "Hacker News only greys out links you have clicked, through your browser's visited-link colour; it does not remember which stories you have scrolled past. The usermods script on this page records every story shown to you on the front page and the other lists, and on later visits puts new stories in bold with an orange bar beside them. Stories you have seen before stay plain. The record stays in your browser, so it works without an account.",
+  "prompt": "On Hacker News, highlight the stories I haven't seen on earlier visits.",
+  "details": "The script keeps the ids of the stories it has shown you in `localStorage` for news.ycombinator.com. On any story list (front page, `newest`, `ask`, `show`, `best` and the rest), stories that are not in that record are marked and then added to it, so a story counts as new only on the first load where it appears. On the first run it only records what is on the page.\n\nA story that has not appeared on any list you loaded for 30 days is dropped from the record, which keeps it well under the browser's storage limit. Item pages are skipped, and the record is per browser. It is not shared between devices.\n\nThe check loads the front page, removes five stories from the record and loads the page again in a frame, then confirms those five are marked and the others are not.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Hide stories",
+      "body": "Logged in, the **hide** link under a story removes it from your lists. It works one story at a time."
+    }
+  ],
+  "related": [
+    "hackernews/paywall-marker",
+    "hackernews/open-links-new-tab",
+    "hackernews/dark-mode"
+  ],
+  "demand": {
+    "score": 34,
+    "evidence": [
+      { "type": "greasyfork", "url": "https://greasyfork.org/en/scripts/39311", "note": "Hacker News Highlighter (total installs, read from api.greasyfork.org/en/scripts/by-site)" },
+      { "type": "chrome-web-store", "url": "https://chromewebstore.google.com/detail/fghfahcbhpdeeaaofcefaoodmfejieok", "note": "Hacker News: Mark All Read (users, read on the detail page)" }
+    ]
+  },
+  "check": {
+    "urls": ["https://news.ycombinator.com/"],
+    "loggedOut": true,
+    "waitFor": "tr.athing.submission",
+    "settleMs": 1000,
+    "actions": "const ids = [...document.querySelectorAll('tr.athing.submission')].map((r) => r.id); const stored = JSON.parse(localStorage.getItem('usermods-hn-seen') || 'null'); if (stored) { ids.slice(0, 5).forEach((id) => delete stored[id]); localStorage.setItem('usermods-hn-seen', JSON.stringify(stored)); } window.umFirst = ids; const f = document.createElement('iframe'); f.id = 'um-check'; f.style.cssText = 'width: 1200px; height: 900px'; document.body.append(f); await new Promise((r) => { f.onload = r; f.src = location.href; }); await new Promise((r) => setTimeout(r, 1000));",
+    "baseline": "(() => { const d = document.getElementById('um-check')?.contentDocument; const rows = d ? [...d.querySelectorAll('tr.athing.submission')] : []; return window.umFirst.length >= 30 && rows.length >= 30 && rows.every((r) => !r.classList.contains('um-new') && getComputedStyle(r.querySelector('.titleline > a')).fontWeight === '400'); })()",
+    "expect": "(() => { const d = document.getElementById('um-check').contentDocument; const rows = [...d.querySelectorAll('tr.athing.submission')]; const removed = window.umFirst.slice(0, 5); const kept = window.umFirst.slice(5); const isNew = (r) => r.classList.contains('um-new') && getComputedStyle(r.querySelector('.titleline > a')).fontWeight === '700'; const top = [...document.querySelectorAll('tr.athing.submission')]; const r1 = rows.filter((r) => removed.includes(r.id)); const r2 = rows.filter((r) => kept.includes(r.id)); return top.every((r) => !r.classList.contains('um-new')) && r1.length >= 4 && r1.every(isNew) && r2.length >= 20 && r2.every((r) => !r.classList.contains('um-new')); })()",
+    "intact": "(() => { const t = [...document.querySelectorAll('.titleline > a')].filter((a) => a.checkVisibility()); const d = document.getElementById('um-check').contentDocument; return t.length >= 30 && d.querySelectorAll('.titleline > a').length >= 30; })()"
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "slug": "declutter",
+  "title": "Remove clutter and upsells from DeepL",
+  "question": "How do I hide the DeepL Pro banners and extra panels?",
+  "answer": "DeepL has no setting to hide its promotions on the free web translator. The usermods script on this page hides the promo banner under the top navigation, the side panel entries that only lead to a DeepL Pro upgrade (Formality, Style profiles and Style rules), and the marketing sections below the translator, so the page ends after the dictionary. The text boxes, language menus, Glossaries and the dictionary stay. Without an extension, the DeepL desktop app shows the translator without the marketing.",
+  "prompt": "Hide the promo banner, the Pro-only options and the marketing sections on the DeepL translator.",
+  "details": "Three CSS rules, keyed to DeepL's `data-testid` attributes and its Pro badge component rather than generated class names. The header navigation, the Translate text / files / speech tabs, the cookie notice and the footer are left alone.\n\nThe check loads the translator page logged out. Logged-in Pro accounts don't see the Pro badges, so the side panel rule does nothing there.",
+  "alternatives": [
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filters",
+      "body": "The same rules as cosmetic filters. Our check runs the script, not these filters.\n\n```\nwww.deepl.com##[data-testid=\"below-navigation-banner\"]\nwww.deepl.com##[data-testid=\"side-panel\"] button:has([data-dui-component=\"Badge\"].as-pro)\nwww.deepl.com##[data-testid=\"translator\"] > div:not(:has(main)):has(section)\n```"
+    },
+    {
+      "kind": "other",
+      "title": "DeepL desktop app",
+      "body": "The Windows and Mac apps show only the translator, without the marketing sections."
+    }
+  ],
+  "related": [
+    "deepl/dark-mode",
+    "deepl/swap-languages-shortcut"
+  ],
+  "demand": {
+    "score": 35,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/556995",
+        "note": "DeepL Unlimited - UI Cleaner Only (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/441609",
+        "note": "clean up deepl.com (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/441547",
+        "note": "Deepl Interface cleanup (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/479043",
+        "note": "RemovePopUp For Un-Formal - deepl.com (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/576776",
+        "note": "DeepL Minimal UI (total installs)"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.deepl.com/en/translator#en/de/Good%20morning"
+    ],
+    "loggedOut": true,
+    "waitFor": "[data-testid=\"translator-source-input\"]",
+    "settleMs": 4000,
+    "baseline": "(() => { const banner = document.querySelector('[data-testid=\"below-navigation-banner\"]'); const pro = [...document.querySelectorAll('[data-testid=\"side-panel\"] button')].filter((b) => b.querySelector('[data-dui-component=\"Badge\"].as-pro')); const sections = [...document.querySelectorAll('[data-testid=\"translator\"] section')].filter((s) => !s.closest('main')); return !!banner && banner.checkVisibility() && pro.length >= 2 && pro.every((b) => b.checkVisibility()) && sections.length >= 3 && sections.some((s) => s.checkVisibility()); })()",
+    "expect": "(() => { const banner = document.querySelector('[data-testid=\"below-navigation-banner\"]'); const pro = [...document.querySelectorAll('[data-testid=\"side-panel\"] button')].filter((b) => b.querySelector('[data-dui-component=\"Badge\"].as-pro')); const sections = [...document.querySelectorAll('[data-testid=\"translator\"] section')].filter((s) => !s.closest('main')); return !!banner && !banner.checkVisibility() && pro.length >= 2 && pro.every((b) => !b.checkVisibility()) && sections.length >= 3 && sections.every((s) => !s.checkVisibility()); })()",
+    "intact": "(() => { const ids = ['translator-source-input', 'translator-target-input', 'translator-source-lang-btn', 'translator-target-lang-btn', 'glossary-button']; const dict = document.querySelector('#dictionary-header'); return ids.every((id) => { const e = document.querySelector('[data-testid=\"' + id + '\"]'); return !!e && e.checkVisibility(); }) && !!dict && dict.checkVisibility() && /Morgen/.test(document.querySelector('[data-testid=\"translator-target-input\"]').innerText); })()"
+  }
+}

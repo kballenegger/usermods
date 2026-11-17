@@ -1,0 +1,56 @@
+{
+  "slug": "disable-60fps",
+  "title": "Turn off 60fps video on YouTube",
+  "question": "How do I stop YouTube from playing videos at 60fps?",
+  "answer": "YouTube has no frame rate setting: on a video uploaded at 60fps, the 720p and higher qualities in the gear menu are all 60fps (720p60, 1080p60). The usermods script on this page hides 50 and 60fps streams from the player, so it plays a 30fps version instead, which takes less CPU and battery. For those videos YouTube only has 30fps versions up to 480p, so that becomes the top quality. Without an extension, pick 480p or lower in the gear menu.",
+  "prompt": "Stop YouTube from playing videos at 60fps.",
+  "details": "Before it fills its quality list, YouTube's player asks the browser which video formats it can play, and the question includes each stream's frame rate. The script answers no for anything above 30fps, so the player leaves those streams out. Videos uploaded at 30fps or less are not affected at all.\n\nThe trade-off: for a video uploaded at 60fps, YouTube only encodes 30fps versions up to 480p, so with the script the gear menu stops at 480p on those videos. Change `MAX_FPS` at the top of the script to allow a higher frame rate.\n\nThe check plays a 60fps 4K video, asks the player for 720p, and confirms the quality list has no 60fps entries and the stream playing is 30fps.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Pick a lower quality",
+      "body": "Open the gear menu, choose **Quality** and pick 480p or lower. On a 60fps upload these are 30fps. It applies to the current video only."
+    },
+    {
+      "kind": "extension",
+      "title": "enhanced-h264ify",
+      "body": "The enhanced-h264ify extension can block 60fps video on YouTube and also block the VP9 and AV1 codecs, for computers that can only decode H.264 in hardware."
+    }
+  ],
+  "related": [
+    "youtube/force-hd-quality",
+    "youtube/disable-autoplay"
+  ],
+  "demand": {
+    "score": 80,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/23329",
+        "note": "Disable YouTube 60 FPS (Force 30 FPS) (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/omkfmpieigblcllmkgbflkikinpkodlk",
+        "note": "enhanced-h264ify (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20disable%2060fps",
+        "note": "returns the query; suggestions: youtube disable 60fps | youtube turn off 60fps | youtube block 60fps | youtube revanced disable 60fps | disable 60fps youtube android"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.youtube.com/watch?v=aqz-KE-bpKQ"
+    ],
+    "loggedOut": true,
+    "waitFor": "#movie_player video",
+    "settleMs": 3000,
+    "actions": "const p = document.querySelector('#movie_player'); p.mute(); p.playVideo(); await new Promise((r) => setTimeout(r, 3000)); p.setPlaybackQualityRange('hd720', 'hd720'); await new Promise((r) => setTimeout(r, 6000));",
+    "baseline": "(() => { const p = document.querySelector('#movie_player'); const labels = p.getAvailableQualityData().map((q) => q.qualityLabel); return labels.includes('1080p60') && labels.includes('720p60') && /@60/.test(p.getStatsForNerds().resolution.split('/')[0]); })()",
+    "expect": "(() => { const p = document.querySelector('#movie_player'); const labels = p.getAvailableQualityData().map((q) => q.qualityLabel); const fps = Number(/@(\\d+)/.exec(p.getStatsForNerds().resolution.split('/')[0])[1]); return labels.length >= 3 && labels.includes('480p') && labels.every((l) => !/p(50|60)/.test(l)) && fps <= 30; })()",
+    "intact": "(() => { const p = document.querySelector('#movie_player'); const v = p.querySelector('video'); return p.getPlayerState() === 1 && v.currentTime > 3 && v.videoHeight >= 240; })()"
+  }
+}

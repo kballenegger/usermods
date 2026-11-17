@@ -48,6 +48,18 @@ before(async () => {
     if (req.url === '/feed-with-frame') return html(PAGE.replace('</main>', '</main><iframe src="/recaptcha/anchor"></iframe>'));
     // The first load gets the page, later loads a bot wall.
     if (req.url === '/wall-second') return html(wallHits++ === 0 ? PAGE : '<!doctype html><p>Our systems have detected unusual traffic</p>');
+    // Etsy's DataDome reload: the first visit carries a cross-site frame that stays busy while the
+    // top page reloads itself, so the frame detaches while the harness is looking in it for a
+    // consent button. The reloaded page has the consent button in the main frame.
+    if (req.url === '/busy-frame') return html('<!doctype html><script>const t = Date.now() + 3000; while (Date.now() < t);</script>');
+    if (req.url === '/consent-reload') {
+      if (/consent=1/.test(req.headers.cookie ?? '')) {
+        return html(PAGE.replace('<main>', '<div id="cmp"><button onclick="this.parentNode.remove()">Accept all</button></div><main>'));
+      }
+      const port = (server.address() as AddressInfo).port;
+      return html(`<!doctype html><title>check</title><iframe src="http://localhost:${port}/busy-frame"></iframe>
+<script>setTimeout(() => { document.cookie = 'consent=1; path=/'; location.reload(); }, 500);</script>`);
+    }
     html(PAGE);
   });
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
@@ -126,6 +138,13 @@ describe('checkUrl', () => {
       actions: "document.body.dataset.acted = '1';",
       expect: `${spec.expect} && document.body.dataset.acted === '1'`,
     });
+    assert.equal(r.result, 'pass', r.note ?? '');
+  });
+
+  test('finds the consent button when the page reloads during the consent scan', async () => {
+    const r = await run(script("GM_addStyle('.promo { display: none !important; }');"), spec, '/consent-reload');
+    assert.equal(r.plain.error, undefined);
+    assert.equal(r.plain.consent, 'Accept all');
     assert.equal(r.result, 'pass', r.note ?? '');
   });
 

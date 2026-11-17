@@ -1,0 +1,56 @@
+{
+  "slug": "dark-mode",
+  "title": "Use dark mode on Medium",
+  "question": "How do I read Medium in dark mode?",
+  "answer": "Medium's website has no dark theme; the dark mode setting is only in its phone apps. The usermods script on this page gives Medium a dark background with light text by inverting the page's colours, then inverts photos, videos and embeds a second time so they keep their real colours. It runs on medium.com and on writers' medium.com subdomains. Without a script, Chrome's Auto Dark Mode flag or a dark-mode extension does a similar job.",
+  "prompt": "Make Medium dark: dark background, light text, normal-looking photos.",
+  "details": "Medium's colours come from generated class names that change between builds, so the script doesn't recolour elements one at a time. It applies `filter: invert(0.92) hue-rotate(180deg)` to the whole page: white turns near-black, dark text turns light grey, and the hue turn keeps green links green. Images, videos, canvases, iframes and background images get the same filter again, which undoes it for them. Publications on their own domains (not medium.com) are not matched.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Medium app",
+      "body": "The Medium apps for iOS and Android have a dark theme in their settings. The website doesn't."
+    },
+    {
+      "kind": "other",
+      "title": "Chrome's Auto Dark Mode",
+      "body": "`chrome://flags/#enable-force-dark` darkens every site, Medium included. It is an experimental flag and changes all pages, not only Medium."
+    },
+    {
+      "kind": "extension",
+      "title": "Dark Reader",
+      "body": "Dark Reader recolours any site and can be turned on per site."
+    }
+  ],
+  "related": [
+    "medium/hide-sticky-bars",
+    "medium/hide-paywall-popup",
+    "medium/enable-text-selection"
+  ],
+  "demand": {
+    "score": 44,
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/bbogakonmnncjkddneipiaogfmldcegn",
+        "note": "Medium Dark Mode Pro (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=medium%20dark%20mode",
+        "note": "returns the query; suggestions: medium dark mode | medium dark mode web | medium dark mode extension | medium dark mode desktop | medium dark mode firefox"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://medium.com/@karpathy/software-2-0-a64152b37c35"
+    ],
+    "loggedOut": true,
+    "waitFor": "article p",
+    "settleMs": 3000,
+    "baseline": "(() => { const lum = (c) => { const [r, g, b] = c.match(/[\\d.]+/g).map(Number); return 0.2126 * r + 0.7152 * g + 0.0722 * b; }; const p = [...document.querySelectorAll('article p')].find((x) => x.textContent.length > 100); return getComputedStyle(document.documentElement).filter === 'none' && lum(getComputedStyle(document.body).backgroundColor) > 200 && !!p && lum(getComputedStyle(p).color) < 80; })()",
+    "expect": "(() => { const lum = (c) => { const [r, g, b] = c.match(/[\\d.]+/g).map(Number); return 0.2126 * r + 0.7152 * g + 0.0722 * b; }; const f = getComputedStyle(document.documentElement).filter; const imgs = [...document.querySelectorAll('article img')].filter((i) => i.naturalWidth > 0); const restored = (i) => /invert\\(1\\)/.test(getComputedStyle(i).filter) || /invert\\(1\\)/.test(getComputedStyle(i.closest('picture') || i).filter); return /invert\\(0\\.92\\)/.test(f) && lum(getComputedStyle(document.body).backgroundColor) > 200 && imgs.length >= 3 && imgs.every(restored); })()",
+    "intact": "(() => { const ps = [...document.querySelectorAll('article p')].filter((p) => p.checkVisibility()); const h = document.querySelector('article h1'); return ps.length >= 20 && !!h && h.checkVisibility(); })()"
+  }
+}

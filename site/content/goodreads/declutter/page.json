@@ -1,0 +1,46 @@
+{
+  "slug": "declutter",
+  "title": "Remove ads and clutter from Goodreads",
+  "question": "How do I clean up Goodreads book pages?",
+  "answer": "Goodreads has no setting to turn off its ads or the sign-up popup. The usermods script on this page hides the \"Discover & Read More\" popup that covers book pages a few seconds after they load for logged-out visitors, keeps the page scrollable, and removes the promo banner above the header and the ad slots. The book details, buttons and reviews stay. Signing in stops the popup, and an ad blocker such as uBlock Origin covers the ads.",
+  "prompt": "On Goodreads, hide the sign-up popup, the promo banner at the top and the ads.",
+  "details": "The script hides the promo banner and ad slots with CSS injected before the page draws. The sign-up popup is made invisible the moment it is added and then closed with its own Close button, so Goodreads releases the scroll lock itself. Other popups, such as the share menu, still open.\n\nAd slots are hidden by their container names (`.Ad`, `.NativeAdWrapper` and `div-gpt-` ids). Logged-out check runs did not load any ads, so the check proves the popup and banner are gone but cannot show ads being removed.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Sign in",
+      "body": "The sign-up popup is only shown to logged-out visitors."
+    },
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filters",
+      "body": "uBlock Origin's default lists block the ads. For the promo banner, add this to My filters. The check does not run it.\n\n```\nwww.goodreads.com##.SiteHeaderBanner\n```\n\nDo not hide the sign-up popup with a cosmetic filter: with the popup set to `display: none`, Goodreads throws an error and the page goes blank."
+    }
+  ],
+  "related": [
+    "goodreads/wide-layout",
+    "goodreads/library-links",
+    "goodreads/dark-mode"
+  ],
+  "demand": {
+    "score": 31,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/372914",
+        "note": "Cleanreads (117 total installs)"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.goodreads.com/book/show/5907.The_Hobbit"
+    ],
+    "loggedOut": true,
+    "waitFor": ".BookPage__leftColumn .BookActions",
+    "settleMs": 10000,
+    "baseline": "(() => { const pop = document.querySelector('.LoginInterstitial'); const ban = document.querySelector('.SiteHeaderBanner'); return !!pop && pop.checkVisibility() && !!ban && ban.checkVisibility() && /hidden/.test(getComputedStyle(document.documentElement).overflow); })()",
+    "expect": "(() => { const pop = document.querySelector('.LoginInterstitial'); const ban = document.querySelector('.SiteHeaderBanner'); const ads = [...document.querySelectorAll('.Ad, [id^=\"div-gpt-\"]')]; const nav = document.querySelector('.Header__contents').getBoundingClientRect(); const main = document.querySelector('.PageFrame__main').getBoundingClientRect(); return (!pop || !pop.checkVisibility()) && !!ban && !ban.checkVisibility() && nav.top < 5 && main.top >= nav.bottom && main.top - nav.bottom < 30 && !/hidden/.test(getComputedStyle(document.documentElement).overflowY) && ads.length > 0 && ads.every((a) => !a.checkVisibility()); })()",
+    "intact": "(() => { const h = document.querySelector('h1[data-testid=\"bookTitle\"]'); const b = document.querySelector('.BookActions button'); const r = document.querySelector('.ReviewsSection'); return [h, b, r].every((e) => e && e.checkVisibility()) && [...document.querySelectorAll('.BookPageMetadataSection a')].filter((a) => a.checkVisibility()).length >= 5; })()"
+  }
+}

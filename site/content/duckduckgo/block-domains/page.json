@@ -1,0 +1,67 @@
+{
+  "slug": "block-domains",
+  "title": "Block sites from DuckDuckGo results",
+  "question": "How do I block a website from showing up in DuckDuckGo?",
+  "answer": "DuckDuckGo has a built-in option: open the three-dot menu next to a result and choose \"Block this site from all results\". The usermods script on this page does the same from a list you edit in the script, so the list is easy to keep, copy to another browser or extend. It hides every web result from those domains and their subdomains, and leaves the other results in place. Without an extension, adding -site:example.com to a search excludes a site for that search only.",
+  "prompt": "Hide DuckDuckGo search results from quora.com and pinterest.com.",
+  "details": "Edit the `BLOCKED` list at the top of the script; it ships with `quora.com` and `pinterest.com`. Each entry also covers its subdomains, so `quora.com` hides `www.quora.com` and `help.quora.com`. The script turns the list into CSS that matches a result by the URL of its title link, so hidden results never flash on screen and results loaded with \"More results\" are hidden too. It only touches web results: images, videos, news and the sidebar are left alone. The check loads a search where Quora results appear and confirms they are hidden and the rest stay visible.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Block this site from all results",
+      "body": "Open the three-dot menu on a result and choose **Block this site from all results**. The same menu has **Redo search without this site** for one search."
+    },
+    {
+      "kind": "other",
+      "title": "The -site: operator",
+      "body": "Add `-site:quora.com` to a search to leave that site out of that search only."
+    },
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filter",
+      "body": "Hides Quora results on DuckDuckGo. Our check runs the script, not this filter.\n\n```\nduckduckgo.com##li:has(> article[data-testid=\"result\"] a[data-testid=\"result-title-a\"][href*=\"quora.com/\"])\n```"
+    }
+  ],
+  "related": [
+    "duckduckgo/remove-ads",
+    "duckduckgo/hide-ai",
+    "duckduckgo/declutter",
+    "duckduckgo/multi-column"
+  ],
+  "check": {
+    "urls": [
+      "https://duckduckgo.com/?q=what+is+quora&kl=us-en"
+    ],
+    "loggedOut": true,
+    "waitFor": "[data-testid=\"result\"]",
+    "settleMs": 4000,
+    "baseline": "(() => [...document.querySelectorAll('[data-testid=\"result\"]')].some((r) => { const a = r.querySelector('a[data-testid=\"result-title-a\"]'); return a && /(^|\\.)quora\\.com$/.test(new URL(a.href).hostname) && r.checkVisibility(); }))()",
+    "expect": "(() => { const q = [...document.querySelectorAll('[data-testid=\"result\"]')].filter((r) => { const a = r.querySelector('a[data-testid=\"result-title-a\"]'); return a && /(^|\\.)(quora|pinterest)\\.com$/.test(new URL(a.href).hostname); }); return q.length > 0 && q.every((r) => !r.checkVisibility()); })()",
+    "intact": "(() => { const rest = [...document.querySelectorAll('[data-testid=\"result\"]')].filter((r) => { const a = r.querySelector('a[data-testid=\"result-title-a\"]'); return a && !/(^|\\.)(quora|pinterest)\\.com$/.test(new URL(a.href).hostname) && r.checkVisibility(); }); return rest.length >= 4 && document.querySelector('#search_form_input').checkVisibility(); })()"
+  },
+  "demand": {
+    "score": 59,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/436428",
+        "note": "DuckDuckGo Enhancements (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/28730",
+        "note": "Web Search Result Domain Filter (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=duckduckgo%20block%20sites",
+        "note": "returns the query; suggestions: duckduckgo block sites | duckduckgo block websites | does duckduckgo block sites | how to block duckduckgo | does duckduckgo block trackers"
+      },
+      {
+        "type": "forum",
+        "url": "https://webapps.stackexchange.com/questions/97983/permanently-exclude-blacklist-site-from-search-results-on-duckduckgo",
+        "note": "webapps.stackexchange question: Permanently exclude / blacklist site from search results on DuckDuckGo"
+      }
+    ]
+  }
+}

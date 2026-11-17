@@ -1,0 +1,44 @@
+{
+  "slug": "dark-mode",
+  "title": "Use dark mode on Craigslist",
+  "question": "How do I get dark mode on Craigslist?",
+  "answer": "Craigslist has no dark mode and no theme setting. The usermods script on this page inverts the page colours, so the white background turns near black and the text turns light grey, while links stay blue and prices stay green. Listing photos and map tiles are flipped back so they look normal. It works on search results, listings and the rest of craigslist.org. Without a userscript, a browser-wide dark mode extension such as Dark Reader also darkens Craigslist.",
+  "prompt": "Give Craigslist a dark theme: dark background and light text, with photos unchanged.",
+  "details": "The script applies `filter: invert(0.92) hue-rotate(180deg)` to the page, which turns light into dark while keeping colours close to their hue, and applies the opposite filter to images, video, canvas and frames so photos come out unchanged. CSS is injected before the page draws, so there is no white flash.\n\nThe check loads the San Francisco Bay Area for-sale search and confirms the page is dark, the body text is light and the photos are not inverted. Listing pages and the posting form use the same rule but the check doesn't load them.",
+  "alternatives": [
+    {
+      "kind": "extension",
+      "title": "Dark Reader",
+      "body": "Dark Reader darkens every site, Craigslist included, by computing a dark palette from the page's own colours."
+    }
+  ],
+  "related": [
+    "craigslist/hide-listings"
+  ],
+  "demand": {
+    "score": 34,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/448573",
+        "note": "Craigslist dark theme (82 total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=craigslist%20dark%20mode",
+        "note": "suggestions: craigslist dark mode, craigslist dark mode chrome, craigslist night mode, craigslist dark theme"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://sfbay.craigslist.org/search/sss"
+    ],
+    "loggedOut": true,
+    "waitFor": ".cl-search-result[title] img",
+    "settleMs": 3000,
+    "baseline": "(() => { const lum = (c) => { const [r, g, b] = c.match(/[\\d.]+/g).map(Number); return 0.2126 * r + 0.7152 * g + 0.0722 * b; }; const bg = (e) => { for (; e; e = e.parentElement) { const c = getComputedStyle(e).backgroundColor; if (!/^rgba\\(.*, 0\\)$/.test(c)) return c; } return 'rgb(255, 255, 255)'; }; const card = document.querySelector('.cl-search-result .gallery-card, .cl-search-result'); return !/invert/.test(getComputedStyle(document.documentElement).filter) && lum(bg(card)) > 230 && lum(getComputedStyle(document.body).color) < 80; })()",
+    "expect": "(() => { const lum = (c) => { const [r, g, b] = c.match(/[\\d.]+/g).map(Number); return 0.2126 * r + 0.7152 * g + 0.0722 * b; }; const f = getComputedStyle(document.documentElement).filter.match(/invert\\(([\\d.]+)\\)/); if (!f) return false; const k = Number(f[1]); const shown = (c) => lum(c) + k * (255 - 2 * lum(c)); const bg = (e) => { for (; e; e = e.parentElement) { const c = getComputedStyle(e).backgroundColor; if (!/^rgba\\(.*, 0\\)$/.test(c)) return c; } return 'rgb(255, 255, 255)'; }; const card = document.querySelector('.cl-search-result .gallery-card, .cl-search-result'); const imgs = [...document.querySelectorAll('.cl-search-result img')].filter((i) => i.checkVisibility()); return shown(bg(card)) < 40 && shown(getComputedStyle(document.body).color) > 180 && imgs.length > 0 && imgs.every((i) => /invert\\(1\\)/.test(getComputedStyle(i).filter)); })()",
+    "intact": "[...document.querySelectorAll('.cl-search-result[title]')].filter((r) => r.checkVisibility()).length >= 6 && [...document.querySelectorAll('.cl-search-result img')].some((i) => i.checkVisibility() && i.naturalWidth > 0)"
+  }
+}

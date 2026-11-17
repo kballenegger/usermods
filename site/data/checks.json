@@ -27,6 +27,192 @@
       "via": "browserbase"
     }
   ],
+  "archive/dark-mode": [
+    {
+      "at": "2026-11-17T06:38:44Z",
+      "result": "pass",
+      "url": "https://archive.org/details/alicesadventures00carr",
+      "scriptSha": "31d25e3c888e3496df158e94c9e01f1aa48f2dc703ec3747e2b74a0772f11b01",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "archive/hide-wayback-toolbar": [
+    {
+      "at": "2026-11-17T06:30:44Z",
+      "result": "pass",
+      "url": "https://web.archive.org/web/2005/http://www.google.com/",
+      "scriptSha": "18a45da6aa18175bb831c5c549164bff4608eda1d68f2c76e89194c3c486939d",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "archive/original-link": [
+    {
+      "at": "2026-11-17T06:44:26Z",
+      "result": "pass",
+      "url": "https://web.archive.org/web/2005/http://www.google.com/",
+      "scriptSha": "9598a13adf3e757b4e00ea949f814bc9e0560a60986393c76936c022567cd7e3",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:31:01Z",
+      "result": "pass",
+      "url": "https://web.archive.org/web/2005/http://www.google.com/",
+      "scriptSha": "9598a13adf3e757b4e00ea949f814bc9e0560a60986393c76936c022567cd7e3",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "archive/pdf-download-link": [
+    {
+      "at": "2026-11-17T06:31:11Z",
+      "result": "pass",
+      "url": "https://archive.org/details/alicesadventures00carr",
+      "scriptSha": "2cac9b038729c81ebdeddfeade332a457ce53a824ed4b5c28a77608e3f858772",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "arxiv/dark-mode": [
+    {
+      "at": "2026-11-17T06:42:15Z",
+      "result": "pass",
+      "url": "https://arxiv.org/abs/1706.03762",
+      "scriptSha": "27fce7694cc88b0c13ddaa35fe9515559af1008e77b6c449c7f69f69a45b0dad",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:34:45Z",
+      "result": "pass",
+      "url": "https://arxiv.org/abs/1706.03762",
+      "scriptSha": "27fce7694cc88b0c13ddaa35fe9515559af1008e77b6c449c7f69f69a45b0dad",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:33:46Z",
+      "result": "pass",
+      "url": "https://arxiv.org/abs/1706.03762",
+      "scriptSha": "c3294b7c874e8bab63264dab1cf19433f1d7d896f6922820b25eed11c553b988",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "arxiv/open-in-alphaxiv": [
+    {
+      "at": "2026-11-17T06:32:17Z",
+      "result": "pass",
+      "url": "https://arxiv.org/abs/1706.03762",
+      "scriptSha": "a862eca817c57e44462e4c564ae063cd3419c5a848c59fb81a2f333c910936b5",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:31:32Z",
+      "result": "blocked",
+      "url": "https://arxiv.org/abs/1706.03762",
+      "scriptSha": "a862eca817c57e44462e4c564ae063cd3419c5a848c59fb81a2f333c910936b5",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "target not present without the script (baseline was false)"
+    }
+  ],
+  "bandcamp/album-duration": [
+    {
+      "at": "2026-11-17T06:30:22Z",
+      "result": "pass",
+      "url": "https://radiohead.bandcamp.com/album/in-rainbows",
+      "scriptSha": "5e4e6330b3ea92e0824b82eb8d42e53fdff0f32e90c3bba1920242a8a7d431a5",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "bandcamp/dark-mode": [
+    {
+      "at": "2026-11-17T06:47:42Z",
+      "result": "pass",
+      "url": "https://radiohead.bandcamp.com/album/in-rainbows",
+      "scriptSha": "ae873003de2fc5cc74bbe99a96044b4a56786408f6e20a3938bb0704b59f10da",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:29:47Z",
+      "result": "pass",
+      "url": "https://radiohead.bandcamp.com/album/in-rainbows",
+      "scriptSha": "5e79514a9e55266cee991dfe07f2ed54b03dc64f64458e49d68059a49668f580",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "bandcamp/download-cover-art": [
+    {
+      "at": "2026-11-17T06:28:45Z",
+      "result": "pass",
+      "url": "https://radiohead.bandcamp.com/album/in-rainbows",
+      "scriptSha": "9224b64c3763958f631eff889c96be0e087359cf7486e5bac77aba5e56f2591e",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:28:22Z",
+      "result": "pass",
+      "url": "https://radiohead.bandcamp.com/album/in-rainbows",
+      "scriptSha": "b24e367e850a4cbf3344bc5ddca40a2f2e3f8e10e3e4f3cff547728218a9aa30",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "bandcamp/playback-speed": [
+    {
+      "at": "2026-11-17T06:27:47Z",
+      "result": "pass",
+      "url": "https://radiohead.bandcamp.com/album/in-rainbows",
+      "scriptSha": "913cfebbb72a256c933cf6f56b7ffe0704f5a100246efa25ce2405bffd6fb67e",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "bandcamp/show-release-date": [
+    {
+      "at": "2026-11-17T06:30:49Z",
+      "result": "pass",
+      "url": "https://radiohead.bandcamp.com/album/in-rainbows",
+      "scriptSha": "eb7201fcdab2c9ecf3910cd0a0c9cc98d0c74c7d66a0063ff45555c82189ec68",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "bandcamp/volume-control": [
+    {
+      "at": "2026-11-17T06:42:16Z",
+      "result": "pass",
+      "url": "https://radiohead.bandcamp.com/album/in-rainbows",
+      "scriptSha": "7c076ed7bb4cd183e1c19c7b365b192fc2aeb0dfb72f163059b6e35a37f7a3c3",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:27:15Z",
+      "result": "pass",
+      "url": "https://radiohead.bandcamp.com/album/in-rainbows",
+      "scriptSha": "7c076ed7bb4cd183e1c19c7b365b192fc2aeb0dfb72f163059b6e35a37f7a3c3",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:26:21Z",
+      "result": "fail",
+      "url": "https://radiohead.bandcamp.com/album/in-rainbows",
+      "scriptSha": "7c076ed7bb4cd183e1c19c7b365b192fc2aeb0dfb72f163059b6e35a37f7a3c3",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "intact was false"
+    }
+  ],
   "bing/clean-homepage": [
     {
       "at": "2026-11-17T05:15:08Z",
@@ -45,6 +231,50 @@
       "via": "browserbase"
     }
   ],
+  "bing/disable-safe-search": [
+    {
+      "at": "2026-11-17T06:59:33Z",
+      "result": "pass",
+      "url": "https://www.bing.com/images/search?q=python+list+comprehension&setlang=en&cc=us",
+      "scriptSha": "85259c61a8eec9e9c6cb6faf3e326f1bed8600091532cca6cf726f1fac0e7947",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:55:16Z",
+      "result": "pass",
+      "url": "https://www.bing.com/search?q=python+list+comprehension&setlang=en&cc=us",
+      "scriptSha": "85259c61a8eec9e9c6cb6faf3e326f1bed8600091532cca6cf726f1fac0e7947",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T06:43:53Z",
+      "result": "pass",
+      "url": "https://www.bing.com/search?q=python+list+comprehension&setlang=en&cc=us",
+      "scriptSha": "85259c61a8eec9e9c6cb6faf3e326f1bed8600091532cca6cf726f1fac0e7947",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T06:42:49Z",
+      "result": "fail",
+      "url": "https://www.bing.com/search?q=python+list+comprehension&setlang=en&cc=us",
+      "scriptSha": "85259c61a8eec9e9c6cb6faf3e326f1bed8600091532cca6cf726f1fac0e7947",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "intact was false"
+    },
+    {
+      "at": "2026-11-17T06:39:49Z",
+      "result": "fail",
+      "url": "https://www.bing.com/search?q=how+to+bake+bread&setlang=en&cc=us",
+      "scriptSha": "85259c61a8eec9e9c6cb6faf3e326f1bed8600091532cca6cf726f1fac0e7947",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "intact was false"
+    }
+  ],
   "bing/image-download-button": [
     {
       "at": "2026-11-17T05:21:40Z",
@@ -61,6 +291,81 @@
       "scriptSha": "7a5216bb4e84aeae885b4af8361ad73ec840ed76f813bb7a564d8bfab7e6c6a9",
       "browser": "chromium 157.0.8103.79",
       "via": "browserbase"
+    }
+  ],
+  "bing/redirect-to-google": [
+    {
+      "at": "2026-11-17T06:45:26Z",
+      "result": "blocked",
+      "url": "https://www.bing.com/search?q=python+list+comprehension&setlang=en&cc=us",
+      "scriptSha": "b4a9ffb54c2a7a85d8382f10bb54217d85e9c3bfd6b2272bf4e4ee720db53748",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "with script: wall url https://www.google.com/sorry/index?continue=https://www.google.com/search%3Fq%3Dpython%2520list%2520comprehension%26sei%3D-_f7avzxDs7R6-AP0a-X4As&q=EgSsbfiiGPvv79cGIjAIg2rhNSDkXmoAasXTx007Fli-EBQ6ppFExXj3ghJn5uX38VbZZmdq9xyplWYeVGgyAnJSWgFDYN39qLPP_I-G-AE"
+    },
+    {
+      "at": "2026-11-17T06:44:19Z",
+      "result": "blocked",
+      "url": "https://www.bing.com/search?q=python+list+comprehension&setlang=en&cc=us",
+      "scriptSha": "b4a9ffb54c2a7a85d8382f10bb54217d85e9c3bfd6b2272bf4e4ee720db53748",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "with script: wall url https://www.google.com/sorry/index?continue=https://www.google.com/search%3Fq%3Dpython%2520list%2520comprehension%26sei%3Duff7ape5Foe5mtkPzIPqwQU&q=EgSsOjWaGLnv79cGIjBWAf1LQqulhH2lklhu08LJL7MBzrLlZ1foYLf7zzz-XUSMu5oi0EqDKe9M4-JKvOAyAnJSWgFDYPHf2Y-R4-eOdQ"
+    },
+    {
+      "at": "2026-11-17T06:42:58Z",
+      "result": "blocked",
+      "url": "https://www.bing.com/search?q=python+list+comprehension&setlang=en&cc=us",
+      "scriptSha": "b4a9ffb54c2a7a85d8382f10bb54217d85e9c3bfd6b2272bf4e4ee720db53748",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "target not present without the script (baseline was false)"
+    },
+    {
+      "at": "2026-11-17T06:40:05Z",
+      "result": "blocked",
+      "url": "https://www.bing.com/search?q=how+to+bake+bread&setlang=en&cc=us",
+      "scriptSha": "b4a9ffb54c2a7a85d8382f10bb54217d85e9c3bfd6b2272bf4e4ee720db53748",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "target not present without the script (baseline was false)"
+    }
+  ],
+  "bing/remove-redirect-links": [
+    {
+      "at": "2026-11-17T06:45:51Z",
+      "result": "pass",
+      "url": "https://www.bing.com/search?q=python+list+comprehension&setlang=en&cc=us",
+      "scriptSha": "2a0ca1579e61e5991b857f7202467ae9c0afdf2143541a02580288ad303ec4d0",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T06:44:44Z",
+      "result": "fail",
+      "url": "https://www.bing.com/search?q=python+list+comprehension&setlang=en&cc=us",
+      "scriptSha": "2a0ca1579e61e5991b857f7202467ae9c0afdf2143541a02580288ad303ec4d0",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "expect was false"
+    },
+    {
+      "at": "2026-11-17T06:43:08Z",
+      "result": "blocked",
+      "url": "https://www.bing.com/search?q=python+list+comprehension&setlang=en&cc=us",
+      "scriptSha": "2a0ca1579e61e5991b857f7202467ae9c0afdf2143541a02580288ad303ec4d0",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "target not present without the script (baseline was false)"
+    },
+    {
+      "at": "2026-11-17T06:40:20Z",
+      "result": "blocked",
+      "url": "https://www.bing.com/search?q=how+to+bake+bread&setlang=en&cc=us",
+      "scriptSha": "2a0ca1579e61e5991b857f7202467ae9c0afdf2143541a02580288ad303ec4d0",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "target not present without the script (baseline was false)"
     }
   ],
   "chatgpt/ctrl-enter-to-send": [
@@ -108,6 +413,105 @@
       "note": "expect was false"
     }
   ],
+  "chatgpt/hide-sidebar": [
+    {
+      "at": "2026-11-17T06:09:34Z",
+      "result": "pass",
+      "url": "https://chatgpt.com/",
+      "scriptSha": "c56b2c213aee562f16ad3aa4ba96339bb3843bd3cf98e5c9fc7fcfb516f8f6a7",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:59:21Z",
+      "result": "pass",
+      "url": "https://chatgpt.com/",
+      "scriptSha": "c56b2c213aee562f16ad3aa4ba96339bb3843bd3cf98e5c9fc7fcfb516f8f6a7",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:57:58Z",
+      "result": "fail",
+      "url": "https://chatgpt.com/",
+      "scriptSha": "ca4325533c64eed7040c50aba9a251692af4e6261a0833564c418e24f6edcb31",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false"
+    },
+    {
+      "at": "2026-11-17T05:57:10Z",
+      "result": "fail",
+      "url": "https://chatgpt.com/",
+      "scriptSha": "5a8b91802186015bdcdba534f9584a38e2748185c89d975cb88e40769eda1113",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false"
+    },
+    {
+      "at": "2026-11-17T05:56:42Z",
+      "result": "fail",
+      "url": "https://chatgpt.com/",
+      "scriptSha": "7ea56a48c51c1d314b8800e4146bb92b38f19d568a9f6eaba9d5795e65b1a565",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false"
+    }
+  ],
+  "chatgpt/latex-copy": [
+    {
+      "at": "2026-11-17T06:48:16Z",
+      "result": "pass",
+      "url": "https://chatgpt.com/",
+      "scriptSha": "dad299034b838b877f4fc7b5ac85adc033befde26a91d989078b9556d5198653",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:34:13Z",
+      "result": "pass",
+      "url": "https://chatgpt.com/",
+      "scriptSha": "dad299034b838b877f4fc7b5ac85adc033befde26a91d989078b9556d5198653",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "chatgpt/message-navigator": [
+    {
+      "at": "2026-11-17T06:49:12Z",
+      "result": "pass",
+      "url": "https://chatgpt.com/",
+      "scriptSha": "325db18cbf934225c52cacbb24f910dfc8c3e1577d86879c020e699918ab3b5c",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:37:16Z",
+      "result": "pass",
+      "url": "https://chatgpt.com/",
+      "scriptSha": "325db18cbf934225c52cacbb24f910dfc8c3e1577d86879c020e699918ab3b5c",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:35:59Z",
+      "result": "pass",
+      "url": "https://chatgpt.com/",
+      "scriptSha": "dd1e2f82ac3ca5b3bac17184f5185c4cd1a88d9efe8ce183bf286c98efac8064",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "chatgpt/rtl-support": [
+    {
+      "at": "2026-11-17T06:32:01Z",
+      "result": "pass",
+      "url": "https://chatgpt.com/",
+      "scriptSha": "be942349476a7b426045f58c9e18bebea28664d839beb162804d8c105040c1c6",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
   "chatgpt/wide-chat": [
     {
       "at": "2026-11-17T05:29:19Z",
@@ -153,6 +557,343 @@
       "note": "expect was false"
     }
   ],
+  "cnn/stop-autoplay": [
+    {
+      "at": "2026-11-17T06:08:25Z",
+      "result": "fail",
+      "url": "https://edition.cnn.com/2026/11/16/politics/video/us-intel-iran-dirty-bomb-dc-vrtc",
+      "scriptSha": "d1c5a8dc5b9e0b4f0b75b50fe9d014adebaf43a73e30bd195a1d514d4120564c",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false, intact was false"
+    },
+    {
+      "at": "2026-11-17T06:06:42Z",
+      "result": "fail",
+      "url": "https://edition.cnn.com/2026/11/16/politics/video/us-intel-iran-dirty-bomb-dc-vrtc",
+      "scriptSha": "d1c5a8dc5b9e0b4f0b75b50fe9d014adebaf43a73e30bd195a1d514d4120564c",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false, intact was false"
+    },
+    {
+      "at": "2026-11-17T06:05:58Z",
+      "result": "fail",
+      "url": "https://edition.cnn.com/2026/11/16/politics/video/us-intel-iran-dirty-bomb-dc-vrtc",
+      "scriptSha": "05b425662d15aa3879bae95f8318eb018523163dbdbff8493babba560f1f939c",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false, intact was false"
+    }
+  ],
+  "craigslist/dark-mode": [
+    {
+      "at": "2026-11-17T06:55:01Z",
+      "result": "pass",
+      "url": "https://sfbay.craigslist.org/search/sss",
+      "scriptSha": "ba8f31c2076405cf0f78bb1453c2244286c10c4b24c7bbc01630c1b438154529",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:54:34Z",
+      "result": "blocked",
+      "url": "https://sfbay.craigslist.org/search/sss",
+      "scriptSha": "ba8f31c2076405cf0f78bb1453c2244286c10c4b24c7bbc01630c1b438154529",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "target not present without the script (baseline was false)"
+    }
+  ],
+  "craigslist/hide-listings": [
+    {
+      "at": "2026-11-17T07:03:21Z",
+      "result": "pass",
+      "url": "https://sfbay.craigslist.org/search/sss",
+      "scriptSha": "ac5fe5387d6ff1f49a9e82eca4d0a62fb66e6fb2a5cf6e1ac0640f24c35c6ea3",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:58:16Z",
+      "result": "pass",
+      "url": "https://sfbay.craigslist.org/search/sss",
+      "scriptSha": "ab1532fce088690c2afbf8790bd1ea6ee57ebf4f7f67f05d3c404fd27957b66f",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:53:36Z",
+      "result": "pass",
+      "url": "https://sfbay.craigslist.org/search/sss",
+      "scriptSha": "ab1532fce088690c2afbf8790bd1ea6ee57ebf4f7f67f05d3c404fd27957b66f",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "dailymotion/disable-autoplay": [
+    {
+      "at": "2026-11-17T06:49:53Z",
+      "result": "pass",
+      "url": "https://www.dailymotion.com/video/x7tgad0",
+      "scriptSha": "eed3c13f933e51ea281560f551e4daf7b8a352bbed4ad0b12dd9422dbf738f41",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:46:31Z",
+      "result": "pass",
+      "url": "https://www.dailymotion.com/video/x7tgad0",
+      "scriptSha": "c3abf0bdd5ffa8de9518f57303b579dd4da4be6d7b8c141d561f677c93073c70",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:31:25Z",
+      "result": "pass",
+      "url": "https://www.dailymotion.com/video/x7tgad0",
+      "scriptSha": "c3abf0bdd5ffa8de9518f57303b579dd4da4be6d7b8c141d561f677c93073c70",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:30:42Z",
+      "result": "fail",
+      "url": "https://www.dailymotion.com/video/x7tgad0",
+      "scriptSha": "0f221cd075283a0721c4b3eb3c0ebee3801774e172ff2dca6b1009bd8c752678",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false"
+    }
+  ],
+  "dailymotion/force-quality": [
+    {
+      "at": "2026-11-17T06:46:53Z",
+      "result": "pass",
+      "url": "https://www.dailymotion.com/video/x7tgad0",
+      "scriptSha": "1f65ebdc8160ef81a93ed267265f13d3693c2da5c888c8610bc7bca674b700c7",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:35:07Z",
+      "result": "pass",
+      "url": "https://www.dailymotion.com/video/x7tgad0",
+      "scriptSha": "1f65ebdc8160ef81a93ed267265f13d3693c2da5c888c8610bc7bca674b700c7",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:33:43Z",
+      "result": "fail",
+      "url": "https://www.dailymotion.com/video/x7tgad0",
+      "scriptSha": "ff66e847445d8fcce96fa5a8db62272df9244a1e9745d55965102534aa02184b",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false"
+    },
+    {
+      "at": "2026-11-17T06:31:39Z",
+      "result": "fail",
+      "url": "https://www.dailymotion.com/video/x7tgad0",
+      "scriptSha": "ff66e847445d8fcce96fa5a8db62272df9244a1e9745d55965102534aa02184b",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false"
+    },
+    {
+      "at": "2026-11-17T06:30:57Z",
+      "result": "fail",
+      "url": "https://www.dailymotion.com/video/x7tgad0",
+      "scriptSha": "4c1d91cac90010d646552e0a61098b27f60d72364036979b371df727a1aa0266",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false"
+    }
+  ],
+  "dailymotion/full-window-player": [
+    {
+      "at": "2026-11-17T06:29:32Z",
+      "result": "pass",
+      "url": "https://www.dailymotion.com/video/x7tgad0",
+      "scriptSha": "931cb778aaf610bbf60e4258334a131325cb73dedbc83d3fd1183d48c25a127d",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "dailymotion/subtitle-size": [
+    {
+      "at": "2026-11-17T06:46:12Z",
+      "result": "pass",
+      "url": "https://geo.dailymotion.com/player/xtv3w.html?video=x7tgad0&mute=true",
+      "scriptSha": "c4d95233878e2584be51c91f63c20493618f615409f15e569502bff4c167bc23",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:40:04Z",
+      "result": "pass",
+      "url": "https://geo.dailymotion.com/player/xtv3w.html?video=x7tgad0&mute=true",
+      "scriptSha": "c4d95233878e2584be51c91f63c20493618f615409f15e569502bff4c167bc23",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "deepl/dark-mode": [
+    {
+      "at": "2026-11-17T07:04:50Z",
+      "result": "pass",
+      "url": "https://www.deepl.com/en/translator#en/de/Good%20morning",
+      "scriptSha": "545d080a3bc9a41ca6d9df76c1da7b11b324de6bd9d01bf195eae1ff333d8ee2",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:44:07Z",
+      "result": "pass",
+      "url": "https://www.deepl.com/en/translator#en/de/Good%20morning",
+      "scriptSha": "545d080a3bc9a41ca6d9df76c1da7b11b324de6bd9d01bf195eae1ff333d8ee2",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:42:55Z",
+      "result": "pass",
+      "url": "https://www.deepl.com/en/translator#en/de/Good%20morning",
+      "scriptSha": "ff263c26d38c7d2d793e92ba57a0fe043392841d37c4cbd16d2d97a0d9121ddc",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "deepl/declutter": [
+    {
+      "at": "2026-11-17T07:03:37Z",
+      "result": "pass",
+      "url": "https://www.deepl.com/en/translator#en/de/Good%20morning",
+      "scriptSha": "a16a01cf9621969789eee92919dc48d2a568b67eb4e96122768e589c72eaa20b",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:45:18Z",
+      "result": "pass",
+      "url": "https://www.deepl.com/en/translator#en/de/Good%20morning",
+      "scriptSha": "a16a01cf9621969789eee92919dc48d2a568b67eb4e96122768e589c72eaa20b",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "deepl/swap-languages-shortcut": [
+    {
+      "at": "2026-11-17T06:46:33Z",
+      "result": "pass",
+      "url": "https://www.deepl.com/en/translator#en/de/Good%20morning",
+      "scriptSha": "caf74a14fac4660219244aeedbfe7996d5c8be1d0f112279673562d48abb9baf",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "devto/hide-sidebars": [
+    {
+      "at": "2026-11-17T07:00:15Z",
+      "result": "pass",
+      "url": "https://dev.to/",
+      "scriptSha": "0133f6f717a13fec4867a717513b72137ee480124490fd779818c4b6582f1b1d",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:52:50Z",
+      "result": "pass",
+      "url": "https://dev.to/",
+      "scriptSha": "0133f6f717a13fec4867a717513b72137ee480124490fd779818c4b6582f1b1d",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "devto/table-of-contents": [
+    {
+      "at": "2026-11-17T06:52:58Z",
+      "result": "pass",
+      "url": "https://dev.to/unseenwizzard/learn-git-concepts-not-commands-4gjc",
+      "scriptSha": "226db82d29a58d4b55c6bc4e8c3d1216b259e1c126f6ddf33e9bec06a56bc467",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "duckduckgo/block-domains": [
+    {
+      "at": "2026-11-17T06:41:46Z",
+      "result": "pass",
+      "url": "https://duckduckgo.com/?q=what+is+quora&kl=us-en",
+      "scriptSha": "e996823166e39d71af3d345c1a892507594cd8e80db3167f4dbf6ad061f67b20",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    }
+  ],
+  "duckduckgo/dark-mode": [
+    {
+      "at": "2026-11-17T06:59:22Z",
+      "result": "pass",
+      "url": "https://duckduckgo.com/?q=how+to+bake+bread&kl=us-en",
+      "scriptSha": "ae8879598b447dd3b98a71342a22153a6745404bb28bb7e9db29a27b9328243b",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T06:42:20Z",
+      "result": "pass",
+      "url": "https://duckduckgo.com/?q=how+to+bake+bread&kl=us-en",
+      "scriptSha": "ae8879598b447dd3b98a71342a22153a6745404bb28bb7e9db29a27b9328243b",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    }
+  ],
+  "duckduckgo/declutter": [
+    {
+      "at": "2026-11-17T06:14:27Z",
+      "result": "pass",
+      "url": "https://duckduckgo.com/?q=how+to+bake+bread&kl=us-en",
+      "scriptSha": "cd61638036a5179b87900d90238b5a67e6ca9f2017ec4baad83102aa1e8b0b17",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T06:11:47Z",
+      "result": "pass",
+      "url": "https://duckduckgo.com/?q=how+to+bake+bread&kl=us-en",
+      "scriptSha": "cd61638036a5179b87900d90238b5a67e6ca9f2017ec4baad83102aa1e8b0b17",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T06:11:09Z",
+      "result": "fail",
+      "url": "https://duckduckgo.com/?q=how+to+bake+bread&kl=us-en",
+      "scriptSha": "cd61638036a5179b87900d90238b5a67e6ca9f2017ec4baad83102aa1e8b0b17",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "expect was false"
+    },
+    {
+      "at": "2026-11-17T06:09:46Z",
+      "result": "fail",
+      "url": "https://duckduckgo.com/?q=how+to+bake+bread&kl=us-en",
+      "scriptSha": "cd61638036a5179b87900d90238b5a67e6ca9f2017ec4baad83102aa1e8b0b17",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "expect was false"
+    },
+    {
+      "at": "2026-11-17T06:06:34Z",
+      "result": "blocked",
+      "url": "https://duckduckgo.com/?q=how+to+bake+bread&kl=us-en",
+      "scriptSha": "cd61638036a5179b87900d90238b5a67e6ca9f2017ec4baad83102aa1e8b0b17",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "target not present without the script (baseline was false)"
+    }
+  ],
   "duckduckgo/disable-safe-search": [
     {
       "at": "2026-11-17T05:22:04Z",
@@ -167,6 +908,16 @@
       "result": "pass",
       "url": "https://duckduckgo.com/?q=test&kl=us-en",
       "scriptSha": "1cfd08e9be6b384bb96c940dbe7daf3cb78e60cd617056e7e285ab80aac4280d",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    }
+  ],
+  "duckduckgo/google-button": [
+    {
+      "at": "2026-11-17T06:07:01Z",
+      "result": "pass",
+      "url": "https://duckduckgo.com/?q=how+to+bake+bread&kl=us-en",
+      "scriptSha": "14de5bdbd1298919174b4ec462aa99435b9846381785c55076ab8909e79f570e",
       "browser": "chromium 157.0.8103.79",
       "via": "browserbase"
     }
@@ -206,7 +957,69 @@
       "note": "expect was false"
     }
   ],
+  "duckduckgo/multi-column": [
+    {
+      "at": "2026-11-17T06:42:54Z",
+      "result": "pass",
+      "url": "https://duckduckgo.com/?q=how+to+bake+bread&kl=us-en",
+      "scriptSha": "634cd80653f679a70f2fb2b07313fb6a512c207e4eac501633bfe56315d8da45",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    }
+  ],
+  "duckduckgo/remove-ads": [
+    {
+      "at": "2026-11-17T06:15:00Z",
+      "result": "pass",
+      "url": "https://duckduckgo.com/?q=car+insurance+quote&kl=us-en",
+      "scriptSha": "0cadff0cdd11833f0664f966a6312084c957a0be2509f753bc1a73c6ebaf643f",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T06:10:17Z",
+      "result": "pass",
+      "url": "https://duckduckgo.com/?q=car+insurance+quote&kl=us-en",
+      "scriptSha": "0cadff0cdd11833f0664f966a6312084c957a0be2509f753bc1a73c6ebaf643f",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T06:07:27Z",
+      "result": "fail",
+      "url": "https://duckduckgo.com/?q=how+to+bake+bread&kl=us-en",
+      "scriptSha": "9c1c234fa512f462de282c5574cbdd0106ee7989576f27e6fbc21954fbbb301c",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "expect was false"
+    },
+    {
+      "at": "2026-11-17T06:03:26Z",
+      "result": "pass",
+      "url": "https://duckduckgo.com/?q=car+insurance+quote&kl=us-en",
+      "scriptSha": "714d25c6d4c847462c754b9480393536b6f7f9b388f880782abcb655ff6da1b8",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    }
+  ],
   "etsy/hide-ads": [
+    {
+      "at": "2026-11-17T05:57:31Z",
+      "result": "pass",
+      "url": "https://www.etsy.com/search?q=mug&instant_download=false",
+      "scriptSha": "f3e7c2e59d61d8e26ecc487a6bcaec05ab3ac3f9ee0c8f98b7b3b2f644070134",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T05:55:52Z",
+      "result": "blocked",
+      "url": "https://www.etsy.com/search?q=mug&instant_download=false",
+      "scriptSha": "f3e7c2e59d61d8e26ecc487a6bcaec05ab3ac3f9ee0c8f98b7b3b2f644070134",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "load without script: locator.count: Frame was detached"
+    },
     {
       "at": "2026-11-17T05:22:27Z",
       "result": "blocked",
@@ -244,6 +1057,42 @@
       "browser": "chromium 153.0.8010.12",
       "via": "local",
       "note": "expect was false, intact was false"
+    }
+  ],
+  "fandom/dark-mode": [
+    {
+      "at": "2026-11-17T06:09:04Z",
+      "result": "pass",
+      "url": "https://harrypotter.fandom.com/wiki/Harry_Potter",
+      "scriptSha": "268850ea2e2963c73ec3dac7b1ab89a20e68a06c696c7f3cbed19f4be635d782",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:05:35Z",
+      "result": "pass",
+      "url": "https://harrypotter.fandom.com/wiki/Harry_Potter",
+      "scriptSha": "268850ea2e2963c73ec3dac7b1ab89a20e68a06c696c7f3cbed19f4be635d782",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:03:53Z",
+      "result": "blocked",
+      "url": "https://harrypotter.fandom.com/wiki/Harry_Potter",
+      "scriptSha": "268850ea2e2963c73ec3dac7b1ab89a20e68a06c696c7f3cbed19f4be635d782",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "load without script: timed out after 60 s"
+    },
+    {
+      "at": "2026-11-17T06:02:30Z",
+      "result": "blocked",
+      "url": "https://harrypotter.fandom.com/wiki/Harry_Potter",
+      "scriptSha": "268850ea2e2963c73ec3dac7b1ab89a20e68a06c696c7f3cbed19f4be635d782",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "load without script: timed out after 60 s"
     }
   ],
   "fandom/redirect-to-independent-wiki": [
@@ -310,6 +1159,88 @@
       "via": "local"
     }
   ],
+  "fandom/wider-content": [
+    {
+      "at": "2026-11-17T06:09:44Z",
+      "result": "pass",
+      "url": "https://harrypotter.fandom.com/wiki/Harry_Potter",
+      "scriptSha": "862ad51204ef8df0ccd7b5f72ff564ed943d5722804b2a1e5e9a9ef41b85ce56",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:07:13Z",
+      "result": "pass",
+      "url": "https://harrypotter.fandom.com/wiki/Harry_Potter",
+      "scriptSha": "862ad51204ef8df0ccd7b5f72ff564ed943d5722804b2a1e5e9a9ef41b85ce56",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:06:13Z",
+      "result": "pass",
+      "url": "https://harrypotter.fandom.com/wiki/Harry_Potter",
+      "scriptSha": "f6736e70b3ea1d22df7da609865a72e006b747efd28225468b0e181f53f65426",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:04:54Z",
+      "result": "blocked",
+      "url": "https://harrypotter.fandom.com/wiki/Harry_Potter",
+      "scriptSha": "f6736e70b3ea1d22df7da609865a72e006b747efd28225468b0e181f53f65426",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "load without script: timed out after 60 s"
+    },
+    {
+      "at": "2026-11-17T06:02:30Z",
+      "result": "blocked",
+      "url": "https://harrypotter.fandom.com/wiki/Harry_Potter",
+      "scriptSha": "f6736e70b3ea1d22df7da609865a72e006b747efd28225468b0e181f53f65426",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "load without script: timed out after 60 s"
+    }
+  ],
+  "genius/copy-lyrics": [
+    {
+      "at": "2026-11-17T06:52:12Z",
+      "result": "blocked",
+      "url": "https://genius.com/Adele-hello-lyrics",
+      "scriptSha": "9e7f22e96efe5fe3ddf38c313dc102484e13ff13f1794bad722ea2bacfaafa33",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "load without script: timed out after 60 s"
+    },
+    {
+      "at": "2026-11-17T06:51:00Z",
+      "result": "blocked",
+      "url": "https://genius.com/Adele-hello-lyrics",
+      "scriptSha": "9e7f22e96efe5fe3ddf38c313dc102484e13ff13f1794bad722ea2bacfaafa33",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "load without script: timed out after 60 s"
+    },
+    {
+      "at": "2026-11-17T06:49:46Z",
+      "result": "blocked",
+      "url": "https://genius.com/Adele-hello-lyrics",
+      "scriptSha": "9e7f22e96efe5fe3ddf38c313dc102484e13ff13f1794bad722ea2bacfaafa33",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "load without script: timed out after 60 s"
+    },
+    {
+      "at": "2026-11-17T06:48:33Z",
+      "result": "blocked",
+      "url": "https://genius.com/Adele-hello-lyrics",
+      "scriptSha": "d633558e71d2baee976572319b4d86912ee1a66d614be294939216e00eb2f323",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "load with script: timed out after 60 s"
+    }
+  ],
   "github/absolute-dates": [
     {
       "at": "2026-11-17T05:29:35Z",
@@ -324,6 +1255,16 @@
       "result": "pass",
       "url": "https://github.com/facebook/react/pulls",
       "scriptSha": "b55e7f6745f6137c8145185e177a40e9146f36aa8b2cfd2d770be21701de3aa6",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "github/copy-raw-url": [
+    {
+      "at": "2026-11-17T06:34:36Z",
+      "result": "pass",
+      "url": "https://github.com/react/react/blob/main/packages/react/src/ReactHooks.js",
+      "scriptSha": "2ddde5e198743840b8ff3d9ebadf9bf5f8631aaab35a7ef7c7e86671611c397a",
       "browser": "chromium 153.0.8010.12",
       "via": "local"
     }
@@ -392,6 +1333,88 @@
       "note": "target not present without the script (baseline was false)"
     }
   ],
+  "github/image-preview": [
+    {
+      "at": "2026-11-17T06:28:53Z",
+      "result": "pass",
+      "url": "https://github.com/simple-icons/simple-icons/tree/develop/icons",
+      "scriptSha": "241506f15f8a159ebd07d66aacba39c34fe172569253fd6076596aa00cb4f2ae",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "github/open-in-github1s": [
+    {
+      "at": "2026-11-17T06:47:59Z",
+      "result": "pass",
+      "url": "https://github.com/react/react/blob/main/packages/react/src/ReactHooks.js",
+      "scriptSha": "1e027398003240f7b3f3a249b5771579255f38540cf11de8899ee41f043f2b88",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:32:27Z",
+      "result": "pass",
+      "url": "https://github.com/react/react/blob/main/packages/react/src/ReactHooks.js",
+      "scriptSha": "1e027398003240f7b3f3a249b5771579255f38540cf11de8899ee41f043f2b88",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "github/readme-toc": [
+    {
+      "at": "2026-11-17T06:40:28Z",
+      "result": "pass",
+      "url": "https://github.com/react/react",
+      "scriptSha": "63707665d296794425cc0964f566709635a4bb7e1a0a72e698ad5d201ed670e6",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:29:04Z",
+      "result": "pass",
+      "url": "https://github.com/react/react",
+      "scriptSha": "63707665d296794425cc0964f566709635a4bb7e1a0a72e698ad5d201ed670e6",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:27:40Z",
+      "result": "pass",
+      "url": "https://github.com/react/react",
+      "scriptSha": "0896347376fe932a1da8069234934a27c7da08cc5489851d40ee7bdaca2c181e",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:26:06Z",
+      "result": "fail",
+      "url": "https://github.com/react/react",
+      "scriptSha": "87cb0896e1e65371e133b1a1ac5c938f3e540b24c689d2aa132383071d8d21b6",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false"
+    }
+  ],
+  "github/sort-tables": [
+    {
+      "at": "2026-11-17T06:33:29Z",
+      "result": "pass",
+      "url": "https://github.com/nodejs/Release",
+      "scriptSha": "a5710b0ffbafba83f8acd882d7736b508986f1cea6c9ff36706ca974bb1dd373",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:33:14Z",
+      "result": "blocked",
+      "url": "https://github.com/nodejs/Release",
+      "scriptSha": "a5710b0ffbafba83f8acd882d7736b508986f1cea6c9ff36706ca974bb1dd373",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "target not present without the script (baseline was false)"
+    }
+  ],
   "github/translate-interface": [
     {
       "at": "2026-11-17T05:33:35Z",
@@ -445,6 +1468,16 @@
       "note": "intact was false"
     }
   ],
+  "github/wrap-code-lines": [
+    {
+      "at": "2026-11-17T06:36:20Z",
+      "result": "pass",
+      "url": "https://github.com/nvm-sh/nvm",
+      "scriptSha": "a33823af6db967c28d265ed23f00630e26317794ee8d12e50dbe418129fcbe2f",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
   "gitlab/dark-mode": [
     {
       "at": "2026-11-17T05:34:41Z",
@@ -478,6 +1511,141 @@
       "browser": "chromium 153.0.8010.12",
       "via": "local",
       "note": "expect was error: page.evaluate: TypeError: Failed to execute 'getComputedStyle' on 'Window': parameter 1 is not of type 'Element'., intact was false"
+    }
+  ],
+  "goodreads/dark-mode": [
+    {
+      "at": "2026-11-17T06:44:53Z",
+      "result": "pass",
+      "url": "https://www.goodreads.com/book/show/5907.The_Hobbit",
+      "scriptSha": "4974c2b568b15dbea123557c5550833c6a729cb775d611d7a031a54cef60ef44",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:37:22Z",
+      "result": "pass",
+      "url": "https://www.goodreads.com/book/show/5907.The_Hobbit",
+      "scriptSha": "4974c2b568b15dbea123557c5550833c6a729cb775d611d7a031a54cef60ef44",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:36:59Z",
+      "result": "fail",
+      "url": "https://www.goodreads.com/book/show/5907.The_Hobbit",
+      "scriptSha": "4974c2b568b15dbea123557c5550833c6a729cb775d611d7a031a54cef60ef44",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false"
+    },
+    {
+      "at": "2026-11-17T06:36:32Z",
+      "result": "pass",
+      "url": "https://www.goodreads.com/book/show/5907.The_Hobbit",
+      "scriptSha": "e94678a2d92eeb4d1b6b2eb655d606f6501730f8783b0919c936611c2daef89e",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "goodreads/declutter": [
+    {
+      "at": "2026-11-17T06:44:43Z",
+      "result": "pass",
+      "url": "https://www.goodreads.com/book/show/5907.The_Hobbit",
+      "scriptSha": "5fe6b1155e4aace50a4d02de99695300571eecb2266c1775165cb7d0724ae449",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:34:51Z",
+      "result": "pass",
+      "url": "https://www.goodreads.com/book/show/5907.The_Hobbit",
+      "scriptSha": "5fe6b1155e4aace50a4d02de99695300571eecb2266c1775165cb7d0724ae449",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:33:57Z",
+      "result": "pass",
+      "url": "https://www.goodreads.com/book/show/5907.The_Hobbit",
+      "scriptSha": "60470f20e50efb7df65972b6c61bfa0c0111e1c83a509cc5dfb7fcfd2868d1e0",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:31:38Z",
+      "result": "fail",
+      "url": "https://www.goodreads.com/book/show/5907.The_Hobbit",
+      "scriptSha": "b6683ff29f88155f2a9adf683f34aadb3a0d7b438263be596a2a6fac00932262",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false, intact was false"
+    },
+    {
+      "at": "2026-11-17T06:30:05Z",
+      "result": "fail",
+      "url": "https://www.goodreads.com/book/show/5907.The_Hobbit",
+      "scriptSha": "b6683ff29f88155f2a9adf683f34aadb3a0d7b438263be596a2a6fac00932262",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false, intact was false"
+    }
+  ],
+  "goodreads/library-links": [
+    {
+      "at": "2026-11-17T06:26:01Z",
+      "result": "pass",
+      "url": "https://www.goodreads.com/book/show/5907.The_Hobbit",
+      "scriptSha": "5f9db57b6d1888e936a14ab1bb1d0fef686769d5d1ab6ea203605fa99f37de82",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "goodreads/series-primary-works": [
+    {
+      "at": "2026-11-17T06:45:01Z",
+      "result": "pass",
+      "url": "https://www.goodreads.com/series/66175-the-lord-of-the-rings",
+      "scriptSha": "6956d24d933850c0b5640e8854ac5b3ea139b11b30378374095d5b9f0a08b9ef",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:35:45Z",
+      "result": "pass",
+      "url": "https://www.goodreads.com/series/66175-the-lord-of-the-rings",
+      "scriptSha": "6956d24d933850c0b5640e8854ac5b3ea139b11b30378374095d5b9f0a08b9ef",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "goodreads/sort-list-by-rating": [
+    {
+      "at": "2026-11-17T06:40:46Z",
+      "result": "pass",
+      "url": "https://www.goodreads.com/list/show/1.Best_Books_Ever",
+      "scriptSha": "7909cc6ba779717dcdbe23d5719dbe7c5ed21371ef2f1c67e142e69f88827ef6",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:26:52Z",
+      "result": "pass",
+      "url": "https://www.goodreads.com/list/show/1.Best_Books_Ever",
+      "scriptSha": "be71fd74247353b75a76f2a5ec4ad6784e5cb8c166e06e5a88bc4092d5ca723d",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "goodreads/wide-layout": [
+    {
+      "at": "2026-11-17T06:28:00Z",
+      "result": "pass",
+      "url": "https://www.goodreads.com/book/show/5907.The_Hobbit",
+      "scriptSha": "99abd331fd2d85718d30365d6a7bb5a044d979e46c744d434da252b721a324c7",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
     }
   ],
   "google-maps/copy-coordinates": [
@@ -520,6 +1688,16 @@
       "result": "pass",
       "url": "https://www.google.com/maps/@40.7128,-74.006,13z?hl=en",
       "scriptSha": "b106423eef4e1840964f69382be8462b9ccd7ad425a80cb42b0ee85c707f438c",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "google-translate/dark-mode": [
+    {
+      "at": "2026-11-17T06:48:44Z",
+      "result": "pass",
+      "url": "https://translate.google.com/?sl=en&tl=fr&text=hello&op=translate&hl=en",
+      "scriptSha": "62c5ae82400c08dfcb0c7a9a36099660b8863b0633d093cfd60584389c7aab54",
       "browser": "chromium 153.0.8010.12",
       "via": "local"
     }
@@ -603,6 +1781,41 @@
       "browser": "chromium 157.0.8103.79",
       "via": "browserbase",
       "note": "load with script: timed out after 60 s"
+    }
+  ],
+  "google/dark-mode": [
+    {
+      "at": "2026-11-17T06:22:41Z",
+      "result": "pass",
+      "url": "https://www.google.com/search?q=how+to+bake+bread&hl=en&gl=us",
+      "scriptSha": "d91545703ca28ca6c5682ba48203e98b938e0ffbb2a36f6216d1a5840f9abd4b",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T06:16:00Z",
+      "result": "pass",
+      "url": "https://www.google.com/search?q=how+to+bake+bread&hl=en&gl=us",
+      "scriptSha": "9d6bef39b8a2d7abb7b897b04e7f726ef21be2079531419989e4edc908e74719",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T06:04:07Z",
+      "result": "blocked",
+      "url": "https://www.google.com/search?q=how+to+bake+bread&hl=en&gl=us",
+      "scriptSha": "9d6bef39b8a2d7abb7b897b04e7f726ef21be2079531419989e4edc908e74719",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "target not present without the script (wall text \"Sign in to continue\")"
+    },
+    {
+      "at": "2026-11-17T05:57:11Z",
+      "result": "pass",
+      "url": "https://www.google.com/search?q=how+to+bake+bread&hl=en&gl=us",
+      "scriptSha": "9d6bef39b8a2d7abb7b897b04e7f726ef21be2079531419989e4edc908e74719",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
     }
   ],
   "google/date-filter-buttons": [
@@ -781,6 +1994,26 @@
       "note": "target not present without the script (wall url https://www.google.com/sorry/index?continue=https://www.google.com/search%3Fq%3Dhow%2Bto%2Bbake%2Bbread%26hl%3Den%26gl%3Dus%26sei%3DpuP7aqaRMKzt5NoPpuHpmAs&hl=en&q=EgREhtLhGKfH79cGIjCbBg3s5IM4duFZXhUMDZQlI-UA8FndkQ-xdg_zVcAfHDIORAGQybmxswqzTal_UDgyAnJSWgFDYI7mjve1jNbdhQE)"
     }
   ],
+  "google/other-engines-buttons": [
+    {
+      "at": "2026-11-17T06:40:08Z",
+      "result": "blocked",
+      "url": "https://www.google.com/search?q=how+to+bake+bread&hl=en&gl=us",
+      "scriptSha": "f59454b5bd3edca2946fbd630ba6c550648bb9d9f5cbdca0540f16e3002f737e",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "target not present without the script (wall url https://www.google.com/sorry/index?continue=https://www.google.com/search%3Fq%3Dhow%2Bto%2Bbake%2Bbread%26hl%3Den%26gl%3Dus%26sei%3Dn_b7arO_MbfAkPIPiaSI8QQ&hl=en&q=EgSIP1rMGKDt79cGIjBaDvmGPHbVEDHbijSNXHLNnB_ac1hIWV5YNz1dO39O9BHS8g57mRQe_gupl4TZYW0yAnJSWgFDYN3O4YzSybHUswE)"
+    },
+    {
+      "at": "2026-11-17T06:39:15Z",
+      "result": "blocked",
+      "url": "https://www.google.com/search?q=how+to+bake+bread&hl=en&gl=us",
+      "scriptSha": "f59454b5bd3edca2946fbd630ba6c550648bb9d9f5cbdca0540f16e3002f737e",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "target not present without the script (wall url https://www.google.com/sorry/index?continue=https://www.google.com/search%3Fq%3Dhow%2Bto%2Bbake%2Bbread%26hl%3Den%26gl%3Dus%26sei%3Dafb7atPjDu7b5NoPxMO62AI&hl=en&q=EgRGFygwGOns79cGIjChgfF1myt1SuACEnnTlOIy_g5Q7HfBECEkIx89rKtWHT1SAaaLKSLOYvce20vmfdMyAnJSWgFDYPrLi_PWorqbVA)"
+    }
+  ],
   "google/remove-ai-overview": [
     {
       "at": "2026-11-17T04:52:24Z",
@@ -838,6 +2071,62 @@
       "via": "browserbase"
     }
   ],
+  "guardian/hide-comments": [
+    {
+      "at": "2026-11-17T06:59:23Z",
+      "result": "pass",
+      "url": "https://www.theguardian.com/commentisfree/2026/nov/16/donald-trump-benjamin-netanyahu-power-israel-pm",
+      "scriptSha": "d592ddc96f77c29d524b17eb472aa81f45c2f29c13195cba2860eaa3a7ee2595",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:54:28Z",
+      "result": "pass",
+      "url": "https://www.theguardian.com/commentisfree/2026/nov/16/donald-trump-benjamin-netanyahu-power-israel-pm",
+      "scriptSha": "6d14e57e7a112e7b01c95858a068d4fe8f9d48f2fa402c6db9807e31fe149cac",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:50:50Z",
+      "result": "pass",
+      "url": "https://www.theguardian.com/commentisfree/2026/nov/16/donald-trump-benjamin-netanyahu-power-israel-pm",
+      "scriptSha": "6d14e57e7a112e7b01c95858a068d4fe8f9d48f2fa402c6db9807e31fe149cac",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "guardian/hide-support-asks": [
+    {
+      "at": "2026-11-17T06:52:27Z",
+      "result": "blocked",
+      "url": "https://www.theguardian.com/commentisfree/2026/nov/16/donald-trump-benjamin-netanyahu-power-israel-pm",
+      "scriptSha": "e6a45b6b7e3f6710e8a761ac069ec175b31c464385ac8640246002b2483d366e",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "load without script: timed out after 60 s"
+    },
+    {
+      "at": "2026-11-17T06:51:05Z",
+      "result": "blocked",
+      "url": "https://www.theguardian.com/commentisfree/2026/nov/16/donald-trump-benjamin-netanyahu-power-israel-pm",
+      "scriptSha": "e6a45b6b7e3f6710e8a761ac069ec175b31c464385ac8640246002b2483d366e",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "target not present without the script (baseline was false)"
+    }
+  ],
+  "hackernews/absolute-dates": [
+    {
+      "at": "2026-11-17T06:26:37Z",
+      "result": "pass",
+      "url": "https://news.ycombinator.com/",
+      "scriptSha": "d312248536cd6b8c4da913137ad0f0ac8d998e964dc9170865bcb745cb85b827",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
   "hackernews/collapse-comments": [
     {
       "at": "2026-11-17T05:11:34Z",
@@ -858,12 +2147,58 @@
       "via": "local"
     }
   ],
+  "hackernews/highlight-new-stories": [
+    {
+      "at": "2026-11-17T06:47:35Z",
+      "result": "pass",
+      "url": "https://news.ycombinator.com/",
+      "scriptSha": "aa470c21991766c60aefc96b3aae92116915a78f7c63477eec215a502bd8da77",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:42:48Z",
+      "result": "pass",
+      "url": "https://news.ycombinator.com/",
+      "scriptSha": "4df80359b0901a964a98e7f68764c54480ca04c34ca386d6114f4cf92e7fd030",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:29:32Z",
+      "result": "pass",
+      "url": "https://news.ycombinator.com/",
+      "scriptSha": "4df80359b0901a964a98e7f68764c54480ca04c34ca386d6114f4cf92e7fd030",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "hackernews/highlight-op": [
+    {
+      "at": "2026-11-17T06:28:31Z",
+      "result": "pass",
+      "url": "https://news.ycombinator.com/item?id=8863",
+      "scriptSha": "077237e219990502f5e9b819d65111d9ab6ff1bf10486bd609680905776c6ec6",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
   "hackernews/larger-font": [
     {
       "at": "2026-11-17T05:10:57Z",
       "result": "pass",
       "url": "https://news.ycombinator.com/",
       "scriptSha": "0a3fa6c5d17dd36db8e9db0c2126f9648e307114d7d3d4d30cef781708db36e3",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "hackernews/mute-users": [
+    {
+      "at": "2026-11-17T06:27:44Z",
+      "result": "pass",
+      "url": "https://news.ycombinator.com/item?id=24862743",
+      "scriptSha": "cc5da029652ed827f4f46c4a5a52d1ac0d74a2806d3e6c06314e6f907d70d6c8",
       "browser": "chromium 153.0.8010.12",
       "via": "local"
     }
@@ -876,6 +2211,159 @@
       "scriptSha": "2f63a206d0269361ef98d4c0049bc5f90c6a21dfeb3259c1381357052c9e156c",
       "browser": "chromium 153.0.8010.12",
       "via": "local"
+    }
+  ],
+  "hackernews/paywall-marker": [
+    {
+      "at": "2026-11-17T06:25:47Z",
+      "result": "pass",
+      "url": "https://news.ycombinator.com/from?site=nytimes.com",
+      "scriptSha": "bc4f854c7138e65c1b2180af7a60201d20f2741ae6fe586c6fab237cc0b28b39",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "huggingface/copy-download-command": [
+    {
+      "at": "2026-11-17T06:43:14Z",
+      "result": "pass",
+      "url": "https://huggingface.co/openai-community/gpt2/tree/main",
+      "scriptSha": "64d6b7281b35856d5cd211335c449368b6ca60dc9fa5355b61aa2c2fdd5d7851",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:31:49Z",
+      "result": "pass",
+      "url": "https://huggingface.co/openai-community/gpt2/tree/main",
+      "scriptSha": "64d6b7281b35856d5cd211335c449368b6ca60dc9fa5355b61aa2c2fdd5d7851",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "huggingface/dark-mode": [
+    {
+      "at": "2026-11-17T06:42:57Z",
+      "result": "pass",
+      "url": "https://huggingface.co/openai-community/gpt2",
+      "scriptSha": "776a1470c77192aa194e337399ea9aa8c9a6635a62c5bc828becec44604a9585",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:35:19Z",
+      "result": "pass",
+      "url": "https://huggingface.co/openai-community/gpt2",
+      "scriptSha": "776a1470c77192aa194e337399ea9aa8c9a6635a62c5bc828becec44604a9585",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:34:57Z",
+      "result": "pass",
+      "url": "https://huggingface.co/openai-community/gpt2",
+      "scriptSha": "776a1470c77192aa194e337399ea9aa8c9a6635a62c5bc828becec44604a9585",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "huggingface/mirror-links": [
+    {
+      "at": "2026-11-17T06:32:45Z",
+      "result": "pass",
+      "url": "https://huggingface.co/openai-community/gpt2/tree/main",
+      "scriptSha": "e6ed51bc44522e2a37e9615fd67ebfbf458e1df276eb9b477f4a1c9f0faa45ff",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "huggingface/spaces-fullscreen": [
+    {
+      "at": "2026-11-17T06:33:58Z",
+      "result": "pass",
+      "url": "https://huggingface.co/spaces/gradio/hello_world",
+      "scriptSha": "fcbf15b8ac8c87f40b195c4cc2318600e0e5a23f110d4ba8481db933aad553f8",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "imdb/external-links": [
+    {
+      "at": "2026-11-17T06:56:39Z",
+      "result": "pass",
+      "url": "https://www.imdb.com/title/tt0111161/",
+      "scriptSha": "778c7b922d8583b9bd7e26b2ec2b3752462be36d5d94456a97ce70fb245cd785",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T06:48:34Z",
+      "result": "pass",
+      "url": "https://www.imdb.com/title/tt0111161/",
+      "scriptSha": "778c7b922d8583b9bd7e26b2ec2b3752462be36d5d94456a97ce70fb245cd785",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T06:46:55Z",
+      "result": "fail",
+      "url": "https://www.imdb.com/title/tt0111161/",
+      "scriptSha": "6a0227f61ee621b2e11dd75094777a2cf6ed1a2074f33aa7a2f1c9a34ea064bf",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "expect was false"
+    }
+  ],
+  "imdb/larger-photos": [
+    {
+      "at": "2026-11-17T06:59:58Z",
+      "result": "pass",
+      "url": "https://www.imdb.com/title/tt0111161/mediaviewer/rm2971500544/",
+      "scriptSha": "eb17ab6cd3827fa20c56820d00ef5d0f59e2bde8a13ab8faf425de5606413195",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T06:57:14Z",
+      "result": "pass",
+      "url": "https://www.imdb.com/title/tt0111161/mediaviewer/rm2971500544/",
+      "scriptSha": "eb17ab6cd3827fa20c56820d00ef5d0f59e2bde8a13ab8faf425de5606413195",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T06:55:49Z",
+      "result": "pass",
+      "url": "https://www.imdb.com/title/tt0111161/mediaviewer/rm2971500544/",
+      "scriptSha": "eb17ab6cd3827fa20c56820d00ef5d0f59e2bde8a13ab8faf425de5606413195",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T06:54:54Z",
+      "result": "fail",
+      "url": "https://www.imdb.com/title/tt0111161/mediaviewer/rm2971500544/",
+      "scriptSha": "3495a1ce33c24eb5c2bd521183970a279ad41369fe36c318cb51fc3d22a19952",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "expect was false"
+    },
+    {
+      "at": "2026-11-17T06:49:11Z",
+      "result": "pass",
+      "url": "https://www.imdb.com/title/tt0111161/mediaviewer/rm2971500544/",
+      "scriptSha": "087118b334def9b7eddf602f8b9914400392b209aced2248f1c8b030829645bf",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T06:47:22Z",
+      "result": "fail",
+      "url": "https://www.imdb.com/title/tt0111161/mediaviewer/rm2971500544/",
+      "scriptSha": "e27d7c701470519ea8e055be08f416d9b2449e46e899a517a9988a5c14bbd186",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "expect was false"
     }
   ],
   "imdb/show-actor-age": [
@@ -902,6 +2390,50 @@
       "scriptSha": "520b86a18975545db45ae572136ab6d303854deb0502dafa979e373402ba40ed",
       "browser": "chromium 157.0.8103.79",
       "via": "browserbase",
+      "note": "expect was false"
+    }
+  ],
+  "imgur/load-all-images": [
+    {
+      "at": "2026-11-17T06:52:05Z",
+      "result": "pass",
+      "url": "https://imgur.com/gallery/carefully-curated-vol-1024-Frbqhg6",
+      "scriptSha": "b87aa36bd842d2e4b5c7e5664f41eda3ec461567426ee973028d8eb35a8146dc",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:50:44Z",
+      "result": "pass",
+      "url": "https://imgur.com/gallery/carefully-curated-vol-1024-Frbqhg6",
+      "scriptSha": "acb706bda1642f7cb6b8231b2b5fcde5bbba29ba1221e274d6f7ab5d8b312560",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:48:34Z",
+      "result": "pass",
+      "url": "https://imgur.com/gallery/carefully-curated-vol-1024-Frbqhg6",
+      "scriptSha": "acb706bda1642f7cb6b8231b2b5fcde5bbba29ba1221e274d6f7ab5d8b312560",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:48:15Z",
+      "result": "blocked",
+      "url": "https://imgur.com/gallery/carefully-curated-vol-1024-Frbqhg6",
+      "scriptSha": "acb706bda1642f7cb6b8231b2b5fcde5bbba29ba1221e274d6f7ab5d8b312560",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "target not present without the script (baseline was false)"
+    },
+    {
+      "at": "2026-11-17T06:44:03Z",
+      "result": "fail",
+      "url": "https://imgur.com/gallery/carefully-curated-vol-1024-Frbqhg6",
+      "scriptSha": "e1f39e5efd10164ec6f9e930b4e3168dac584a55847ef04c23b65b265581ede5",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
       "note": "expect was false"
     }
   ],
@@ -968,12 +2500,320 @@
       "note": "expect was false"
     }
   ],
+  "kick/click-to-pause": [
+    {
+      "at": "2026-11-17T06:50:31Z",
+      "result": "pass",
+      "url": "https://kick.com/lospollostv/videos/01a1d33b-ebd0-73ba-a568-6b54155cd924",
+      "scriptSha": "de9a1969d0004e118ade386d8e132af538ebd8a7522ba5109e7f286bb8a5bee2",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:35:51Z",
+      "result": "pass",
+      "url": "https://kick.com/lospollostv/videos/01a1d33b-ebd0-73ba-a568-6b54155cd924",
+      "scriptSha": "de9a1969d0004e118ade386d8e132af538ebd8a7522ba5109e7f286bb8a5bee2",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "kick/force-quality": [
+    {
+      "at": "2026-11-17T06:36:32Z",
+      "result": "fail",
+      "url": "https://kick.com/lospollostv/videos/01a1d33b-ebd0-73ba-a568-6b54155cd924",
+      "scriptSha": "d4639ab79aa2fa0de452eae29774560de5e6a5fea1ddd9f16551b4394e10f0f0",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false"
+    }
+  ],
+  "kick/hide-chat": [
+    {
+      "at": "2026-11-17T06:39:34Z",
+      "result": "pass",
+      "url": "https://kick.com/lospollostv/videos/01a1d33b-ebd0-73ba-a568-6b54155cd924",
+      "scriptSha": "7e034fa18d4e74b67d03f5a0b9e373fc49a22af3f9f8ebe38d3889fccd0f576e",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:37:04Z",
+      "result": "fail",
+      "url": "https://kick.com/lospollostv/videos/01a1d33b-ebd0-73ba-a568-6b54155cd924",
+      "scriptSha": "c237ee5155f7c4f49f4f66533f1081d8fa3ec3e8a348d2a44b64843aaec24a9e",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false, intact was false"
+    }
+  ],
+  "kick/theater-mode": [
+    {
+      "at": "2026-11-17T06:41:39Z",
+      "result": "pass",
+      "url": "https://kick.com/lospollostv/videos/01a1d33b-ebd0-73ba-a568-6b54155cd924",
+      "scriptSha": "a44aa86aa15ba08ad95c22f6a95126b2b8fa8d65f82eba5a3af198ab52845664",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:40:20Z",
+      "result": "fail",
+      "url": "https://kick.com/lospollostv/videos/01a1d33b-ebd0-73ba-a568-6b54155cd924",
+      "scriptSha": "51c459d2e6eac243216ba26c0ea3bd172be07378afb07e7c5efcb8e7d4dbba70",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false, intact was false"
+    },
+    {
+      "at": "2026-11-17T06:37:29Z",
+      "result": "blocked",
+      "url": "https://kick.com/lospollostv/videos/01a1d33b-ebd0-73ba-a568-6b54155cd924",
+      "scriptSha": "51c459d2e6eac243216ba26c0ea3bd172be07378afb07e7c5efcb8e7d4dbba70",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "target not present without the script (baseline was false)"
+    }
+  ],
+  "letterboxd/exact-average-rating": [
+    {
+      "at": "2026-11-17T07:04:14Z",
+      "result": "pass",
+      "url": "https://letterboxd.com/film/parasite-2019/",
+      "scriptSha": "313fe46cedc5a6bfeaedbe119bac99e734ac9b25a0daf90be9a93b38304bec79",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:57:48Z",
+      "result": "pass",
+      "url": "https://letterboxd.com/film/parasite-2019/",
+      "scriptSha": "313fe46cedc5a6bfeaedbe119bac99e734ac9b25a0daf90be9a93b38304bec79",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:57:18Z",
+      "result": "blocked",
+      "url": "https://letterboxd.com/film/parasite-2019/",
+      "scriptSha": "313fe46cedc5a6bfeaedbe119bac99e734ac9b25a0daf90be9a93b38304bec79",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "target not present without the script (captcha frame)"
+    },
+    {
+      "at": "2026-11-17T06:56:02Z",
+      "result": "blocked",
+      "url": "https://letterboxd.com/film/parasite-2019/",
+      "scriptSha": "313fe46cedc5a6bfeaedbe119bac99e734ac9b25a0daf90be9a93b38304bec79",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "target not present without the script (captcha frame)"
+    },
+    {
+      "at": "2026-11-17T06:55:08Z",
+      "result": "fail",
+      "url": "https://letterboxd.com/film/parasite-2019/",
+      "scriptSha": "313fe46cedc5a6bfeaedbe119bac99e734ac9b25a0daf90be9a93b38304bec79",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "intact was false"
+    }
+  ],
+  "letterboxd/hide-ads": [
+    {
+      "at": "2026-11-17T07:02:07Z",
+      "result": "blocked",
+      "url": "https://letterboxd.com/film/parasite-2019/",
+      "scriptSha": "853661f7ed5b3e679f8025340f421298f493e5126af73173539b67b7c821dc81",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "load without script: timed out after 60 s"
+    },
+    {
+      "at": "2026-11-17T07:00:55Z",
+      "result": "blocked",
+      "url": "https://letterboxd.com/film/parasite-2019/",
+      "scriptSha": "853661f7ed5b3e679f8025340f421298f493e5126af73173539b67b7c821dc81",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "target not present without the script (captcha frame)"
+    }
+  ],
+  "letterboxd/runtime-hours": [
+    {
+      "at": "2026-11-17T06:58:44Z",
+      "result": "pass",
+      "url": "https://letterboxd.com/film/parasite-2019/",
+      "scriptSha": "9ba69f71080c88b7c19372be1966f6484a1cf0311100d76b3487998d0e4849c7",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "medium/dark-mode": [
+    {
+      "at": "2026-11-17T06:35:53Z",
+      "result": "pass",
+      "url": "https://medium.com/@karpathy/software-2-0-a64152b37c35",
+      "scriptSha": "c1ea401e6e5c2e330cb09060f503894e227e5210005f4dec59e6731c20f2142d",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "medium/enable-text-selection": [
+    {
+      "at": "2026-11-17T06:44:40Z",
+      "result": "pass",
+      "url": "https://medium.com/@karpathy/software-2-0-a64152b37c35",
+      "scriptSha": "47a300d4817220dfa73ffbcddbaf42f40feb95da25dcfb24c108f9a93a410ea9",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:37:43Z",
+      "result": "pass",
+      "url": "https://medium.com/@karpathy/software-2-0-a64152b37c35",
+      "scriptSha": "47a300d4817220dfa73ffbcddbaf42f40feb95da25dcfb24c108f9a93a410ea9",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "medium/hide-member-only": [
+    {
+      "at": "2026-11-17T06:09:45Z",
+      "result": "pass",
+      "url": "https://medium.com/tag/javascript/recommended",
+      "scriptSha": "dbe8ee3f0c98cd2817173342389833b2f2f3f61d2609a9f81d9ce5e2384ac464",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:02:34Z",
+      "result": "pass",
+      "url": "https://medium.com/tag/javascript/recommended",
+      "scriptSha": "dbe8ee3f0c98cd2817173342389833b2f2f3f61d2609a9f81d9ce5e2384ac464",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "medium/hide-paywall-popup": [
+    {
+      "at": "2026-11-17T06:48:29Z",
+      "result": "pass",
+      "url": "https://medium.com/@karpathy/software-2-0-a64152b37c35",
+      "scriptSha": "973e196aeae81663a478556c69b29600764266d1e25a56e0d5693010700193f7",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:44:11Z",
+      "result": "pass",
+      "url": "https://medium.com/@karpathy/software-2-0-a64152b37c35",
+      "scriptSha": "103ad3638c1d1138fe74d266864b1de5743223364da8274e3d7f4a13857b7f66",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:34:21Z",
+      "result": "pass",
+      "url": "https://medium.com/@karpathy/software-2-0-a64152b37c35",
+      "scriptSha": "103ad3638c1d1138fe74d266864b1de5743223364da8274e3d7f4a13857b7f66",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "medium/hide-sticky-bars": [
+    {
+      "at": "2026-11-17T06:10:19Z",
+      "result": "pass",
+      "url": "https://medium.com/@curllmooha/i-built-a-three-js-portfolio-you-can-walk-around-in-d0ff55fd1645",
+      "scriptSha": "5b887979848444d86c310fa696f7324c6038465a1f0bfda78aaa427df0a5d568",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T06:08:02Z",
+      "result": "pass",
+      "url": "https://medium.com/@curllmooha/i-built-a-three-js-portfolio-you-can-walk-around-in-d0ff55fd1645",
+      "scriptSha": "5b887979848444d86c310fa696f7324c6038465a1f0bfda78aaa427df0a5d568",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T06:06:37Z",
+      "result": "fail",
+      "url": "https://medium.com/medium-eng/how-we-built-the-new-table-of-contents-feature-c3825d8c279d",
+      "scriptSha": "5b887979848444d86c310fa696f7324c6038465a1f0bfda78aaa427df0a5d568",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "expect was false"
+    }
+  ],
+  "npm/bundle-size-link": [
+    {
+      "at": "2026-11-17T06:46:46Z",
+      "result": "blocked",
+      "url": "https://www.npmjs.com/package/react",
+      "scriptSha": "d239732f5b2d23499bb84d52013249b69736e1bc471f55de3617647bdf6265d8",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "target not present without the script (waitFor aside[aria-label=\"Package sidebar\"] code never appeared)"
+    },
+    {
+      "at": "2026-11-17T06:45:18Z",
+      "result": "blocked",
+      "url": "https://www.npmjs.com/package/react",
+      "scriptSha": "d239732f5b2d23499bb84d52013249b69736e1bc471f55de3617647bdf6265d8",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "target not present without the script (waitFor aside[aria-label=\"Package sidebar\"] code never appeared)"
+    }
+  ],
+  "npm/install-command-variants": [
+    {
+      "at": "2026-11-17T06:47:30Z",
+      "result": "blocked",
+      "url": "https://www.npmjs.com/package/react",
+      "scriptSha": "29925013579a07377d3e11ad7ee4040f7370b56cd4ae04b430793e6adf946ded",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "target not present without the script (captcha frame)"
+    },
+    {
+      "at": "2026-11-17T06:45:56Z",
+      "result": "blocked",
+      "url": "https://www.npmjs.com/package/react",
+      "scriptSha": "29925013579a07377d3e11ad7ee4040f7370b56cd4ae04b430793e6adf946ded",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "target not present without the script (captcha frame)"
+    }
+  ],
   "pinterest/remove-login-popup": [
     {
       "at": "2026-11-17T05:04:58Z",
       "result": "pass",
       "url": "https://www.pinterest.com/search/pins/?q=living%20room%20ideas",
       "scriptSha": "c97c3f58b80ae0ea9ab42dda7109954cafa0893c12623a455153c9207de2fd1e",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "python-docs/latest-version-redirect": [
+    {
+      "at": "2026-11-17T06:54:34Z",
+      "result": "pass",
+      "url": "https://docs.python.org/2/library/os.html",
+      "scriptSha": "fde34dc2d43fe3556e567a1f98ba8bc2b0bc3dc4e6ee1ca64fe34499efd954ad",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:51:11Z",
+      "result": "pass",
+      "url": "https://docs.python.org/2/library/os.html",
+      "scriptSha": "fde34dc2d43fe3556e567a1f98ba8bc2b0bc3dc4e6ee1ca64fe34499efd954ad",
       "browser": "chromium 153.0.8010.12",
       "via": "local"
     }
@@ -1043,6 +2883,61 @@
       "note": "target not present without the script (captcha frame)"
     }
   ],
+  "reddit/image-viewer": [
+    {
+      "at": "2026-11-17T06:51:21Z",
+      "result": "pass",
+      "url": "https://www.reddit.com/r/pics/",
+      "scriptSha": "269277f5de5a2982fef0e8ba24283f7eacf7758d54041c15711dbc2f23ad82a4",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T06:48:25Z",
+      "result": "pass",
+      "url": "https://www.reddit.com/r/pics/",
+      "scriptSha": "136d64511cfc81dc2b067696d768c1357b486a4c9a2accf7a98fcb90d1ffb6d9",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T06:39:53Z",
+      "result": "pass",
+      "url": "https://www.reddit.com/r/pics/",
+      "scriptSha": "136d64511cfc81dc2b067696d768c1357b486a4c9a2accf7a98fcb90d1ffb6d9",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    }
+  ],
+  "reddit/multi-column": [
+    {
+      "at": "2026-11-17T06:45:48Z",
+      "result": "fail",
+      "url": "https://www.reddit.com/r/pics/",
+      "scriptSha": "6d05073efb2a823f0ddf387af288722a0ea75cbb0cda8b285dfeea6d8db8a12f",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "expect was false"
+    },
+    {
+      "at": "2026-11-17T06:43:43Z",
+      "result": "fail",
+      "url": "https://www.reddit.com/r/pics/",
+      "scriptSha": "ff63b941b32df55806068161188c0a87a9daf492e1d089c1e136ca717ccebff0",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "expect was false"
+    },
+    {
+      "at": "2026-11-17T06:43:05Z",
+      "result": "fail",
+      "url": "https://www.reddit.com/r/pics/",
+      "scriptSha": "9e6859b2c0299dbcecc43116effff7893d8669e5c972dc5b97b7abf5d74ac918",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "expect was false"
+    }
+  ],
   "reddit/remove-sidebar": [
     {
       "at": "2026-11-17T04:44:51Z",
@@ -1076,6 +2971,70 @@
       "result": "pass",
       "url": "https://www.reddit.com/r/movies/comments/1xy6xe1/what_was_heartland_and_why_is_jessica_chastain/",
       "scriptSha": "2d5d501afbb23eaf1a2f94b2e9bd5477abb062f269da9b00addf3a2c475adf44",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "reddit/wide-layout": [
+    {
+      "at": "2026-11-17T06:04:53Z",
+      "result": "pass",
+      "url": "https://www.reddit.com/r/AskReddit/",
+      "scriptSha": "34b1a84e97fca9eff2cec98965464476ac7f1631af1f00068cfd6f588968abaa",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:00:29Z",
+      "result": "pass",
+      "url": "https://www.reddit.com/r/AskReddit/",
+      "scriptSha": "34b1a84e97fca9eff2cec98965464476ac7f1631af1f00068cfd6f588968abaa",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "soundcloud/direct-links": [
+    {
+      "at": "2026-11-17T06:29:43Z",
+      "result": "pass",
+      "url": "https://soundcloud.com/forss/flickermood",
+      "scriptSha": "0db9cc5139d69d420212bab6ea4c6750d174115378c1b33ba5813dd7597ff248",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "soundcloud/download-cover-art": [
+    {
+      "at": "2026-11-17T06:42:10Z",
+      "result": "pass",
+      "url": "https://soundcloud.com/forss/flickermood",
+      "scriptSha": "c45cca17583f091b24d543e56cfb01363f8df735ee2189d550c5cbf2b265d7fb",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:29:55Z",
+      "result": "pass",
+      "url": "https://soundcloud.com/forss/flickermood",
+      "scriptSha": "c45cca17583f091b24d543e56cfb01363f8df735ee2189d550c5cbf2b265d7fb",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "soundcloud/hide-reposts": [
+    {
+      "at": "2026-11-17T06:41:57Z",
+      "result": "pass",
+      "url": "https://soundcloud.com/diplo",
+      "scriptSha": "b564c1c74f7f7b235fc68c362b43d8c281d6e4a5cd4c7ec4153d5c78418565d9",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:30:09Z",
+      "result": "pass",
+      "url": "https://soundcloud.com/diplo",
+      "scriptSha": "b564c1c74f7f7b235fc68c362b43d8c281d6e4a5cd4c7ec4153d5c78418565d9",
       "browser": "chromium 153.0.8010.12",
       "via": "local"
     }
@@ -1122,6 +3081,63 @@
       "result": "pass",
       "url": "https://open.spotify.com/album/4LH4d3cOWNNsVw41Gqt2kv",
       "scriptSha": "03a1413344ea16740b4fec970b3830f6ea9199a789d36dc127aab05ea5e6022c",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "spotify/light-mode": [
+    {
+      "at": "2026-11-17T06:44:05Z",
+      "result": "pass",
+      "url": "https://open.spotify.com/album/4LH4d3cOWNNsVw41Gqt2kv",
+      "scriptSha": "521aa0aada8ab59dfe92298e64825d1b1ada21eff0b5c42aa1691b9740dab358",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "spotify/open-in-app": [
+    {
+      "at": "2026-11-17T06:42:37Z",
+      "result": "pass",
+      "url": "https://open.spotify.com/album/4LH4d3cOWNNsVw41Gqt2kv",
+      "scriptSha": "21a4da5db08d3a25750743e50586a5f6d109da55115d2b8ac49c81aeb3ea79e4",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:42:12Z",
+      "result": "blocked",
+      "url": "https://open.spotify.com/album/4LH4d3cOWNNsVw41Gqt2kv",
+      "scriptSha": "f2780ed1e22f2204862b62290ba44cb60f413b6b33136c6d5b7a9b709895fed6",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "load with script: timed out after 60 s"
+    }
+  ],
+  "stackexchange/hide-hot-network-questions": [
+    {
+      "at": "2026-11-17T06:54:01Z",
+      "result": "pass",
+      "url": "https://superuser.com/questions/1157967/how-to-block-hot-network-questions-in-the-sidebar-of-stack-exchange-network",
+      "scriptSha": "7a2a1fbf51bdc18abeaf01a03eb8df0edc009909c771a3c61bf3c8d86118a284",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "stackoverflow/copy-code-button": [
+    {
+      "at": "2026-11-17T06:05:53Z",
+      "result": "pass",
+      "url": "https://stackoverflow.com/questions/11227809/why-is-processing-a-sorted-array-faster-than-processing-an-unsorted-array",
+      "scriptSha": "a1c25c1e6642fcac04a3eee5b01b2b476212606c2d0b624013d599588cefd3c9",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:03:12Z",
+      "result": "pass",
+      "url": "https://stackoverflow.com/questions/11227809/why-is-processing-a-sorted-array-faster-than-processing-an-unsorted-array",
+      "scriptSha": "a1c25c1e6642fcac04a3eee5b01b2b476212606c2d0b624013d599588cefd3c9",
       "browser": "chromium 153.0.8010.12",
       "via": "local"
     }
@@ -1230,6 +3246,114 @@
       "via": "browserbase"
     }
   ],
+  "steam/direct-links": [
+    {
+      "at": "2026-11-17T06:37:24Z",
+      "result": "pass",
+      "url": "https://store.steampowered.com/app/292030/",
+      "scriptSha": "0533b4eecac70d723a2dbf3bde307bf8e6300e73bc47a5d7ca89477bf8555d39",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "steam/review-percentage": [
+    {
+      "at": "2026-11-17T06:38:11Z",
+      "result": "pass",
+      "url": "https://store.steampowered.com/app/292030/",
+      "scriptSha": "d88f313b42a740f1427e0b7f692ab28eca16f2c49a76b5762a664f32655c2800",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:37:32Z",
+      "result": "pass",
+      "url": "https://store.steampowered.com/app/292030/",
+      "scriptSha": "6dd1e64d00ce530e015548da81bb979b001687b15563235466aef26f0800c48d",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "steam/steamdb-link": [
+    {
+      "at": "2026-11-17T06:37:40Z",
+      "result": "pass",
+      "url": "https://store.steampowered.com/app/292030/",
+      "scriptSha": "a7edf77f2dfed47963fed60bd583d2f46df2d2b94fc9221ae650a468d3c58ee6",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "substack/disable-quote-popup": [
+    {
+      "at": "2026-11-17T06:10:52Z",
+      "result": "pass",
+      "url": "https://garymarcus.substack.com/p/report-from-the-vatican",
+      "scriptSha": "ec22f71ca228bc5e44eaa37c5e301e6db18a91f7a4cb6bcb5c3453f7fcbda5d7",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:57:40Z",
+      "result": "pass",
+      "url": "https://garymarcus.substack.com/p/report-from-the-vatican",
+      "scriptSha": "ec22f71ca228bc5e44eaa37c5e301e6db18a91f7a4cb6bcb5c3453f7fcbda5d7",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "substack/dismiss-popups": [
+    {
+      "at": "2026-11-17T06:11:03Z",
+      "result": "pass",
+      "url": "https://garymarcus.substack.com/",
+      "scriptSha": "1e01fd9b375eedad74e49612eb8516a067ebcccca0eafc3f0cb9108c2eb5e7bf",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:56:53Z",
+      "result": "pass",
+      "url": "https://garymarcus.substack.com/",
+      "scriptSha": "1e01fd9b375eedad74e49612eb8516a067ebcccca0eafc3f0cb9108c2eb5e7bf",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:55:43Z",
+      "result": "pass",
+      "url": "https://garymarcus.substack.com/",
+      "scriptSha": "eb38fe058f966cbeed6267cffde40fb5b7363664eee7be40175eb7cf4a9c74e4",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "substack/widescreen": [
+    {
+      "at": "2026-11-17T06:11:58Z",
+      "result": "pass",
+      "url": "https://garymarcus.substack.com/p/report-from-the-vatican",
+      "scriptSha": "37756636701bebe0c0899aa62aacce6044ecd90ce891e26c6ccceee0d15f8259",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:11:12Z",
+      "result": "pass",
+      "url": "https://garymarcus.substack.com/p/report-from-the-vatican",
+      "scriptSha": "f4c506b12d9e5ac8ad136d2028b1f09db3c8daa76f94122b016098cb66b53f22",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:57:49Z",
+      "result": "pass",
+      "url": "https://garymarcus.substack.com/p/report-from-the-vatican",
+      "scriptSha": "f4c506b12d9e5ac8ad136d2028b1f09db3c8daa76f94122b016098cb66b53f22",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
   "trello/show-card-numbers": [
     {
       "at": "2026-11-17T05:25:12Z",
@@ -1244,6 +3368,42 @@
       "result": "pass",
       "url": "https://trello.com/b/nC8QJJoZ/trello-development-roadmap",
       "scriptSha": "cbe203d1d2d85a0ae5bbbcd2ad319df7d5cbd1e45794790036a5e2db308e1c90",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "trello/show-label-text": [
+    {
+      "at": "2026-11-17T06:47:43Z",
+      "result": "pass",
+      "url": "https://trello.com/b/Dj3EzmL9",
+      "scriptSha": "2dfa064f77a0d5ef39c44d525745aceb8f5784759d55fd7a1f9674990910f299",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "trello/wide-lists": [
+    {
+      "at": "2026-11-17T06:58:57Z",
+      "result": "pass",
+      "url": "https://trello.com/b/nC8QJJoZ/trello-development-roadmap",
+      "scriptSha": "4370db997ff05d50e98615936eeddfc217e529ba2654b3adff1c800d6ef1701c",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:45:41Z",
+      "result": "pass",
+      "url": "https://trello.com/b/nC8QJJoZ/trello-development-roadmap",
+      "scriptSha": "4370db997ff05d50e98615936eeddfc217e529ba2654b3adff1c800d6ef1701c",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:45:02Z",
+      "result": "pass",
+      "url": "https://trello.com/b/nC8QJJoZ/trello-development-roadmap",
+      "scriptSha": "f8df2b9bb7845326ea5cd7c35628b9ed2120ac5edfa1646a2d81ed902c91ba1c",
       "browser": "chromium 153.0.8010.12",
       "via": "local"
     }
@@ -1324,6 +3484,60 @@
       "result": "fail",
       "url": "https://www.twitch.tv/caedrel247",
       "scriptSha": "16b601139bbc6a7e25cab8d340e22a34c67af9ed587b019cae9810ea53a3d01a",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false"
+    }
+  ],
+  "twitch/hide-extensions": [
+    {
+      "at": "2026-11-17T06:50:02Z",
+      "result": "pass",
+      "url": "https://www.twitch.tv/caseoh_",
+      "scriptSha": "b7d4110e913347e3b3a0c9cdfce7c62619964482d13c43ac6973153fdf59fe13",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:34:10Z",
+      "result": "pass",
+      "url": "https://www.twitch.tv/caseoh_",
+      "scriptSha": "b7d4110e913347e3b3a0c9cdfce7c62619964482d13c43ac6973153fdf59fe13",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:32:39Z",
+      "result": "fail",
+      "url": "https://www.twitch.tv/caseoh_",
+      "scriptSha": "0ffc450568250e81dd593dcede04b41b4ef86dda7c2e3135ece46772971000da",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false"
+    },
+    {
+      "at": "2026-11-17T06:31:59Z",
+      "result": "fail",
+      "url": "https://www.twitch.tv/caseoh_",
+      "scriptSha": "52952af70dfea6e8f1e6af152314c2703bfc6a85ac973de0eb743e8ae9e66d4a",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false"
+    },
+    {
+      "at": "2026-11-17T06:31:40Z",
+      "result": "blocked",
+      "url": "https://www.twitch.tv/caseoh_",
+      "scriptSha": "52952af70dfea6e8f1e6af152314c2703bfc6a85ac973de0eb743e8ae9e66d4a",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "target not present without the script (waitFor .extensions-video-overlay-size-container iframe never appeared)"
+    },
+    {
+      "at": "2026-11-17T06:30:42Z",
+      "result": "fail",
+      "url": "https://www.twitch.tv/caseoh_",
+      "scriptSha": "52952af70dfea6e8f1e6af152314c2703bfc6a85ac973de0eb743e8ae9e66d4a",
       "browser": "chromium 153.0.8010.12",
       "via": "local",
       "note": "expect was false"
@@ -1436,6 +3650,199 @@
       "note": "expect was false, intact was false"
     }
   ],
+  "twitch/video-screenshot": [
+    {
+      "at": "2026-11-17T06:42:54Z",
+      "result": "pass",
+      "url": "https://www.twitch.tv/videos/1627844339",
+      "scriptSha": "c58199d1204bff7bfee8b12a824cddbb1a11f02ba485b451fb6ee546fa686093",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:42:20Z",
+      "result": "pass",
+      "url": "https://www.twitch.tv/videos/1627844339",
+      "scriptSha": "8446aaf6985f4d280b2a5fc3c09d1b17588dbd0d300631e607bf7f3a628ba656",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:38:36Z",
+      "result": "pass",
+      "url": "https://www.twitch.tv/videos/1627844339",
+      "scriptSha": "5bbe247a88b4b52164dd5658dba509d37deb3dd0c17501fcbc7360ffc6ae2d8a",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "twitch/video-speed": [
+    {
+      "at": "2026-11-17T06:50:31Z",
+      "result": "pass",
+      "url": "https://www.twitch.tv/videos/1627844339",
+      "scriptSha": "3cb455f1bbea2be394116c8c9e68464a2900160b4f0da41479640464cd349136",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:37:47Z",
+      "result": "pass",
+      "url": "https://www.twitch.tv/videos/1627844339",
+      "scriptSha": "3cb455f1bbea2be394116c8c9e68464a2900160b4f0da41479640464cd349136",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:36:15Z",
+      "result": "fail",
+      "url": "https://www.twitch.tv/videos/1627844339",
+      "scriptSha": "ee771795013ec4f306e1059cdd525ddc89eeb62075cbc2fe6486a96e39a73ba5",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false"
+    }
+  ],
+  "vimeo/disable-autoplay": [
+    {
+      "at": "2026-11-17T06:47:36Z",
+      "result": "pass",
+      "url": "https://vimeo.com/76979871",
+      "scriptSha": "914eb1fa28cb198712103f719db42b59dbef6e2fb731559d341e3ce268da920a",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:40:43Z",
+      "result": "pass",
+      "url": "https://vimeo.com/76979871",
+      "scriptSha": "914eb1fa28cb198712103f719db42b59dbef6e2fb731559d341e3ce268da920a",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "vimeo/playback-speed": [
+    {
+      "at": "2026-11-17T06:47:48Z",
+      "result": "pass",
+      "url": "https://vimeo.com/76979871",
+      "scriptSha": "3cf2aaac8f6a558396ab6c6821a1bc710626c061af0a6dcf070bf2d9feea9b30",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:39:28Z",
+      "result": "pass",
+      "url": "https://vimeo.com/76979871",
+      "scriptSha": "3cf2aaac8f6a558396ab6c6821a1bc710626c061af0a6dcf070bf2d9feea9b30",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:38:15Z",
+      "result": "pass",
+      "url": "https://vimeo.com/76979871",
+      "scriptSha": "3cf2aaac8f6a558396ab6c6821a1bc710626c061af0a6dcf070bf2d9feea9b30",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "vimeo/theater-mode": [
+    {
+      "at": "2026-11-17T06:40:52Z",
+      "result": "pass",
+      "url": "https://vimeo.com/76979871",
+      "scriptSha": "35abc9dbccc7de52d17a42138f36bc9b4463b288528547aa143e5d48837bf77f",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:39:37Z",
+      "result": "pass",
+      "url": "https://vimeo.com/76979871",
+      "scriptSha": "35abc9dbccc7de52d17a42138f36bc9b4463b288528547aa143e5d48837bf77f",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "weather/dark-mode": [
+    {
+      "at": "2026-11-17T06:55:51Z",
+      "result": "pass",
+      "url": "https://weather.com/weather/today/l/40.71,-74.01",
+      "scriptSha": "ecd6d619813b5ba9173707159fb370a653def8b808bae21fa4f186d56251cd21",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "weather/declutter": [
+    {
+      "at": "2026-11-17T07:03:58Z",
+      "result": "pass",
+      "url": "https://weather.com/weather/today/l/40.71,-74.01",
+      "scriptSha": "3c0d6d4916bd106942f1ab5c85f3100ac29c8e5b2c2a003554af9bf7e79e87ca",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T07:03:46Z",
+      "result": "pass",
+      "url": "https://weather.com/weather/today/l/40.71,-74.01",
+      "scriptSha": "3c0d6d4916bd106942f1ab5c85f3100ac29c8e5b2c2a003554af9bf7e79e87ca",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T07:03:31Z",
+      "result": "pass",
+      "url": "https://weather.com/weather/today/l/40.71,-74.01",
+      "scriptSha": "3c0d6d4916bd106942f1ab5c85f3100ac29c8e5b2c2a003554af9bf7e79e87ca",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:59:19Z",
+      "result": "pass",
+      "url": "https://weather.com/weather/today/l/40.71,-74.01",
+      "scriptSha": "3c0d6d4916bd106942f1ab5c85f3100ac29c8e5b2c2a003554af9bf7e79e87ca",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:58:45Z",
+      "result": "blocked",
+      "url": "https://weather.com/weather/today/l/40.71,-74.01",
+      "scriptSha": "3c0d6d4916bd106942f1ab5c85f3100ac29c8e5b2c2a003554af9bf7e79e87ca",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "target not present without the script (baseline was false)"
+    },
+    {
+      "at": "2026-11-17T06:55:40Z",
+      "result": "pass",
+      "url": "https://weather.com/weather/today/l/40.71,-74.01",
+      "scriptSha": "3c0d6d4916bd106942f1ab5c85f3100ac29c8e5b2c2a003554af9bf7e79e87ca",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:49:56Z",
+      "result": "blocked",
+      "url": "https://weather.com/weather/today/l/40.71,-74.01",
+      "scriptSha": "3c0d6d4916bd106942f1ab5c85f3100ac29c8e5b2c2a003554af9bf7e79e87ca",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "target not present without the script (baseline was false)"
+    },
+    {
+      "at": "2026-11-17T06:49:33Z",
+      "result": "pass",
+      "url": "https://weather.com/weather/today/l/40.71,-74.01",
+      "scriptSha": "3c0d6d4916bd106942f1ab5c85f3100ac29c8e5b2c2a003554af9bf7e79e87ca",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
   "wikipedia/always-desktop": [
     {
       "at": "2026-11-17T05:16:09Z",
@@ -1467,6 +3874,89 @@
       "via": "local"
     }
   ],
+  "wikipedia/hide-unused-languages": [
+    {
+      "at": "2026-11-17T06:10:10Z",
+      "result": "pass",
+      "url": "https://en.wikipedia.org/wiki/Moon",
+      "scriptSha": "c9d232bbc2f87cf8d83d09086f157fc5616815068a05b6e17272a08a57c7c7de",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:04:08Z",
+      "result": "pass",
+      "url": "https://en.wikipedia.org/wiki/Moon",
+      "scriptSha": "c9d232bbc2f87cf8d83d09086f157fc5616815068a05b6e17272a08a57c7c7de",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:03:26Z",
+      "result": "fail",
+      "url": "https://en.wikipedia.org/wiki/Moon",
+      "scriptSha": "c9d232bbc2f87cf8d83d09086f157fc5616815068a05b6e17272a08a57c7c7de",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "intact was false"
+    }
+  ],
+  "wikipedia/inline-footnotes": [
+    {
+      "at": "2026-11-17T06:32:54Z",
+      "result": "pass",
+      "url": "https://en.wikipedia.org/wiki/Moon",
+      "scriptSha": "9c7d78e57225df6048566629d73eef70442fe4ab390e45b375526431909c3abe",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "wikipedia/larger-font": [
+    {
+      "at": "2026-11-17T06:33:41Z",
+      "result": "pass",
+      "url": "https://en.wikipedia.org/wiki/Moon",
+      "scriptSha": "488a281d4c04a607254071e520b4aa84a8f162ec4577e4a4391be95ba6509339",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "wikipedia/multi-column": [
+    {
+      "at": "2026-11-17T06:42:34Z",
+      "result": "pass",
+      "url": "https://en.wikipedia.org/wiki/Moon",
+      "scriptSha": "e0af3a87fa2cc592b1eb20721502576c3b2e906b6c2c7d38245f4b2cda959370",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:35:17Z",
+      "result": "pass",
+      "url": "https://en.wikipedia.org/wiki/Moon",
+      "scriptSha": "e0af3a87fa2cc592b1eb20721502576c3b2e906b6c2c7d38245f4b2cda959370",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:34:57Z",
+      "result": "fail",
+      "url": "https://en.wikipedia.org/wiki/Moon",
+      "scriptSha": "ff8cfe27429fa1162873d0d781dfcbe721a3bfec2d2be5cb749983e4a012c03b",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false"
+    },
+    {
+      "at": "2026-11-17T06:34:13Z",
+      "result": "blocked",
+      "url": "https://en.wikipedia.org/wiki/Moon",
+      "scriptSha": "ff8cfe27429fa1162873d0d781dfcbe721a3bfec2d2be5cb749983e4a012c03b",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "target not present without the script (baseline was false)"
+    }
+  ],
   "wikipedia/old-layout": [
     {
       "at": "2026-11-17T05:13:13Z",
@@ -1475,6 +3965,159 @@
       "scriptSha": "be01068fbc69cc26537c399b7ee58615974e479d01fe0ba3ce4b9f8d4534a648",
       "browser": "chromium 153.0.8010.12",
       "via": "local"
+    }
+  ],
+  "wikipedia/redirect-to-wikiwand": [
+    {
+      "at": "2026-11-17T06:42:26Z",
+      "result": "pass",
+      "url": "https://en.wikipedia.org/wiki/Moon",
+      "scriptSha": "5290a8bfa7b4a62327d37b6c647dd2b0835404b0abfddb0ec217796a83976ec7",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:31:52Z",
+      "result": "pass",
+      "url": "https://en.wikipedia.org/wiki/Moon",
+      "scriptSha": "5290a8bfa7b4a62327d37b6c647dd2b0835404b0abfddb0ec217796a83976ec7",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:31:36Z",
+      "result": "blocked",
+      "url": "https://en.wikipedia.org/wiki/Moon",
+      "scriptSha": "5290a8bfa7b4a62327d37b6c647dd2b0835404b0abfddb0ec217796a83976ec7",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "target not present without the script (baseline was false)"
+    }
+  ],
+  "wiktionary/dark-mode": [
+    {
+      "at": "2026-11-17T06:47:19Z",
+      "result": "pass",
+      "url": "https://en.wiktionary.org/wiki/set",
+      "scriptSha": "7b8d1954ac7c1e76b3cec85c0b83a8fbdebb6beb4635e1a85d30e82bd8de32a5",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:41:37Z",
+      "result": "pass",
+      "url": "https://en.wiktionary.org/wiki/set",
+      "scriptSha": "7b8d1954ac7c1e76b3cec85c0b83a8fbdebb6beb4635e1a85d30e82bd8de32a5",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "wiktionary/filter-languages": [
+    {
+      "at": "2026-11-17T06:47:26Z",
+      "result": "pass",
+      "url": "https://en.wiktionary.org/wiki/set",
+      "scriptSha": "f12f18143e04f80f73862d5d446f0e18f6adb2606b810b0133e7d5fbc4a10eaf",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:41:43Z",
+      "result": "pass",
+      "url": "https://en.wiktionary.org/wiki/set",
+      "scriptSha": "f12f18143e04f80f73862d5d446f0e18f6adb2606b810b0133e7d5fbc4a10eaf",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "yahoo/block-news-sources": [
+    {
+      "at": "2026-11-17T06:51:16Z",
+      "result": "pass",
+      "url": "https://www.yahoo.com/news/",
+      "scriptSha": "ff435d31185fd41724bce7700bfd0bbd0859f0de715c617ab438b2d843b5e30c",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:39:32Z",
+      "result": "pass",
+      "url": "https://www.yahoo.com/news/",
+      "scriptSha": "ff435d31185fd41724bce7700bfd0bbd0859f0de715c617ab438b2d843b5e30c",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "yahoo/hide-ads": [
+    {
+      "at": "2026-11-17T06:51:31Z",
+      "result": "pass",
+      "url": "https://www.yahoo.com/news/",
+      "scriptSha": "97479b1b4a43156e4670ca4907e690eb6068bbceeab240521f787c7f264e97da",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:41:22Z",
+      "result": "pass",
+      "url": "https://www.yahoo.com/news/",
+      "scriptSha": "97479b1b4a43156e4670ca4907e690eb6068bbceeab240521f787c7f264e97da",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:40:57Z",
+      "result": "fail",
+      "url": "https://www.yahoo.com/news/",
+      "scriptSha": "dce703d5a71904a18d11a78c2dfb518ddd79181c25c6880825ac0bd06359cba7",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "intact was false"
+    }
+  ],
+  "youtube/always-theater-mode": [
+    {
+      "at": "2026-11-17T06:43:22Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+      "scriptSha": "22298e9307c414550fb92e9c2ff90daed063c8d30a278fa6722b4401da6d13b6",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:30:29Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+      "scriptSha": "22298e9307c414550fb92e9c2ff90daed063c8d30a278fa6722b4401da6d13b6",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:29:47Z",
+      "result": "fail",
+      "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+      "scriptSha": "6544f605b7c96013a002058bd6a9243a9553bbbb02e54b330c6f7af4d2011977",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false"
+    },
+    {
+      "at": "2026-11-17T06:29:25Z",
+      "result": "fail",
+      "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+      "scriptSha": "184305eddf571aeb04d16549488020c2177edf4edb8373d6a80990f9439bbf54",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false"
+    },
+    {
+      "at": "2026-11-17T06:28:05Z",
+      "result": "fail",
+      "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+      "scriptSha": "bf6b64b202101be27a098eec2222b19c3bae4335a81dd27d6fd15e2e13465d7e",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false"
     }
   ],
   "youtube/block-channels": [
@@ -1495,6 +4138,41 @@
       "via": "local"
     }
   ],
+  "youtube/clean-description-links": [
+    {
+      "at": "2026-11-17T06:48:44Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      "scriptSha": "3ab509fe81f94f6410b6005d76fdea685161ae12d96db1e9ace94abadf0ce545",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:43:36Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      "scriptSha": "bea54aa261d07f7dc9f321ca5a683d77f59196aa7b408ecd8905be54312f1519",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:33:22Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      "scriptSha": "bea54aa261d07f7dc9f321ca5a683d77f59196aa7b408ecd8905be54312f1519",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:32:22Z",
+      "result": "blocked",
+      "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      "scriptSha": "bea54aa261d07f7dc9f321ca5a683d77f59196aa7b408ecd8905be54312f1519",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "target not present without the script (baseline was false)"
+    }
+  ],
   "youtube/default-playback-speed": [
     {
       "at": "2026-11-17T05:06:21Z",
@@ -1503,6 +4181,33 @@
       "scriptSha": "31af5bb420ed44b8f4f11c4227dfe574dbd774791824d3ef13a0620e8c9e5df8",
       "browser": "chromium 153.0.8010.12",
       "via": "local"
+    }
+  ],
+  "youtube/disable-60fps": [
+    {
+      "at": "2026-11-17T06:44:01Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/watch?v=aqz-KE-bpKQ",
+      "scriptSha": "e877c2830915e9416d1ee2745a3824ede1d4ccd2a0eaa997d30c5e6ce44d91a2",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:33:11Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/watch?v=aqz-KE-bpKQ",
+      "scriptSha": "e877c2830915e9416d1ee2745a3824ede1d4ccd2a0eaa997d30c5e6ce44d91a2",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:32:30Z",
+      "result": "blocked",
+      "url": "https://www.youtube.com/watch?v=aqz-KE-bpKQ",
+      "scriptSha": "e877c2830915e9416d1ee2745a3824ede1d4ccd2a0eaa997d30c5e6ce44d91a2",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "target not present without the script (baseline was false)"
     }
   ],
   "youtube/disable-autoplay": [
@@ -1574,6 +4279,71 @@
       "browser": "chromium 153.0.8010.12",
       "via": "local",
       "note": "expect was false"
+    }
+  ],
+  "youtube/disable-channel-autoplay": [
+    {
+      "at": "2026-11-17T06:43:52Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/@MrBeast",
+      "scriptSha": "2a362eb9367492731cf5b9090a983e3fbc51c4397b86ec224050eb658465e070",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:28:21Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/@MrBeast",
+      "scriptSha": "2a362eb9367492731cf5b9090a983e3fbc51c4397b86ec224050eb658465e070",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "youtube/disable-hover-preview": [
+    {
+      "at": "2026-11-17T06:47:58Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/results?search_query=minecraft&hl=en",
+      "scriptSha": "901e9e48aa07e46c2a793241aad228b6166dbe6755dd6b5d0a568392c5a71ca9",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:46:28Z",
+      "result": "blocked",
+      "url": "https://www.youtube.com/results?search_query=minecraft&hl=en",
+      "scriptSha": "901e9e48aa07e46c2a793241aad228b6166dbe6755dd6b5d0a568392c5a71ca9",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "target not present without the script (baseline was false)"
+    }
+  ],
+  "youtube/expand-description": [
+    {
+      "at": "2026-11-17T06:28:35Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      "scriptSha": "541ac1febb938974c57e75d9e5dd454c3026dad8b10bc7f684bf9b8f5d1bee0a",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "youtube/faster-playback-speed": [
+    {
+      "at": "2026-11-17T06:44:53Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/watch?v=aqz-KE-bpKQ",
+      "scriptSha": "8b19040213e190d1a492c80c7da522eb6067d883fd862ec09e5d631bc8e884e2",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:29:32Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/watch?v=aqz-KE-bpKQ",
+      "scriptSha": "8b19040213e190d1a492c80c7da522eb6067d883fd862ec09e5d631bc8e884e2",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
     }
   ],
   "youtube/force-hd-quality": [
@@ -1672,6 +4442,33 @@
       "via": "local"
     }
   ],
+  "youtube/hide-paid-promotion": [
+    {
+      "at": "2026-11-17T06:50:51Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/watch?v=1KxqLC7F0iE&hl=en",
+      "scriptSha": "1c919625fd00e313e4eb2865a7a0f56bc12a89ee9d2679b9f95b73dd95ceac6b",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:48:04Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/watch?v=1KxqLC7F0iE&hl=en",
+      "scriptSha": "1c919625fd00e313e4eb2865a7a0f56bc12a89ee9d2679b9f95b73dd95ceac6b",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:46:34Z",
+      "result": "fail",
+      "url": "https://www.youtube.com/watch?v=1KxqLC7F0iE&hl=en",
+      "scriptSha": "1c919625fd00e313e4eb2865a7a0f56bc12a89ee9d2679b9f95b73dd95ceac6b",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "intact was false"
+    }
+  ],
   "youtube/hide-recommendations": [
     {
       "at": "2026-11-17T05:23:56Z",
@@ -1700,12 +4497,112 @@
       "via": "local"
     }
   ],
+  "youtube/hide-sign-in-prompt": [
+    {
+      "at": "2026-11-17T06:05:30Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/",
+      "scriptSha": "7046d2246b5471e757f8cf08b4935003132f0fe0f28c1afe94d783110fd22f49",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:59:03Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/",
+      "scriptSha": "7046d2246b5471e757f8cf08b4935003132f0fe0f28c1afe94d783110fd22f49",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:57:54Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/",
+      "scriptSha": "38f95e99bce2134907dc026bf27eace833902749721681a43aa6368b83a2d8d7",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "youtube/like-keyboard-shortcut": [
+    {
+      "at": "2026-11-17T06:34:21Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+      "scriptSha": "d0ca244fc19279fea32a91090d9bb9f2b58964165b43868501d6649ee2af3866",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "youtube/loop-video": [
+    {
+      "at": "2026-11-17T06:28:16Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+      "scriptSha": "888fbb5495812c62e3e4c12ce8007d87a472c162b412ad8e942bf4b5f0194d7b",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
   "youtube/more-videos-per-row": [
     {
       "at": "2026-11-17T05:10:22Z",
       "result": "pass",
       "url": "https://www.youtube.com/@YouTube/videos",
       "scriptSha": "09ac9060744ffc103c7d61e4742766c119ed662ed6f0c4ad467e242b1e917b9f",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "youtube/open-links-new-tab": [
+    {
+      "at": "2026-11-17T06:56:53Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/results?search_query=minecraft&hl=en",
+      "scriptSha": "7ad2fe0af9e18cdc1b0912077b4712600bfeda0986804581a115d2ac15fc14c5",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:55:21Z",
+      "result": "blocked",
+      "url": "https://www.youtube.com/watch?v=1KxqLC7F0iE&hl=en",
+      "scriptSha": "7ad2fe0af9e18cdc1b0912077b4712600bfeda0986804581a115d2ac15fc14c5",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "load without script: page.evaluate: TypeError: Cannot read properties of null (reading 'click')"
+    },
+    {
+      "at": "2026-11-17T06:53:55Z",
+      "result": "blocked",
+      "url": "https://www.youtube.com/watch?v=1KxqLC7F0iE&hl=en",
+      "scriptSha": "7ad2fe0af9e18cdc1b0912077b4712600bfeda0986804581a115d2ac15fc14c5",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "target not present without the script (baseline was false)"
+    },
+    {
+      "at": "2026-11-17T06:51:07Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/results?search_query=minecraft&hl=en",
+      "scriptSha": "23fce8a635b518ed6c41707e18735a62bf40f5f63d64448b27f164c2ba5da3fe",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:46:50Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/results?search_query=minecraft&hl=en",
+      "scriptSha": "23fce8a635b518ed6c41707e18735a62bf40f5f63d64448b27f164c2ba5da3fe",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "youtube/redirect-shorts": [
+    {
+      "at": "2026-11-17T05:55:21Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/shorts/bkSNwyl7iHE",
+      "scriptSha": "4111431e066e46c8b0f94c55bb3aaf2d623a25fdf6e065e2304f4937b599ff07",
       "browser": "chromium 153.0.8010.12",
       "via": "local"
     }
@@ -1744,6 +4641,100 @@
       "browser": "chromium 153.0.8010.12",
       "via": "local",
       "note": "expect was false, intact was false"
+    }
+  ],
+  "youtube/rotate-video": [
+    {
+      "at": "2026-11-17T06:31:26Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/watch?v=aqz-KE-bpKQ",
+      "scriptSha": "87e73c9ad061852babcfafd40fa05e0953c2e1ee426fc939c43132778e43cdaf",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "youtube/scroll-volume": [
+    {
+      "at": "2026-11-17T06:48:57Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+      "scriptSha": "3a946d16f08ad537d143508f2a48b928bbccc1d50caac7309dc73eeafd364399",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:35:48Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+      "scriptSha": "84067b8b8adf298fc2b5cb58164319d574645cf710b7439efb0b8017914ecaad",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:35:02Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+      "scriptSha": "84067b8b8adf298fc2b5cb58164319d574645cf710b7439efb0b8017914ecaad",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "youtube/show-full-titles": [
+    {
+      "at": "2026-11-17T06:29:01Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/results?search_query=minecraft",
+      "scriptSha": "011a10d21680df486bbc1fda30d2c68e208fac0d66dba015f40ea6327e3ad002",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "youtube/show-video-tags": [
+    {
+      "at": "2026-11-17T06:34:10Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+      "scriptSha": "2d664df4491c9afe3e1edc53a5f895b10f2f27f7d5c0fe02a0fa4d76b4c250c2",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "youtube/video-screenshot": [
+    {
+      "at": "2026-11-17T06:26:42Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+      "scriptSha": "a13a202d2b928117f39364f26b207d6e05c19ce852b7b510ee08564b3976f76c",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "youtube/view-thumbnail": [
+    {
+      "at": "2026-11-17T06:36:02Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      "scriptSha": "77f0f72468e536b16682ebb4a5a9c3886cd71fc89b37b17f30ea1b3c66134f45",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "youtube/volume-boost": [
+    {
+      "at": "2026-11-17T06:44:23Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/watch?v=aqz-KE-bpKQ",
+      "scriptSha": "7ed583117aed8b4928b141582a71d2a721008c58760990acab9517b9ab9ab529",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T06:35:53Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/watch?v=aqz-KE-bpKQ",
+      "scriptSha": "7ed583117aed8b4928b141582a71d2a721008c58760990acab9517b9ab9ab529",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
     }
   ]
 }

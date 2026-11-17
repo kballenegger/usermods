@@ -1,0 +1,38 @@
+{
+  "slug": "show-release-date",
+  "title": "Show the release date at the top of Bandcamp albums",
+  "question": "Where is the release date on a Bandcamp album page?",
+  "answer": "On a Bandcamp album or track page the release date is in the credits under the track list, as a line such as \"released December 28, 2007\", usually below the first screen. The usermods script on this page copies that date to just under the album title and artist name, so you see it without scrolling. Without a script, scroll past the track list to the credits.",
+  "prompt": "Show the Bandcamp release date right under the album title.",
+  "details": "The script reads the first line of the credits block, `released <date>` (or `releases <date>` for a pre-order), and adds it as a line under the title and artist. The credits themselves are not moved or changed. If a page has no date in its credits, nothing is added.\n\nThe date is the one the artist entered as the release date, which can be earlier than when the album went up on Bandcamp. The check loads In Rainbows, released December 28, 2007.",
+  "related": [
+    "bandcamp/album-duration",
+    "bandcamp/download-cover-art"
+  ],
+  "demand": {
+    "score": 40,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/420662",
+        "note": "Bandcamp: Show publish date (total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=bandcamp%20release%20date",
+        "note": "returns \"bandcamp release date\"; suggestions: bandcamp release date | bandcamp set release date | bandcamp future release date | bandcamp change release date | bandcamp publish before release date"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://radiohead.bandcamp.com/album/in-rainbows"
+    ],
+    "loggedOut": true,
+    "waitFor": ".tralbum-credits",
+    "settleMs": 2000,
+    "baseline": "(() => { const c = document.querySelector('.tralbum-credits'); return !!c && /released December 28, 2007/.test(c.textContent) && c.getBoundingClientRect().top > 900 && !document.querySelector('#name-section').textContent.includes('2007'); })()",
+    "expect": "(() => { const l = [...document.querySelectorAll('#name-section div')].find((e) => e.textContent.trim() === 'Released December 28, 2007'); return !!l && l.checkVisibility() && l.getBoundingClientRect().top < 600; })()",
+    "intact": "(() => { const c = document.querySelector('.tralbum-credits'); return c.checkVisibility() && /released December 28, 2007/.test(c.textContent) && [...document.querySelectorAll('#track_table .track_row_view')].filter((r) => r.checkVisibility()).length >= 10; })()"
+  }
+}

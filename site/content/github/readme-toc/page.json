@@ -1,0 +1,45 @@
+{
+  "slug": "readme-toc",
+  "title": "Add a table of contents to GitHub READMEs",
+  "question": "How do I get a table of contents sidebar for a GitHub README?",
+  "answer": "GitHub has an Outline button in the README header that opens the headings as a drop-down menu, but it closes after each click and does not stay on screen. The usermods script on this page adds a Contents list of the README's headings to the right sidebar of a repository's front page and keeps it in view while you scroll, so you can jump between sections at any point. Without an extension, the Outline button is the built-in way.",
+  "prompt": "Add a table of contents for the README to the GitHub repository sidebar that stays visible while I scroll.",
+  "details": "The script reads the README's first three heading levels and links each to the anchor GitHub already gives it. The list goes at the bottom of the right sidebar, under About, Releases and Contributors, and sticks to the top of the window once you scroll past them. Long lists scroll on their own.\n\nIt rebuilds when you move between repositories without a full page load. It only shows on a repository's front page, where the sidebar is; README files opened in the file view and narrow windows (where GitHub hides the sidebar) get nothing.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "The Outline button",
+      "body": "The list icon labelled **Outline** at the top right of the README box opens a menu of its headings. It does not stay open while you read."
+    },
+    {
+      "kind": "extension",
+      "title": "GitHub TOC Sidebar",
+      "body": "The GitHub TOC Sidebar extension for Chrome adds a similar panel."
+    }
+  ],
+  "related": [
+    "github/full-width",
+    "github/sort-tables",
+    "github/wrap-code-lines"
+  ],
+  "check": {
+    "urls": [
+      "https://github.com/react/react"
+    ],
+    "loggedOut": true,
+    "waitFor": "article.markdown-body .markdown-heading",
+    "settleMs": 4000,
+    "baseline": "(() => { const heads = document.querySelectorAll('article.markdown-body .markdown-heading a.anchor[href^=\"#\"]'); const pane = document.querySelector('[class*=\"prc-PageLayout-Pane-\"]:has([class*=\"sidebarSection\"])'); return heads.length >= 5 && !!pane && pane.checkVisibility() && !document.getElementById('usermods-readme-toc'); })()",
+    "expect": "(async () => { const toc = document.querySelector('[class*=\"prc-PageLayout-Pane-\"] #usermods-readme-toc'); if (!toc || !toc.checkVisibility()) return false; const want = [...document.querySelectorAll('article.markdown-body .markdown-heading')].filter((w) => w.querySelector('h1, h2, h3')).map((w) => w.querySelector('a.anchor').getAttribute('href')); const got = [...toc.querySelectorAll('a')].map((a) => a.getAttribute('href')); if (want.length < 5 || want.join() !== got.join()) return false; const art = document.querySelector('article.markdown-body').getBoundingClientRect(); window.scrollTo(0, window.scrollY + art.bottom - window.innerHeight); await new Promise((r) => setTimeout(r, 300)); const r = toc.getBoundingClientRect(); const ok = r.top >= 0 && r.top < 100 && r.bottom > 0; window.scrollTo(0, 0); return ok; })()",
+    "intact": "(() => { const a = document.querySelector('article.markdown-body'); const about = [...document.querySelectorAll('[class*=\"prc-PageLayout-Pane-\"] h2')].find((h) => /About/.test(h.textContent)); const files = [...document.querySelectorAll('a[href*=\"/react/react/tree/main/\"], a[href*=\"/react/react/blob/main/\"]')].filter((e) => e.checkVisibility()); return !!a && a.checkVisibility() && !!about && about.checkVisibility() && files.length >= 5; })()"
+  },
+  "demand": {
+    "score": 63,
+    "evidence": [
+      { "type": "greasyfork", "url": "https://greasyfork.org/en/scripts/406337", "note": "Greasy Fork total installs, \"Toc Bar, auto-generating table of content\" (multi-site), 7,038 (api.greasyfork.org)" },
+      { "type": "greasyfork", "url": "https://greasyfork.org/en/scripts/18344", "note": "Greasy Fork total installs, \"GitHub Table of Contents\", 723 (api.greasyfork.org)" },
+      { "type": "cws", "url": "https://chromewebstore.google.com/detail/cdiiikhamhampcninkmmpgejjbgdgdnn", "note": "Chrome Web Store users, \"GitHub TOC Sidebar\", 157" },
+      { "type": "autocomplete", "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=github%20readme%20table%20of%20contents", "note": "Google suggests \"github readme table of contents\" and \"github markdown table of contents\"" }
+    ]
+  }
+}

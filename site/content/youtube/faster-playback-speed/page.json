@@ -1,0 +1,77 @@
+{
+  "slug": "faster-playback-speed",
+  "title": "Play YouTube faster than 2x",
+  "question": "How do I watch YouTube faster than 2x speed?",
+  "answer": "Without YouTube Premium, the desktop player stops at 2x: the Playback speed slider and the Shift+> shortcut top out there, and the 3.0 button in the speed menu opens a Premium offer. The usermods script on this page lets Shift+> keep going past 2x in steps of 0.25, up to 4x, and Shift+< bring it back down, showing the speed on the video. Without an extension, run document.querySelector('video').playbackRate = 3 in the browser console.",
+  "prompt": "Let me speed YouTube videos up past 2x with the keyboard.",
+  "details": "The script takes over YouTube's own speed shortcuts, Shift+> and Shift+<. Up to 2x it sets the speed through YouTube's player, so the Settings menu shows it. Above 2x it sets the speed of the video element directly, since the menu has no entry for it; the menu goes on showing 2.\n\nThe top speed is 4x, because Chrome mutes the sound above that. Change `MAX_SPEED` or `STEP` at the top of the script for other limits. The shortcuts do nothing while you are typing in the search box or a comment.\n\nThe check presses Shift+> eight times on a playing video and confirms it plays at 3x for several seconds.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "YouTube Premium",
+      "body": "The Playback speed menu has a 3.0 button for YouTube Premium members. Logged out or on a free account, clicking it shows a Premium sign-up offer instead."
+    },
+    {
+      "kind": "other",
+      "title": "Browser console",
+      "body": "Open the developer console (Cmd+Option+J on a Mac, Ctrl+Shift+J on Windows) on the video page and run:\n\n```js\ndocument.querySelector('video').playbackRate = 3\n```\n\nIt lasts until you load another video."
+    },
+    {
+      "kind": "extension",
+      "title": "Video Speed Controller",
+      "body": "The Video Speed Controller extension sets the speed of any HTML5 video, YouTube included, well past 2x, with its own keyboard shortcuts."
+    }
+  ],
+  "related": [
+    "youtube/default-playback-speed",
+    "youtube/loop-video",
+    "youtube/force-hd-quality"
+  ],
+  "demand": {
+    "score": 87,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/421670",
+        "note": "YouTube More Speeds (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/30506",
+        "note": "Video Speed Buttons (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/hdannnflhlmdablckfkjpleikpphncik",
+        "note": "Youtube Playback Speed Control (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/naalfmaaomhjpbndelnlijacdniggpjn",
+        "note": "YouTube Speed Controls (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20speed%20more%20than%202x",
+        "note": "returns the query; suggestions: youtube speed more than 2x | youtube speed more than 2x extension | increase youtube speed more than 2x | change youtube speed more than 2x | youtube playback speed more than 2x"
+      },
+      {
+        "type": "forum",
+        "url": "https://webapps.stackexchange.com/questions/123389/watch-youtube-videos-faster-than-2x-speed",
+        "note": "webapps.stackexchange question: Watch YouTube videos faster than 2x speed?"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.youtube.com/watch?v=aqz-KE-bpKQ"
+    ],
+    "loggedOut": true,
+    "waitFor": "#movie_player video",
+    "settleMs": 3000,
+    "actions": "const p = document.querySelector('#movie_player'); p.mute(); p.playVideo(); await new Promise((r) => setTimeout(r, 4000)); for (let i = 0; i < 8; i++) { document.body.dispatchEvent(new KeyboardEvent('keydown', { key: '>', code: 'Period', keyCode: 190, shiftKey: true, bubbles: true, cancelable: true })); await new Promise((r) => setTimeout(r, 150)); } const v = p.querySelector('video'); const t0 = v.currentTime; await new Promise((r) => setTimeout(r, 5000)); window.__advance = v.currentTime - t0;",
+    "baseline": "(() => { const v = document.querySelector('#movie_player video'); return v.playbackRate === 2 && window.__advance < 11; })()",
+    "expect": "(() => { const v = document.querySelector('#movie_player video'); return v.playbackRate === 3 && window.__advance > 12; })()",
+    "intact": "(() => { const p = document.querySelector('#movie_player'); return p.getPlayerState() === 1 && p.getPlaybackRate() === 2 && p.querySelector('.ytp-settings-button').checkVisibility(); })()"
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "slug": "review-percentage",
+  "title": "Show the review percentage on Steam",
+  "question": "How do I see the exact positive review percentage on Steam?",
+  "answer": "Hover over the review summary (\"Very Positive\", \"Mixed\") on a Steam store game page: the tooltip shows the share of positive reviews. The usermods script on this page writes that percentage next to each summary, for both recent reviews and all reviews, so it is visible without hovering. It uses the number Steam already publishes in the tooltip and does not calculate anything itself.",
+  "prompt": "Show the positive review percentage next to the review summary on Steam game pages.",
+  "details": "Each summary row carries its tooltip text in a `data-tooltip-html` attribute, such as \"96% of the 249,565 user reviews for this game are positive\". The script copies the percentage into a small label after the summary, in the summary's own color. It runs on store game pages only; search results and wishlists keep the hover tooltip.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Hover the summary",
+      "body": "The tooltip on the review summary shows the percentage and the number of reviews."
+    },
+    {
+      "kind": "other",
+      "title": "Narrow window",
+      "body": "When the store page is narrow enough for its mobile layout, Steam prints the percentage under the summary."
+    }
+  ],
+  "related": [
+    "steam/steamdb-link",
+    "steam/direct-links"
+  ],
+  "demand": {
+    "score": 50,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/24113",
+        "note": "Greasy Fork total installs: \"MoreSteamRatings\" (1,033)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=steam%20review%20percentage",
+        "note": "Google suggests: steam review percentages, steam mixed reviews percentage, steam rating percentages"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://store.steampowered.com/app/292030/"
+    ],
+    "loggedOut": true,
+    "waitFor": ".user_reviews_summary_row",
+    "settleMs": 3000,
+    "baseline": "(() => { const rows = [...document.querySelectorAll('.user_reviews_summary_row[data-tooltip-html]')].filter((r) => r.checkVisibility() && /^\\s*\\d+%/.test(r.dataset.tooltipHtml)); return rows.length >= 1 && rows.every((r) => !/\\d+%/.test(r.innerText)); })()",
+    "expect": "(() => { const rows = [...document.querySelectorAll('.user_reviews_summary_row[data-tooltip-html]')].filter((r) => r.checkVisibility() && /^\\s*\\d+%/.test(r.dataset.tooltipHtml)); return rows.length >= 1 && rows.every((r) => { const t = r.querySelector('.um-review-pct'); return !!t && t.checkVisibility() && t.textContent.trim() === r.dataset.tooltipHtml.match(/^\\s*(\\d+%)/)[1]; }); })()",
+    "intact": "(() => { const s = document.querySelector('.user_reviews_summary_row .game_review_summary'); const p = document.querySelector('#game_area_purchase'); const cols = [...document.querySelectorAll('.user_reviews_summary_row .summary')].filter((c) => c.checkVisibility()); return !!s && s.checkVisibility() && !!p && p.checkVisibility() && cols.length >= 1 && cols.every((c) => c.scrollWidth <= c.clientWidth + 1); })()"
+  }
+}

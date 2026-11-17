@@ -51,12 +51,41 @@ export function desktopChromeUA(browserVersion: string): string {
 // Consent screens (Google, YouTube and most CMPs): click "Reject all" when offered, else "Accept all".
 const CONSENT_LABELS = [/^reject all$/i, /^accept all$/i, /^i agree$/i, /^accept$/i, /^agree$/i];
 
-async function dismissConsent(page: Page): Promise<string | undefined> {
+// Errors Playwright throws when the page navigates under a call: a frame it was reading from is
+// detached, or the document it was evaluating in is replaced. Etsy's DataDome check reloads the
+// page shortly after the first load, often while consent dismissal is scanning its frames.
+const NAVIGATED = /Frame was detached|frame got detached|Execution context was destroyed/i;
+
+// Runs fn; if the page navigated during it, waits for the new document and runs fn once more.
+async function acrossReload<T>(page: Page, fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (e) {
+    if (!NAVIGATED.test((e as Error).message)) throw e;
+    await page.waitForLoadState('domcontentloaded');
+    return fn();
+  }
+}
+
+function dismissConsent(page: Page): Promise<string | undefined> {
+  return acrossReload(page, () => clickConsent(page));
+}
+
+async function clickConsent(page: Page): Promise<string | undefined> {
   for (const label of CONSENT_LABELS) {
     for (const frame of page.frames()) {
       const button = frame.getByRole('button', { name: label }).first();
-      if ((await button.count()) === 0 || !(await button.isVisible())) continue;
-      const text = (await button.innerText()).trim();
+      let text: string;
+      try {
+        if ((await button.count()) === 0 || !(await button.isVisible())) continue;
+        text = (await button.innerText()).trim();
+      } catch (e) {
+        // A frame removed mid-scan (an ad slot, or every subframe when the top page reloads) has
+        // no button to click. Let a reload finish, then go on with the frames that remain.
+        if (frame === page.mainFrame() || !frame.isDetached()) throw e;
+        await page.waitForLoadState('domcontentloaded');
+        continue;
+      }
       await button.click();
       await page.waitForLoadState('domcontentloaded');
       await page.waitForTimeout(1500);
@@ -123,8 +152,8 @@ async function load(
       }
       await page.waitForTimeout(spec.settleMs);
       report.finalUrl = page.url();
-      report.title = await page.title();
-      const wall = await detectWall(page);
+      report.title = await acrossReload(page, () => page.title());
+      const wall = await acrossReload(page, () => detectWall(page));
       if (wall) report.wall = wall;
       if (spec.actions) await page.evaluate(`(async () => { ${spec.actions}\n })()`);
       if (script) {

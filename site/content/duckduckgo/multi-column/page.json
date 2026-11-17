@@ -1,0 +1,46 @@
+{
+  "slug": "multi-column",
+  "title": "Show DuckDuckGo results in columns",
+  "question": "How do I see more DuckDuckGo results at once?",
+  "answer": "DuckDuckGo has no setting for a multi-column layout; results always sit in one narrow column. The usermods script on this page lets the results use the full window width and lays them out in a grid of columns, two on a typical laptop screen and more on wider ones, with the sidebar moved below the results. Without an extension, the closest option is zooming the page out so more of the single column fits on screen.",
+  "prompt": "Show DuckDuckGo web results in two columns across the whole window.",
+  "details": "The results list becomes a CSS grid with as many columns at least 440px wide as fit the window, so a narrow window still shows one column. Items that are not web results, such as the \"More results\" button and related searches, span the full width. The sidebar (knowledge panel and similar) moves below the results instead of being hidden. Images, videos and news tabs are not changed.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Zoom out",
+      "body": "Press Ctrl and minus (Cmd and minus on a Mac) to fit more of the single column on screen."
+    }
+  ],
+  "related": [
+    "duckduckgo/declutter",
+    "duckduckgo/remove-ads",
+    "duckduckgo/block-domains"
+  ],
+  "check": {
+    "urls": [
+      "https://duckduckgo.com/?q=how+to+bake+bread&kl=us-en"
+    ],
+    "loggedOut": true,
+    "waitFor": "[data-testid=\"result\"]",
+    "settleMs": 4000,
+    "baseline": "(() => { const res = [...document.querySelectorAll('[data-testid=\"result\"]')].filter((r) => r.checkVisibility()); return res.length >= 5 && new Set(res.map((r) => Math.round(r.getBoundingClientRect().left))).size === 1; })()",
+    "expect": "(() => { const res = [...document.querySelectorAll('[data-testid=\"result\"]')].filter((r) => r.checkVisibility()); const lefts = new Set(res.map((r) => Math.round(r.getBoundingClientRect().left))); return res.length >= 5 && lefts.size >= 2 && res.some((a, i) => res.some((b, j) => i !== j && Math.abs(a.getBoundingClientRect().top - b.getBoundingClientRect().top) < 40 && a.getBoundingClientRect().left !== b.getBoundingClientRect().left)); })()",
+    "intact": "(() => { const res = [...document.querySelectorAll('[data-testid=\"result\"]')].filter((r) => r.checkVisibility() && r.getBoundingClientRect().width >= 300); return res.length >= 8 && document.querySelector('#search_form_input').checkVisibility(); })()"
+  },
+  "demand": {
+    "score": 38,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/423337",
+        "note": "DuckDuckGo - Multi-Columns (ORGANIC) (USw) v.66 (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=duckduckgo%20multiple%20columns",
+        "note": "does not return the query; suggestions: "
+      }
+    ]
+  }
+}

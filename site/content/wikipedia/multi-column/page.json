@@ -1,0 +1,45 @@
+{
+  "slug": "multi-column",
+  "title": "Read Wikipedia in columns",
+  "question": "How do I show Wikipedia articles in multiple columns?",
+  "answer": "Wikipedia has no column layout; articles are one long column of text, and the Appearance menu only changes text size, width and colour. The usermods script on this page lays article text out in newspaper-style columns, two at Wikipedia's standard width and more with its Wide setting on a large screen. Each section starts its own set of columns under its heading, and images, infoboxes and tables stay whole inside a column.",
+  "prompt": "Show Wikipedia article text in newspaper-style columns, one set per section.",
+  "details": "The script injects CSS that sets a minimum column width (22em) on each top-level section of the article, so the browser decides how many columns fit. Section headings span all columns, which means you read down one short set of columns per section rather than scrolling back to the top of a long one. Infoboxes, images and tables stop floating at the side and sit inside a column at up to its full width; wide tables scroll sideways.\n\nWith Wikipedia's Wide setting (Appearance, Width) you get more columns; with the Large text size at the standard width, columns are wider and only one fits. The script relies on the `<section>` elements Wikipedia wraps around each part of an article. The check loads one English article at the standard width and confirms the text sits in more than one column.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Wide layout",
+      "body": "Appearance, **Width**, **Wide** lets the single text column use the whole window. It doesn't split it into columns."
+    }
+  ],
+  "related": [
+    "wikipedia/full-width",
+    "wikipedia/larger-font"
+  ],
+  "demand": {
+    "score": 26,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/408604",
+        "note": "Wikipedia Multi-Column Layout (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=wikipedia%20multi%20column",
+        "note": "does not return the query; suggestions: "
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://en.wikipedia.org/wiki/Moon"
+    ],
+    "loggedOut": true,
+    "waitFor": "#mw-content-text p",
+    "settleMs": 3000,
+    "baseline": "(() => { const ps = [...document.querySelectorAll('#mw-content-text p')].filter((p) => p.checkVisibility() && p.textContent.trim().length > 50); return ps.length >= 10 && new Set(ps.map((p) => Math.round(p.getBoundingClientRect().left))).size === 1; })()",
+    "expect": "(() => { const ps = [...document.querySelectorAll('#mw-content-text p')].filter((p) => p.checkVisibility() && p.textContent.trim().length > 50); const lefts = ps.map((p) => p.getBoundingClientRect().left); return getComputedStyle(document.querySelector('#mw-content-text > .mw-parser-output > section')).columnWidth !== 'auto' && Math.max(...lefts) - Math.min(...lefts) > 300; })()",
+    "intact": "(() => { const ps = [...document.querySelectorAll('#mw-content-text p')].filter((p) => p.checkVisibility() && p.textContent.trim().length > 50); const box = document.querySelector('.infobox'); return ps.length >= 10 && ps.every((p) => p.getBoundingClientRect().width > 250) && !!box && box.checkVisibility(); })()"
+  }
+}

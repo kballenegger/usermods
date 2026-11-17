@@ -1,0 +1,36 @@
+{
+  "slug": "block-news-sources",
+  "title": "Hide news sources on Yahoo News",
+  "question": "How do I block a publisher from Yahoo News?",
+  "answer": "Yahoo News has no setting to block a publisher on the website. The usermods script on this page adds a small hide button next to the source name under each story on Yahoo News. Click it and every story from that publisher disappears from the page, now and on later visits in the same browser. A bar in the corner lists the hidden sources and has a Show all button to undo.",
+  "prompt": "On Yahoo News, add a button to hide all stories from a given news source.",
+  "details": "Each story link on Yahoo carries the publisher's name in its tracking data (`data-yga`, field `yContentPartner`). The script reads that, finds the story's card, and hides the card when the publisher is on your list. The list is kept in the browser's local storage for www.yahoo.com, so it lasts across visits but not across browsers. You can also put names in `ALWAYS_HIDE` at the top of the script. The script matches all of www.yahoo.com, so it also works on the homepage feed, but the check only loads https://www.yahoo.com/news/. Stories without a publisher in their link data, such as Yahoo's own video modules, are left alone.",
+  "alternatives": [
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filter",
+      "body": "A procedural filter can hide headlines from one publisher. It hides the headline, not always the whole card, and our check runs the script, not this filter.\n\n```\nwww.yahoo.com##h3:has(a[data-yga*='\"yContentPartner\":\"HuffPost\"'])\n```"
+    }
+  ],
+  "related": ["yahoo/hide-ads"],
+  "demand": {
+    "score": 40,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/5384",
+        "note": "Purge Huffington Post from Yahoo News feed (total installs)"
+      }
+    ]
+  },
+  "check": {
+    "urls": ["https://www.yahoo.com/news/"],
+    "loggedOut": true,
+    "waitFor": "a[data-yga*=\"yContentPartner\"]",
+    "settleMs": 5000,
+    "actions": "const b = [...document.querySelectorAll('.um-block-source')].find((x) => x.checkVisibility()); if (b) b.click(); await new Promise((r) => setTimeout(r, 1000));",
+    "baseline": "(() => { const p = [...document.querySelectorAll('a[data-yga*=\"yContentPartner\"]')].filter((a) => a.checkVisibility()).map((a) => JSON.parse(a.dataset.yga).yContentPartner); return p.length >= 10 && new Set(p).size >= 3; })()",
+    "expect": "(() => { const list = JSON.parse(localStorage.getItem('usermods-yahoo-blocked-sources') || '[]'); if (list.length !== 1) return false; const links = [...document.querySelectorAll('a[data-yga*=\"yContentPartner\"]')]; const mine = links.filter((a) => JSON.parse(a.dataset.yga).yContentPartner === list[0]); const others = links.filter((a) => JSON.parse(a.dataset.yga).yContentPartner !== list[0] && a.checkVisibility()); const bar = document.getElementById('um-blocked-bar'); return mine.length > 0 && mine.every((a) => !a.checkVisibility()) && others.length >= 5 && !!bar && bar.textContent.includes(list[0]); })()",
+    "intact": "[...document.querySelectorAll('h3 a[href*=\"/news/\"], h3 a[href*=\"/articles/\"]')].filter((a) => a.checkVisibility()).length >= 5"
+  }
+}

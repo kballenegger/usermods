@@ -1,0 +1,38 @@
+{
+  "slug": "paywall-marker",
+  "title": "Mark paywalled links on Hacker News",
+  "question": "How can I tell which Hacker News links are paywalled?",
+  "answer": "Hacker News does not mark paywalled links; the only hint is the site name in brackets after each title. The usermods script on this page adds a small red paywall tag next to stories from sites that keep most articles behind a paywall, such as nytimes.com, wsj.com, ft.com, bloomberg.com and economist.com. The list is in the script and you can edit it. Without a script, check the site name before clicking, or look in the comments, where readers often post an archive link.",
+  "prompt": "On Hacker News, put a paywall tag next to links from sites like the NYT, WSJ and FT.",
+  "details": "The script reads the site name Hacker News prints after each title (`span.sitestr`) and compares it with a fixed list of about 30 paywalled sites, subdomains included. Matching stories get a red `paywall` tag after the site name. Nothing is hidden and the script makes no network requests, so it cannot tell a free article on a paywalled site from a locked one.\n\nThe check loads the list of New York Times stories at `from?site=nytimes.com`. The same code runs on the front page, `newest`, `best` and other story lists.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Archive links in the comments",
+      "body": "Hacker News allows paywalled articles when there is a workaround, and readers often post an archive.today or Wayback Machine link as one of the first comments."
+    }
+  ],
+  "related": [
+    "hackernews/open-links-new-tab",
+    "hackernews/absolute-dates",
+    "hackernews/dark-mode"
+  ],
+  "demand": {
+    "score": 52,
+    "evidence": [
+      { "type": "greasyfork", "url": "https://greasyfork.org/en/scripts/452024", "note": "Hacker News Anti-Paywall (total installs, read from api.greasyfork.org/en/scripts/by-site)" },
+      { "type": "autocomplete", "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=hacker%20news%20paywall", "note": "returns the query; suggestions: hacker news paywall" },
+      { "type": "forum", "url": "https://news.ycombinator.com/item?id=41389094", "note": "HN thread: Is there any way HN can implement a 'paywall tag' to save wasted clicks?" },
+      { "type": "forum", "url": "https://news.ycombinator.com/item?id=16860952", "note": "HN thread: Should we use [paywall] tag where applicable?" }
+    ]
+  },
+  "check": {
+    "urls": ["https://news.ycombinator.com/from?site=nytimes.com"],
+    "loggedOut": true,
+    "waitFor": "tr.athing",
+    "settleMs": 2000,
+    "baseline": "(() => { const s = [...document.querySelectorAll('.titleline .sitestr')]; return s.length >= 10 && s.every((e) => e.textContent.trim() === 'nytimes.com') && !document.querySelector('.um-paywall'); })()",
+    "expect": "(() => { const rows = [...document.querySelectorAll('tr.athing')].filter((r) => r.querySelector('.sitestr')); return rows.length >= 10 && rows.every((r) => { const t = r.querySelector('.titleline .um-paywall'); return !!t && t.checkVisibility() && t.textContent === 'paywall'; }); })()",
+    "intact": "(() => { const links = [...document.querySelectorAll('.titleline > a')].filter((a) => a.checkVisibility() && /nytimes\\.com/.test(a.href)); return links.length >= 10 && document.querySelectorAll('.subline').length >= 10; })()"
+  }
+}

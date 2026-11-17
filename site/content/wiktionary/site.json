@@ -1,0 +1,7 @@
+{
+  "slug": "wiktionary",
+  "name": "Wiktionary",
+  "domains": ["wiktionary.org", "en.wiktionary.org"],
+  "category": "reference",
+  "intro": "Userscripts for reading Wiktionary logged out: only the languages you read, and dark mode that doesn't reset."
+}

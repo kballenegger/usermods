@@ -1,0 +1,36 @@
+{
+  "slug": "disable-autoplay",
+  "title": "Turn off Vimeo autoplay of the next video",
+  "question": "How do I stop Vimeo from autoplaying the next video?",
+  "answer": "Switch off the Autoplay next toggle on the Vimeo video page; it is on by default. The usermods script on this page switches it off for you each time you open a video page on vimeo.com, so a video stops at the end instead of moving on to the next one. If you switch it back on, the script leaves it on for that video. Without an extension, flip the toggle by hand on each visit.",
+  "prompt": "Turn off Vimeo's Autoplay next switch on every video page.",
+  "details": "The script clicks Vimeo's own Autoplay next switch once per video page, which goes through Vimeo's handler the same way a click of yours would. It runs again when you move to another video without a full page load.\n\nIt does not change the start-of-video autoplay of players embedded on other sites; that is set by the site that embeds the video.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "The Autoplay next switch",
+      "body": "Turn off **Autoplay next** on the video page."
+    }
+  ],
+  "related": [
+    "vimeo/playback-speed",
+    "vimeo/theater-mode"
+  ],
+  "check": {
+    "urls": [
+      "https://vimeo.com/76979871"
+    ],
+    "loggedOut": true,
+    "waitFor": "#viewer_home_playlist_autoplay",
+    "settleMs": 4000,
+    "baseline": "(() => { const t = document.getElementById('viewer_home_playlist_autoplay'); const label = document.querySelector('label[for=\"viewer_home_playlist_autoplay\"]'); return !!t && t.checked && !!label && label.checkVisibility() && /Autoplay next/.test(label.textContent); })()",
+    "expect": "(() => { const t = document.getElementById('viewer_home_playlist_autoplay'); const label = document.querySelector('label[for=\"viewer_home_playlist_autoplay\"]'); return !!t && !t.checked && !!label && label.checkVisibility(); })()",
+    "intact": "(() => { const v = document.querySelector('video'); return !!v && v.checkVisibility() && v.duration > 30 && v.getBoundingClientRect().width > 800; })()"
+  },
+  "demand": {
+    "score": 5,
+    "evidence": [
+      { "type": "autocomplete", "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=vimeo%20disable%20autoplay", "note": "Google suggests \"vimeo turn off autoplay next video\" and \"vimeo turn off autoplay\"" }
+    ]
+  }
+}

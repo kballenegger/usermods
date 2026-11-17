@@ -1,0 +1,55 @@
+{
+  "slug": "external-links",
+  "title": "Add links to other movie sites on IMDb",
+  "question": "How do I jump from an IMDb page to Letterboxd, Rotten Tomatoes or TMDb?",
+  "answer": "IMDb title pages do not link to Letterboxd, TMDb or Rotten Tomatoes. The usermods script on this page adds a row of links under the title: Letterboxd and TMDb open the same film directly from its IMDb id, and Rotten Tomatoes, Metacritic and Wikipedia open a search for the title. Without an extension, Letterboxd accepts IMDb ids in its URL: replace the start of the IMDb address with letterboxd.com/imdb/ and keep the tt number.",
+  "prompt": "On IMDb title pages, add links to the same movie on Letterboxd, TMDb, Rotten Tomatoes, Metacritic and Wikipedia.",
+  "details": "The links are built from the page itself: the `tt` id in the address, the title in the heading and the year in the page's structured data. The script sends no requests. Letterboxd (`letterboxd.com/imdb/<id>/`) and TMDb (`themoviedb.org/redirect?external_source=imdb_id&external_id=<id>`) redirect to their page for that id; Letterboxd only lists films, so its link fails for TV series. The other three are searches, so a common title may need a second click. Links open in a new tab. Only the main title page (`/title/tt.../`) gets the row; cast, reviews and other sub-pages do not.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Letterboxd and TMDb by IMDb id",
+      "body": "Open `https://letterboxd.com/imdb/tt0111161/` or `https://www.themoviedb.org/redirect?external_source=imdb_id&external_id=tt0111161` with the id from the IMDb address."
+    }
+  ],
+  "related": [
+    "imdb/show-actor-age",
+    "imdb/larger-photos"
+  ],
+  "check": {
+    "urls": [
+      "https://www.imdb.com/title/tt0111161/"
+    ],
+    "loggedOut": true,
+    "waitFor": "h1[data-testid=\"hero__pageTitle\"]",
+    "settleMs": 4000,
+    "baseline": "(() => { const h = document.querySelector('h1[data-testid=\"hero__pageTitle\"]'); return !!h && h.checkVisibility() && /Shawshank/.test(h.textContent) && !document.querySelector('a[href*=\"letterboxd.com\"], a[href*=\"themoviedb.org\"], a[href*=\"rottentomatoes.com\"]'); })()",
+    "expect": "(() => { const row = document.querySelector('.usermods-ext-links'); if (!row || !row.checkVisibility()) return false; const hrefs = [...row.querySelectorAll('a')].filter((a) => a.checkVisibility()).map((a) => a.href); return hrefs.length === 5 && hrefs.includes('https://letterboxd.com/imdb/tt0111161/') && hrefs.some((u) => u.includes('themoviedb.org/redirect') && u.includes('external_id=tt0111161')) && hrefs.some((u) => u.startsWith('https://www.rottentomatoes.com/search?search=The%20Shawshank%20Redemption')) && hrefs.some((u) => u.includes('wikipedia.org') && u.includes('1994')); })()",
+    "intact": "(() => { const h = document.querySelector('h1[data-testid=\"hero__pageTitle\"]'); const poster = document.querySelector('[data-testid=\"hero-media__poster\"]'); const cast = document.querySelector('[data-testid=\"title-cast\"]'); return !!h && h.checkVisibility() && !!poster && poster.checkVisibility() && !!cast && cast.checkVisibility(); })()"
+  },
+  "demand": {
+    "score": 59,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/17154",
+        "note": "IMDb: Link 'em all! (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/3399",
+        "note": "IMDB+ (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/ifinopelnonfmkeadpclelgkbdpmgoll",
+        "note": "IMDB++ (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=imdb%20links",
+        "note": "returns the query; suggestions: imdb links | imdb links of justice | imdb movie links | imdb sneaky links | stream imdb links"
+      }
+    ]
+  }
+}

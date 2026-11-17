@@ -1,0 +1,7 @@
+{
+  "slug": "archive",
+  "name": "Internet Archive",
+  "domains": ["archive.org", "web.archive.org"],
+  "category": "reference",
+  "intro": "Userscripts for archive.org item pages and Wayback Machine snapshots: downloads, the snapshot toolbar and links back to the live page."
+}

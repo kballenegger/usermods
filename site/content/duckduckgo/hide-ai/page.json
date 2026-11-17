@@ -23,9 +23,7 @@
     }
   ],
   "related": [
-    "duckduckgo/declutter",
-    "google/remove-ai-overview",
-    "bing/remove-copilot"
+    "google/remove-ai-overview"
   ],
   "demand": {
     "score": 79,

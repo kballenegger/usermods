@@ -1,0 +1,50 @@
+{
+  "slug": "larger-font",
+  "title": "Make Wikipedia text bigger",
+  "question": "How do I increase the font size on Wikipedia?",
+  "answer": "Wikipedia has a text size setting on desktop: open the Appearance menu at the top right of an article and pick Large under Text. Logged out, that choice is kept by your browser for that one language of Wikipedia only, and private windows or cleared site data lose it. The usermods script on this page turns on the same Large size on every Wikipedia page as it loads, so it never resets and needs no account.",
+  "prompt": "Always show Wikipedia articles at the Large text size.",
+  "details": "The script swaps the text size class on the page's root element to `vector-feature-custom-font-size-clientpref-2`, the same switch the Appearance menu makes when you pick Large. Body text goes from 16 to 20 pixels, and tables, infoboxes and references grow with it, using Wikipedia's own sizes. It keeps the class set while the page loads, because Wikipedia's startup code rewrites it from the saved preference.\n\nWhile the script is on, the Small and Standard choices in the Appearance menu have no effect. It works with the default Vector skin; the check loads one English article.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Appearance menu",
+      "body": "On desktop, open **Appearance** at the top right (or in the sidebar) and choose **Large** under **Text**. Logged in, the choice is saved to your account. Logged out, it is stored in your browser for that language edition only."
+    },
+    {
+      "kind": "other",
+      "title": "Browser zoom",
+      "body": "Ctrl and + (Cmd and + on a Mac) zooms the whole page, menus and images included. Chrome remembers the zoom level per site."
+    }
+  ],
+  "related": [
+    "wikipedia/dark-mode",
+    "wikipedia/full-width"
+  ],
+  "demand": {
+    "score": 28,
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/dkcfmmedajaacimlkhcgnfdnjchefjhh",
+        "note": "Wiki Refined (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=wikipedia%20font%20size",
+        "note": "returns the query; suggestions: wikipedia font size | wikipedia font size change | wikipedia font size too small | wiki font size | wikipedia text size"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://en.wikipedia.org/wiki/Moon"
+    ],
+    "loggedOut": true,
+    "waitFor": "#mw-content-text p",
+    "settleMs": 3000,
+    "baseline": "(() => { const p = document.querySelector('#mw-content-text p:not(.mw-empty-elt)'); return document.documentElement.classList.contains('vector-feature-custom-font-size-clientpref-1') && parseFloat(getComputedStyle(p).fontSize) <= 16; })()",
+    "expect": "(() => { const p = document.querySelector('#mw-content-text p:not(.mw-empty-elt)'); const c = document.documentElement.classList; return c.contains('vector-feature-custom-font-size-clientpref-2') && !c.contains('vector-feature-custom-font-size-clientpref-1') && parseFloat(getComputedStyle(p).fontSize) >= 20; })()",
+    "intact": "[...document.querySelectorAll('#mw-content-text p')].filter((p) => p.checkVisibility() && p.textContent.trim().length > 50).length >= 10"
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "slug": "volume-boost",
+  "title": "Boost YouTube volume above 100%",
+  "question": "How do I make a quiet YouTube video louder than max volume?",
+  "answer": "YouTube's volume slider stops at 100% and the site has no setting to go past it; Stable Volume and Voice boost in the gear menu change the balance of the sound, not the maximum. The usermods script on this page adds a button next to the volume slider that boosts the sound to 1.5x, 2x or 3x of full volume and back to normal. Without an extension, turn up your system volume or use speakers with their own amplifier.",
+  "prompt": "Add a volume boost button to YouTube that makes videos louder than 100%.",
+  "details": "Each click on the button moves to the next level: 1x (off), 1.5x, 2x, 3x, then back to 1x. The button shows the current level and turns yellow while a boost is on.\n\nThe browser's video element can't play louder than 100%, so on the first boost the script routes the video's sound through a Web Audio gain node, which multiplies it. YouTube's own volume slider still works on top of that. The boost stays on when you move to the next video. Loud passages clip and distort at high levels, so use it for quiet videos.\n\nThe check sets the boost to 2x and measures that the sound coming out of the gain node is twice as strong as the sound going in.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Stable Volume",
+      "body": "The gear menu has **Stable Volume**, which evens out loud and quiet parts of a video. It does not take the volume past 100%."
+    },
+    {
+      "kind": "extension",
+      "title": "Volume Booster for YouTube",
+      "body": "The Volume Booster for YouTube extension does the same with a slider in the browser toolbar."
+    }
+  ],
+  "related": [
+    "youtube/faster-playback-speed",
+    "youtube/loop-video",
+    "youtube/default-playback-speed"
+  ],
+  "demand": {
+    "score": 79,
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/camciclnnglajljifpjocnpmepnkajgi",
+        "note": "Volume Booster for YouTube™ (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20volume%20booster",
+        "note": "returns the query; suggestions: youtube volume booster | youtube volume booster extension | youtube volume booster firefox | youtube volume booster chrome extension | youtube volume booster iphone"
+      },
+      {
+        "type": "forum",
+        "url": "https://webapps.stackexchange.com/questions/6506/how-to-increase-the-volume-on-certain-youtube-videos",
+        "note": "webapps.stackexchange question: How to increase the volume on certain YouTube videos"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.youtube.com/watch?v=aqz-KE-bpKQ"
+    ],
+    "loggedOut": true,
+    "waitFor": "#movie_player video",
+    "settleMs": 3000,
+    "actions": "const p = document.querySelector('#movie_player'); p.unMute(); p.setVolume(100); p.playVideo(); await new Promise((r) => setTimeout(r, 4000)); window.__audio = { sources: [], gains: [] }; const proto = AudioContext.prototype; const mes = proto.createMediaElementSource; proto.createMediaElementSource = function (el) { const n = mes.call(this, el); window.__audio.sources.push(n); return n; }; const cg = proto.createGain; proto.createGain = function () { const n = cg.call(this); window.__audio.gains.push(n); return n; }; const b = document.querySelector('#usermods-volume-boost'); b?.click(); b?.click(); await new Promise((r) => setTimeout(r, 1000));",
+    "baseline": "(() => { const p = document.querySelector('#movie_player'); const v = p.querySelector('video'); const s = p.querySelector('.ytp-volume-panel'); const labels = [...p.querySelectorAll('.ytp-chrome-bottom button')].map((b) => b.getAttribute('aria-label') || '').join(' '); return s.getAttribute('aria-valuemax') === '100' && p.getVolume() === 100 && v.volume <= 1 && !/boost/i.test(labels) && window.__audio.sources.length === 0; })()",
+    "expect": "(async () => { const b = document.querySelector('#usermods-volume-boost'); const { sources, gains } = window.__audio; if (!b || !b.checkVisibility() || b.textContent !== '2x' || sources.length !== 1 || gains.length !== 1) return false; const src = sources[0], g = gains[0]; if (src.mediaElement !== document.querySelector('#movie_player video') || g.gain.value !== 2 || src.context.state !== 'running') return false; const a1 = src.context.createAnalyser(), a2 = src.context.createAnalyser(); src.connect(a1); g.connect(a2); await new Promise((r) => setTimeout(r, 1500)); const rms = (a) => { const d = new Float32Array(a.fftSize); a.getFloatTimeDomainData(d); return Math.sqrt(d.reduce((s, x) => s + x * x, 0) / d.length); }; const i = rms(a1), o = rms(a2); return i > 0.001 && Math.abs(o / i - 2) < 0.05; })()",
+    "intact": "(() => { const p = document.querySelector('#movie_player'); return p.getPlayerState() === 1 && !p.isMuted() && p.querySelector('.ytp-volume-area').checkVisibility() && p.querySelector('video').currentTime > 3; })()"
+  }
+}

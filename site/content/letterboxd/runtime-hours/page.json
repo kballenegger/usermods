@@ -1,0 +1,37 @@
+{
+  "slug": "runtime-hours",
+  "title": "Show Letterboxd runtimes in hours and minutes",
+  "question": "How do I see film runtimes in hours on Letterboxd?",
+  "answer": "Letterboxd shows a film's runtime only in minutes, in the line with the IMDb and TMDB links on the film page, and has no setting to change the format. The usermods script on this page adds the hours and minutes next to it, so \"133 mins\" becomes \"133 mins (2h 13m)\". Films under an hour are left as they are. Without a script, divide by 60: the hours are the whole part and the remainder is the minutes.",
+  "prompt": "On Letterboxd film pages, show the runtime in hours and minutes next to the minutes.",
+  "details": "The runtime sits at the start of the footer line that also holds the IMDb and TMDB links. The script rewrites that one piece of text once the page has loaded and leaves the links alone. It only changes film pages; lists and search results don't show runtimes.",
+  "related": [
+    "letterboxd/exact-average-rating"
+  ],
+  "demand": {
+    "score": 33,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/465414",
+        "note": "Letterboxd runtime in hours and minutes (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/509860",
+        "note": "Letterboxd Runtime (total installs)"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://letterboxd.com/film/parasite-2019/"
+    ],
+    "loggedOut": true,
+    "waitFor": "p.text-footer",
+    "settleMs": 2000,
+    "baseline": "(() => { const p = document.querySelector('p.text-footer'); return !!p && /133\\s*mins/.test(p.textContent) && !/2h 13m/.test(p.textContent); })()",
+    "expect": "(() => { const p = document.querySelector('p.text-footer'); return !!p && /133\\s*mins \\(2h 13m\\)/.test(p.textContent) && p.checkVisibility(); })()",
+    "intact": "(() => { const p = document.querySelector('p.text-footer'); const title = document.querySelector('h1.primaryname'); return !!title && /Parasite/.test(title.textContent) && !!p && !!p.querySelector('a[href*=\"imdb.com\"]') && !!p.querySelector('a[href*=\"themoviedb.org\"]'); })()"
+  }
+}

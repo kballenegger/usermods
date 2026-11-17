@@ -1,0 +1,52 @@
+{
+  "slug": "disable-hover-preview",
+  "title": "Stop YouTube previews on hover",
+  "question": "How do I stop YouTube videos from playing when I hover over them?",
+  "answer": "Signed out, YouTube has no switch to stop videos playing when you hover over a thumbnail. The usermods script on this page stops the hover preview everywhere: it hides the preview that YouTube lays over a thumbnail and pauses its video, so the plain thumbnail stays and no preview keeps playing out of sight. Clicking a video still opens it as usual, and the watch page player is untouched.",
+  "prompt": "Stop YouTube from playing previews when I hover over a video thumbnail.",
+  "details": "YouTube plays hover previews in a floating element, `#video-preview`, placed over the thumbnail. The script hides that element with CSS and pauses any video that starts playing inside it. The check hovers a thumbnail on a search results page. The home page and channel pages use the same preview element, but the check does not load them.",
+  "alternatives": [
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filter",
+      "body": "Hides the preview, but the preview video still loads and plays out of sight. Our check runs the script, not this filter.\n\n```\nwww.youtube.com###video-preview\n```"
+    }
+  ],
+  "related": [
+    "youtube/open-links-new-tab",
+    "youtube/disable-autoplay",
+    "youtube/hide-shorts"
+  ],
+  "check": {
+    "urls": [
+      "https://www.youtube.com/results?search_query=minecraft&hl=en"
+    ],
+    "loggedOut": true,
+    "waitFor": "ytd-video-renderer a#thumbnail",
+    "settleMs": 3000,
+    "actions": "const el = document.querySelectorAll('ytd-video-renderer')[1].querySelector('#dismissible'); const r = el.getBoundingClientRect(); for (const t of ['pointerover', 'pointerenter', 'mouseover', 'mouseenter', 'pointermove', 'mousemove']) el.dispatchEvent(new (t.startsWith('pointer') ? PointerEvent : MouseEvent)(t, { bubbles: !t.endsWith('enter'), composed: true, clientX: r.x + 20, clientY: r.y + 20, view: window })); await new Promise((r) => setTimeout(r, 4000));",
+    "baseline": "(() => { const p = document.querySelector('#video-preview'); const v = p && p.querySelector('video'); return !!p && p.checkVisibility() && !!v && !v.paused; })()",
+    "expect": "(() => { const p = document.querySelector('#video-preview'); const v = p && p.querySelector('video'); return !!p && !p.checkVisibility() && (!v || v.paused); })()",
+    "intact": "[...document.querySelectorAll('ytd-video-renderer')].filter((v) => v.checkVisibility()).length >= 5"
+  },
+  "demand": {
+    "score": 53,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/555488",
+        "note": "YouTube - Block Autoplay Preview Thumbnail and Channel Trailer (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/ideedcbdjnpgbombplbbclpkpdhobjdi",
+        "note": "YouTube Autoplay Preventer - Stop Video Previews (378 users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20disable%20preview%20on%20hover",
+        "note": "returns the query; suggestions: youtube disable preview on hover | disable youtube auto preview | how to turn youtube preview off | can you turn off preview on youtube | how to turn off auto preview in youtube"
+      }
+    ]
+  }
+}

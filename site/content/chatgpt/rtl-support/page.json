@@ -1,0 +1,61 @@
+{
+  "slug": "rtl-support",
+  "title": "Show your ChatGPT messages right to left",
+  "question": "How do I make ChatGPT show Persian, Arabic or Hebrew right to left?",
+  "answer": "ChatGPT already lays out its own replies right to left when they are in Persian, Arabic or Hebrew, but your messages and the message box stay left to right, so punctuation and English words land on the wrong side. ChatGPT has no setting to change this. The usermods script on this page marks your sent messages and the message box so the browser picks the direction from the text, and English messages stay left to right.",
+  "prompt": "On ChatGPT, show my own messages and the message box right to left when I write in Persian or Arabic.",
+  "details": "The script sets `dir=\"auto\"` on each of your sent messages and on the message box, and keeps doing it as new messages appear and as you move between chats. With `dir=\"auto\"` the browser takes the direction from the first letter of the text, so a Persian message is laid out right to left and an English one left to right.\n\nIt leaves ChatGPT's replies alone, because ChatGPT already marks them the same way, and it does not touch code blocks. The check sends a Persian message logged out and types a second one into the box.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Ctrl with right Shift in the message box",
+      "body": "In Chrome and Edge on Windows, Ctrl with the right Shift key switches a focused text box to right to left, and Ctrl with the left Shift key switches it back. It applies to the box only, until the page reloads, and does not change messages you have sent."
+    },
+    {
+      "kind": "extension",
+      "title": "RTL extensions",
+      "body": "Several Chrome extensions, such as ChatGPT RTL, flip ChatGPT's text direction and add font options."
+    }
+  ],
+  "related": [
+    "chatgpt/wide-chat",
+    "chatgpt/ctrl-enter-to-send"
+  ],
+  "demand": {
+    "score": 59,
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/fjhcbdccgkekaflpomnjjcfcfpmgjijf",
+        "note": "ChatGPT RTL (4,000 users)"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/igfnpdinafnhaidnnkedokcabfgeknnn",
+        "note": "ChatGPT RTL Support (4,000 users)"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/ljfnhokapbmbchbfpgdkedekmfeodoie",
+        "note": "ChatGPT RTL Support (Farsi/Arabic) (3,000 users)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=chatgpt%20rtl",
+        "note": "returns the query; suggestions: chatgpt rtl | chatgpt rtl extension | chatgpt rtl extension chrome | chatgpt rtl (persian/farsi) | chatgpt rtl support"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://chatgpt.com/"
+    ],
+    "loggedOut": true,
+    "waitFor": "form textarea[name=\"prompt\"]",
+    "settleMs": 3000,
+    "actions": "const sleep = (ms) => new Promise((r) => setTimeout(r, ms)); const box = document.querySelector('form textarea[name=\"prompt\"]'); box.focus(); document.execCommand('insertText', false, 'سلام. لطفا در یک جمله بگو Python چیست؟'); await sleep(500); box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true })); for (let i = 0; i < 50 && !document.querySelector('li[data-message-role=\"assistant\"][data-message-complete]'); i++) await sleep(500); await sleep(1500); const b2 = document.querySelector('form textarea[name=\"prompt\"]'); b2.focus(); document.execCommand('insertText', false, 'پیام دوم، با کلمه Python.'); await sleep(500);",
+    "baseline": "(() => { const u = document.querySelector('li[data-message-role=\"user\"] p[data-user-message-copy]'); const box = document.querySelector('form textarea[name=\"prompt\"]'); return !!u && /[\\u0600-\\u06FF]/.test(u.textContent) && getComputedStyle(u).direction === 'ltr' && /[\\u0600-\\u06FF]/.test(box.value) && getComputedStyle(box).direction === 'ltr'; })()",
+    "expect": "(() => { const u = document.querySelector('li[data-message-role=\"user\"] p[data-user-message-copy]'); const box = document.querySelector('form textarea[name=\"prompt\"]'); return !!u && /[\\u0600-\\u06FF]/.test(u.textContent) && getComputedStyle(u).direction === 'rtl' && /[\\u0600-\\u06FF]/.test(box.value) && getComputedStyle(box).direction === 'rtl'; })()",
+    "intact": "[...document.querySelectorAll('li[data-message-role]')].filter((m) => m.checkVisibility()).length >= 2 && !!document.querySelector('li[data-message-role=\"assistant\"][data-message-complete]') && document.querySelector('form textarea[name=\"prompt\"]').checkVisibility()"
+  }
+}

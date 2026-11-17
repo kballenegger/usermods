@@ -1,0 +1,51 @@
+{
+  "slug": "redirect-shorts",
+  "title": "Open YouTube Shorts in the regular player",
+  "question": "How do I watch YouTube Shorts in the regular video player?",
+  "answer": "YouTube has no setting that opens Shorts in the normal player, but every Short is also a regular video: change /shorts/ in the address to /watch?v= and keep the video ID. The usermods script on this page does that for you. When a youtube.com/shorts/ link loads, or you click a Short in a feed or search results, it opens the same video on the regular watch page, with the seek bar, playback speed, quality menu and comments.",
+  "prompt": "Open YouTube Shorts in the normal video player instead of the Shorts player.",
+  "details": "The script runs before the page draws. On a direct load of a `/shorts/<id>` URL (a pasted link, a new tab, a reload) it replaces the address with `/watch?v=<id>`, so the Shorts URL does not stay in your history and Back works normally. Inside YouTube, a plain click on a Shorts link loads the watch page instead; a middle click or Ctrl/Cmd-click opens a new tab, which then redirects on load.\n\nThe check loads a Shorts URL directly and confirms the watch page plays the same video ID. The click path is not covered by the check. Shorts shelves in feeds stay visible; to hide them, use the Hide YouTube Shorts script.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Edit the URL by hand",
+      "body": "Replace `/shorts/` with `/watch?v=` in the address bar. `youtube.com/shorts/bkSNwyl7iHE` becomes `youtube.com/watch?v=bkSNwyl7iHE`."
+    }
+  ],
+  "related": [
+    "youtube/hide-shorts",
+    "youtube/default-playback-speed",
+    "youtube/disable-autoplay"
+  ],
+  "demand": {
+    "score": 65,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/439993",
+        "note": "Youtube shorts redirect (20311 total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/504848",
+        "note": "YouTube Shorts To Normal Video (4071 total installs)"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/cmhmepchidgajcngdkpdchbdboheihgi",
+        "note": "Shorts to Normal player (10000 users)"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.youtube.com/shorts/bkSNwyl7iHE"
+    ],
+    "loggedOut": true,
+    "waitFor": "ytd-app",
+    "settleMs": 6000,
+    "baseline": "(() => { const s = document.querySelector(\"ytd-shorts\"); return location.pathname === \"/shorts/bkSNwyl7iHE\" && !!s && s.checkVisibility(); })()",
+    "expect": "(() => { const w = document.querySelector(\"ytd-watch-flexy\"); const s = document.querySelector(\"ytd-shorts\"); return location.pathname === \"/watch\" && new URLSearchParams(location.search).get(\"v\") === \"bkSNwyl7iHE\" && !!w && w.checkVisibility() && !(s && s.checkVisibility()); })()",
+    "intact": "(() => { const v = document.querySelector(\"#movie_player video\"); const t = document.querySelector(\"ytd-watch-metadata h1\"); return !!v && v.checkVisibility() && !!t && t.checkVisibility() && t.textContent.trim().length > 0; })()"
+  }
+}

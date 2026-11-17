@@ -1,0 +1,45 @@
+{
+  "slug": "dark-mode",
+  "title": "Use dark mode on Hugging Face without logging in",
+  "question": "How do I use dark mode on Hugging Face?",
+  "answer": "Logged out, Hugging Face follows your operating system: switch the system or browser to dark and the site turns dark too. Logged in, you can pick a theme in your account settings. The usermods script on this page keeps huggingface.co in its own dark theme for logged-out visitors even when the system is set to light, on model, dataset and Space pages and the rest of the site. It uses the site's built-in dark styles, so nothing looks out of place.",
+  "prompt": "Make huggingface.co always use its dark theme, even when I'm logged out and my system is in light mode.",
+  "details": "Hugging Face styles its dark theme from a `dark` class on the page's root element and sets that class for guests from the system's `prefers-color-scheme`. The script adds the class before the page draws and adds it back if the page removes it, so there is no light flash.\n\nThe app inside a Space comes from a separate address and follows its own theme, usually the system setting. The check loads a model page with the browser in light mode and confirms the dark background and light text.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "System dark mode",
+      "body": "Logged out, the site matches your system or browser colour scheme. Set the operating system, or the browser's own appearance setting, to dark."
+    },
+    {
+      "kind": "site-setting",
+      "title": "Account theme",
+      "body": "Logged in, the theme is an account setting, so it applies wherever you are signed in."
+    }
+  ],
+  "related": [
+    "huggingface/spaces-fullscreen",
+    "huggingface/copy-download-command"
+  ],
+  "demand": {
+    "score": 5,
+    "evidence": [
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=huggingface%20dark%20mode",
+        "note": "returns \"huggingface dark mode\"; suggestions: huggingface dark mode | huggingface dark theme | huggingface model list | how to use huggingface models | how to download huggingface model"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://huggingface.co/openai-community/gpt2"
+    ],
+    "loggedOut": true,
+    "waitFor": "h1 a.font-mono[href]",
+    "settleMs": 3000,
+    "baseline": "(() => { const bg = getComputedStyle(document.body).backgroundColor; return !document.documentElement.classList.contains('dark') && bg === 'rgb(255, 255, 255)' && !matchMedia('(prefers-color-scheme: dark)').matches; })()",
+    "expect": "(() => { const bg = getComputedStyle(document.body).backgroundColor.match(/\\d+/g).map(Number); const fg = getComputedStyle(document.querySelector('.model-card-content, main .prose') || document.querySelector('h1')).color; const c = document.createElement('canvas').getContext('2d'); c.fillStyle = fg; c.fillRect(0, 0, 1, 1); const [r, g, b] = c.getImageData(0, 0, 1, 1).data; return document.documentElement.classList.contains('dark') && bg[0] < 40 && bg[1] < 40 && bg[2] < 40 && r > 150 && g > 150 && b > 150; })()",
+    "intact": "(() => { const h = document.querySelector('h1'); const p = [...document.querySelectorAll('main .prose p, .model-card-content p')].filter((e) => e.checkVisibility()); return !!h && h.checkVisibility() && p.length >= 3; })()"
+  }
+}

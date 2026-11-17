@@ -1,0 +1,56 @@
+{
+  "slug": "library-links",
+  "title": "Search your library from Goodreads",
+  "question": "How do I check if my library has a book I'm looking at on Goodreads?",
+  "answer": "Goodreads has no library lookup; its buy buttons point to stores. The usermods script on this page adds a \"Find it at a library\" box under the Want to Read button on every book page, with search links for WorldCat, OverDrive (the catalogue behind Libby) and Open Library, filled in with the book's title and author. One click shows which libraries hold it. Without a script, copy the title into your library's catalogue or the Libby app by hand.",
+  "prompt": "On Goodreads book pages, add links that search WorldCat, OverDrive and Open Library for the book.",
+  "details": "The script reads the title and the first author from the page and builds three search URLs. It makes no network requests of its own, so it cannot show availability on the page; the links open the search in a new tab. WorldCat shows libraries near you that own a copy. OverDrive search covers the ebooks and audiobooks that Libby lends. Open Library lends scanned copies.\n\nA subtitle after a colon is left out of the search so more editions match. The box is re-added if Goodreads re-renders the page or you move to another book.",
+  "alternatives": [
+    {
+      "kind": "extension",
+      "title": "Available Reads",
+      "body": "A Chrome extension that checks your OverDrive library for availability and shows it on Goodreads. It makes network calls to your library on every page."
+    },
+    {
+      "kind": "other",
+      "title": "Search by hand",
+      "body": "Copy the title into your library's catalogue, the Libby app or worldcat.org."
+    }
+  ],
+  "related": [
+    "goodreads/sort-list-by-rating",
+    "goodreads/declutter",
+    "goodreads/wide-layout"
+  ],
+  "demand": {
+    "score": 59,
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/gclnfffacbjpclfenjgefpfnafmjghhk",
+        "note": "Available Reads (4000 users)"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/jehnphgljiclcngoamjmckillljaohko",
+        "note": "Goodreads Library Links (25 users)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=goodreads%20library%20extension",
+        "note": "suggestions: goodreads library extension, most read books on goodreads"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.goodreads.com/book/show/5907.The_Hobbit"
+    ],
+    "loggedOut": true,
+    "waitFor": ".BookPage__leftColumn .BookActions",
+    "settleMs": 3000,
+    "baseline": "(() => { const a = document.querySelector('.BookPage__leftColumn .BookActions'); return !!a && a.checkVisibility() && !document.querySelector('a[href*=\"worldcat.org\"], a[href*=\"overdrive.com/search\"]'); })()",
+    "expect": "(() => { const box = document.querySelector('.BookPage__leftColumn .BookActions + .um-library-links'); if (!box || !box.checkVisibility()) return false; const hrefs = [...box.querySelectorAll('a')].filter((a) => a.checkVisibility()).map((a) => decodeURIComponent(a.href)); return hrefs.length === 3 && hrefs[0].startsWith('https://search.worldcat.org/search?q=ti:The Hobbit') && hrefs[0].includes('Tolkien') && hrefs[1].startsWith('https://www.overdrive.com/search?q=The Hobbit') && hrefs[2].startsWith('https://openlibrary.org/search?title=The Hobbit'); })()",
+    "intact": "(() => { const h = document.querySelector('h1[data-testid=\"bookTitle\"]'); const b = document.querySelector('.BookPage__leftColumn .BookActions button'); return !!h && h.checkVisibility() && !!b && b.checkVisibility() && [...document.querySelectorAll('.BookPageMetadataSection a')].filter((a) => a.checkVisibility()).length >= 5; })()"
+  }
+}

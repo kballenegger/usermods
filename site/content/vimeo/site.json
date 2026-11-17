@@ -1,0 +1,7 @@
+{
+  "slug": "vimeo",
+  "name": "Vimeo",
+  "domains": ["vimeo.com", "player.vimeo.com"],
+  "category": "video",
+  "intro": "Scripts for Vimeo's video pages: playback speed and player size."
+}

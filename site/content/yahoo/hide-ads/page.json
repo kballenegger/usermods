@@ -1,0 +1,39 @@
+{
+  "slug": "hide-ads",
+  "title": "Hide ads on Yahoo News",
+  "question": "How do I remove ads on the Yahoo homepage and news?",
+  "answer": "Yahoo has no setting that turns off the ads on Yahoo News. The usermods script on this page hides the ads on Yahoo News: the grey banner band under the header, the ads in the right-hand column, the ad slots between stories and the sponsored Taboola stories in the feed. Headlines and articles stay in place. A general ad blocker such as uBlock Origin also removes them and stops the ads from loading.",
+  "prompt": "Hide all the ads and sponsored stories on Yahoo News.",
+  "details": "The script is CSS only. It hides Yahoo's ad slots (`.ad-container`, `.cls-ad-rail`, `.cls-ad-top-center`, ids starting with `sda-` and sections with `-ad-` in their id) and Taboola's sponsored story blocks (`.trc_related_container`), along with the list items that hold them so no empty gaps are left. It hides the ads but does not stop them from loading, so it saves no data. It matches all of www.yahoo.com, so it also applies on the homepage, but the check only loads https://www.yahoo.com/news/.",
+  "alternatives": [
+    {
+      "kind": "extension",
+      "title": "uBlock Origin",
+      "body": "Its default lists block Yahoo's ads and Taboola before they load. Our check runs the script, not uBlock."
+    }
+  ],
+  "related": [
+    "yahoo/block-news-sources"
+  ],
+  "demand": {
+    "score": 5,
+    "evidence": [
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=yahoo%20ad%20blocker",
+        "note": "returns \"yahoo ad blocker\"; suggestions: yahoo ad blocker | yahoo ad blocker message | yahoo ad blocker chrome | yahoo ad blocker firefox | yahoo ad blocker reddit"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.yahoo.com/news/"
+    ],
+    "loggedOut": true,
+    "waitFor": "a[data-yga*=\"yContentPartner\"]",
+    "settleMs": 6000,
+    "baseline": "(() => { const ads = [...document.querySelectorAll('.ad-container, .cls-ad-rail, .cls-ad-top-center, .trc_related_container')].filter((e) => e.checkVisibility() && e.offsetHeight > 50); return ads.length >= 2 && document.querySelectorAll('.trc_related_container').length > 0; })()",
+    "expect": "(() => { const ads = [...document.querySelectorAll('.ad-container, .cls-ad-rail, .cls-ad-top-center, .trc_related_container, [id^=\"sda-\"], section[id*=\"-ad-\"]')]; const top = document.querySelector('.cls-ad-top-center'); return ads.length >= 3 && ads.every((e) => !e.checkVisibility()) && !!top; })()",
+    "intact": "[...document.querySelectorAll('h3 a[href*=\"/news/\"], h3 a[href*=\"/articles/\"]')].filter((a) => a.checkVisibility()).length >= 8"
+  }
+}
