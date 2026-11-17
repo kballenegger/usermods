@@ -230,6 +230,37 @@ test("robots, scripts and assets are served from the manifest; assets are not lo
   assert.equal(rowCount("/assets/site.css"), 0);
 });
 
+test("binary assets answer byte ranges; compressible files ignore them", async () => {
+  const full = await get("/assets/clip.mp4");
+  assert.equal(full.status, 200);
+  assert.equal(full.headers["content-type"], "video/mp4");
+  assert.equal(full.headers["accept-ranges"], "bytes");
+  assert.equal(full.text, "0123456789abcdefghijklmnopqrstuvwxyz");
+
+  const first = await get("/assets/clip.mp4", { range: "bytes=0-1" });
+  assert.equal(first.status, 206);
+  assert.equal(first.headers["content-range"], "bytes 0-1/36");
+  assert.equal(first.headers["content-length"], "2");
+  assert.equal(first.text, "01");
+
+  const open = await get("/assets/clip.mp4", { range: "bytes=30-" });
+  assert.equal(open.status, 206);
+  assert.equal(open.text, "uvwxyz");
+  assert.equal((await get("/assets/clip.mp4", { range: "bytes=-3" })).text, "xyz");
+  assert.equal((await get("/assets/clip.mp4", { range: "bytes=10-999" })).headers["content-range"], "bytes 10-35/36");
+
+  const past = await get("/assets/clip.mp4", { range: "bytes=36-" });
+  assert.equal(past.status, 416);
+  assert.equal(past.headers["content-range"], "bytes */36");
+
+  // A stale If-Range or a multi-range request gets the whole file.
+  assert.equal((await get("/assets/clip.mp4", { range: "bytes=0-1", "if-range": '"old"' })).status, 200);
+  assert.equal((await get("/assets/clip.mp4", { range: "bytes=0-1,4-5" })).status, 200);
+  const css = await get("/assets/site.css", { range: "bytes=0-1" });
+  assert.equal(css.status, 200);
+  assert.equal(css.headers["accept-ranges"], undefined);
+});
+
 test("unknown paths 404 with the HTML or markdown not-found page; HEAD has no body; POST is refused", async () => {
   const html = await get("/nope");
   assert.equal(html.status, 404);

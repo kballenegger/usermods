@@ -52,6 +52,8 @@ const ASSET_TYPES: Record<string, string> = {
   '.webp': 'image/webp',
   '.gif': 'image/gif',
   '.ico': 'image/x-icon',
+  '.mp4': 'video/mp4',
+  '.woff2': 'font/woff2',
 };
 
 const maxIso = (dates: string[]): string | null =>
@@ -130,7 +132,7 @@ export function build(opts: BuildOpts): { manifest: Manifest; warnings: string[]
     const lastmod = date ?? maxIso(all.filter((p) => p.site.slug === slug).map((p) => p.checked))!;
     const r = hubPage(origin, site, listed, date, isIndexable);
     addPage(`/${slug}`, 'hub', r.html.match(/<h1>(.*?)<\/h1>/)?.[1] ?? site.name, lastmod, isIndexable, r);
-    if (date) hubs.push({ site, count: listed.length, date });
+    if (date) hubs.push({ site, count: listed.length, date, pages: listed });
   }
   hubs.sort((a, b) => a.site.name.localeCompare(b.site.name));
 
@@ -143,7 +145,7 @@ export function build(opts: BuildOpts): { manifest: Manifest; warnings: string[]
   const libraryDate = maxIso(indexable.map((p) => p.checked));
   const homeDate = maxIso([libraryDate, guideDate].filter((d): d is string => !!d));
   addPage('/', 'home', 'usermods: AI userscript generator for Chrome', homeDate ?? builtAt, true,
-    homePage(origin, hubs, indexable.slice(0, 10), indexable.length, libraryDate));
+    homePage(origin, hubs, indexable.length, libraryDate));
 
   const nf = notFoundPage(origin);
   write('404.html', nf.html);

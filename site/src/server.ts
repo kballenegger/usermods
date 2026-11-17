@@ -153,6 +153,30 @@ function etagMatches(header: string, etag: string): boolean {
   return header.split(",").some((t) => t.trim().replace(/^W\//, "").replace(/"/g, "").replace(/-(gz|br)$/, "") === etag);
 }
 
+/** The inclusive byte range a Range header asks for, null for the whole file. */
+function byteRange(req: IncomingMessage, e: Entry): [number, number] | "unsatisfiable" | null {
+  const header = req.headers.range;
+  if (!header) return null;
+  const ifRange = req.headers["if-range"] as string | undefined;
+  if (ifRange !== undefined && ifRange.replace(/"/g, "") !== e.etag) return null;
+  const m = /^bytes=(\d*)-(\d*)$/.exec(header.trim());
+  if (!m || (m[1] === "" && m[2] === "")) return null;
+  const size = e.body.length;
+  let start: number;
+  let end: number;
+  if (m[1] === "") {
+    const suffix = Number(m[2]);
+    if (suffix === 0) return "unsatisfiable";
+    start = Math.max(0, size - suffix);
+    end = size - 1;
+  } else {
+    start = Number(m[1]);
+    end = m[2] === "" ? size - 1 : Math.min(Number(m[2]), size - 1);
+    if (start > end) return start >= size ? "unsatisfiable" : null;
+  }
+  return [start, end];
+}
+
 function send(
   req: IncomingMessage,
   res: ServerResponse,
@@ -186,6 +210,26 @@ function send(
   }
   if (status === 200) res.setHeader("ETag", `"${tag}"`);
   res.setHeader("Content-Type", e.type);
+  // Byte ranges for files sent as stored (video, images, fonts). Safari will not play a video
+  // without them. A single range only; anything else gets the whole file, which RFC 9110 allows.
+  if (status === 200 && !e.compress) {
+    res.setHeader("Accept-Ranges", "bytes");
+    const range = byteRange(req, e);
+    if (range === "unsatisfiable") {
+      res.setHeader("Content-Range", `bytes */${body.length}`);
+      res.setHeader("Content-Length", 0);
+      res.writeHead(416).end();
+      return;
+    }
+    if (range) {
+      const [start, end] = range;
+      res.setHeader("Content-Range", `bytes ${start}-${end}/${body.length}`);
+      res.setHeader("Content-Length", end - start + 1);
+      res.writeHead(206);
+      res.end(req.method === "HEAD" ? undefined : body.subarray(start, end + 1));
+      return;
+    }
+  }
   res.setHeader("Content-Length", body.length);
   res.writeHead(status);
   res.end(req.method === "HEAD" ? undefined : body);

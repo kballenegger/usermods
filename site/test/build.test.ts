@@ -169,6 +169,11 @@ test('robots, sitemaps, llms.txt, scripts.json', () => {
   assert.deepEqual(scripts.map((s) => s.task).sort(), ['blocked-later', 'hide-shorts']);
   assert.equal(scripts.find((s) => s.task === 'hide-shorts')!.scriptUrl, 'https://usermods.kennethballenegger.com/tube/hide-shorts.user.js');
   assert.match(b.read('index.html'), /2 scripts for 1 site, last checked 15 November 2026\./);
+  // The home page carries the whole library: every indexable script under its site, in HTML and the twin.
+  const home = b.read('index.html');
+  for (const path of ['/tube/hide-shorts', '/tube/blocked-later']) assert.ok(home.includes(`<li><a href="${path}">`), path);
+  assert.ok(!home.includes('href="/tube/fails-now"'));
+  assert.match(b.read('index.md'), /### \[Tube\]\(https:\/\/usermods\.kennethballenegger\.com\/tube\.md\)\n\n- \[/);
   assert.match(b.read('tube/index.html'), /<h1>Tube userscripts: 2 tweaks checked November 2026<\/h1>/);
 });
 

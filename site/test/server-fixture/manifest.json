@@ -16,7 +16,8 @@
       "lastmod": "2026-11-17T09:12:00Z", "format": "js" },
     "/robots.txt": { "file": "robots.txt", "type": "text/plain; charset=utf-8", "lastmod": "2026-11-17T10:00:00Z", "format": "txt" },
     "/llms.txt": { "file": "llms.txt", "type": "text/plain; charset=utf-8", "lastmod": "2026-11-17T09:12:00Z", "format": "llms" },
-    "/assets/site.css": { "file": "assets/site.css", "type": "text/css; charset=utf-8", "lastmod": "2026-11-17T10:00:00Z", "format": "asset" }
+    "/assets/site.css": { "file": "assets/site.css", "type": "text/css; charset=utf-8", "lastmod": "2026-11-17T10:00:00Z", "format": "asset" },
+    "/assets/clip.mp4": { "file": "assets/clip.mp4", "type": "video/mp4", "lastmod": "2026-11-17T10:00:00Z", "format": "asset" }
   },
   "notFound": { "html": "404.html", "md": "404.md" },
   "redirects": { "/youtube/remove-shorts": "/youtube/hide-shorts" }

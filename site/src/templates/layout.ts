@@ -49,6 +49,8 @@ export interface LayoutOpts {
   jsonld: object[];
   body: string;
   ogType?: 'website' | 'article';
+  /** The home page: a wide main column, a large share image and the library filter script. */
+  home?: boolean;
 }
 
 export function layout(o: LayoutOpts): string {
@@ -73,8 +75,9 @@ ${o.indexable ? '' : '<meta name="robots" content="noindex, follow">\n'}<link re
 <meta property="og:title" content="${esc(o.title)}">
 <meta property="og:description" content="${esc(o.description)}">
 <meta property="og:url" content="${esc(canonical)}">
-<meta property="og:image" content="${esc(o.origin)}/assets/icon-512.png">
-<meta name="twitter:card" content="summary">
+${o.home
+    ? `<meta property="og:image" content="${esc(o.origin)}/assets/home/banner.webp">\n<meta name="twitter:card" content="summary_large_image">`
+    : `<meta property="og:image" content="${esc(o.origin)}/assets/icon-512.png">\n<meta name="twitter:card" content="summary">`}
 ${ld}
 </head>
 <body>
@@ -83,13 +86,14 @@ ${ld}
   <a class="brand" href="/"><img src="/assets/icon-32.png" width="32" height="32" alt=""> usermods</a>
   <nav aria-label="Site"><a href="/#sites">Scripts</a> <a href="/guide">Guide</a> <a href="${installHref(o.path)}" rel="nofollow">Add to Chrome</a></nav>
 </header>
-<main id="main">
+<main id="main"${o.home ? ' class="home"' : ''}>
 ${o.body}
 </main>
 <footer class="foot">
   <p>usermods is a Chrome extension that writes userscripts with AI, in a side panel on the page you want to change. <a href="${GITHUB_URL}" rel="noopener">Source on GitHub</a>.</p>
 </footer>
 <script src="/assets/copy.js" defer></script>
+${o.home ? '<script src="/assets/filter.js" defer></script>\n' : ''}
 </body>
 </html>
 `;

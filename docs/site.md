@@ -19,7 +19,7 @@ Everything is in `site/`. It runs on Node 24 with no npm dependencies: TypeScrip
 | `site/src/build/`, `site/src/templates/`, `site/src/markdown.ts` | The static generator |
 | `site/src/server.ts` | The server: static files, markdown twins, install redirect, request log, IndexNow |
 | `site/bin/` | CLIs: `build.ts`, `check.ts`, `traffic.ts`, `ai-panel.ts` |
-| `site/assets/` | CSS, icons, guide screenshots (`assets/guide/`) |
+| `site/assets/` | CSS, icons, the Jersey 10 display font (`assets/fonts/`), home page media (`assets/home/`: launch video, poster, banner and screenshots as WebP) and guide screenshots (`assets/guide/`). The server answers byte-range requests for binary assets, which Safari needs to play the video |
 | `site/Dockerfile` | The production image |
 | `site/test/` | Tests: `npm run test:site` |
 
