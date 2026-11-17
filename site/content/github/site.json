@@ -1,0 +1,7 @@
+{
+  "slug": "github",
+  "name": "GitHub",
+  "domains": ["github.com"],
+  "category": "work",
+  "intro": "Userscripts that change how GitHub looks and reads: interface language, file icons, dates and layout."
+}

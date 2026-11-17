@@ -1,0 +1,7 @@
+{
+  "slug": "wikipedia",
+  "name": "Wikipedia",
+  "domains": ["wikipedia.org", "en.wikipedia.org"],
+  "category": "reference",
+  "intro": "Userscripts for reading Wikipedia logged out: dark mode, the old layout and full width, without an account or settings that reset."
+}

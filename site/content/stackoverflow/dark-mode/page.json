@@ -1,0 +1,56 @@
+{
+  "slug": "dark-mode",
+  "title": "Dark mode for Stack Overflow",
+  "question": "How do I get Stack Overflow dark mode without an account?",
+  "answer": "Stack Overflow's dark theme is a profile preference, so you need an account: log in, open Settings, then Preferences, and choose Dark or System under Theme. Logged out, the site offers no theme switch. The usermods script on this page turns on Stack Overflow's own dark theme on every page while you are logged out, by adding the class the site uses for signed-in dark mode. Code blocks, votes and links keep the site's own dark colors.",
+  "prompt": "Make Stack Overflow use its dark theme even though I'm not logged in.",
+  "details": "Stack Overflow sends its dark theme styles to every visitor and switches them on with a `theme-dark` class on the page body. The script adds that class as soon as the body exists and puts it back if the page removes it, so nothing has to be restyled by hand.\n\nIt runs on stackoverflow.com only. The check runs signed out. Signed in, use the theme in your preferences instead.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Theme preference",
+      "body": "Logged in: **Settings** > **Preferences** > **Theme**, then **Dark**, or **System** to follow your operating system."
+    },
+    {
+      "kind": "extension",
+      "title": "Dark Reader",
+      "body": "Dark Reader darkens any site by recoloring it, which works logged out but uses its own colors instead of Stack Overflow's theme."
+    }
+  ],
+  "related": [
+    "stackoverflow/hide-cookie-banner",
+    "stackoverflow/hide-sidebar",
+    "stackoverflow/hide-hot-network-questions"
+  ],
+  "check": {
+    "urls": [
+      "https://stackoverflow.com/questions/11227809/why-is-processing-a-sorted-array-faster-than-processing-an-unsorted-array"
+    ],
+    "loggedOut": true,
+    "waitFor": "#question",
+    "settleMs": 4000,
+    "baseline": "(() => { const lum = (c) => { const m = c.match(/[\\d.]+/g).map(Number); return 0.2126 * m[0] + 0.7152 * m[1] + 0.0722 * m[2]; }; return !document.body.classList.contains('theme-dark') && lum(getComputedStyle(document.body).backgroundColor) > 200; })()",
+    "expect": "(() => { const lum = (c) => { const m = c.match(/[\\d.]+/g).map(Number); return 0.2126 * m[0] + 0.7152 * m[1] + 0.0722 * m[2]; }; const q = document.querySelector('#question .s-prose'); return document.body.classList.contains('theme-dark') && lum(getComputedStyle(document.body).backgroundColor) < 60 && lum(getComputedStyle(q).color) > 180; })()",
+    "intact": "(() => { const q = document.querySelector('#question .s-prose'); const answers = [...document.querySelectorAll('#answers .answer')].filter((a) => a.checkVisibility()); return !!q && q.checkVisibility() && answers.length >= 5; })()"
+  },
+  "demand": {
+    "score": 36,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/400254",
+        "note": "Greasy Fork total installs: \"StackOverflow Always Dark Theme\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/480700",
+        "note": "Greasy Fork total installs: \"Dark Theme Stackoverflow\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=stack+overflow+dark+mode",
+        "note": "suggests \"stack overflow dark mode without login\""
+      }
+    ]
+  }
+}

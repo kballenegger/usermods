@@ -1,0 +1,72 @@
+{
+  "slug": "hide-recommendations",
+  "title": "Hide YouTube recommendations",
+  "question": "How do I hide recommended videos on YouTube?",
+  "answer": "YouTube has no setting that hides the recommended videos next to a video. The usermods script on this page hides the list of recommended videos beside the player, or below it in a narrow window, and the grid of suggestions that appears when a video ends. The video, its description and the comments stay. Install it with usermods or any userscript manager. Without an extension, turning off watch history in your Google account empties the home page feed, but the list beside videos stays.",
+  "prompt": "Hide the recommended videos next to and under YouTube videos.",
+  "details": "The script is CSS only and loads before YouTube draws the page, so recommendations never flash on screen and it keeps working as you move between videos without a reload.\n\nIt hides:\n\n- The recommended videos beside the player (below it when the window is narrow)\n- The grid of suggested videos at the end of a video and in the paused full-screen player\n\nYouTube is testing a newer watch-page layout that shows recommended videos as a grid below the player. The script does not hide that grid yet; it covers the classic layout with the list beside the player. The check covers that list; the end-of-video grid is not covered. Playlist panels, live chat and the comments stay. The home page feed is a separate script.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Turn off watch history",
+      "body": "Signed in, go to **myactivity.google.com**, open **YouTube History** and turn it off. With history off YouTube shows an empty home page instead of a feed. Recommendations beside videos still appear."
+    },
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filters",
+      "body": "Add these under *My filters* in uBlock Origin. They use the same selectors as the script; our check runs the script, not these filters.\n\n```\nwww.youtube.com##ytd-watch-next-secondary-results-renderer\nwww.youtube.com##.ytp-endscreen-content\nwww.youtube.com##.ytp-fullscreen-grid-stills-container\n```"
+    },
+    {
+      "kind": "extension",
+      "title": "Unhook",
+      "body": "The Unhook extension for Chrome and Firefox has switches for the home feed, the recommendations beside videos, the end screen and Shorts."
+    }
+  ],
+  "related": [
+    "youtube/hide-home-feed",
+    "youtube/hide-end-screens",
+    "youtube/hide-shorts",
+    "youtube/disable-autoplay"
+  ],
+  "demand": {
+    "score": 95,
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/khncfooichmfjbepaaaebmommgaepoid",
+        "note": "Unhook - Remove YouTube Recommended & Shorts (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/lcpclaffcdiihapebmfgcmmplphbkjmd",
+        "note": "Block YouTube Feed - Homepage, Sidebar Videos (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/cdhdichomdnlaadbndgmagohccgpejae",
+        "note": "RYS \u2014 Remove YouTube Suggestions (users, read on the store search page for 'hide youtube recommendations')"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=hide%20youtube%20recommendations",
+        "note": "returns the query; suggestions: hide youtube recommendations | hide youtube recommendations extension | hide youtube recommendations firefox | hide youtube recommendations videos | hide youtube recommendations safari"
+      },
+      {
+        "type": "thread",
+        "url": "https://webapps.stackexchange.com/questions/120799",
+        "note": "Hide all recommended videos and channel on homepage in YouTube"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.youtube.com/watch?v=jNQXAC9IVRw"
+    ],
+    "loggedOut": true,
+    "waitFor": "ytd-watch-next-secondary-results-renderer yt-lockup-view-model",
+    "settleMs": 4000,
+    "baseline": "[...document.querySelectorAll('ytd-watch-next-secondary-results-renderer yt-lockup-view-model')].filter((e) => e.checkVisibility()).length >= 5",
+    "expect": "(() => { const l = [...document.querySelectorAll('ytd-watch-next-secondary-results-renderer yt-lockup-view-model')]; return l.length > 0 && l.every((e) => !e.checkVisibility()); })()",
+    "intact": "document.querySelector('#movie_player video').checkVisibility() && document.querySelector('ytd-watch-metadata h1').checkVisibility() && document.querySelector('ytd-comments#comments').checkVisibility()"
+  }
+}

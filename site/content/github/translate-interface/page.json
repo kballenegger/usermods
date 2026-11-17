@@ -1,0 +1,46 @@
+{
+  "slug": "translate-interface",
+  "title": "Translate the GitHub interface into Chinese",
+  "question": "How do I use GitHub in Chinese?",
+  "answer": "GitHub has no setting to change its interface language, so it shows English menus to everyone. The usermods script on this page replaces GitHub's English menu, tab, button and sidebar labels with Simplified Chinese, such as 代码 for Code and 登录 for Sign in. It leaves READMEs, code, file names, commit messages and issue titles in their original language. Without an extension, your browser's built-in page translation translates the whole page, user content included.",
+  "prompt": "Translate GitHub's menus, tabs and buttons into Simplified Chinese but leave code and READMEs alone.",
+  "details": "The script carries a fixed dictionary of GitHub's interface labels and replaces a piece of text only when the whole label matches, so a sentence in a README or comment is never changed by accident. It also skips everything inside READMEs, code, file names in the file list, file tree and path breadcrumbs, commit messages, issue and PR titles and form fields.\n\nIt covers the header, repository tabs, the file list, the repository sidebar, issue and pull request lists and the footer. Labels that are not in the dictionary stay in English. The check loads a repository page and a file in the code view, and confirms the folder named Documentation stays in English in the file list, the file tree and the breadcrumbs. Issue and pull request lists use the same mechanism, but the check does not load them.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Browser page translation",
+      "body": "Chrome and Edge can translate any page into Chinese from the address bar's translate icon. That translates everything on the page, including code comments, READMEs and file names, and it can garble code blocks."
+    },
+    {
+      "kind": "extension",
+      "title": "GitHub Internationalization userscript",
+      "body": "The \"GitHub Internationalization\" userscript on Greasy Fork carries a much larger Chinese dictionary for GitHub, including settings pages."
+    }
+  ],
+  "related": [
+    "github/absolute-dates",
+    "github/file-icons"
+  ],
+  "demand": {
+    "score": 78,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/407485",
+        "note": "Greasy Fork total installs, \"GitHub Internationalization\" (api.greasyfork.org, 2026-11-17)"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://github.com/torvalds/linux",
+      "https://github.com/torvalds/linux/blob/master/Documentation/process/changes.rst"
+    ],
+    "loggedOut": true,
+    "waitFor": "tr.react-directory-row, li[role=\"treeitem\"]",
+    "settleMs": 5000,
+    "baseline": "(() => { const texts = (sel) => { const out = []; for (const el of document.querySelectorAll(sel)) { if (!el.checkVisibility()) continue; for (const n of el.childNodes) if (n.nodeType === 3 && n.nodeValue.trim()) out.push([el, n.nodeValue.trim()]); } return out; }; const blob = location.pathname.includes('/blob/'); const inTree = (el) => !!el.closest('li[role=\"treeitem\"]'); const inCrumb = (el) => !!el.closest('[data-testid=\"breadcrumbs\"], [id^=\"repos-header-breadcrumb\"]'); const all = texts('body *'); if (blob) return all.some(([e, t]) => t === 'Sign in') && all.some(([e, t]) => t === 'Documentation' && inTree(e)) && all.some(([e, t]) => t === 'Documentation' && inCrumb(e)); const want = ['Sign in', 'Releases', 'Contributors', 'Languages', 'Notifications', 'Latest commit']; return new Set(all.filter(([e, t]) => want.includes(t)).map(([e, t]) => t)).size >= 5; })()",
+    "expect": "(() => { const texts = (sel) => { const out = []; for (const el of document.querySelectorAll(sel)) { if (!el.checkVisibility()) continue; for (const n of el.childNodes) if (n.nodeType === 3 && n.nodeValue.trim()) out.push([el, n.nodeValue.trim()]); } return out; }; const blob = location.pathname.includes('/blob/'); const inTree = (el) => !!el.closest('li[role=\"treeitem\"]'); const inCrumb = (el) => !!el.closest('[data-testid=\"breadcrumbs\"], [id^=\"repos-header-breadcrumb\"]'); const all = texts('body *'); const en = blob ? ['Sign in'] : ['Sign in', 'Releases', 'Contributors', 'Languages', 'Notifications', 'Latest commit']; const zh = blob ? ['登录'] : ['登录', '发行版', '贡献者', '语言', '通知', '最新提交']; const seen = new Set(all.filter(([e, t]) => zh.includes(t)).map(([e, t]) => t)); return !all.some(([e, t]) => en.includes(t)) && seen.size >= (blob ? 1 : 5); })()",
+    "intact": "(() => { const texts = (sel) => { const out = []; for (const el of document.querySelectorAll(sel)) { if (!el.checkVisibility()) continue; for (const n of el.childNodes) if (n.nodeType === 3 && n.nodeValue.trim()) out.push([el, n.nodeValue.trim()]); } return out; }; const blob = location.pathname.includes('/blob/'); const inTree = (el) => !!el.closest('li[role=\"treeitem\"]'); const inCrumb = (el) => !!el.closest('[data-testid=\"breadcrumbs\"], [id^=\"repos-header-breadcrumb\"]'); const all = texts('body *'); if (blob) { const lines = [...document.querySelectorAll('.react-code-lines, #read-only-cursor-text-area, article.markdown-body')].some((e) => e.checkVisibility()); return lines && all.some(([e, t]) => t === 'Documentation' && inTree(e)) && all.some(([e, t]) => t === 'Documentation' && inCrumb(e)) && !all.some(([e, t]) => t === '文档' && (inTree(e) || inCrumb(e))); } const rows = [...document.querySelectorAll('tr.react-directory-row')].filter((r) => r.checkVisibility()); const docs = [...document.querySelectorAll('tr.react-directory-row a[title=\"Documentation\"]')].some((a) => a.checkVisibility() && a.textContent.trim() === 'Documentation'); return rows.length >= 10 && docs; })()"
+  }
+}

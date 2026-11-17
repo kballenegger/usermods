@@ -1,0 +1,7 @@
+{
+  "slug": "spotify",
+  "name": "Spotify",
+  "domains": ["open.spotify.com"],
+  "category": "other",
+  "intro": "Userscripts for the Spotify web player at open.spotify.com: small tools it doesn't have and fewer sign-up prompts."
+}

@@ -1,0 +1,60 @@
+{
+  "slug": "hide-promoted",
+  "title": "Hide promoted posts on Reddit",
+  "question": "How do I hide promoted posts on Reddit?",
+  "answer": "Reddit has no setting that turns off promoted posts for free accounts or logged-out visitors. The usermods script on this page hides the promoted posts mixed into subreddit and home feeds, the ad box in the right sidebar, and the ads Reddit places above and between comments on a post. Install it with usermods or any userscript manager. Without a userscript, uBlock Origin can hide the same elements with cosmetic filters.",
+  "prompt": "Hide promoted posts and ads on Reddit.",
+  "details": "Reddit marks each ad with its own element: `shreddit-ad-post` for a promoted post in a feed, `shreddit-sidebar-ad` for the sidebar box, and `shreddit-comments-page-ad` and `shreddit-comment-tree-ads` on a post's page. The script hides those four with CSS before the page draws, plus the divider line after each feed ad so no double line is left.\n\nIt leaves ordinary posts, comments and the sidebar's subreddit information alone. The check loads a subreddit feed; the comment-page ads are covered by the same rule but the check doesn't load a post page.",
+  "alternatives": [
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filters",
+      "body": "These cosmetic filters hide the same elements. Our check runs the script, not these filters.\n\n```\nwww.reddit.com##shreddit-ad-post\nwww.reddit.com##shreddit-sidebar-ad\nwww.reddit.com##shreddit-comments-page-ad\nwww.reddit.com##shreddit-comment-tree-ads\n```"
+    },
+    {
+      "kind": "other",
+      "title": "Reddit Premium",
+      "body": "Reddit's paid subscription includes ad-free browsing while you are logged in."
+    }
+  ],
+  "related": [
+    "reddit/remove-sidebar",
+    "reddit/expand-threads"
+  ],
+  "demand": {
+    "score": 70,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/382572",
+        "note": "Hide Reddit's promoted posts (1,934 total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/405756",
+        "note": "Reddit Promotion Blocker (1,128 total installs)"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/mmnhjecbajmgkapcinkhdnjabclcnfpg",
+        "note": "Reddit Promoted Ad Blocker (20,000 users)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=reddit%20hide%20promoted%20posts",
+        "note": "suggestions: reddit hide promoted posts, reddit remove promoted posts, reddit block promoted posts, reddit hide sponsored posts"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.reddit.com/r/AskReddit/"
+    ],
+    "loggedOut": true,
+    "waitFor": "shreddit-post",
+    "settleMs": 4000,
+    "baseline": "[...document.querySelectorAll('shreddit-ad-post')].some((a) => a.checkVisibility())",
+    "expect": "(() => { const l = [...document.querySelectorAll('shreddit-ad-post, shreddit-sidebar-ad')]; return document.querySelectorAll('shreddit-ad-post').length > 0 && l.every((a) => !a.checkVisibility()); })()",
+    "intact": "[...document.querySelectorAll('shreddit-post')].filter((p) => p.checkVisibility()).length >= 5"
+  }
+}

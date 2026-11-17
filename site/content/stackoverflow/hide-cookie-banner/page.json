@@ -1,0 +1,46 @@
+{
+  "slug": "hide-cookie-banner",
+  "title": "Hide the Stack Overflow cookie banner",
+  "question": "How do I hide the Stack Overflow cookie banner?",
+  "answer": "The banner goes away for good once you click Necessary cookies only or Customize settings, because Stack Overflow stores your choice in a cookie. If you clear cookies often or browse privately it comes back on every visit. The usermods script on this page hides the cookie banner in the bottom corner of Stack Overflow pages without clicking anything, and leaves the Cookie Settings link in the footer working.",
+  "prompt": "Hide the cookie consent banner on Stack Overflow.",
+  "details": "The banner is a OneTrust banner with a fixed id, so one CSS rule hides it before it appears. The script does not click any of the banner's buttons, so it records no choice. The banner says that continuing to use the site counts as agreeing to its cookies; if you want only necessary cookies, open **Cookie Settings** in the footer and choose there.\n\nIt runs on stackoverflow.com only, not on other Stack Exchange sites.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Make a choice once",
+      "body": "Click **Necessary cookies only** on the banner. Stack Overflow remembers it in a cookie and stops showing the banner until that cookie is cleared."
+    },
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filter",
+      "body": "uBlock Origin's cookie notice lists (Settings > Filter lists > Annoyances) already cover OneTrust banners. A single cosmetic filter with the same selector as the script also works. Our check runs the script, not this filter.\n\n```\nstackoverflow.com###onetrust-banner-sdk\n```"
+    }
+  ],
+  "related": [
+    "stackoverflow/hide-sidebar",
+    "stackoverflow/hide-hot-network-questions",
+    "stackoverflow/dark-mode"
+  ],
+  "demand": {
+    "score": 47,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/426258",
+        "note": "Greasy Fork total installs: \"Hide stackoverflow.com privacy panel\" (read via api.greasyfork.org, 2026-11-17)"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://stackoverflow.com/questions/11227809/why-is-processing-a-sorted-array-faster-than-processing-an-unsorted-array"
+    ],
+    "loggedOut": true,
+    "waitFor": "#question",
+    "settleMs": 4000,
+    "baseline": "(() => { const b = document.querySelector('#onetrust-banner-sdk'); return !!b && b.checkVisibility() && /cookies/i.test(b.textContent); })()",
+    "expect": "(() => { const b = document.querySelector('#onetrust-banner-sdk'); return !!b && /cookies/i.test(b.textContent) && !b.checkVisibility(); })()",
+    "intact": "(() => { const q = document.querySelector('#question .s-prose'); const answers = [...document.querySelectorAll('#answers .answer')].filter((a) => a.checkVisibility()); const link = document.querySelector('#consent-footer-link'); return !!q && q.checkVisibility() && answers.length >= 5 && !!link && link.checkVisibility(); })()"
+  }
+}

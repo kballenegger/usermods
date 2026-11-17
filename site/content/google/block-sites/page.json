@@ -1,0 +1,65 @@
+{
+  "slug": "block-sites",
+  "title": "Block sites from Google search results",
+  "question": "How do I block a website from showing up in Google search results?",
+  "answer": "Google has no setting for blocking a site from your results; its old blocking feature was removed years ago. The usermods script on this page hides every result from the sites on a block list you edit at the top of the script, Pinterest to start with, and leaves the other results in place. Install it with usermods or any userscript manager. Without a script, adding -site:pinterest.com to a search drops that site from that one search.",
+  "prompt": "Hide Pinterest results from my Google searches.",
+  "details": "The block list is the `BLOCKED` array at the top of the script. A domain also covers its subdomains, so `pinterest.com` hides `www.pinterest.com`; country domains such as `pinterest.co.uk` need their own entry. In usermods you can ask the chat to add a site.\n\nGoogle's result links point to an opaque `/goto` address, so the script reads each result's site from the address line Google prints under its title, or from the video link on video results. It hides the whole result, and a row of videos only when every video in it comes from a blocked site. Images and the AI Overview's source links are not filtered.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "The -site: operator",
+      "body": "Add `-site:pinterest.com` to a search to leave that site out. It only applies to the search you type it into."
+    },
+    {
+      "kind": "extension",
+      "title": "uBlacklist",
+      "body": "The uBlacklist extension keeps a block list in its own settings and adds a block link to each result."
+    }
+  ],
+  "related": [
+    "google/hide-sponsored",
+    "google/web-results-only"
+  ],
+  "demand": {
+    "score": 90,
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/ublacklist/pncfbmialoiaghdehhbnbhkkgmjanfhe",
+        "note": "Chrome Web Store users: \"uBlacklist\" (2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/1682",
+        "note": "Greasy Fork total installs: \"Google Hit Hider by Domain (Search Filter / Block Sites)\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=block+sites+from+google+search+results",
+        "note": "suggests \"block sites from google search results\""
+      },
+      {
+        "type": "forum",
+        "url": "https://news.ycombinator.com/item?id=29546433",
+        "note": "Hacker News thread on uBlacklist; people asking to drop sites like Pinterest"
+      },
+      {
+        "type": "forum",
+        "url": "https://news.ycombinator.com/item?id=16613996",
+        "note": "Hacker News: 'Pinterest needs to be removed from Google'"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.google.com/search?q=sourdough+bread+ideas&hl=en&gl=us"
+    ],
+    "loggedOut": true,
+    "waitFor": "#rso",
+    "settleMs": 4000,
+    "baseline": "(() => { const host = (el) => { const m = /^https?:\\/\\/([^\\s/›]+)/.exec((el.getAttribute('data-curl') || el.getAttribute('data-surl') || el.textContent).trim()); return m ? m[1].toLowerCase() : ''; }; const pin = [...document.querySelectorAll('#rso cite, #rso [data-curl], #rso [data-surl]')].filter((el) => /(^|\\.)pinterest\\.com$/.test(host(el))); return pin.some((el) => el.checkVisibility()); })()",
+    "expect": "(() => { const host = (el) => { const m = /^https?:\\/\\/([^\\s/›]+)/.exec((el.getAttribute('data-curl') || el.getAttribute('data-surl') || el.textContent).trim()); return m ? m[1].toLowerCase() : ''; }; const pin = [...document.querySelectorAll('#rso cite, #rso [data-curl], #rso [data-surl]')].filter((el) => /(^|\\.)pinterest\\.com$/.test(host(el))); return pin.length > 0 && pin.every((el) => !el.checkVisibility()); })()",
+    "intact": "[...document.querySelectorAll('#rso a h3')].filter((h) => h.checkVisibility() && !h.closest('[data-text-ad]')).length >= 4"
+  }
+}

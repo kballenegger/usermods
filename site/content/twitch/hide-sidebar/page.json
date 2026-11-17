@@ -1,0 +1,55 @@
+{
+  "slug": "hide-sidebar",
+  "title": "Hide the Twitch sidebar",
+  "question": "How do I hide recommended channels in the Twitch sidebar?",
+  "answer": "To get rid of the recommended channels, hide Twitch's left sidebar. The usermods script on this page removes the whole sidebar, with its live and recommended channel lists, and lets the rest of the page use the full width of the window. Install it with usermods or any userscript manager. Without an extension, click the arrow at the top of the sidebar: Twitch collapses it to a narrow column of channel avatars, which takes less room but still shows recommendations.",
+  "prompt": "Hide the left sidebar with recommended channels on Twitch and let the page use the full width.",
+  "details": "The script hides the element Twitch marks `data-a-target=\"side-nav-bar\"` together with its wrapper, so the rest of the page moves over to fill the space. It is CSS only, so it applies on every Twitch page as you move around the site.\n\nIt removes the whole sidebar, including your followed channels when you are logged in; use the Following page (`twitch.tv/directory/following`) to see who is live. The check loads the logged-out Browse page, where the sidebar lists live channels.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Collapse the sidebar",
+      "body": "Click the arrow at the top of the sidebar. It shrinks to a narrow column of channel avatars instead of going away."
+    },
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filter",
+      "body": "The same rule as the script. Our check runs the script, not this filter.\n\n```\nwww.twitch.tv##div:has(> [data-a-target=\"side-nav-bar\"])\n```"
+    }
+  ],
+  "related": [
+    "twitch/hide-chat",
+    "twitch/disable-autoplay"
+  ],
+  "demand": {
+    "score": 48,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/404887",
+        "note": "Hide Twitch SideBar (612 total installs)"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/ljimojeoadeiidhochpjmkpaccmkboei",
+        "note": "Twitch Hide Recommended (711 users)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=twitch%20hide%20recommended%20channels",
+        "note": "suggestions: twitch hide recommended channels | twitch remove recommended channels | twitch remove recommended channels from sidebar | twitch hide suggested channels"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.twitch.tv/directory/all"
+    ],
+    "loggedOut": true,
+    "waitFor": "[data-a-target=\"side-nav-bar\"] [data-a-target=\"side-nav-card-metadata\"]",
+    "settleMs": 4000,
+    "baseline": "(() => { const s = document.querySelector('[data-a-target=\"side-nav-bar\"]'); return !!s && s.checkVisibility() && [...s.querySelectorAll('[data-a-target=\"side-nav-card-metadata\"]')].filter((c) => c.checkVisibility()).length >= 5; })()",
+    "expect": "(() => { const s = [...document.querySelectorAll('[data-a-target=\"side-nav-bar\"]')]; const m = document.querySelector('main'); return s.length > 0 && s.every((e) => !e.checkVisibility()) && !!m && m.getBoundingClientRect().left < 10; })()",
+    "intact": "[...document.querySelectorAll('main a[data-a-target=\"preview-card-image-link\"]')].filter((a) => a.checkVisibility()).length >= 5"
+  }
+}

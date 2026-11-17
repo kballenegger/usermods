@@ -1,0 +1,64 @@
+{
+  "slug": "dark-mode",
+  "title": "Dark mode for Google Maps",
+  "question": "How do I use dark mode in Google Maps on a computer?",
+  "answer": "Google Maps has no dark mode setting on desktop; the dark theme is only in the phone apps. The usermods script on this page inverts the colours of the whole Google Maps page, map and side panel included, and turns the hues back so water stays blue and parks stay green. Photos are inverted twice so they keep their real colours. Without an extension, Chrome's flag chrome://flags/#enable-force-dark darkens every website, Maps included.",
+  "prompt": "Make Google Maps dark: invert the map and the side panel, but keep photos in their normal colours.",
+  "details": "The map is drawn on a canvas, so the script can't recolour roads and labels one by one. It puts `filter: invert(1) hue-rotate(180deg)` on the whole page, which turns white backgrounds black and keeps the map's colours close to their usual hues. Images and videos get the same filter again, which cancels it, so place photos look normal.\n\nLimits: satellite and Street View imagery is drawn on the canvas too, so it shows inverted. Switch the script off in usermods when you want those. The check loads the default map view only.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Chrome's Auto Dark Mode flag",
+      "body": "Open `chrome://flags/#enable-force-dark`, set **Auto Dark Mode for Web Contents** to Enabled and restart Chrome. It darkens every site, not just Maps, and its results vary from page to page."
+    },
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filters",
+      "body": "uBlock can inject the same CSS as the script. Our check runs the script, not these filters.\n\n```\nwww.google.com##html:style(filter: invert(1) hue-rotate(180deg) !important)\nwww.google.com##img:style(filter: invert(1) hue-rotate(180deg) !important)\n```\n\nThese apply to all of www.google.com, not only Maps, because cosmetic filters can't be limited to a path."
+    }
+  ],
+  "related": [
+    "google-maps/copy-coordinates"
+  ],
+  "demand": {
+    "score": 70,
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/aogldndldipgagdpmlgpplfdjdlgahke",
+        "note": "Chrome Web Store users, \"Dark Google Maps\""
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/dpgomlnlopaohpdnmohphlcgonkdgcif",
+        "note": "Chrome Web Store users, \"Google Maps Dark Mode Desktop\"; count from CWS search page"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=google%20maps%20dark%20mo",
+        "note": "Google suggests \"google maps dark mode\""
+      },
+      {
+        "type": "forum",
+        "url": "https://support.google.com/maps/thread/360583298/request-for-native-dark-mode-support-in-google-maps-on-desktop-chromium?hl=en",
+        "note": "Google Maps community: request native dark mode on desktop"
+      },
+      {
+        "type": "forum",
+        "url": "https://eileenslounge.com/viewtopic.php?style=24&t=41444",
+        "note": "Eileen's Lounge: Google Maps dark mode on Windows needs an extension"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.google.com/maps/@40.7128,-74.006,13z?hl=en"
+    ],
+    "loggedOut": true,
+    "waitFor": "canvas",
+    "settleMs": 4000,
+    "baseline": "!/invert/.test(getComputedStyle(document.documentElement).filter) && [...document.querySelectorAll('canvas')].some((c) => c.checkVisibility() && c.width > 500)",
+    "expect": "(() => { const html = document.documentElement; const f = getComputedStyle(html).filter; if (html.style.filter || !/invert\\(1\\)/.test(f) || !/hue-rotate\\(180deg\\)/.test(f)) return false; const imgs = [...document.querySelectorAll('img')].filter((i) => i.checkVisibility()); if (!imgs.length || !imgs.every((i) => /invert\\(1\\)/.test(getComputedStyle(i).filter))) return false; let el = document.querySelector('#searchboxinput, input[name=\"q\"]'); while (el && /rgba\\(0, 0, 0, 0\\)|transparent/.test(getComputedStyle(el).backgroundColor)) el = el.parentElement; const rgb = el && getComputedStyle(el).backgroundColor.match(/\\d+/g).slice(0, 3).map(Number); return !!rgb && el !== document.documentElement && el !== document.body && rgb.every((c) => c > 200); })()",
+    "intact": "[...document.querySelectorAll('canvas')].some((c) => c.checkVisibility() && c.width > 500) && !!document.querySelector('input[name=\"q\"], #searchboxinput')?.checkVisibility() && [...document.querySelectorAll('button[aria-label=\"Zoom in\"]')].some((b) => b.checkVisibility())"
+  }
+}

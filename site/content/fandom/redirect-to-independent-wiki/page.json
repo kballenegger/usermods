@@ -1,0 +1,69 @@
+{
+  "slug": "redirect-to-independent-wiki",
+  "title": "Redirect Fandom wikis to their independent versions",
+  "question": "How do I automatically go from Fandom to the independent wiki?",
+  "answer": "Fandom has no setting that sends you to a wiki's new home, so you need an extension or a userscript. The usermods script on this page checks the Fandom subdomain against a list of wikis whose communities moved, such as Minecraft, Terraria and RuneScape, and opens the same article on the independent wiki before the Fandom page loads. Other Fandom wikis are left alone. The Indie Wiki Buddy extension does the same with a longer list.",
+  "prompt": "When I open a Fandom wiki that has moved to an independent site, like minecraft.fandom.com, send me to the same page on the new wiki.",
+  "details": "The script holds a short list of Fandom subdomains and the wiki each one moved to: Minecraft (minecraft.wiki), Terraria, Calamity Mod, ARK, Don't Starve, Oxygen Not Included, Satisfactory, Risk of Rain 2, Dead Cells and Hades (wiki.gg), Hollow Knight (hollowknight.wiki), Stardew Valley (stardewvalleywiki.com), Team Fortress 2 (wiki.teamfortress.com), Warframe (wiki.warframe.com), RuneScape and Old School RuneScape (runescape.wiki).\n\nIt redirects English article URLs (`/wiki/Title`) to the same title on the new wiki, and a wiki's front page to the new wiki's front page. Language versions such as `/de/wiki/` and other Fandom pages are left alone. If the new wiki named a page differently, you land on its \"page not found\" or search page.\n\nThe check loads the Terraria wiki's Zombie page; the other entries in the list are not covered by it. Add your own wikis by adding a line to the `MOVED` list.",
+  "alternatives": [
+    {
+      "kind": "extension",
+      "title": "Indie Wiki Buddy",
+      "body": "A browser extension for Chrome and Firefox that redirects hundreds of Fandom wikis to their independent versions and can also filter Fandom out of search results."
+    },
+    {
+      "kind": "other",
+      "title": "Search the new wiki directly",
+      "body": "Bookmark the independent wiki, or add it as a custom search engine in your browser, so searches go there instead of through a search engine that ranks Fandom first."
+    }
+  ],
+  "related": [
+    "fandom/remove-clutter"
+  ],
+  "check": {
+    "urls": [
+      "https://terraria.fandom.com/wiki/Zombie"
+    ],
+    "loggedOut": true,
+    "waitFor": "h1",
+    "settleMs": 3000,
+    "baseline": "location.hostname === 'terraria.fandom.com' && [...document.querySelectorAll('h1')].some((h) => h.textContent.includes('Zombie') && h.checkVisibility())",
+    "expect": "location.hostname === 'terraria.wiki.gg' && location.pathname === '/wiki/Zombie'",
+    "intact": "[...document.querySelectorAll('h1')].some((h) => h.textContent.includes('Zombie') && h.checkVisibility()) && document.querySelectorAll('.mw-parser-output p').length >= 3"
+  },
+  "demand": {
+    "score": 85,
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/indie-wiki-buddy/fkagelmloambgokoeokbpihmgpkbgbfm",
+        "note": "Chrome Web Store users: \"Indie Wiki Buddy\" (2026-11-17)"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/wikigg-redirect/cngoemokfjekjkmajenlaokhnmmiinca",
+        "note": "Chrome Web Store users: \"wiki.gg Redirect\" (2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/476527",
+        "note": "Greasy Fork total installs: \"Fandom Redirect\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=fandom+wiki+redirect",
+        "note": "suggests \"fandom wiki redirect extension\""
+      },
+      {
+        "type": "forum",
+        "url": "https://news.ycombinator.com/item?id=49604870",
+        "note": "Hacker News 'Google Jail for independent wikis': users share redirect extensions"
+      },
+      {
+        "type": "forum",
+        "url": "https://news.ycombinator.com/item?id=42571619",
+        "note": "Hacker News: Indie Wiki Buddy recommended to leave Fandom"
+      }
+    ]
+  }
+}

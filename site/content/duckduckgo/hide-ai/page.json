@@ -1,0 +1,71 @@
+{
+  "slug": "hide-ai",
+  "title": "Hide AI answers on DuckDuckGo",
+  "question": "How do I turn off AI answers in DuckDuckGo?",
+  "answer": "DuckDuckGo lets you turn Search Assist off in its search settings, and noai.duckduckgo.com is a version of the search with AI features off. Both depend on a saved setting or on using that address. The usermods script on this page hides the Search Assist answer box in the results and the Search Assist and Ask Duck.ai buttons above them, with no settings or cookies needed. The ordinary results stay as they are.",
+  "prompt": "Hide the Search Assist AI answers and the Duck.ai button on DuckDuckGo.",
+  "details": "The script is CSS only. It hides the list item that holds the Search Assist answer (found by its `data-testid`, not by class names, which DuckDuckGo generates), the **Search Assist** button that carries `data-assist-icon-trigger`, and the **Ask Duck.ai** button that links to the `ia=chat` view.\n\nIt leaves the Duck.ai link in the side menu and the duck.ai site itself alone. It does not change your DuckDuckGo settings.\n\nIt also hides the **Explore More** box of AI-generated follow-up answers that DuckDuckGo shows beside some results (`li[data-layout=\"explore_more\"]`). The check's search does not always show that box, so the check does not cover it.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "DuckDuckGo search settings",
+      "body": "Open the gear icon next to **Ask Duck.ai** on a results page, or duckduckgo.com/settings, and turn Search Assist off. The setting is saved in a cookie, so it resets when cookies are cleared or in a private window."
+    },
+    {
+      "kind": "other",
+      "title": "noai.duckduckgo.com",
+      "body": "Search from `https://noai.duckduckgo.com/` instead of duckduckgo.com. You can set `https://noai.duckduckgo.com/?q=%s` as your browser's search engine."
+    },
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filters",
+      "body": "The same selectors as the script. Our check runs the script, not these filters.\n\n```\nduckduckgo.com##li:has([data-testid=\"duckassist-answer-content\"])\nduckduckgo.com###react-duckbar li:has([data-assist-icon-trigger])\nduckduckgo.com###react-duckbar li:has(a[href*=\"ia=chat\"])\nduckduckgo.com##li[data-layout=\"explore_more\"]\n```"
+    }
+  ],
+  "related": [
+    "duckduckgo/declutter",
+    "google/remove-ai-overview",
+    "bing/remove-copilot"
+  ],
+  "demand": {
+    "score": 79,
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/duckduckgo-no-ai-search/faoilnlkccdjdkpljainiiimmijofmpd",
+        "note": "Chrome Web Store users: \"DuckDuckGo No-AI Search\" (2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/540673",
+        "note": "Greasy Fork total installs: \"DuckDuckGo Remove AI\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=duckduckgo+turn+off+ai",
+        "note": "suggests \"can you turn off ai in duckduckgo\""
+      },
+      {
+        "type": "forum",
+        "url": "https://news.ycombinator.com/item?id=48359130",
+        "note": "Hacker News: complaints about DDG's AI popup"
+      },
+      {
+        "type": "forum",
+        "url": "https://windowsforum.com/threads/duckduckgo-no-ai-a-clear-opt-out-for-ai-free-search.399001/",
+        "note": "WindowsForum thread on DuckDuckGo No AI opt-out"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://duckduckgo.com/?q=how+to+bake+bread&kl=us-en"
+    ],
+    "loggedOut": true,
+    "waitFor": "[data-testid=\"mainline\"] li[data-layout=\"organic\"]",
+    "settleMs": 5000,
+    "baseline": "[...document.querySelectorAll('[data-testid=\"duckassist-answer-content\"]')].some((e) => e.checkVisibility()) && [...document.querySelectorAll('#react-duckbar a[href*=\"ia=chat\"]')].some((a) => a.checkVisibility())",
+    "expect": "(() => { const t = [...document.querySelectorAll('[data-testid=\"duckassist-answer-content\"], #react-duckbar [data-assist-icon-trigger], #react-duckbar a[href*=\"ia=chat\"]')]; return document.querySelectorAll('[data-testid=\"duckassist-answer-content\"]').length > 0 && document.querySelectorAll('#react-duckbar a[href*=\"ia=chat\"]').length > 0 && t.every((e) => !e.checkVisibility()); })()",
+    "intact": "[...document.querySelectorAll('li[data-layout=\"organic\"] [data-testid=\"result-title-a\"]')].filter((a) => a.checkVisibility()).length >= 5 && document.querySelector('#react-duckbar a[href*=\"ia=images\"]').checkVisibility()"
+  }
+}

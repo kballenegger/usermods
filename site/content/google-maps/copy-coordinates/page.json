@@ -1,0 +1,54 @@
+{
+  "slug": "copy-coordinates",
+  "title": "Copy coordinates from Google Maps",
+  "question": "How do I copy GPS coordinates from Google Maps?",
+  "answer": "In Google Maps on a computer, right-click a spot on the map: the first line of the menu is its latitude and longitude, and clicking it copies them. The usermods script on this page adds a Copy coordinates button at the bottom of the map that copies the open place's coordinates, or the map centre's when no place is open, as \"latitude, longitude\". Without an extension, the right-click menu is the quickest way, and the numbers after @ in the address are the map centre.",
+  "prompt": "Add a button to Google Maps that copies the current place's latitude and longitude to the clipboard.",
+  "details": "Google Maps keeps the position in the page address. The script reads it when you click the button: a place page carries the place's own position (`!3d<lat>!4d<lng>`), and every view carries the map centre (`@<lat>,<lng>`). The place's position wins when both are there. The button shows what it copied for two seconds.\n\nThe check loads a map view with no place open and checks the copied text against the map centre in the address. Copying a place's position is not covered by it.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Right-click the map",
+      "body": "Right-click any spot on the map. The coordinates are the first item in the menu; click them to copy. This gives the spot you clicked, not the place in the side panel."
+    },
+    {
+      "kind": "other",
+      "title": "Read them from the address",
+      "body": "The numbers after `@` in the address bar, such as `@40.7128,-74.006,13z`, are the latitude and longitude of the map centre."
+    }
+  ],
+  "related": [
+    "google-maps/dark-mode"
+  ],
+  "demand": {
+    "score": 44,
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/bepccpkaangcaemdmhadifefccidkgbe",
+        "note": "Chrome Web Store users, \"Google Maps Coordinate Copier\"; count from CWS search page"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/378597",
+        "note": "Greasy Fork total installs, \"Google Maps Coordinates Grabber\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=google%20maps%20copy%20coordinat",
+        "note": "Google suggests \"google maps copy coordinates\""
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.google.com/maps/@40.7128,-74.006,13z?hl=en"
+    ],
+    "loggedOut": true,
+    "waitFor": "canvas",
+    "settleMs": 4000,
+    "baseline": "/@-?\\d+(\\.\\d+)?,-?\\d+(\\.\\d+)?/.test(location.href) && [...document.querySelectorAll('canvas')].some((c) => c.checkVisibility() && c.width > 500) && !document.getElementById('usermods-copy-coords')",
+    "expect": "(async () => { const b = document.getElementById('usermods-copy-coords'); if (!b || !b.checkVisibility()) return false; const m = location.href.match(/@(-?\\d+(?:\\.\\d+)?),(-?\\d+(?:\\.\\d+)?)/); let got = null; navigator.clipboard.writeText = async (t) => { got = t; }; b.click(); await new Promise((r) => setTimeout(r, 300)); return !!m && got === m[1] + ', ' + m[2] && b.textContent === 'Copied ' + got; })()",
+    "intact": "[...document.querySelectorAll('canvas')].some((c) => c.checkVisibility() && c.width > 500) && [...document.querySelectorAll('button[aria-label=\"Zoom in\"]')].some((b) => b.checkVisibility())"
+  }
+}

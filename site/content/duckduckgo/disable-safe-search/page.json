@@ -1,0 +1,37 @@
+{
+  "slug": "disable-safe-search",
+  "title": "Turn off SafeSearch on DuckDuckGo for good",
+  "question": "How do I permanently turn off SafeSearch on DuckDuckGo?",
+  "answer": "Pick Off in the Safe search menu above DuckDuckGo's results, or in duckduckgo.com/settings. DuckDuckGo keeps that choice in a cookie, so it goes back to Moderate when cookies are cleared, in private windows and on new browsers. The usermods script on this page adds kp=-2, DuckDuckGo's URL parameter for SafeSearch off, to every search that doesn't already set a level, so results come back unfiltered with no cookie. Without an extension, add &kp=-2 to the search URL your browser uses.",
+  "prompt": "Always turn SafeSearch off on DuckDuckGo by adding kp=-2 to searches.",
+  "details": "When you open a DuckDuckGo search whose address has no `kp` parameter, the script replaces the address with the same search plus `kp=-2` before the page draws. It does not touch searches that already carry `kp`, so choosing Strict or Moderate for one search still works. It changes no settings and stores nothing.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "DuckDuckGo's Safe search menu",
+      "body": "Choose **Off** in the **Safe search** menu above the results, or under **Safe Search** at duckduckgo.com/settings. It is saved in a cookie for that browser."
+    },
+    {
+      "kind": "other",
+      "title": "A search engine URL with kp=-2",
+      "body": "Set your browser's search engine to `https://duckduckgo.com/?q=%s&kp=-2`. Searches from the address bar then have SafeSearch off. Searches typed on duckduckgo.com itself don't carry it."
+    }
+  ],
+  "related": ["duckduckgo/hide-ai", "duckduckgo/declutter"],
+  "demand": {
+    "score": 50,
+    "evidence": [
+      { "type": "greasyfork", "url": "https://greasyfork.org/en/scripts/33049", "note": "Greasy Fork total installs: \"DuckDuckGo unsafe search\" (read via api.greasyfork.org, 2026-11-17)" },
+      { "type": "autocomplete", "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=duckduckgo+turn+off+safe+search", "note": "suggests \"duckduckgo safesearch won't turn off\"" }
+    ]
+  },
+  "check": {
+    "urls": ["https://duckduckgo.com/?q=test&kl=us-en"],
+    "loggedOut": true,
+    "waitFor": "[data-testid=\"mainline\"] li[data-layout=\"organic\"]",
+    "settleMs": 4000,
+    "baseline": "!new URL(location.href).searchParams.has('kp') && [...document.querySelectorAll('button, span')].some((e) => /^safe ?search: ?moderate$/i.test(e.textContent.trim()) && e.checkVisibility())",
+    "expect": "new URL(location.href).searchParams.get('kp') === '-2' && [...document.querySelectorAll('button, span')].some((e) => /^safe ?search: ?off$/i.test(e.textContent.trim()) && e.checkVisibility())",
+    "intact": "new URL(location.href).searchParams.get('q') === 'test' && [...document.querySelectorAll('li[data-layout=\"organic\"] [data-testid=\"result-title-a\"]')].filter((a) => a.checkVisibility()).length >= 5"
+  }
+}

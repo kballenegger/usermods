@@ -1,0 +1,57 @@
+{
+  "slug": "collapse-comments",
+  "title": "Collapse Hacker News comment threads",
+  "question": "How do I collapse all comments on Hacker News?",
+  "answer": "Hacker News only lets you collapse one thread at a time with the [–] link next to each comment; there is no collapse-all option. The usermods script on this page adds a \"collapse all\" link to the line under the story on every comment page. Clicking it folds every top-level thread down to its author line, and the link then switches to \"expand all\". Install it with usermods or any userscript manager. Without a userscript, click [–] on each top-level comment.",
+  "prompt": "Add a collapse all link to Hacker News comment pages that folds every top-level comment thread.",
+  "details": "The script adds the link after the comment count on item pages. It clicks Hacker News's own [–] toggle on each top-level comment that isn't already folded, so each thread folds exactly as if you clicked it by hand and shows HN's \"[N more]\" count. \"expand all\" clicks them again.\n\nIt only adds the link; nothing is folded until you click it. If you are logged in, Hacker News saves each fold to your account (one request per thread), so the threads stay folded on later visits until you click \"expand all\" or [N more].",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Fold threads by hand",
+      "body": "Click [–] next to a comment's author to fold that comment and its replies. Click [N more] to unfold it."
+    }
+  ],
+  "related": [
+    "hackernews/larger-font",
+    "hackernews/dark-mode",
+    "hackernews/open-links-new-tab"
+  ],
+  "demand": {
+    "score": 41,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/18066",
+        "note": "Comments Owl for Hacker News (258 total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/12493",
+        "note": "Hacker News - Folding Subtrees (235 total installs)"
+      },
+      {
+        "type": "forum",
+        "url": "https://news.ycombinator.com/item?id=10539731",
+        "note": "How do you collapse comments in Hacker news threads?"
+      },
+      {
+        "type": "forum",
+        "url": "https://news.ycombinator.com/item?id=23823923",
+        "note": "Ask HN: Hacker News Bug? I can not collapse comments"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://news.ycombinator.com/item?id=24862743"
+    ],
+    "loggedOut": true,
+    "waitFor": "tr.athing.comtr",
+    "settleMs": 1500,
+    "actions": "document.getElementById('usermods-collapse-all')?.click(); await new Promise((r) => setTimeout(r, 500));",
+    "baseline": "(() => { const rows = [...document.querySelectorAll('tr.athing.comtr')]; const isTop = (r) => r.querySelector('td.ind').getAttribute('indent') === '0'; const top = rows.filter(isTop), kids = rows.filter((r) => !isTop(r)); return top.length >= 5 && kids.length > 0 && kids.some((r) => r.checkVisibility()) && top.every((r) => !r.classList.contains('coll')); })()",
+    "expect": "(() => { const rows = [...document.querySelectorAll('tr.athing.comtr')]; const isTop = (r) => r.querySelector('td.ind').getAttribute('indent') === '0'; const top = rows.filter(isTop), kids = rows.filter((r) => !isTop(r)); return document.getElementById('usermods-collapse-all')?.textContent === 'expand all' && top.length >= 5 && kids.length > 0 && top.every((r) => r.classList.contains('coll') && r.checkVisibility()) && kids.every((r) => !r.checkVisibility()); })()",
+    "intact": "[...document.querySelectorAll('tr.athing.comtr')].filter((r) => r.checkVisibility()).length >= 5 && document.querySelector('.fatitem .titleline').checkVisibility()"
+  }
+}

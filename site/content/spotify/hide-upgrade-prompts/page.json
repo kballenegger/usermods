@@ -1,0 +1,39 @@
+{
+  "slug": "hide-upgrade-prompts",
+  "title": "Hide Premium upsells in Spotify web",
+  "question": "How do I hide the Upgrade to Premium prompts on Spotify web?",
+  "answer": "Spotify has no setting to hide its Premium prompts in the web player. The usermods script on this page hides the Premium button in the top bar and the \"Preview of Spotify ... Sign up free\" banner along the bottom of the player. The Log in and Sign up buttons, your songs and the player controls stay. Install it with usermods or any userscript manager. Without an extension, the only way to lose the prompts is a Premium subscription.",
+  "prompt": "On open.spotify.com, hide the Premium and Explore Premium buttons in the top bar and the sign-up banner at the bottom.",
+  "details": "The bottom banner is hidden with CSS by its `data-testid`. The top bar buttons have only generated class names, so the script finds buttons and links in the top bar whose whole text is Premium, Explore Premium, Upgrade to Premium, Try Premium or Upgrade, and hides those.\n\nThe check runs logged out, so it covers the Premium button and the bottom banner. The Explore Premium button that free accounts see is matched by its text but the check can't load it. The script does not touch the Premium links in the page footer, audio ads or pop-ups.",
+  "alternatives": [
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filters",
+      "body": "The first filter uses the same selector as the script; the second finds the top bar button by its text. Our check runs the script, not these filters.\n\n```\nopen.spotify.com##[data-testid=\"signup-bar\"]\nopen.spotify.com###global-nav-bar button:has-text(/^(Explore )?Premium$/)\n```"
+    }
+  ],
+  "related": [
+    "spotify/copy-track-info"
+  ],
+  "demand": {
+    "score": 54,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/522592",
+        "note": "Greasy Fork total installs, \"Spotify AdBlocker (banners, premium prompts)\" (api.greasyfork.org, 2026-11-17)"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://open.spotify.com/album/4LH4d3cOWNNsVw41Gqt2kv"
+    ],
+    "loggedOut": true,
+    "waitFor": "[data-testid=\"signup-bar\"]",
+    "settleMs": 3000,
+    "baseline": "!!document.querySelector('[data-testid=\"signup-bar\"]')?.checkVisibility() && [...document.querySelectorAll('#global-nav-bar button')].some((b) => b.textContent.trim() === 'Premium' && b.checkVisibility())",
+    "expect": "(() => { const bar = document.querySelector('[data-testid=\"signup-bar\"]'); const prem = [...document.querySelectorAll('#global-nav-bar button')].filter((b) => b.textContent.trim() === 'Premium'); return !!bar && !bar.checkVisibility() && prem.length > 0 && prem.every((b) => !b.checkVisibility()); })()",
+    "intact": "!!document.querySelector('[data-testid=\"login-button\"]')?.checkVisibility() && !!document.querySelector('[data-testid=\"signup-button\"]')?.checkVisibility() && [...document.querySelectorAll('[data-testid=\"tracklist-row\"] a[data-testid=\"internal-track-link\"]')].filter((a) => a.checkVisibility()).length >= 5"
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "slug": "dark-mode",
+  "title": "Use dark mode on Hacker News",
+  "question": "How do I get dark mode on Hacker News?",
+  "answer": "Hacker News has no dark mode and no theme setting; logged-in users can only change the colour of the top bar. The usermods script on this page gives the site a near-black background with light grey text, dims the metadata lines and brightens the vote arrows, while keeping the orange header. Install it with usermods or any userscript manager. Without a userscript, a browser-wide dark mode extension such as Dark Reader also works on Hacker News.",
+  "prompt": "Give Hacker News a dark theme with light text.",
+  "details": "The script injects CSS before the page draws, so there is no white flash. It overrides the beige `#hnmain` background, the story, comment and metadata colours, the faded colours HN uses for downvoted comments, and text fields. Links inside comments turn light blue so they stand out from the text.\n\nThe orange header bar keeps its colour. The check loads the front page; the same rules apply to comment pages and the rest of the site.",
+  "alternatives": [
+    {
+      "kind": "extension",
+      "title": "Dark Reader",
+      "body": "Dark Reader darkens every site, Hacker News included, by computing a dark palette from the page's own colours."
+    },
+    {
+      "kind": "site-setting",
+      "title": "Top bar colour",
+      "body": "Logged-in users can set `topcolor` on their profile page. It only changes the header bar, not the page."
+    }
+  ],
+  "related": [
+    "hackernews/larger-font",
+    "hackernews/collapse-comments",
+    "hackernews/open-links-new-tab"
+  ],
+  "demand": {
+    "score": 46,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/439101",
+        "note": "Hacker News Dark Mode + QoL (177 total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/447218",
+        "note": "Auto dark mode HN (89 total installs)"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/abpjflhoidbeaacggmdjoahiakcledna",
+        "note": "HN Dark Mode (533 users)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=hacker%20news%20dark%20mode",
+        "note": "suggestions: hacker news dark mode, hacker news dark mode firefox, hacker news dark mode extension"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://news.ycombinator.com/"
+    ],
+    "loggedOut": true,
+    "waitFor": "tr.athing",
+    "settleMs": 1500,
+    "baseline": "(() => { const lum = (c) => { const [r, g, b] = c.match(/\\d+/g).map(Number); return 0.2126 * r + 0.7152 * g + 0.0722 * b; }; return lum(getComputedStyle(document.getElementById('hnmain')).backgroundColor) > 200 && lum(getComputedStyle(document.querySelector('.titleline > a')).color) < 60; })()",
+    "expect": "(() => { const lum = (c) => { const [r, g, b] = c.match(/\\d+/g).map(Number); return 0.2126 * r + 0.7152 * g + 0.0722 * b; }; const links = [...document.querySelectorAll('.titleline > a')]; return lum(getComputedStyle(document.body).backgroundColor) < 40 && lum(getComputedStyle(document.getElementById('hnmain')).backgroundColor) < 40 && links.length > 0 && links.every((a) => lum(getComputedStyle(a).color) > 140); })()",
+    "intact": "[...document.querySelectorAll('tr.athing')].filter((r) => r.checkVisibility()).length >= 25"
+  }
+}

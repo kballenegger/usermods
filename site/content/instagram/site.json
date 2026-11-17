@@ -1,0 +1,7 @@
+{
+  "slug": "instagram",
+  "name": "Instagram",
+  "domains": ["instagram.com", "www.instagram.com"],
+  "category": "social",
+  "intro": "Userscripts for Instagram on the web: fewer popups and better controls for photos and videos."
+}

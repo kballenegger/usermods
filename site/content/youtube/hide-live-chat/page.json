@@ -1,0 +1,55 @@
+{
+  "slug": "hide-live-chat",
+  "title": "Hide YouTube live chat",
+  "question": "How do I hide live chat on YouTube streams?",
+  "answer": "YouTube has no setting that keeps live chat hidden. The Close button at the top of the chat panel collapses it, but only on the stream you are watching. The usermods script on this page hides the live chat panel on every stream and premiere, so the related videos move up into its place. Install it with usermods or any userscript manager. Without an extension, click Close in the chat header each time.",
+  "prompt": "Hide the live chat on YouTube live streams so it never shows.",
+  "details": "The script is CSS only and hides `#chat-container` on the watch page, the column that holds the chat. It loads before the page draws, so the chat never flashes on screen, and it keeps working as you move between videos.\n\nIt also hides the chat replay on past streams, which the check does not cover. The video, its title and description, comments and the related videos stay as they are. Some streams also show a Live chat card under the title with an Open panel button; the card stays, but the panel it opens is hidden. Turn the script off in your userscript manager when you want the chat back.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Close the chat panel",
+      "body": "Click the X (**Close**) at the top right of the chat panel. The chat collapses to a **Show chat** button for that stream. It opens again on the next stream."
+    },
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filter",
+      "body": "Add this under *My filters* in uBlock Origin. It uses the same selector as the script; our check runs the script, not this filter.\n\n```\nwww.youtube.com##ytd-watch-flexy #chat-container\n```"
+    }
+  ],
+  "related": [
+    "youtube/hide-comments",
+    "youtube/hide-shorts"
+  ],
+  "demand": {
+    "score": 65,
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/bnbnjkiglooccambmgnmbepaofnjjjpl",
+        "note": "Turn Off YouTube Comments & Live Chat (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=hide%20youtube%20live%20chat",
+        "note": "returns the query; suggestions: hide youtube live chat | hide youtube live chat extension | turn off youtube live chat | remove youtube live chat | youtube hide live chat by default"
+      },
+      {
+        "type": "thread",
+        "url": "https://webapps.stackexchange.com/questions/122414",
+        "note": "Can I permanently hide the YouTube chat window?"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.youtube.com/@LofiGirl/live"
+    ],
+    "loggedOut": true,
+    "waitFor": "ytd-live-chat-frame",
+    "settleMs": 5000,
+    "baseline": "document.querySelector('ytd-live-chat-frame #chatframe')?.checkVisibility() === true",
+    "expect": "(() => { const c = document.querySelector('ytd-live-chat-frame'); return c !== null && !c.checkVisibility() && !document.querySelector('#chat-container').checkVisibility(); })()",
+    "intact": "document.querySelector('#movie_player').checkVisibility() && [...document.querySelectorAll('#secondary yt-lockup-view-model, #secondary ytd-compact-video-renderer')].filter((e) => e.checkVisibility()).length >= 5"
+  }
+}

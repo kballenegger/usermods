@@ -1,0 +1,56 @@
+{
+  "slug": "dark-mode",
+  "title": "Dark mode for GitHub",
+  "question": "How do I turn on dark mode on GitHub?",
+  "answer": "Signed in, open Settings, then Appearance, and pick a dark theme under Theme mode. Signed out, GitHub follows your system or browser's light or dark setting, and there is no switch on the page. The usermods script on this page sets GitHub's own dark theme on every page while you are signed out, whatever your system uses. Without an extension, switch your operating system or Chrome's appearance to dark and GitHub follows it.",
+  "prompt": "Make GitHub always use its dark theme, even when I am signed out.",
+  "details": "GitHub chooses its theme from attributes on the page's root element. The script sets the color mode to dark and the dark theme to GitHub's standard dark theme, so the colors are GitHub's own and every part of the site matches. It sets them again if GitHub changes them during in-page navigation.\n\nThe check runs signed out. Signed in, use the theme in your appearance settings instead. The script also runs on gist.github.com, which the check does not load.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Appearance settings",
+      "body": "Signed in: **Settings** > **Appearance** > **Theme mode**. Choose **Single theme** and a dark theme, or **Sync with system** with a dark night theme. GitHub also offers dimmed and high contrast dark themes there."
+    },
+    {
+      "kind": "other",
+      "title": "System or browser appearance",
+      "body": "Signed out, GitHub follows the light or dark setting of your operating system. In Chrome you can also set **Settings** > **Appearance** > **Mode** to **Dark**."
+    }
+  ],
+  "related": [
+    "github/full-width",
+    "github/file-icons",
+    "gitlab/dark-mode"
+  ],
+  "demand": {
+    "score": 58,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/15562",
+        "note": "Greasy Fork total installs, \"GitHub Dark Script\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/ebpfohnniggcgdadnghbkdopcpfcdmgh",
+        "note": "Chrome Web Store users, \"GitHub Dark\""
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=github%20dark%20mo",
+        "note": "Google suggests \"github dark mode\""
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://github.com/torvalds/linux"
+    ],
+    "loggedOut": true,
+    "waitFor": "tr.react-directory-row",
+    "settleMs": 4000,
+    "baseline": "(() => { const lum = ((c) => { const m = c.match(/[\\d.]+/g).map(Number); return 0.2126 * m[0] + 0.7152 * m[1] + 0.0722 * m[2]; }); return document.documentElement.getAttribute('data-color-mode') !== 'dark' && lum(getComputedStyle(document.body).backgroundColor) > 200; })()",
+    "expect": "(() => { const lum = ((c) => { const m = c.match(/[\\d.]+/g).map(Number); return 0.2126 * m[0] + 0.7152 * m[1] + 0.0722 * m[2]; }); const link = document.querySelector('tr.react-directory-row a[title]'); return document.documentElement.getAttribute('data-color-mode') === 'dark' && lum(getComputedStyle(document.body).backgroundColor) < 50 && lum(getComputedStyle(link).color) > 150; })()",
+    "intact": "[...document.querySelectorAll('tr.react-directory-row')].filter((r) => r.checkVisibility()).length >= 10"
+  }
+}

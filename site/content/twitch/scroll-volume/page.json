@@ -1,0 +1,46 @@
+{
+  "slug": "scroll-volume",
+  "title": "Control Twitch volume with the mouse wheel",
+  "question": "How do I control Twitch volume with the mouse wheel?",
+  "answer": "Twitch has no option to change the volume with the mouse wheel; scrolling over the player does nothing to the sound. The usermods script on this page turns the volume up or down by 5% for each wheel notch over a Twitch player (every 100 pixels of scrolling on a trackpad), moving Twitch's own volume slider, and unmutes the player when you scroll up. Install it with usermods or any userscript manager. Without an extension, hover the player and use the volume slider, or press M to mute and unmute.",
+  "prompt": "Let me change the volume on Twitch by scrolling the mouse wheel over the video.",
+  "details": "The script listens for the mouse wheel over any Twitch video player and moves the player's volume slider by 5% for every 100 pixels of scrolling, which is one notch on most mice. Trackpads and smooth-scrolling wheels send many small scroll events; the script adds them up, so a swipe moves the volume step by step instead of jumping to 0% or 100%. It fires the same events a drag on the slider would, so the slider, the mute button and the volume Twitch remembers all agree. The page doesn't scroll while the pointer is over the player; move the pointer off the video to scroll.\n\nScrolling up on a muted player unmutes it first. The check runs it on the featured player on the logged-out front page with four 100-pixel wheel events; it doesn't send trackpad-sized events. Channel pages use the same player, but the check doesn't load one because no single channel is always live.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "The player's own controls",
+      "body": "Hover the video to show the volume slider, or press **M** to mute and unmute."
+    }
+  ],
+  "related": [
+    "twitch/disable-autoplay",
+    "twitch/theater-mode"
+  ],
+  "demand": {
+    "score": 51,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/420862",
+        "note": "Twitch Scroll Wheel Volume (1139 total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=twitch%20scroll%20wheel%20volume",
+        "note": "suggestions: twitch scroll wheel volume | why does my scroll wheel change volume"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.twitch.tv/"
+    ],
+    "loggedOut": true,
+    "waitFor": "[data-a-target=\"front-page-carousel\"] [data-a-target=\"video-player\"] input[data-a-target=\"player-volume-slider\"]",
+    "settleMs": 5000,
+    "actions": "const umPlayer = document.querySelector('[data-a-target=\"front-page-carousel\"] [data-a-target=\"video-player\"]'); const umSlider = umPlayer.querySelector('input[data-a-target=\"player-volume-slider\"]'); window.__umBefore = Number(umSlider.value); window.__umUp = window.__umBefore <= 0.8; for (let i = 0; i < 4; i++) umPlayer.querySelector('video').dispatchEvent(new WheelEvent('wheel', { deltaY: window.__umUp ? -100 : 100, bubbles: true, cancelable: true })); await new Promise((r) => setTimeout(r, 1500));",
+    "baseline": "(() => { const p = document.querySelector('[data-a-target=\"front-page-carousel\"] [data-a-target=\"video-player\"]'); const s = p && p.querySelector('input[data-a-target=\"player-volume-slider\"]'); return !!s && !!p.querySelector('video') && Number(s.value) === window.__umBefore; })()",
+    "expect": "(() => { const p = document.querySelector('[data-a-target=\"front-page-carousel\"] [data-a-target=\"video-player\"]'); const s = p.querySelector('input[data-a-target=\"player-volume-slider\"]'); const v = p.querySelector('video'); const moved = Number(s.value) - window.__umBefore; return Math.abs(Math.abs(moved) - 0.2) < 0.011 && (moved > 0) === window.__umUp && Math.abs(v.volume - Number(s.value)) < 0.011 && !v.muted; })()",
+    "intact": "new Promise((done) => { const v = document.querySelector('[data-a-target=\"front-page-carousel\"] video'); if (!v || !v.checkVisibility()) return done(false); const t0 = v.currentTime; const end = Date.now() + 10000; const tick = () => { if (!v.paused && v.currentTime > t0 + 0.5) return done(true); if (Date.now() > end) return done(false); setTimeout(tick, 250); }; tick(); })"
+  }
+}

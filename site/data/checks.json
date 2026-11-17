@@ -1,4 +1,786 @@
 {
+  "aliexpress/clean-urls": [
+    {
+      "at": "2026-11-17T05:24:18Z",
+      "result": "pass",
+      "url": "https://www.aliexpress.com/w/wholesale-usb-c-cable.html",
+      "scriptSha": "d232d61cfd7be9fb46cb7ef3d1ed02a61b87fe707baf4fc26d0a61ca1d5a7799",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:10:49Z",
+      "result": "pass",
+      "url": "https://www.aliexpress.com/w/wholesale-usb-c-cable.html",
+      "scriptSha": "d232d61cfd7be9fb46cb7ef3d1ed02a61b87fe707baf4fc26d0a61ca1d5a7799",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "amazon/hide-sponsored": [
+    {
+      "at": "2026-11-17T05:08:51Z",
+      "result": "pass",
+      "url": "https://www.amazon.com/s?k=usb+c+cable",
+      "scriptSha": "96572aad249fd8a9f561c408e3c0f7043ac9a349d439ba7e217107acefe6b7eb",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    }
+  ],
+  "bing/clean-homepage": [
+    {
+      "at": "2026-11-17T05:15:08Z",
+      "result": "pass",
+      "url": "https://www.bing.com/?cc=us&setlang=en",
+      "scriptSha": "c0ba65736a1c8e9e101cc50eeca19ff8649ed043d2c50a108d924634d908cf44",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T05:14:10Z",
+      "result": "pass",
+      "url": "https://www.bing.com/?cc=us&setlang=en",
+      "scriptSha": "825ca9b92a90cd30b75f0114f45488452f899b0264f9540826894444ddabdde5",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    }
+  ],
+  "bing/image-download-button": [
+    {
+      "at": "2026-11-17T05:21:40Z",
+      "result": "pass",
+      "url": "https://www.bing.com/images/search?q=mountain&setlang=en&cc=us",
+      "scriptSha": "7a5216bb4e84aeae885b4af8361ad73ec840ed76f813bb7a564d8bfab7e6c6a9",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T05:16:54Z",
+      "result": "pass",
+      "url": "https://www.bing.com/images/search?q=mountain&setlang=en&cc=us",
+      "scriptSha": "7a5216bb4e84aeae885b4af8361ad73ec840ed76f813bb7a564d8bfab7e6c6a9",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    }
+  ],
+  "chatgpt/ctrl-enter-to-send": [
+    {
+      "at": "2026-11-17T05:28:34Z",
+      "result": "pass",
+      "url": "https://chatgpt.com/",
+      "scriptSha": "81305632658ea392a24567442022ca05c9c35ec308807b78668e1b1e9743bb69",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:13:46Z",
+      "result": "pass",
+      "url": "https://chatgpt.com/",
+      "scriptSha": "81305632658ea392a24567442022ca05c9c35ec308807b78668e1b1e9743bb69",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "chatgpt/export-chat": [
+    {
+      "at": "2026-11-17T05:28:55Z",
+      "result": "pass",
+      "url": "https://chatgpt.com/",
+      "scriptSha": "4d56a7c77eaeac288634d4360ac5ab0bcb2b62fbaba0e5522385575ce25c13df",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:17:32Z",
+      "result": "pass",
+      "url": "https://chatgpt.com/",
+      "scriptSha": "4d56a7c77eaeac288634d4360ac5ab0bcb2b62fbaba0e5522385575ce25c13df",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:16:02Z",
+      "result": "fail",
+      "url": "https://chatgpt.com/",
+      "scriptSha": "678cf958c1af767fca5d770c8a1ee9eb6c3cc9af21cca6ad20d5e6fae7c05111",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false"
+    }
+  ],
+  "chatgpt/wide-chat": [
+    {
+      "at": "2026-11-17T05:29:19Z",
+      "result": "pass",
+      "url": "https://chatgpt.com/",
+      "scriptSha": "c076744561a500589fd10ed32ef726ff1968fda963681b58458c483c605fa873",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:22:48Z",
+      "result": "pass",
+      "url": "https://chatgpt.com/",
+      "scriptSha": "c076744561a500589fd10ed32ef726ff1968fda963681b58458c483c605fa873",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:21:09Z",
+      "result": "fail",
+      "url": "https://chatgpt.com/",
+      "scriptSha": "f2487111203666ed1ba10b952fc508274264aac3a8e7bc0aa196ee6f3c71d62c",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false"
+    },
+    {
+      "at": "2026-11-17T05:19:56Z",
+      "result": "fail",
+      "url": "https://chatgpt.com/",
+      "scriptSha": "9a9681dd0c027b23c7fa7b571e25fff89a761f504ef059e4644b4c380d4bf2a9",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false"
+    },
+    {
+      "at": "2026-11-17T05:18:48Z",
+      "result": "fail",
+      "url": "https://chatgpt.com/",
+      "scriptSha": "9711524dfb82ef41049d06f02d60d736e974c0af4fc3cf89e54087bb024c928f",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false"
+    }
+  ],
+  "duckduckgo/disable-safe-search": [
+    {
+      "at": "2026-11-17T05:22:04Z",
+      "result": "pass",
+      "url": "https://duckduckgo.com/?q=test&kl=us-en",
+      "scriptSha": "1cfd08e9be6b384bb96c940dbe7daf3cb78e60cd617056e7e285ab80aac4280d",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T05:18:22Z",
+      "result": "pass",
+      "url": "https://duckduckgo.com/?q=test&kl=us-en",
+      "scriptSha": "1cfd08e9be6b384bb96c940dbe7daf3cb78e60cd617056e7e285ab80aac4280d",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    }
+  ],
+  "duckduckgo/hide-ai": [
+    {
+      "at": "2026-11-17T05:22:32Z",
+      "result": "pass",
+      "url": "https://duckduckgo.com/?q=how+to+bake+bread&kl=us-en",
+      "scriptSha": "e1f3748f277d8f3063ac8541fd3067ee02f1db2edac2db6aa6cefc1d9e81f74a",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T05:19:44Z",
+      "result": "pass",
+      "url": "https://duckduckgo.com/?q=how+to+bake+bread&kl=us-en",
+      "scriptSha": "e1f3748f277d8f3063ac8541fd3067ee02f1db2edac2db6aa6cefc1d9e81f74a",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T05:09:18Z",
+      "result": "pass",
+      "url": "https://duckduckgo.com/?q=how+to+bake+bread&kl=us-en",
+      "scriptSha": "08b55aa8c2508b8d4841fea483f0cca5389fc71a5ecbc163fe19b908a5d3e00b",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T05:06:40Z",
+      "result": "fail",
+      "url": "https://duckduckgo.com/?q=how+to+bake+bread&kl=us-en",
+      "scriptSha": "f199dd8395a6db03d22771874e24f3c50a7830db5bd9fd2b1509ccfdaae7e1c4",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "expect was false"
+    }
+  ],
+  "etsy/hide-ads": [
+    {
+      "at": "2026-11-17T05:22:27Z",
+      "result": "blocked",
+      "url": "https://www.etsy.com/search?q=mug&instant_download=false",
+      "scriptSha": "f3e7c2e59d61d8e26ecc487a6bcaec05ab3ac3f9ee0c8f98b7b3b2f644070134",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "load without script: locator.count: Frame was detached"
+    },
+    {
+      "at": "2026-11-17T05:21:58Z",
+      "result": "blocked",
+      "url": "https://www.etsy.com/search?q=mug",
+      "scriptSha": "f3e7c2e59d61d8e26ecc487a6bcaec05ab3ac3f9ee0c8f98b7b3b2f644070134",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "load without script: locator.count: Frame was detached"
+    },
+    {
+      "at": "2026-11-17T05:21:43Z",
+      "result": "blocked",
+      "url": "https://www.etsy.com/search?q=mug",
+      "scriptSha": "f3e7c2e59d61d8e26ecc487a6bcaec05ab3ac3f9ee0c8f98b7b3b2f644070134",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "load without script: locator.count: Frame was detached"
+    }
+  ],
+  "facebook/remove-login-popup": [
+    {
+      "at": "2026-11-17T05:17:42Z",
+      "result": "fail",
+      "url": "https://www.facebook.com/NASA",
+      "scriptSha": "107c9fc802003afe18fe668c95361017ffe6047f9c73af2971bc9feeb23babca",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false, intact was false"
+    }
+  ],
+  "fandom/redirect-to-independent-wiki": [
+    {
+      "at": "2026-11-17T05:25:08Z",
+      "result": "pass",
+      "url": "https://terraria.fandom.com/wiki/Zombie",
+      "scriptSha": "c14ba2cb3d41cf0766ada1ec7af71cd5ed8c1743481071b02775a61ecc7bccb7",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:11:47Z",
+      "result": "pass",
+      "url": "https://terraria.fandom.com/wiki/Zombie",
+      "scriptSha": "c14ba2cb3d41cf0766ada1ec7af71cd5ed8c1743481071b02775a61ecc7bccb7",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:08:32Z",
+      "result": "blocked",
+      "url": "https://minecraft.fandom.com/wiki/Creeper",
+      "scriptSha": "c14ba2cb3d41cf0766ada1ec7af71cd5ed8c1743481071b02775a61ecc7bccb7",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "load with script: timed out after 60 s"
+    },
+    {
+      "at": "2026-11-17T05:06:26Z",
+      "result": "blocked",
+      "url": "https://minecraft.fandom.com/wiki/Creeper",
+      "scriptSha": "181bd901cb18fc85cb0b03699a9c4400c2cb8af845e23dbbb989270d1941be5c",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "load with script: timed out after 60 s"
+    }
+  ],
+  "fandom/remove-ads": [
+    {
+      "at": "2026-11-17T05:22:03Z",
+      "result": "pass",
+      "url": "https://harrypotter.fandom.com/wiki/Harry_Potter",
+      "scriptSha": "20eeb641f94788733c2f42e5c9132ec438bd20190c89b4902ef7dbac97b7e689",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "fandom/remove-clutter": [
+    {
+      "at": "2026-11-17T05:25:36Z",
+      "result": "pass",
+      "url": "https://harrypotter.fandom.com/wiki/Harry_Potter",
+      "scriptSha": "03a0d8340ad7ef9150f88220ca1d6237a523844b4b6ee827b5a46d7d60f74f51",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:15:25Z",
+      "result": "pass",
+      "url": "https://harrypotter.fandom.com/wiki/Harry_Potter",
+      "scriptSha": "03a0d8340ad7ef9150f88220ca1d6237a523844b4b6ee827b5a46d7d60f74f51",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "github/absolute-dates": [
+    {
+      "at": "2026-11-17T05:29:35Z",
+      "result": "pass",
+      "url": "https://github.com/facebook/react/pulls",
+      "scriptSha": "b55e7f6745f6137c8145185e177a40e9146f36aa8b2cfd2d770be21701de3aa6",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:11:45Z",
+      "result": "pass",
+      "url": "https://github.com/facebook/react/pulls",
+      "scriptSha": "b55e7f6745f6137c8145185e177a40e9146f36aa8b2cfd2d770be21701de3aa6",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "github/dark-mode": [
+    {
+      "at": "2026-11-17T05:34:30Z",
+      "result": "pass",
+      "url": "https://github.com/torvalds/linux",
+      "scriptSha": "14b7f37283e1d9c6af300c372bdf289726fd571bd193c00bbdc9c239581e28dd",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:07:41Z",
+      "result": "pass",
+      "url": "https://github.com/torvalds/linux",
+      "scriptSha": "8b54cdc378260f55f02215845bc2854416cacbd2641bc48b3bef93330c178bcb",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "github/file-icons": [
+    {
+      "at": "2026-11-17T05:07:06Z",
+      "result": "pass",
+      "url": "https://github.com/facebook/react",
+      "scriptSha": "cbfb868583273dc4a2ee6424e88fce7eb9cb80d3bc38034cc450ff4cd952712d",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:06:48Z",
+      "result": "pass",
+      "url": "https://github.com/facebook/react",
+      "scriptSha": "ba4978fee76797d8d371db4b6996c1e5a4101d478a3551b66f268b3fe09798a8",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "github/full-width": [
+    {
+      "at": "2026-11-17T05:13:44Z",
+      "result": "pass",
+      "url": "https://github.com/facebook/react/pulls",
+      "scriptSha": "febb3ee7d52b472fab1d233083c0869b6bc47b53ad6faccea6a33c726fd469e2",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:13:26Z",
+      "result": "blocked",
+      "url": "https://github.com/facebook/react/pulls",
+      "scriptSha": "febb3ee7d52b472fab1d233083c0869b6bc47b53ad6faccea6a33c726fd469e2",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "target not present without the script (baseline was false)"
+    },
+    {
+      "at": "2026-11-17T05:13:01Z",
+      "result": "blocked",
+      "url": "https://github.com/facebook/react/pulls",
+      "scriptSha": "febb3ee7d52b472fab1d233083c0869b6bc47b53ad6faccea6a33c726fd469e2",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "target not present without the script (baseline was false)"
+    }
+  ],
+  "github/translate-interface": [
+    {
+      "at": "2026-11-17T05:33:35Z",
+      "result": "pass",
+      "url": "https://github.com/torvalds/linux",
+      "scriptSha": "e0f9496027e59f6c732ed913432a8eb302930f9aebcea2c8957ca232170da022",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:32:47Z",
+      "result": "fail",
+      "url": "https://github.com/torvalds/linux/blob/master/Documentation/process/changes.rst",
+      "scriptSha": "e0f9496027e59f6c732ed913432a8eb302930f9aebcea2c8957ca232170da022",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "intact was false"
+    },
+    {
+      "at": "2026-11-17T05:32:10Z",
+      "result": "fail",
+      "url": "https://github.com/torvalds/linux/blob/master/Documentation/process/changes.rst",
+      "scriptSha": "e0f9496027e59f6c732ed913432a8eb302930f9aebcea2c8957ca232170da022",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "intact was false"
+    },
+    {
+      "at": "2026-11-17T05:19:32Z",
+      "result": "pass",
+      "url": "https://github.com/torvalds/linux",
+      "scriptSha": "cec2fd350ee4cc0509352ccbd05e5f9e14070b263bd2f996c27f4aab188efbb5",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:05:24Z",
+      "result": "pass",
+      "url": "https://github.com/torvalds/linux",
+      "scriptSha": "ff7c36c317cafa942ee5aecbb2049f94e1a42e03d116c012cf62273c455410e3",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:04:59Z",
+      "result": "fail",
+      "url": "https://github.com/torvalds/linux",
+      "scriptSha": "ff7c36c317cafa942ee5aecbb2049f94e1a42e03d116c012cf62273c455410e3",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "intact was false"
+    }
+  ],
+  "gitlab/dark-mode": [
+    {
+      "at": "2026-11-17T05:34:41Z",
+      "result": "pass",
+      "url": "https://gitlab.com/gitlab-org/gitlab",
+      "scriptSha": "500aad20514c84947017940890899f9ed794cd3562fc99dc93992c77b5ac11e5",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:29:46Z",
+      "result": "pass",
+      "url": "https://gitlab.com/gitlab-org/gitlab",
+      "scriptSha": "69ada7201641ed12b4edf361e4a5d0d2b345aa39bdd987e68a3559f540691bc6",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:26:59Z",
+      "result": "pass",
+      "url": "https://gitlab.com/gitlab-org/gitlab",
+      "scriptSha": "69ada7201641ed12b4edf361e4a5d0d2b345aa39bdd987e68a3559f540691bc6",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:26:32Z",
+      "result": "fail",
+      "url": "https://gitlab.com/gitlab-org/gitlab/-/issues/14560",
+      "scriptSha": "69ada7201641ed12b4edf361e4a5d0d2b345aa39bdd987e68a3559f540691bc6",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was error: page.evaluate: TypeError: Failed to execute 'getComputedStyle' on 'Window': parameter 1 is not of type 'Element'., intact was false"
+    }
+  ],
+  "google-maps/copy-coordinates": [
+    {
+      "at": "2026-11-17T05:17:47Z",
+      "result": "pass",
+      "url": "https://www.google.com/maps/@40.7128,-74.006,13z?hl=en",
+      "scriptSha": "62b2e972123842c66ba7c201980aaef0f7d95e24c07f424c022b11ef39eaad3a",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "google-maps/dark-mode": [
+    {
+      "at": "2026-11-17T05:26:21Z",
+      "result": "pass",
+      "url": "https://www.google.com/maps/@40.7128,-74.006,13z?hl=en",
+      "scriptSha": "b106423eef4e1840964f69382be8462b9ccd7ad425a80cb42b0ee85c707f438c",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:26:05Z",
+      "result": "pass",
+      "url": "https://www.google.com/maps/@40.7128,-74.006,13z?hl=en",
+      "scriptSha": "b106423eef4e1840964f69382be8462b9ccd7ad425a80cb42b0ee85c707f438c",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:24:42Z",
+      "result": "pass",
+      "url": "https://www.google.com/maps/@40.7128,-74.006,13z?hl=en",
+      "scriptSha": "b106423eef4e1840964f69382be8462b9ccd7ad425a80cb42b0ee85c707f438c",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:09:35Z",
+      "result": "pass",
+      "url": "https://www.google.com/maps/@40.7128,-74.006,13z?hl=en",
+      "scriptSha": "b106423eef4e1840964f69382be8462b9ccd7ad425a80cb42b0ee85c707f438c",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "google/block-sites": [
+    {
+      "at": "2026-11-17T05:44:18Z",
+      "result": "pass",
+      "url": "https://www.google.com/search?q=sourdough+bread+ideas&hl=en&gl=us",
+      "scriptSha": "cfa0ee0ae672cc41d91638fe4f1da5a0aa2d46c8a1d5e1da3643776519e56210",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T05:43:20Z",
+      "result": "blocked",
+      "url": "https://www.google.com/search?q=sourdough+bread+ideas&hl=en&gl=us",
+      "scriptSha": "cfa0ee0ae672cc41d91638fe4f1da5a0aa2d46c8a1d5e1da3643776519e56210",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "target not present without the script (wall text \"Sign in to continue\")"
+    },
+    {
+      "at": "2026-11-17T05:40:29Z",
+      "result": "pass",
+      "url": "https://www.google.com/search?q=sourdough+bread+ideas&hl=en&gl=us",
+      "scriptSha": "cfa0ee0ae672cc41d91638fe4f1da5a0aa2d46c8a1d5e1da3643776519e56210",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T05:39:43Z",
+      "result": "blocked",
+      "url": "https://www.google.com/search?q=sourdough+bread+ideas&hl=en&gl=us",
+      "scriptSha": "cfa0ee0ae672cc41d91638fe4f1da5a0aa2d46c8a1d5e1da3643776519e56210",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "with script: wall url https://www.google.com/sorry/index?continue=https://www.google.com/search%3Fq%3Dsourdough%2Bbread%2Bideas%26hl%3Den%26gl%3Dus%26sei%3Dd-j7apOSGovi5NoPvNvb6Q4&hl=en&q=EgQYvJSgGPfQ79cGIjB34rwofvdOQ9y7OA8RpxCKxPOUf8pg6fB7pC2Op4pL-FpDbuwY5o2uFK6V10yRyiQyAnJSWgFDYPGJ1vKEjtqjPw"
+    },
+    {
+      "at": "2026-11-17T05:35:05Z",
+      "result": "blocked",
+      "url": "https://www.google.com/search?q=sourdough+bread+ideas&hl=en&gl=us",
+      "scriptSha": "cfa0ee0ae672cc41d91638fe4f1da5a0aa2d46c8a1d5e1da3643776519e56210",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "target not present without the script (wall url https://www.google.com/sorry/index?continue=https://www.google.com/search%3Fq%3Dsourdough%2Bbread%2Bideas%26hl%3Den%26gl%3Dus%26sei%3DYOf7ap-_O8S05NoP386H-QY&hl=en&q=EgRHf_AkGOHO79cGIjAc8wo8ZynSuHyAV7N1PSIlPB-RZ5HyFeM51z0KZPodYYxQJGj_PwVUfEdS7anRWDwyAnJSWgFDYPeuxKWV7bzXowE)"
+    },
+    {
+      "at": "2026-11-17T05:29:58Z",
+      "result": "blocked",
+      "url": "https://www.google.com/search?q=sourdough+bread+ideas&hl=en&gl=us",
+      "scriptSha": "cfa0ee0ae672cc41d91638fe4f1da5a0aa2d46c8a1d5e1da3643776519e56210",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "target not present without the script (wall text \"Sign in to continue\")"
+    },
+    {
+      "at": "2026-11-17T05:27:55Z",
+      "result": "blocked",
+      "url": "https://www.google.com/search?q=sourdough+bread+ideas&hl=en&gl=us",
+      "scriptSha": "cfa0ee0ae672cc41d91638fe4f1da5a0aa2d46c8a1d5e1da3643776519e56210",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "target not present without the script (wall url https://www.google.com/sorry/index?continue=https://www.google.com/search%3Fq%3Dsourdough%2Bbread%2Bideas%26hl%3Den%26gl%3Dus%26sei%3Ds-X7aqb1CeieptQPo8PdAQ&hl=en&q=EgREPHy0GLPL79cGIjBGdseNPVCrUX21U6oGlfwtAiRCzuNLfkOU10AyBaprPhpqEgNF94ZtrYGuObiWsgAyAnJSWgFDYIHp27i1vIKFwQE)"
+    },
+    {
+      "at": "2026-11-17T05:23:12Z",
+      "result": "fail",
+      "url": "https://www.google.com/search?q=sourdough+bread+pinterest&hl=en&gl=us",
+      "scriptSha": "49b10c62f7321451a470c8ca03f8f3000c85150b3bfcf7beab02f5e799a12c60",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "intact was false"
+    },
+    {
+      "at": "2026-11-17T05:17:24Z",
+      "result": "blocked",
+      "url": "https://www.google.com/search?q=sourdough+bread+pinterest&hl=en&gl=us",
+      "scriptSha": "49b10c62f7321451a470c8ca03f8f3000c85150b3bfcf7beab02f5e799a12c60",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "load with script: timed out after 60 s"
+    }
+  ],
+  "google/date-filter-buttons": [
+    {
+      "at": "2026-11-17T05:18:24Z",
+      "result": "pass",
+      "url": "https://www.google.com/search?q=how+to+bake+bread&hl=en&gl=us",
+      "scriptSha": "fd8a5dfe1a5a0d332f2d121179f981f9f260c7feb9aac69f562b96d216677bf3",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    }
+  ],
+  "google/hide-ai-mode": [
+    {
+      "at": "2026-11-17T05:15:58Z",
+      "result": "pass",
+      "url": "https://www.google.com/search?q=how+to+bake+bread&hl=en&gl=us",
+      "scriptSha": "fc181e455f5cd95a1a0942a66cc84358801e41c8fb23ea82ad86a39c11786709",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T05:12:08Z",
+      "result": "blocked",
+      "url": "https://www.google.com/search?q=how+to+bake+bread&hl=en&gl=us",
+      "scriptSha": "fc181e455f5cd95a1a0942a66cc84358801e41c8fb23ea82ad86a39c11786709",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "target not present without the script (wall url https://www.google.com/sorry/index?continue=https://www.google.com/search%3Fq%3Dhow%2Bto%2Bbake%2Bbread%26hl%3Den%26gl%3Dus%26sei%3D--H7ar_-LJinqtsPt8LBqQk&hl=en&q=EgSsO0c2GPzD79cGIjCL-G32vQ-oLulZb5-00sFD4LqaZYn2wpYnvaPHLi5owHzhnFLIKHwiGGVIV2CjfqAyAnJSWgFDYK6o27e22LCtaw)"
+    },
+    {
+      "at": "2026-11-17T05:08:14Z",
+      "result": "blocked",
+      "url": "https://www.google.com/search?q=how+to+bake+bread&hl=en&gl=us",
+      "scriptSha": "fc181e455f5cd95a1a0942a66cc84358801e41c8fb23ea82ad86a39c11786709",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "target not present without the script (wall url https://www.google.com/sorry/index?continue=https://www.google.com/search%3Fq%3Dhow%2Bto%2Bbake%2Bbread%26hl%3Den%26gl%3Dus%26sei%3DFuH7auHcFofk5NoPnv_LoQw&hl=en&q=EgRIXsCsGJbC79cGIjBcPt-R46XlavMjK4SODnKVQ_9Xu31T0xvvL4WOm6VXXn9PT5_n_cJRC2z2sq9ABJgyAnJSWgFDYLrU-_2BqOSKLg)"
+    }
+  ],
+  "google/hide-people-also-ask": [
+    {
+      "at": "2026-11-17T05:13:07Z",
+      "result": "pass",
+      "url": "https://www.google.com/search?q=how+to+bake+bread&hl=en&gl=us",
+      "scriptSha": "48f78043d45e97555980de853a31c1782aea52cfb5a8f0f9d3a6459c2edeec68",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T05:09:37Z",
+      "result": "blocked",
+      "url": "https://www.google.com/search?q=how+to+bake+bread&hl=en&gl=us",
+      "scriptSha": "48f78043d45e97555980de853a31c1782aea52cfb5a8f0f9d3a6459c2edeec68",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "with script: wall url https://www.google.com/sorry/index?continue=https://www.google.com/search%3Fq%3Dhow%2Bto%2Bbake%2Bbread%26hl%3Den%26gl%3Dus%26sei%3DaOH7asX0MezZ5NoPwMzf2AU&hl=en&q=EgRIXsCsGOnC79cGIjCxx2gLv1m3j_MRCtvtTsJ3CZzJWQY1vC0uFn0VlMz9wT2ylDF93sowSzjNLViu29IyAnJSWgFDYMynidCPhqz4Bg"
+    }
+  ],
+  "google/hide-sponsored": [
+    {
+      "at": "2026-11-17T05:11:16Z",
+      "result": "pass",
+      "url": "https://www.google.com/search?q=car+insurance+quote&hl=en&gl=us",
+      "scriptSha": "ca3026c9d09421221b1f1dc8e45113f49a779f2eb75967dcc3a77af5f55b535c",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T05:10:18Z",
+      "result": "blocked",
+      "url": "https://www.google.com/search?q=car+insurance+quote&hl=en&gl=us",
+      "scriptSha": "ca3026c9d09421221b1f1dc8e45113f49a779f2eb75967dcc3a77af5f55b535c",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "target not present without the script (wall url https://www.google.com/sorry/index?continue=https://www.google.com/search%3Fq%3Dcar%2Binsurance%2Bquote%26hl%3Den%26gl%3Dus%26sei%3Dk-H7auzSHMnf5NoPwbb-qA4&hl=en&q=EgRIXsCsGJPD79cGIjAhGvbTxGrR0De4xmMHWli_EkjiY0DGhkrUJ9vp3HkuFa159T8f7JUF6yJfS_kcK04yAnJSWgFDYL_s4sGGtO_JNg)"
+    }
+  ],
+  "google/images-direct-links": [
+    {
+      "at": "2026-11-17T05:46:46Z",
+      "result": "pass",
+      "url": "https://www.google.com/search?q=mountain&udm=2&hl=en&gl=us",
+      "scriptSha": "e2bd5352aa163ac84f6cfa00324689d54616db1738003228c580b1bd8807dae8",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T05:37:01Z",
+      "result": "pass",
+      "url": "https://www.google.com/search?q=mountain&udm=2&hl=en&gl=us",
+      "scriptSha": "e2bd5352aa163ac84f6cfa00324689d54616db1738003228c580b1bd8807dae8",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T05:33:32Z",
+      "result": "blocked",
+      "url": "https://www.google.com/search?q=mountain&udm=2&hl=en&gl=us",
+      "scriptSha": "e2bd5352aa163ac84f6cfa00324689d54616db1738003228c580b1bd8807dae8",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "target not present without the script (wall url https://www.google.com/sorry/index?continue=https://www.google.com/search%3Fq%3Dmountain%26udm%3D2%26hl%3Den%26gl%3Dus%26sei%3DBOf7aqbxMdisptQPz_7i2A8&hl=en&q=EgSUSxEZGIXO79cGIjAOZWEXon_fg6QS-Jf2E7zHU-o9199xq9Rl2t6twXrR4RIcAEdfIPKuPthnC3dBS1syAVJaAUNgv-vVuM35iNlY)"
+    }
+  ],
+  "google/keyboard-shortcuts": [
+    {
+      "at": "2026-11-17T05:35:48Z",
+      "result": "pass",
+      "url": "https://www.google.com/search?q=how+to+bake+bread&hl=en&gl=us",
+      "scriptSha": "d4d98c461d291a050ce7c952a8ba4854ef0e127aacfc3c776e84d20764d4c6a8",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T05:30:48Z",
+      "result": "blocked",
+      "url": "https://www.google.com/search?q=how+to+bake+bread&hl=en&gl=us",
+      "scriptSha": "d4d98c461d291a050ce7c952a8ba4854ef0e127aacfc3c776e84d20764d4c6a8",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "target not present without the script (wall text \"Sign in to continue\")"
+    },
+    {
+      "at": "2026-11-17T05:29:01Z",
+      "result": "blocked",
+      "url": "https://www.google.com/search?q=how+to+bake+bread&hl=en&gl=us",
+      "scriptSha": "d4d98c461d291a050ce7c952a8ba4854ef0e127aacfc3c776e84d20764d4c6a8",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "with script: wall url https://www.google.com/sorry/index?continue=https://www.google.com/search%3Fq%3Dhow%2Bto%2Bbake%2Bbread%26hl%3Den%26gl%3Dus%26sei%3D9uX7ar_nO6_W5NoPqe7Z0AQ&hl=en&q=EgQv4YknGPfL79cGIjCmfgCLZ2Cs3IIiVPTH79xfVKBJtPTw_NCKPQ1w_VZ4ekDnQDBORy0aBvqd92rq5AYyAnJSWgFDYJnT69Px1qugKw"
+    },
+    {
+      "at": "2026-11-17T05:24:45Z",
+      "result": "blocked",
+      "url": "https://www.google.com/search?q=how+to+bake+bread&hl=en&gl=us",
+      "scriptSha": "d4d98c461d291a050ce7c952a8ba4854ef0e127aacfc3c776e84d20764d4c6a8",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "target not present without the script (wall text \"Sign in to continue\")"
+    },
+    {
+      "at": "2026-11-17T05:21:20Z",
+      "result": "blocked",
+      "url": "https://www.google.com/search?q=how+to+bake+bread&hl=en&gl=us",
+      "scriptSha": "d4d98c461d291a050ce7c952a8ba4854ef0e127aacfc3c776e84d20764d4c6a8",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "target not present without the script (wall url https://www.google.com/sorry/index?continue=https://www.google.com/search%3Fq%3Dhow%2Bto%2Bbake%2Bbread%26hl%3Den%26gl%3Dus%26sei%3DKOT7auCvNbStw8cP4vXDmA0&hl=en&q=EgSsOxjHGKnI79cGIjBaJnLu3zBf5lL_VXszuRzC2sRo5VN1uu9mYkT2d9lMK2KI86qmjz4MQkK4UcaTLywyAnJSWgFDYM7hnqj38rzLswE)"
+    }
+  ],
+  "google/open-results-new-tab": [
+    {
+      "at": "2026-11-17T05:45:12Z",
+      "result": "pass",
+      "url": "https://www.google.com/search?q=how+to+bake+bread&hl=en&gl=us",
+      "scriptSha": "6ecfb37d11ed2e788c433df12dc43d3e72d26194bfd7f2c984c7a825938a611f",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T05:23:58Z",
+      "result": "pass",
+      "url": "https://www.google.com/search?q=how+to+bake+bread&hl=en&gl=us",
+      "scriptSha": "6ecfb37d11ed2e788c433df12dc43d3e72d26194bfd7f2c984c7a825938a611f",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T05:19:10Z",
+      "result": "blocked",
+      "url": "https://www.google.com/search?q=how+to+bake+bread&hl=en&gl=us",
+      "scriptSha": "6ecfb37d11ed2e788c433df12dc43d3e72d26194bfd7f2c984c7a825938a611f",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "target not present without the script (wall url https://www.google.com/sorry/index?continue=https://www.google.com/search%3Fq%3Dhow%2Bto%2Bbake%2Bbread%26hl%3Den%26gl%3Dus%26sei%3DpuP7aqaRMKzt5NoPpuHpmAs&hl=en&q=EgREhtLhGKfH79cGIjCbBg3s5IM4duFZXhUMDZQlI-UA8FndkQ-xdg_zVcAfHDIORAGQybmxswqzTal_UDgyAnJSWgFDYI7mjve1jNbdhQE)"
+    }
+  ],
   "google/remove-ai-overview": [
     {
       "at": "2026-11-17T04:52:24Z",
@@ -27,6 +809,240 @@
       "note": "intact was false"
     }
   ],
+  "google/show-image-size": [
+    {
+      "at": "2026-11-17T05:38:14Z",
+      "result": "pass",
+      "url": "https://www.google.com/search?q=mountain&udm=2&hl=en&gl=us",
+      "scriptSha": "099ed42c25adf4671671705f1b9635d6618997e1fdc622e73ed76ae8071a4c65",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T05:34:18Z",
+      "result": "blocked",
+      "url": "https://www.google.com/search?q=mountain&udm=2&hl=en&gl=us",
+      "scriptSha": "099ed42c25adf4671671705f1b9635d6618997e1fdc622e73ed76ae8071a4c65",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "target not present without the script (wall url https://www.google.com/sorry/index?continue=https://www.google.com/search%3Fq%3Dmountain%26udm%3D2%26hl%3Den%26gl%3Dus%26sei%3DMuf7avv3K_3cptQPx__kkAk&hl=en&q=EgQvxDMXGLPO79cGIjAtKeKt0ThS4T753ez01k5LwOSK2FAVBBhaLnr6JduvaxmS6btjThpYg9zK7g6p7JsyAVJaAUNgtJynkYnkv4DOAQ)"
+    }
+  ],
+  "google/web-results-only": [
+    {
+      "at": "2026-11-17T05:20:34Z",
+      "result": "pass",
+      "url": "https://www.google.com/search?q=how+to+bake+bread&hl=en&gl=us",
+      "scriptSha": "8060371b484c658de604a33b0c1537754c90693329e1c93efb5cc8e48a0bed06",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    }
+  ],
+  "hackernews/collapse-comments": [
+    {
+      "at": "2026-11-17T05:11:34Z",
+      "result": "pass",
+      "url": "https://news.ycombinator.com/item?id=24862743",
+      "scriptSha": "5c01ddaeb30c646223ec21c48d39d8bd7578e82041d59e703942ead7f93026ae",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "hackernews/dark-mode": [
+    {
+      "at": "2026-11-17T05:10:18Z",
+      "result": "pass",
+      "url": "https://news.ycombinator.com/",
+      "scriptSha": "d7489162c207c9f30cbf83ff542fd07617f1178924e648258207e28def8965a7",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "hackernews/larger-font": [
+    {
+      "at": "2026-11-17T05:10:57Z",
+      "result": "pass",
+      "url": "https://news.ycombinator.com/",
+      "scriptSha": "0a3fa6c5d17dd36db8e9db0c2126f9648e307114d7d3d4d30cef781708db36e3",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "hackernews/open-links-new-tab": [
+    {
+      "at": "2026-11-17T05:12:15Z",
+      "result": "pass",
+      "url": "https://news.ycombinator.com/",
+      "scriptSha": "2f63a206d0269361ef98d4c0049bc5f90c6a21dfeb3259c1381357052c9e156c",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "imdb/show-actor-age": [
+    {
+      "at": "2026-11-17T05:27:02Z",
+      "result": "pass",
+      "url": "https://www.imdb.com/name/nm0000151/",
+      "scriptSha": "015286f8c4441f55348d1da4ac4905f5e1015f7412f21337b28d27b05a827424",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T05:21:08Z",
+      "result": "pass",
+      "url": "https://www.imdb.com/name/nm0000151/",
+      "scriptSha": "015286f8c4441f55348d1da4ac4905f5e1015f7412f21337b28d27b05a827424",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T05:19:32Z",
+      "result": "fail",
+      "url": "https://www.imdb.com/name/nm0000151/",
+      "scriptSha": "520b86a18975545db45ae572136ab6d303854deb0502dafa979e373402ba40ed",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "expect was false"
+    }
+  ],
+  "instagram/open-full-size-image": [
+    {
+      "at": "2026-11-17T05:19:12Z",
+      "result": "pass",
+      "url": "https://www.instagram.com/nasa/p/DfahZrMjAqq/",
+      "scriptSha": "14b774e18187e2ba8164b1b22e74d72337e8bf38616d6eaf50d9cd79c61aeec8",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:15:05Z",
+      "result": "pass",
+      "url": "https://www.instagram.com/nasa/p/DfahZrMjAqq/",
+      "scriptSha": "14b774e18187e2ba8164b1b22e74d72337e8bf38616d6eaf50d9cd79c61aeec8",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "instagram/remove-login-popup": [
+    {
+      "at": "2026-11-17T05:19:26Z",
+      "result": "pass",
+      "url": "https://www.instagram.com/nasa/",
+      "scriptSha": "d807e55d090818e88039e2d9d98b326a43e37d838a78b64628c0fe3f7cc644c0",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:05:40Z",
+      "result": "pass",
+      "url": "https://www.instagram.com/nasa/",
+      "scriptSha": "d807e55d090818e88039e2d9d98b326a43e37d838a78b64628c0fe3f7cc644c0",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "instagram/video-controls": [
+    {
+      "at": "2026-11-17T05:19:45Z",
+      "result": "pass",
+      "url": "https://www.instagram.com/nasa/reel/Df0DoVpmTBI/",
+      "scriptSha": "feeb9a4b73293d1afe688c2207f1cc9cc02893e38145bf5b157cf8c1a5728c91",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:12:29Z",
+      "result": "pass",
+      "url": "https://www.instagram.com/nasa/reel/Df0DoVpmTBI/",
+      "scriptSha": "feeb9a4b73293d1afe688c2207f1cc9cc02893e38145bf5b157cf8c1a5728c91",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:07:39Z",
+      "result": "fail",
+      "url": "https://www.instagram.com/nasa/reel/Df0DoVpmTBI/",
+      "scriptSha": "8cc8f4eea1d9cdba4f592b55da5a0096623efd6d6f4503e79dd51ef420a32783",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false"
+    }
+  ],
+  "pinterest/remove-login-popup": [
+    {
+      "at": "2026-11-17T05:04:58Z",
+      "result": "pass",
+      "url": "https://www.pinterest.com/search/pins/?q=living%20room%20ideas",
+      "scriptSha": "c97c3f58b80ae0ea9ab42dda7109954cafa0893c12623a455153c9207de2fd1e",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "reddit/disable-translation": [
+    {
+      "at": "2026-11-17T05:13:09Z",
+      "result": "pass",
+      "url": "https://www.reddit.com/r/de/?tl=en",
+      "scriptSha": "c3828a69b34d2df6a3aebcc885489e6a2bf4b44fbc440e840e9e5a4c04faa713",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "reddit/expand-threads": [
+    {
+      "at": "2026-11-17T05:18:40Z",
+      "result": "pass",
+      "url": "https://www.reddit.com/r/AskReddit/comments/draola/how_would_you_feel_about_a_feature_where_if/",
+      "scriptSha": "d188c9e40711afb6fb3d5658d9190c0cd5d1a37236aab0eafcf916dba9c16907",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:07:20Z",
+      "result": "pass",
+      "url": "https://www.reddit.com/r/AskReddit/comments/draola/how_would_you_feel_about_a_feature_where_if/",
+      "scriptSha": "d188c9e40711afb6fb3d5658d9190c0cd5d1a37236aab0eafcf916dba9c16907",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "reddit/hide-promoted": [
+    {
+      "at": "2026-11-17T05:06:04Z",
+      "result": "pass",
+      "url": "https://www.reddit.com/r/AskReddit/",
+      "scriptSha": "c61e1642e33cdc61c62b9102a1d18b3bd9cd0687479abd8e050618c466b13504",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "reddit/hide-trending-searches": [
+    {
+      "at": "2026-11-17T05:18:54Z",
+      "result": "pass",
+      "url": "https://www.reddit.com/",
+      "scriptSha": "39a0c8ec45a4e26181ad232653c34f9d3b5eae330e6bf0232cafa19bd81129ba",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:16:20Z",
+      "result": "pass",
+      "url": "https://www.reddit.com/",
+      "scriptSha": "39a0c8ec45a4e26181ad232653c34f9d3b5eae330e6bf0232cafa19bd81129ba",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:15:12Z",
+      "result": "blocked",
+      "url": "https://www.reddit.com/",
+      "scriptSha": "39a0c8ec45a4e26181ad232653c34f9d3b5eae330e6bf0232cafa19bd81129ba",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "target not present without the script (captcha frame)"
+    }
+  ],
   "reddit/remove-sidebar": [
     {
       "at": "2026-11-17T04:44:51Z",
@@ -46,6 +1062,634 @@
       "note": "load without script: timed out after 60 s"
     }
   ],
+  "reddit/unblur-spoilers": [
+    {
+      "at": "2026-11-17T05:19:05Z",
+      "result": "pass",
+      "url": "https://www.reddit.com/r/movies/comments/1xy6xe1/what_was_heartland_and_why_is_jessica_chastain/",
+      "scriptSha": "2d5d501afbb23eaf1a2f94b2e9bd5477abb062f269da9b00addf3a2c475adf44",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:08:51Z",
+      "result": "pass",
+      "url": "https://www.reddit.com/r/movies/comments/1xy6xe1/what_was_heartland_and_why_is_jessica_chastain/",
+      "scriptSha": "2d5d501afbb23eaf1a2f94b2e9bd5477abb062f269da9b00addf3a2c475adf44",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "spotify/copy-track-info": [
+    {
+      "at": "2026-11-17T05:24:53Z",
+      "result": "pass",
+      "url": "https://open.spotify.com/album/4LH4d3cOWNNsVw41Gqt2kv",
+      "scriptSha": "f4ddc3327404046961411310b61e8ba64aef1daf1de2a087f385744dacdde464",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:12:07Z",
+      "result": "pass",
+      "url": "https://open.spotify.com/album/4LH4d3cOWNNsVw41Gqt2kv",
+      "scriptSha": "f4ddc3327404046961411310b61e8ba64aef1daf1de2a087f385744dacdde464",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "spotify/download-cover": [
+    {
+      "at": "2026-11-17T05:27:01Z",
+      "result": "pass",
+      "url": "https://open.spotify.com/album/4LH4d3cOWNNsVw41Gqt2kv",
+      "scriptSha": "65552d23fdaf7de11a965a62aad6f94646285c4ae483943ddc813b017aad83a7",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:16:58Z",
+      "result": "pass",
+      "url": "https://open.spotify.com/album/4LH4d3cOWNNsVw41Gqt2kv",
+      "scriptSha": "65552d23fdaf7de11a965a62aad6f94646285c4ae483943ddc813b017aad83a7",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "spotify/hide-upgrade-prompts": [
+    {
+      "at": "2026-11-17T05:13:25Z",
+      "result": "pass",
+      "url": "https://open.spotify.com/album/4LH4d3cOWNNsVw41Gqt2kv",
+      "scriptSha": "03a1413344ea16740b4fec970b3830f6ea9199a789d36dc127aab05ea5e6022c",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "stackoverflow/dark-mode": [
+    {
+      "at": "2026-11-17T05:16:40Z",
+      "result": "pass",
+      "url": "https://stackoverflow.com/questions/11227809/why-is-processing-a-sorted-array-faster-than-processing-an-unsorted-array",
+      "scriptSha": "0fff8c59e6c617052038572b8875d090894b8fb6087dff9e47849438d0e9de1c",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "stackoverflow/hide-cookie-banner": [
+    {
+      "at": "2026-11-17T05:09:33Z",
+      "result": "pass",
+      "url": "https://stackoverflow.com/questions/11227809/why-is-processing-a-sorted-array-faster-than-processing-an-unsorted-array",
+      "scriptSha": "4d43f917b2d455e804fc7a0d22ded3dcb5730c2b5ce62d634f2b01acb5bf1844",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "stackoverflow/hide-hot-network-questions": [
+    {
+      "at": "2026-11-17T05:21:29Z",
+      "result": "pass",
+      "url": "https://stackoverflow.com/questions/11227809/why-is-processing-a-sorted-array-faster-than-processing-an-unsorted-array",
+      "scriptSha": "e7f58f9044171fc24ea3b3922ce53a3ef4a70b00724740179315afbffaed2810",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T05:20:11Z",
+      "result": "blocked",
+      "url": "https://stackoverflow.com/questions/11227809/why-is-processing-a-sorted-array-faster-than-processing-an-unsorted-array",
+      "scriptSha": "e7f58f9044171fc24ea3b3922ce53a3ef4a70b00724740179315afbffaed2810",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "target not present without the script (captcha frame)"
+    },
+    {
+      "at": "2026-11-17T05:17:42Z",
+      "result": "blocked",
+      "url": "https://stackoverflow.com/questions/11227809/why-is-processing-a-sorted-array-faster-than-processing-an-unsorted-array",
+      "scriptSha": "e7f58f9044171fc24ea3b3922ce53a3ef4a70b00724740179315afbffaed2810",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "with script: captcha frame"
+    }
+  ],
+  "stackoverflow/hide-sidebar": [
+    {
+      "at": "2026-11-17T05:22:09Z",
+      "result": "pass",
+      "url": "https://stackoverflow.com/questions/11227809/why-is-processing-a-sorted-array-faster-than-processing-an-unsorted-array",
+      "scriptSha": "e9b620e66d4f8408dc42b495abaa0b5eb07942bb0ca75e6b859be90535b293ed",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T05:18:18Z",
+      "result": "blocked",
+      "url": "https://stackoverflow.com/questions/11227809/why-is-processing-a-sorted-array-faster-than-processing-an-unsorted-array",
+      "scriptSha": "e9b620e66d4f8408dc42b495abaa0b5eb07942bb0ca75e6b859be90535b293ed",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "target not present without the script (captcha frame)"
+    }
+  ],
+  "stackoverflow/iso-dates": [
+    {
+      "at": "2026-11-17T05:30:27Z",
+      "result": "pass",
+      "url": "https://stackoverflow.com/questions/11227809/why-is-processing-a-sorted-array-faster-than-processing-an-unsorted-array",
+      "scriptSha": "28dba5de868693d62f653abef66b5118cd0cdcc0d78490e236294141e479538f",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:22:52Z",
+      "result": "pass",
+      "url": "https://stackoverflow.com/questions/11227809/why-is-processing-a-sorted-array-faster-than-processing-an-unsorted-array",
+      "scriptSha": "28dba5de868693d62f653abef66b5118cd0cdcc0d78490e236294141e479538f",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    },
+    {
+      "at": "2026-11-17T05:19:01Z",
+      "result": "blocked",
+      "url": "https://stackoverflow.com/questions/11227809/why-is-processing-a-sorted-array-faster-than-processing-an-unsorted-array",
+      "scriptSha": "28dba5de868693d62f653abef66b5118cd0cdcc0d78490e236294141e479538f",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "target not present without the script (captcha frame)"
+    }
+  ],
+  "stackoverflow/wide-layout": [
+    {
+      "at": "2026-11-17T05:24:26Z",
+      "result": "pass",
+      "url": "https://stackoverflow.com/questions/11227809/why-is-processing-a-sorted-array-faster-than-processing-an-unsorted-array",
+      "scriptSha": "aababe3350f55e0744184a14d21584291bde7acfda05c9f966035d26589b3403",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase"
+    }
+  ],
+  "trello/show-card-numbers": [
+    {
+      "at": "2026-11-17T05:25:12Z",
+      "result": "pass",
+      "url": "https://trello.com/b/nC8QJJoZ/trello-development-roadmap",
+      "scriptSha": "6fff0a80a53888374b17a6bd49dde7a7e766b304c4eac9621d2b6618c13df432",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:24:34Z",
+      "result": "pass",
+      "url": "https://trello.com/b/nC8QJJoZ/trello-development-roadmap",
+      "scriptSha": "cbe203d1d2d85a0ae5bbbcd2ad319df7d5cbd1e45794790036a5e2db308e1c90",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "twitch/disable-autoplay": [
+    {
+      "at": "2026-11-17T05:26:47Z",
+      "result": "pass",
+      "url": "https://www.twitch.tv/",
+      "scriptSha": "96793a9ed99a9a6d8397a213b25861edec3ab5ed4e4956ac8b0129627cf76f0a",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:14:05Z",
+      "result": "pass",
+      "url": "https://www.twitch.tv/",
+      "scriptSha": "96793a9ed99a9a6d8397a213b25861edec3ab5ed4e4956ac8b0129627cf76f0a",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:13:27Z",
+      "result": "blocked",
+      "url": "https://www.twitch.tv/",
+      "scriptSha": "96793a9ed99a9a6d8397a213b25861edec3ab5ed4e4956ac8b0129627cf76f0a",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "target not present without the script (waitFor [data-a-target=\"front-page-carousel\"] video never appeared)"
+    },
+    {
+      "at": "2026-11-17T05:12:22Z",
+      "result": "fail",
+      "url": "https://www.twitch.tv/",
+      "scriptSha": "96793a9ed99a9a6d8397a213b25861edec3ab5ed4e4956ac8b0129627cf76f0a",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "intact was false"
+    }
+  ],
+  "twitch/hide-chat": [
+    {
+      "at": "2026-11-17T05:34:45Z",
+      "result": "pass",
+      "url": "https://www.twitch.tv/caedrel247",
+      "scriptSha": "a1a1573206dfcb93b8076dcc69f38b34f2d0d8a8ee7766a8e6dea086bd63a1b2",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:34:23Z",
+      "result": "blocked",
+      "url": "https://www.twitch.tv/caedrel247",
+      "scriptSha": "a1a1573206dfcb93b8076dcc69f38b34f2d0d8a8ee7766a8e6dea086bd63a1b2",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "target not present without the script (waitFor [data-a-target=\"right-column__toggle-collapse-btn\"] never appeared)"
+    },
+    {
+      "at": "2026-11-17T05:21:51Z",
+      "result": "pass",
+      "url": "https://www.twitch.tv/caedrel247",
+      "scriptSha": "a1a1573206dfcb93b8076dcc69f38b34f2d0d8a8ee7766a8e6dea086bd63a1b2",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:21:32Z",
+      "result": "fail",
+      "url": "https://www.twitch.tv/caedrel247",
+      "scriptSha": "16b601139bbc6a7e25cab8d340e22a34c67af9ed587b019cae9810ea53a3d01a",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false"
+    },
+    {
+      "at": "2026-11-17T05:20:22Z",
+      "result": "fail",
+      "url": "https://www.twitch.tv/caedrel247",
+      "scriptSha": "16b601139bbc6a7e25cab8d340e22a34c67af9ed587b019cae9810ea53a3d01a",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false"
+    }
+  ],
+  "twitch/hide-sidebar": [
+    {
+      "at": "2026-11-17T05:18:59Z",
+      "result": "pass",
+      "url": "https://www.twitch.tv/directory/all",
+      "scriptSha": "6ac7e584da6fbbc620d71c0aaf24ae30b5e2a418728429732e50a5cdab523f40",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "twitch/scroll-volume": [
+    {
+      "at": "2026-11-17T05:35:17Z",
+      "result": "pass",
+      "url": "https://www.twitch.tv/",
+      "scriptSha": "bc95ffe155ad8517bdfe8927c74826067acac98007933e585cee8b3b1704cbff",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:33:34Z",
+      "result": "blocked",
+      "url": "https://www.twitch.tv/",
+      "scriptSha": "bc95ffe155ad8517bdfe8927c74826067acac98007933e585cee8b3b1704cbff",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "load without script: page.evaluate: TypeError: Cannot read properties of null (reading 'querySelector')"
+    },
+    {
+      "at": "2026-11-17T05:27:23Z",
+      "result": "pass",
+      "url": "https://www.twitch.tv/",
+      "scriptSha": "bb22ae975e1159fc0a969f77d4dbca71374a6395404a33363bae7f10b94112d5",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:17:29Z",
+      "result": "pass",
+      "url": "https://www.twitch.tv/",
+      "scriptSha": "bb22ae975e1159fc0a969f77d4dbca71374a6395404a33363bae7f10b94112d5",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "twitch/theater-mode": [
+    {
+      "at": "2026-11-17T05:33:48Z",
+      "result": "pass",
+      "url": "https://www.twitch.tv/caedrel247",
+      "scriptSha": "00fc88753f059a39c21c1daee5a537422833c407e47e005ec952f8397ac74bb1",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:28:27Z",
+      "result": "pass",
+      "url": "https://www.twitch.tv/caedrel247",
+      "scriptSha": "00fc88753f059a39c21c1daee5a537422833c407e47e005ec952f8397ac74bb1",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:28:16Z",
+      "result": "fail",
+      "url": "https://www.twitch.tv/caedrel247",
+      "scriptSha": "00fc88753f059a39c21c1daee5a537422833c407e47e005ec952f8397ac74bb1",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "intact was false"
+    },
+    {
+      "at": "2026-11-17T05:27:48Z",
+      "result": "fail",
+      "url": "https://www.twitch.tv/caedrel247",
+      "scriptSha": "00fc88753f059a39c21c1daee5a537422833c407e47e005ec952f8397ac74bb1",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "intact was false"
+    },
+    {
+      "at": "2026-11-17T05:25:01Z",
+      "result": "pass",
+      "url": "https://www.twitch.tv/caedrel247",
+      "scriptSha": "00fc88753f059a39c21c1daee5a537422833c407e47e005ec952f8397ac74bb1",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:24:35Z",
+      "result": "blocked",
+      "url": "https://www.twitch.tv/caedrel247",
+      "scriptSha": "00fc88753f059a39c21c1daee5a537422833c407e47e005ec952f8397ac74bb1",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "target not present without the script (waitFor .persistent-player [data-a-target=\"player-controls\"] button[aria-label*=\"alt+t\" i] never appeared)"
+    },
+    {
+      "at": "2026-11-17T05:23:08Z",
+      "result": "fail",
+      "url": "https://www.twitch.tv/caedrel247",
+      "scriptSha": "ec4d10141b3d4cd48afe1c9f2946eb660670e5f767ab957ebd8bd160def9271a",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false, intact was false"
+    }
+  ],
+  "wikipedia/always-desktop": [
+    {
+      "at": "2026-11-17T05:16:09Z",
+      "result": "blocked",
+      "url": "https://en.m.wikipedia.org/wiki/Userscript#History",
+      "scriptSha": "ab0d6c221f1083897b11bc33d1841d4a6039c1e417fee3fc440d986b1ed822af",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "target not present without the script (baseline was false)"
+    }
+  ],
+  "wikipedia/dark-mode": [
+    {
+      "at": "2026-11-17T05:12:36Z",
+      "result": "pass",
+      "url": "https://en.wikipedia.org/wiki/Moon",
+      "scriptSha": "db18987bd3ad9b00276fae0e76646713f777ee5a6cfde30f48c9322721e4c8a9",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "wikipedia/full-width": [
+    {
+      "at": "2026-11-17T05:23:06Z",
+      "result": "pass",
+      "url": "https://en.wikipedia.org/wiki/Moon",
+      "scriptSha": "7c7532e0ff2cabc4e63e3d3dde97f0a3395fe415130a12a286afc1fed7ffa1c7",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "wikipedia/old-layout": [
+    {
+      "at": "2026-11-17T05:13:13Z",
+      "result": "pass",
+      "url": "https://en.wikipedia.org/wiki/Moon",
+      "scriptSha": "be01068fbc69cc26537c399b7ee58615974e479d01fe0ba3ce4b9f8d4534a648",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "youtube/block-channels": [
+    {
+      "at": "2026-11-17T05:18:40Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/results?search_query=minecraft",
+      "scriptSha": "7975220063f5823e8e8842c26ffc1dcfe6f2b9bd0c2d202b832e246b2e112704",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:15:49Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/results?search_query=minecraft",
+      "scriptSha": "7975220063f5823e8e8842c26ffc1dcfe6f2b9bd0c2d202b832e246b2e112704",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "youtube/default-playback-speed": [
+    {
+      "at": "2026-11-17T05:06:21Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+      "scriptSha": "31af5bb420ed44b8f4f11c4227dfe574dbd774791824d3ef13a0620e8c9e5df8",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "youtube/disable-autoplay": [
+    {
+      "at": "2026-11-17T05:23:21Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+      "scriptSha": "29f8179e77f9f78711212c232c9959c71427e76a3d2fc4d92ba9c12e4fa734b5",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:18:58Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+      "scriptSha": "29f8179e77f9f78711212c232c9959c71427e76a3d2fc4d92ba9c12e4fa734b5",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:18:46Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+      "scriptSha": "29f8179e77f9f78711212c232c9959c71427e76a3d2fc4d92ba9c12e4fa734b5",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:16:48Z",
+      "result": "fail",
+      "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+      "scriptSha": "e8b267ac60bbc685fba1e6e448b12f3a97e66fd351adccf8c57a714b50761fd9",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false"
+    },
+    {
+      "at": "2026-11-17T05:14:33Z",
+      "result": "fail",
+      "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+      "scriptSha": "427ea30e10ba559745a1ece174bc82d6dda32598a8ef65ecec1a22a5f6a86d69",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false"
+    },
+    {
+      "at": "2026-11-17T05:13:32Z",
+      "result": "fail",
+      "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+      "scriptSha": "289cd3c1eb4be2e57873485ece2ab977f81d8357d40652361ee2f564ea3e17fd",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false"
+    },
+    {
+      "at": "2026-11-17T05:12:49Z",
+      "result": "blocked",
+      "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+      "scriptSha": "2e0a2279032a16fd3bef3ed0b8652e81c1a64b403eef63ea79bc38a7b3dba380",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "load with script: timed out after 60 s"
+    },
+    {
+      "at": "2026-11-17T05:11:32Z",
+      "result": "fail",
+      "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+      "scriptSha": "1876fe6d2f32296323fd7cb0cd0a9bfcecb58a04078094195d193ae3cf047ac8",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false"
+    }
+  ],
+  "youtube/force-hd-quality": [
+    {
+      "at": "2026-11-17T05:09:19Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/watch?v=aqz-KE-bpKQ",
+      "scriptSha": "4814fa8b98f0eec79800b4d11ac90816e101081493906cacd3c830fb580b6d27",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "youtube/hide-ads": [
+    {
+      "at": "2026-11-17T05:06:49Z",
+      "result": "blocked",
+      "url": "https://www.youtube.com/watch?v=kJQP7kiw5Fk",
+      "scriptSha": "02afd1f2f9ac75a3dd0c0d86e293d77d1213af029f3117c81606e6300863e63f",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "target not present without the script (baseline was false)"
+    },
+    {
+      "at": "2026-11-17T05:05:59Z",
+      "result": "blocked",
+      "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      "scriptSha": "02afd1f2f9ac75a3dd0c0d86e293d77d1213af029f3117c81606e6300863e63f",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "target not present without the script (baseline was false)"
+    }
+  ],
+  "youtube/hide-comments": [
+    {
+      "at": "2026-11-17T05:23:43Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      "scriptSha": "67bf5b4528c0b9dd10bc17935dfcf34a909afe2d170a18b7258c16396b561c66",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:21:57Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      "scriptSha": "67bf5b4528c0b9dd10bc17935dfcf34a909afe2d170a18b7258c16396b561c66",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:21:17Z",
+      "result": "fail",
+      "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      "scriptSha": "2be931714c8fc00b4a336c497b68ffa6344b5a5ee442dc615651070091719dd1",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false, intact was error: page.evaluate: TypeError: Cannot read properties of null (reading 'checkVisibility')"
+    }
+  ],
+  "youtube/hide-end-screens": [
+    {
+      "at": "2026-11-17T05:20:26Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      "scriptSha": "4db3fd3bed7505b2752ec4bfde66b4a00a43bcbf3107dfd6d4e53490b989b64c",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "youtube/hide-home-feed": [
+    {
+      "at": "2026-11-17T05:08:11Z",
+      "result": "blocked",
+      "url": "https://www.youtube.com/",
+      "scriptSha": "940df63c960470d1034a716f3952ee5b5b0443d875c44a1f3c85a0034880a243",
+      "browser": "chromium 157.0.8103.79",
+      "via": "browserbase",
+      "note": "target not present without the script (baseline was false)"
+    }
+  ],
+  "youtube/hide-live-chat": [
+    {
+      "at": "2026-11-17T05:18:57Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/@LofiGirl/live",
+      "scriptSha": "c9b709e130fc223836f0dee3e68f93ea55c9f44fe9335167178cd39fd0e28b3b",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:07:47Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/@LofiGirl/live",
+      "scriptSha": "c9b709e130fc223836f0dee3e68f93ea55c9f44fe9335167178cd39fd0e28b3b",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "youtube/hide-recommendations": [
+    {
+      "at": "2026-11-17T05:23:56Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+      "scriptSha": "6e285b910b669c7cb40911be2cb8c14836cc8cae967fbfad676d1bc0b8efb05c",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:07:18Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+      "scriptSha": "6e285b910b669c7cb40911be2cb8c14836cc8cae967fbfad676d1bc0b8efb05c",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
   "youtube/hide-shorts": [
     {
       "at": "2026-11-17T04:44:35Z",
@@ -54,6 +1698,52 @@
       "scriptSha": "2e8f11998a0bc3c016438701e794dda10d95709ba715255889fa87c95969a3c0",
       "browser": "chromium 153.0.8010.12",
       "via": "local"
+    }
+  ],
+  "youtube/more-videos-per-row": [
+    {
+      "at": "2026-11-17T05:10:22Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/@YouTube/videos",
+      "scriptSha": "09ac9060744ffc103c7d61e4742766c119ed662ed6f0c4ad467e242b1e917b9f",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    }
+  ],
+  "youtube/resize-player": [
+    {
+      "at": "2026-11-17T05:19:08Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+      "scriptSha": "02290457ece7f724fd5a391e51a05bfbba5fdef65f58291f31e0457b170aedfe",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:14:17Z",
+      "result": "pass",
+      "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+      "scriptSha": "02290457ece7f724fd5a391e51a05bfbba5fdef65f58291f31e0457b170aedfe",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local"
+    },
+    {
+      "at": "2026-11-17T05:12:02Z",
+      "result": "fail",
+      "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+      "scriptSha": "77a163355f0cd1612c2856cfd6f49a003c5861a094e756f09dd7e8fbb3f91025",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false, intact was false"
+    },
+    {
+      "at": "2026-11-17T05:11:33Z",
+      "result": "fail",
+      "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+      "scriptSha": "84afdb0b4b32d49ae7ee74633df13234164f1cded48786365dace778647d1a5f",
+      "browser": "chromium 153.0.8010.12",
+      "via": "local",
+      "note": "expect was false, intact was false"
     }
   ]
 }

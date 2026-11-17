@@ -1,0 +1,7 @@
+{
+  "slug": "hackernews",
+  "name": "Hacker News",
+  "domains": ["news.ycombinator.com"],
+  "category": "news",
+  "intro": "Userscripts for news.ycombinator.com: a dark theme, bigger text and easier ways through long comment threads."
+}

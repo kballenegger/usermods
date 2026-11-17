@@ -1,0 +1,81 @@
+{
+  "slug": "wide-chat",
+  "title": "Make the ChatGPT chat wider",
+  "question": "How do I make the ChatGPT conversation use the full width of the screen?",
+  "answer": "ChatGPT has no setting for the width of the chat; it keeps messages in a center column about 768 pixels wide however large the window is. The usermods script on this page removes that cap so the conversation and the message box fill the space beside the sidebar, with a small margin on each side. Install it with usermods or any userscript manager. Without an extension, zooming the page out with Ctrl and minus fits more text in the column, but makes it smaller.",
+  "prompt": "Make the ChatGPT conversation use the full width of the window instead of the narrow center column.",
+  "details": "The script is CSS only. It lifts the 768 pixel cap on the conversation column and keeps 32 pixels of space at each side, so long lines, code blocks and tables get the room. The sidebar is left as it is; close it for even more width.\n\nThe check runs logged out and measures the column there. The signed-in page sets its width through a different rule, which the script also overrides, but the check does not cover it.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Zoom out",
+      "body": "Press Ctrl and minus (Cmd and minus on a Mac). The column stays the same share of the window, so text gets smaller rather than lines getting longer."
+    },
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filter",
+      "body": "uBlock Origin can apply the same style rules. Our check runs the script, not these filters.\n\n```\nchatgpt.com##main[data-slot=\"conversation\"] > div:style(max-width: none !important; padding-inline: 32px !important; box-sizing: border-box !important)\nchatgpt.com##div[data-slot=\"composer\"] > div[data-slot=\"composer-replacement\"]:style(max-width: none !important; padding-inline: 32px !important; box-sizing: border-box !important)\n```"
+    },
+    {
+      "kind": "extension",
+      "title": "Roomy",
+      "body": "A Chrome extension that widens the chat on ChatGPT, Gemini, Claude and DeepSeek."
+    }
+  ],
+  "related": [
+    "chatgpt/ctrl-enter-to-send",
+    "chatgpt/export-chat"
+  ],
+  "demand": {
+    "score": 75,
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/apadogadaahdjhhmbdhkmdecbobijoed",
+        "note": "Chrome Web Store users, \"Roomy: Wide Mode for Gemini, ChatGPT, Claude & DeepSeek\""
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/499377",
+        "note": "Greasy Fork total installs, \"Wider AI Chat\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/461206",
+        "note": "Greasy Fork total installs, \"ChatGPT / Gemini / Claude Width\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=chatgpt%20wide%20mo",
+        "note": "Google suggests \"chatgpt wide mode\""
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=chatgpt%20full%20wid",
+        "note": "Google suggests \"chatgpt full width\""
+      },
+      {
+        "type": "forum",
+        "url": "https://community.openai.com/t/allow-users-to-customize-chat-window-width-in-chatgpt/958512",
+        "note": "OpenAI forum feature request: customize chat window width"
+      },
+      {
+        "type": "forum",
+        "url": "https://community.openai.com/t/wider-conversation-view-adapting-to-main-windows-width/484180",
+        "note": "OpenAI forum feature request: wider conversation view"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://chatgpt.com/"
+    ],
+    "loggedOut": true,
+    "waitFor": "form textarea[name=\"prompt\"]",
+    "settleMs": 3000,
+    "actions": "const sleep = (ms) => new Promise((r) => setTimeout(r, ms)); const box = document.querySelector('form textarea[name=\"prompt\"]'); box.focus(); document.execCommand('insertText', false, 'Write one paragraph of about 120 words about rivers.'); await sleep(500); box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true })); for (let i = 0; i < 50 && !document.querySelector('li[data-message-role=\"assistant\"][data-message-complete]'); i++) await sleep(500); await sleep(1500);",
+    "baseline": "(() => { const c = document.querySelector('section[aria-label=\"Conversation\"]'); return !!c && c.checkVisibility() && c.getBoundingClientRect().width <= 800; })()",
+    "expect": "(() => { const c = document.querySelector('section[aria-label=\"Conversation\"]'); const main = document.querySelector('main[data-slot=\"conversation\"]').getBoundingClientRect().width; const form = document.querySelector('form:has(textarea[name=\"prompt\"])').getBoundingClientRect().width; return !!c && c.getBoundingClientRect().width >= main - 120 && form >= main - 120 && main >= 1000; })()",
+    "intact": "[...document.querySelectorAll('li[data-message-role]')].filter((m) => m.checkVisibility()).length >= 2 && !!document.querySelector('li[data-message-role=\"assistant\"][data-message-complete]') && document.querySelector('form textarea[name=\"prompt\"]').checkVisibility()"
+  }
+}

@@ -1,0 +1,81 @@
+{
+  "slug": "ctrl-enter-to-send",
+  "title": "Send ChatGPT messages with Ctrl+Enter",
+  "question": "How do I make Enter add a new line in ChatGPT instead of sending?",
+  "answer": "ChatGPT's own setting for this is buggy. Signed-in accounts can assign a combo such as Ctrl+Enter to \"Send message\" under Settings > Keyboard, but plain Enter still sends until you turn that shortcut off, and then you have to send with the Send button. The usermods script on this page makes Enter add a new line and Ctrl+Enter (Cmd+Enter on a Mac) send the message, logged in or out. Other keys and buttons work as before. Install it with usermods or any userscript manager. Without an extension, hold Shift while pressing Enter to start a new line.",
+  "prompt": "In ChatGPT, make Enter add a new line and Ctrl+Enter send the message.",
+  "details": "The script listens for Enter in the ChatGPT message box before ChatGPT does. A plain Enter adds a new line; Ctrl+Enter, or Cmd+Enter on a Mac, presses the send button. Shift+Enter, Alt+Enter and Enter while typing with an input method editor (Japanese, Chinese, Korean) are left to ChatGPT.\n\nIt handles both message boxes ChatGPT uses: the plain one logged-out visitors get and the rich editor signed-in accounts get. The check runs logged out, so it covers the first one only. Clicking the send button still works.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Settings > Keyboard > Send message",
+      "body": "Signed-in ChatGPT lets you assign a key combo to **Send message**. Assigning Ctrl+Enter does not stop plain Enter from sending. Turning the shortcut off makes Enter add a new line, and you then send with the Send button. Not available logged out."
+    },
+    {
+      "kind": "other",
+      "title": "Shift+Enter",
+      "body": "ChatGPT already adds a new line on **Shift+Enter**. Nothing to install, but a plain Enter still sends."
+    },
+    {
+      "kind": "extension",
+      "title": "Chat AI Ctrl+Enter Sender",
+      "body": "A Chrome extension that does the same for ChatGPT and other AI chat sites. It asks for access to those sites."
+    }
+  ],
+  "related": [
+    "chatgpt/wide-chat",
+    "chatgpt/export-chat"
+  ],
+  "demand": {
+    "score": 85,
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/gbncgdhklmnckojlibfhdadpfbcdbnch",
+        "note": "Chrome Web Store users, \"Chat AI Ctrl+Enter Sender\""
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/llifnfdbmdcpjfnlhpombbadbhfghdao",
+        "note": "Chrome Web Store users, \"ChatGPT EnterControl\"; count from CWS search page"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=chatgpt%20ctrl%20ent",
+        "note": "Google suggests \"chatgpt ctrl enter\""
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=chatgpt%20enter%20to%20se",
+        "note": "Google suggests \"chatgpt enter to send\""
+      },
+      {
+        "type": "forum",
+        "url": "https://community.openai.com/t/toggle-for-ctrl-enter-enter-to-send/788209",
+        "note": "OpenAI forum: toggle for Ctrl-Enter / Enter to send"
+      },
+      {
+        "type": "forum",
+        "url": "https://community.openai.com/t/feature-request-option-to-disable-enter-to-send/1393238",
+        "note": "OpenAI forum: option to disable Enter to send"
+      },
+      {
+        "type": "forum",
+        "url": "https://community.openai.com/t/bug-custom-send-keyboard-combo-still-results-in-immediate-send-with-enter/1411081/11",
+        "note": "OpenAI forum: custom send combo still sends on Enter (Nov 2026)"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://chatgpt.com/"
+    ],
+    "loggedOut": true,
+    "waitFor": "form textarea[name=\"prompt\"]",
+    "settleMs": 3000,
+    "actions": "const P = 'Reply with the single word ok'; const sleep = (ms) => new Promise((r) => setTimeout(r, ms)); const box = () => document.querySelector('form textarea[name=\"prompt\"]'); const sent = () => [...document.querySelectorAll('section[aria-label=\"Conversation\"]')].some((s) => s.innerText.includes(P)); const press = (o) => box().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true, ...o })); box().focus(); document.execCommand('insertText', false, P); await sleep(500); press({}); await sleep(4000); window.__um = { sentAfterEnter: sent(), valueAfterEnter: box() ? box().value : null }; if (box() && box().value) { box().focus(); press({ ctrlKey: true }); } await sleep(6000); window.__um.sentAfterCtrlEnter = sent();",
+    "baseline": "window.__um.sentAfterEnter === true",
+    "expect": "window.__um.sentAfterEnter === false && window.__um.valueAfterEnter === 'Reply with the single word ok\\n' && window.__um.sentAfterCtrlEnter === true",
+    "intact": "(() => { const b = document.querySelector('form textarea[name=\"prompt\"]'); return !!b && b.checkVisibility() && b.value === ''; })()"
+  }
+}

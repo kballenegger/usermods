@@ -1,0 +1,50 @@
+{
+  "slug": "hide-ai-mode",
+  "title": "Hide the AI Mode button in Google Search",
+  "question": "How do I turn off AI Mode in Google Search?",
+  "answer": "Google has no setting that turns off AI Mode; it is a tab next to All that opens a chat-style search. The usermods script on this page hides the AI Mode tab from the row of tabs above Google Search results, so you can't open it by accident, and leaves the other tabs and the results alone. Install it with usermods or any userscript manager, or add the uBlock Origin filter below.",
+  "prompt": "Hide the AI Mode tab on Google search results.",
+  "details": "The AI Mode tab is a link to the same search with `udm=50` in the URL. The script hides that link and the tab around it with CSS, so it works in any interface language and nothing flashes on screen.\n\nIt does not hide the AI Overview box (see the related page) or an AI Mode button on the Google home page; the check covers the results page.",
+  "alternatives": [
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filter",
+      "body": "The same rule as a cosmetic filter. Our check runs the script, not this filter.\n\n```\nwww.google.com##[role=\"listitem\"]:has(a[href*=\"udm=50\"])\n```"
+    }
+  ],
+  "related": [
+    "google/remove-ai-overview",
+    "google/web-results-only"
+  ],
+  "demand": {
+    "score": 70,
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/disable-ai-mode-ai-overvi/ebefbfhaicjahbdopihcjonaokjjmchp",
+        "note": "Chrome Web Store users: \"Disable AI Mode & AI Overview\" (2026-11-17)"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/ai-content-shield-hide-ai/eoghcliblbhjimkgnfemelcpfdnmiceo",
+        "note": "Chrome Web Store users: \"AI Content Shield - Hide AI Overviews & AI Mode\" (2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=turn+off+ai+mode+google",
+        "note": "suggests \"turn off ai mode google search\""
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.google.com/search?q=how+to+bake+bread&hl=en&gl=us"
+    ],
+    "loggedOut": true,
+    "waitFor": "#rso",
+    "settleMs": 4000,
+    "baseline": "[...document.querySelectorAll('a[href*=\"udm=50\"]')].some((a) => a.checkVisibility())",
+    "expect": "(() => { const l = [...document.querySelectorAll('a[href*=\"udm=50\"]')]; const t = [...document.querySelectorAll('a, [role=\"link\"]')].filter((e) => e.textContent.trim() === 'AI Mode'); return l.length > 0 && l.every((a) => !a.checkVisibility()) && t.every((e) => !e.checkVisibility()); })()",
+    "intact": "(() => { const img = [...document.querySelectorAll('[role=\"listitem\"] a')].some((a) => a.textContent.trim() === 'Images' && a.checkVisibility()); return img && [...document.querySelectorAll('#rso a h3')].filter((h) => h.checkVisibility() && !h.closest('[data-text-ad]')).length >= 5; })()"
+  }
+}

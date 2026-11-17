@@ -1,3 +1,17 @@
 [
-  { "slug": "getting-started", "description": "Add usermods to Chrome, allow user scripts and connect a model." }
+  { "slug": "getting-started", "description": "Add usermods to Chrome, allow user scripts and connect a model." },
+  { "slug": "providers", "description": "Connect Anthropic, OpenAI, xAI, OpenRouter or a local model, and pick the model per chat." },
+  { "slug": "subscriptions", "description": "Sign in with a ChatGPT or SuperGrok subscription instead of an API key." },
+  { "slug": "write-a-mod", "description": "Describe a change and usermods inspects the page, writes a userscript, tests it and proposes it." },
+  { "slug": "edit-a-mod", "description": "Change any installed mod in chat and write the update back over the same mod." },
+  { "slug": "page-tasks", "description": "Ask questions about the page or run a one-off task without making a mod." },
+  { "slug": "install-userscripts", "description": "Install .user.js scripts from Greasy Fork, gists, a URL or a file, with a preview first." },
+  { "slug": "migrate-from-tampermonkey", "description": "Bring your Tampermonkey scripts across with one backup file." },
+  { "slug": "gm-api", "description": "Which GM_* functions usermods supports, how @connect works, and which world a script runs in." },
+  { "slug": "updates", "description": "Update checks, the review screen, and asking the model to review an update." },
+  { "slug": "sharing", "description": "Export a mod, share it as a GitHub gist or publish it on Greasy Fork." },
+  { "slug": "dashboard", "description": "Every chat and every mod across every site in one tab." },
+  { "slug": "side-panel", "description": "Keep the side panel on one tab or have it follow you across tabs." },
+  { "slug": "privacy", "description": "What usermods sends to your model provider, what stays on your device, and what it never does." },
+  { "slug": "usermods-vs-tampermonkey", "description": "How usermods and Tampermonkey compare, feature by feature." }
 ]

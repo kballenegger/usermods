@@ -1,0 +1,51 @@
+{
+  "slug": "remove-login-popup",
+  "title": "Remove Pinterest's login popup",
+  "question": "How do I browse Pinterest without the login popup?",
+  "answer": "Pinterest has no setting that stops the login popup for logged-out visitors; it opens over search and explore pages and locks scrolling. The usermods script on this page hides the \"Welcome to Pinterest\" popup and its dark backdrop and turns page scrolling back on, so you can look through search results without an account. Install it with usermods or any userscript manager. Without an extension, the only way to stop the popup is to log in.",
+  "prompt": "Get rid of the Pinterest login popup and let me scroll the page without logging in.",
+  "details": "Pinterest puts the popup and its backdrop inside one element marked `data-test-id=\"fullPageSignupModal\"`. The script hides that element with CSS and overrides the `overflow: hidden` rule Pinterest puts on the page body while the popup is open. Because it is CSS, it also covers popups that open later.\n\nIt does not log you in or unlock anything Pinterest only shows to accounts. Clicking a pin while logged out opens a separate \"You are signed out\" prompt instead of the pin. The script leaves that prompt alone, because Pinterest does not open the pin behind it without an account. The check loads a search results page and does not click pins.",
+  "alternatives": [
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filters",
+      "body": "The same two rules as the script. Our check runs the script, not these filters.\n\n```\nwww.pinterest.com##[data-test-id=\"fullPageSignupModal\"]\nwww.pinterest.com##html body:style(overflow: visible !important)\n```"
+    }
+  ],
+  "demand": {
+    "score": 78,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/438053",
+        "note": "Browse your interests without registration (75918 total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/21468",
+        "note": "Pinterest registration popup killer (5926 total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/382612",
+        "note": "Pinterest with no registration modal popup (4895 total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=pinterest%20without%20login",
+        "note": "suggestions: pinterest without login | pinterest without login free | pinterest without login or sign up | pinterest without login reddit"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.pinterest.com/search/pins/?q=living%20room%20ideas"
+    ],
+    "loggedOut": true,
+    "waitFor": "[data-test-id=\"fullPageSignupModal\"]",
+    "settleMs": 4000,
+    "baseline": "(() => { const m = document.querySelector('[data-test-id=\"fullPageSignupModal\"] [aria-modal=\"true\"]'); return !!m && m.checkVisibility() && getComputedStyle(document.body).overflowY === 'hidden'; })()",
+    "expect": "(() => { const m = [...document.querySelectorAll('[data-test-id=\"fullPageSignupModal\"] [aria-modal=\"true\"]')]; if (m.length === 0 || m.some((e) => e.checkVisibility())) return false; window.scrollTo(0, 1500); return getComputedStyle(document.body).overflowY !== 'hidden' && window.scrollY > 0; })()",
+    "intact": "[...document.querySelectorAll('[data-test-id=\"gated-pin-rep\"] img, [data-test-id=\"pin\"] img')].filter((i) => i.checkVisibility()).length >= 10"
+  }
+}

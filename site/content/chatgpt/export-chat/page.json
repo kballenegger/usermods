@@ -1,0 +1,71 @@
+{
+  "slug": "export-chat",
+  "title": "Export a ChatGPT conversation",
+  "question": "How do I export a ChatGPT chat to Markdown or PDF?",
+  "answer": "ChatGPT has no button that saves one chat as a file. Its Export data setting emails a zip of your whole history instead. The usermods script on this page adds an Export .md button at the top of any open conversation that downloads it as a Markdown file, with each message under a You or ChatGPT heading and its lists and bold text kept as Markdown. Install it with usermods or any userscript manager. For a PDF, print the page to PDF from the browser.",
+  "prompt": "Add a button to ChatGPT that downloads the current conversation as a Markdown file.",
+  "details": "The button appears at the top center of the page whenever a conversation is on screen. The file is built from the messages already on the page, in your browser; nothing is uploaded. The file name is the chat title.\n\nIt converts paragraphs, headings, bulleted and numbered lists, bold and italic text, inline code, code blocks, links, quotes and tables. The check covers paragraphs, bulleted lists and bold text; the rest is untested. Images, file attachments and canvas documents are left out.\n\nIt reads both the logged-out ChatGPT page and the page signed-in accounts see. The check runs logged out, so it covers the first one only. In very long chats ChatGPT may not have every older message on the page; scroll to the top first.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Export data",
+      "body": "Signed in, open **Settings > Data controls > Export data**. ChatGPT emails a link to a zip with every chat as HTML and JSON. It covers your whole history, not one chat."
+    },
+    {
+      "kind": "other",
+      "title": "Print to PDF",
+      "body": "Press Ctrl+P (Cmd+P on a Mac) on the chat and choose **Save as PDF**. The sidebar and message box print too."
+    },
+    {
+      "kind": "extension",
+      "title": "ChatGPT Exporter",
+      "body": "A Chrome extension and userscript that exports chats to PDF, Markdown, text and other formats."
+    }
+  ],
+  "related": [
+    "chatgpt/ctrl-enter-to-send",
+    "chatgpt/wide-chat"
+  ],
+  "demand": {
+    "score": 85,
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/ilmdofdhpnhffldihboadndccenlnfll",
+        "note": "Chrome Web Store users, \"ChatGPT Exporter - ChatGPT to PDF, MD, and more\""
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/mjdmggegbkookpcmbdllcnbfboikcbop",
+        "note": "Chrome Web Store users, \"ChatGPT to Word or PDF\""
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/456055",
+        "note": "Greasy Fork total installs, \"ChatGPT Exporter\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=chatgpt%20export%20ch",
+        "note": "Google suggests \"chatgpt export chat\""
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=chatgpt%20export%20to%20p",
+        "note": "Google suggests \"chatgpt export to pdf\""
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://chatgpt.com/"
+    ],
+    "loggedOut": true,
+    "waitFor": "form textarea[name=\"prompt\"]",
+    "settleMs": 3000,
+    "actions": "const sleep = (ms) => new Promise((r) => setTimeout(r, ms)); const box = document.querySelector('form textarea[name=\"prompt\"]'); box.focus(); document.execCommand('insertText', false, 'List three rivers as bullet points, each with one bold word.'); await sleep(500); box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true })); for (let i = 0; i < 50 && !document.querySelector('li[data-message-role=\"assistant\"][data-message-complete] li'); i++) await sleep(500); await sleep(1500); window.__um = { blob: null }; const create = URL.createObjectURL; URL.createObjectURL = (b) => { window.__um.blob = b; return create.call(URL, b); }; const button = document.getElementById('usermods-export'); window.__um.visible = !!button && button.checkVisibility(); if (button) { button.click(); await sleep(500); window.__um.text = window.__um.blob ? await window.__um.blob.text() : ''; }",
+    "baseline": "[...document.querySelectorAll('li[data-message-role]')].filter((m) => m.checkVisibility()).length >= 2 && !!document.querySelector('li[data-message-role=\"assistant\"] li')",
+    "expect": "(() => { const t = window.__um.text || ''; const items = [...document.querySelectorAll('li[data-message-role=\"assistant\"] li')].map((li) => li.innerText.trim().split('\\n')[0]); return window.__um.visible && t.includes('## You') && t.includes('List three rivers as bullet points, each with one bold word.') && t.includes('## ChatGPT') && items.length >= 3 && /^- .*\\*\\*.+\\*\\*/m.test(t) && items.every((s) => t.replace(/\\*/g, '').includes('- ' + s.trim())); })()",
+    "intact": "[...document.querySelectorAll('li[data-message-role]')].filter((m) => m.checkVisibility()).length >= 2 && document.querySelector('form textarea[name=\"prompt\"]').checkVisibility()"
+  }
+}
