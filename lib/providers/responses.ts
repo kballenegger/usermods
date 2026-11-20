@@ -155,12 +155,12 @@ export function createResponsesProvider(cfg: ResponsesConfig): Provider {
               const reason = ev.response?.incomplete_details?.reason;
               if (status === 'incomplete' && reason === 'max_output_tokens') stopReason = 'max_tokens';
               else if (status === 'incomplete' && reason === 'content_filter') stopReason = 'refusal';
-              break;
+              return false;
             }
             case 'response.incomplete':
               sawTerminal = true;
               stopReason = ev.response?.incomplete_details?.reason === 'max_output_tokens' ? 'max_tokens' : 'other';
-              break;
+              return false;
             case 'response.failed':
               throw streamedError(ev.response?.error);
             case 'error':

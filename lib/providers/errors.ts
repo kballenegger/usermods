@@ -108,20 +108,27 @@ export async function fetchOrNetworkError(
 /**
  * Read a streamed body to its end, handing each chunk to `onChunk`. A read that fails part-way (the
  * connection was reset, the machine went offline) becomes a 'stream' ProviderError; an abort passes
- * through untouched.
+ * through untouched. The parser can return false when the protocol has finished.
  */
-export async function readStream(body: ReadableStream<Uint8Array>, signal: AbortSignal | undefined, onChunk: (text: string) => void): Promise<void> {
+export async function readStream(body: ReadableStream<Uint8Array>, signal: AbortSignal | undefined, onChunk: (text: string) => false | void): Promise<void> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
-  while (true) {
-    let chunk: ReadableStreamReadResult<Uint8Array>;
-    try {
-      chunk = await reader.read();
-    } catch (e) {
-      if (isAbortError(e) || signal?.aborted) throw e;
-      throw streamIncomplete(e);
+  try {
+    while (true) {
+      let chunk: ReadableStreamReadResult<Uint8Array>;
+      try {
+        chunk = await reader.read();
+      } catch (e) {
+        if (isAbortError(e) || signal?.aborted) throw e;
+        throw streamIncomplete(e);
+      }
+      if (chunk.done) return;
+      if (onChunk(decoder.decode(chunk.value, { stream: true })) === false) {
+        void reader.cancel().catch(() => {});
+        return;
+      }
     }
-    if (chunk.done) return;
-    onChunk(decoder.decode(chunk.value, { stream: true }));
+  } finally {
+    reader.releaseLock();
   }
 }

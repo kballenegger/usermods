@@ -1092,10 +1092,10 @@ dismissed, the flow simply completes in place, which is the easy case.
 (OpenAI signals "not approved yet" with a 403/404 rather than an RFC error body, and adds a code
 exchange after approval), so one working does not prove the other.
 
-**What a failure at each point means:** no presets → the build flags regressed; "Failed to fetch" →
-the host is not allowed; a fresh sign-in button after reopening → the persistence or `oauth.restore`
-regressed; signed in but the chat fails → the backend host, not the auth host, is the one not
-allowed.
+Missing presets point to the build flags. A fresh sign-in button after reopening points to persistence
+or `oauth.restore`. If sign-in succeeds and chat still fails, check the chat error and whether **Fetch
+models** shows a live list or reports that it used the built-in list. A live list confirms the extension
+could reach the backend for model discovery. The chat request and its streamed reply are separate.
 
 ## Distribution
 
