@@ -55,6 +55,13 @@ test('the vendor hosts are the ones the flow actually reaches', () => {
   assert.deepEqual([...AUTH_HOSTS.xai], ['auth.x.ai', 'cli-chat-proxy.grok.com']);
 });
 
+test('Safari points to the host of the failed request after ChatGPT sign-in', () => {
+  const message = fetchFailureMessage('chatgpt', true, 'chatgpt.com');
+  assert.match(message, /Could not reach chatgpt\.com/);
+  assert.match(message, /not allowed on chatgpt\.com/);
+  assert.doesNotMatch(message, /auth\.openai\.com/);
+});
+
 test('on Safari the message names the host to allow and where to allow it', () => {
   // "Failed to fetch" sends someone to check their wifi for a permission problem. This is the
   // whole point of the classification: say what to press.

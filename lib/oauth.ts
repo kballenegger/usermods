@@ -97,12 +97,12 @@ export function isOpaqueFetchFailure(e: unknown): boolean {
  * install and per-site permission is not a thing the user manages, the host advice would be noise,
  * so the message is the plain network one.
  */
-export function fetchFailureMessage(kind: OAuthKind, safari: boolean): string {
-  const hosts = AUTH_HOSTS[kind].join(' and ');
+export function fetchFailureMessage(kind: OAuthKind, safari: boolean, host?: string): string {
+  const hosts = host ?? AUTH_HOSTS[kind].join(' and ');
   if (!safari) return `Could not reach ${hosts}. Check your internet connection and try again.`;
   return (
     `Could not reach ${hosts}. Safari asks per website, so this usually means usermods is not allowed on ` +
-    `${AUTH_HOSTS[kind][0]} yet. Open Safari's settings for usermods and set it to Allow on Every Website ` +
+    `${host ?? AUTH_HOSTS[kind][0]} yet. Open Safari's settings for usermods and set it to Allow on Every Website ` +
     `(iPhone and iPad: Settings > Apps > Safari > Extensions > usermods; Mac: Safari > Settings > Extensions > ` +
     `usermods > Edit Websites). If it is already allowed, check your internet connection.`
   );
@@ -318,11 +318,11 @@ function expiresFrom(expiresIn: unknown, access: string): number {
  * Every request in this file goes through it, so a host Safari has not granted is reported as a
  * permission to fix rather than as a network to blame, wherever in the flow it is hit.
  */
-async function authFetch(kind: OAuthKind, url: string, init: RequestInit): Promise<Response> {
+export async function authFetch(kind: OAuthKind, url: string, init: RequestInit): Promise<Response> {
   try {
     return await fetch(url, init);
   } catch (e) {
-    if (isOpaqueFetchFailure(e)) throw new Error(fetchFailureMessage(kind, SAFARI_BUILD));
+    if (isOpaqueFetchFailure(e)) throw new Error(fetchFailureMessage(kind, SAFARI_BUILD, new URL(url).hostname), { cause: e });
     throw e;
   }
 }

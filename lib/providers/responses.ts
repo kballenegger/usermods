@@ -9,6 +9,7 @@ export interface ResponsesConfig {
   baseUrl: string;
   model: string;
   headers: () => Promise<Record<string, string>>;
+  explainNetworkFailure?: (url: string) => Promise<string>;
   /** Extra top-level request fields (e.g. reasoning settings). */
   body?: Record<string, unknown>;
   /** Tag stored on opaque parts so only this adapter replays them. */
@@ -93,7 +94,7 @@ export function createResponsesProvider(cfg: ResponsesConfig): Provider {
           include: ['reasoning.encrypted_content'],
           ...cfg.body,
         }),
-      });
+      }, cfg.explainNetworkFailure);
       if (!res.ok || !res.body) throw await httpError(res);
 
       const content: Part[] = [];

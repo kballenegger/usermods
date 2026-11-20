@@ -133,6 +133,8 @@ Two subscriptions can sign in directly from Settings, with no API key and no loc
 
 Both talk to the vendor's Responses API backend that their own coding agents use. Tokens are stored in extension local storage and refreshed automatically. The model picker lists the model ids your plan allows once you are signed in (the ChatGPT backend is asked the way the open-source Codex CLI asks it). If a listing fails, a short built-in list is offered instead, marked as such, and you can always type a model id.
 
+Settings fetches the first model list after sign-in. If ChatGPT signs in but Safari reports that it couldn't reach `chatgpt.com`, check that usermods is allowed on that website. Sign-in uses `auth.openai.com`, while model listing and chat use `chatgpt.com`. The model picker and Settings show the listing error.
+
 Caveats worth knowing:
 
 - Neither vendor publishes developer docs for this. The endpoints and headers are the ones their CLIs use, as reused by several open-source agents. OpenAI and xAI have both said third-party tools may use these logins, but that is a statement, not a contract.

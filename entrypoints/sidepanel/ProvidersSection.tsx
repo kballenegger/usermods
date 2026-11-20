@@ -213,6 +213,13 @@ function ConnectionCard({
     }
   }
 
+  const needsInitialModels = subscription && status === 'connected' && conn.models === undefined;
+  useEffect(() => {
+    if (needsInitialModels) void fetchModels();
+    // Fetch once when this connection first becomes usable. Manual refresh handles later failures.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [needsInitialModels]);
+
   async function remove() {
     pending.current = {};
     if (timer.current != null) window.clearTimeout(timer.current);

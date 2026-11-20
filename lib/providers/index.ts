@@ -1,5 +1,6 @@
 import {
   CHATGPT_CODEX_BASE,
+  SAFARI_BUILD,
   SUBSCRIPTIONS_OFF,
   XAI_PROXY_BASE,
   unavailableProviderMessage,
@@ -42,6 +43,8 @@ export function createProvider(settings: Settings, deps: OpenAIProviderDeps = {}
 function createSubscriptionProvider(settings: Settings, kind: 'chatgpt' | 'xai'): Provider {
   if (SUBSCRIPTIONS_OFF) throw new Error(unavailableProviderMessage(kind));
   const oauth = () => import('../oauth');
+  const explainNetworkFailure = async (url: string) =>
+    (await oauth()).fetchFailureMessage(kind, SAFARI_BUILD, new URL(url).hostname);
 
   // The chat's Thinking level, if it set one. 'default' maps to nothing, so the per-vendor defaults
   // just below stay exactly as they were: medium for ChatGPT, high for xAI. A chosen level replaces
@@ -57,6 +60,7 @@ function createSubscriptionProvider(settings: Settings, kind: 'chatgpt' | 'xai')
       tag: 'chatgpt',
       baseUrl: settings.baseUrl || CHATGPT_CODEX_BASE,
       model: settings.model,
+      explainNetworkFailure,
       headers: async () => {
         const o = await oauth();
         return o.chatgptHeaders(await o.getValidTokens('chatgpt'));
@@ -69,6 +73,7 @@ function createSubscriptionProvider(settings: Settings, kind: 'chatgpt' | 'xai')
     tag: 'xai',
     baseUrl: settings.baseUrl || XAI_PROXY_BASE,
     model: settings.model,
+    explainNetworkFailure,
     headers: async () => {
       const o = await oauth();
       return o.xaiProxyHeaders(settings.model, (await o.getValidTokens('xai')).access);

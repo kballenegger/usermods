@@ -89,12 +89,19 @@ export function isAbortError(e: unknown): boolean {
  * 'network' rather than the browser's bare TypeError("Failed to fetch"). An abort passes through
  * untouched.
  */
-export async function fetchOrNetworkError(url: string, init: RequestInit): Promise<Response> {
+export async function fetchOrNetworkError(
+  url: string,
+  init: RequestInit,
+  explainFailure?: (url: string) => Promise<string>,
+): Promise<Response> {
   try {
     return await fetch(url, init);
   } catch (e) {
     if (isAbortError(e) || init.signal?.aborted) throw e;
-    throw new ProviderError(`Could not reach the model provider (${e instanceof Error ? e.message : String(e)}).`, { kind: 'network', cause: e });
+    const message = explainFailure
+      ? await explainFailure(url)
+      : `Could not reach the model provider (${e instanceof Error ? e.message : String(e)}).`;
+    throw new ProviderError(message, { kind: 'network', cause: e });
   }
 }
 
