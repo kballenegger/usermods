@@ -2458,7 +2458,9 @@ async function listModels(connectionId: string): Promise<ModelListResult> {
         auth = o.xaiProxyHeaders('', (await o.getValidTokens('xai')).access);
       }
       const { url, headers } = modelsRequest(target, auth);
-      const r = await fetch(url, { headers });
+      const r = !SUBSCRIPTIONS_OFF && (target.kind === 'chatgpt' || target.kind === 'xai')
+        ? await (await oauthModule()).authFetch(target.kind, url, { headers })
+        : await fetch(url, { headers });
       if (!r.ok) throw new Error(listFailureMessage(r.status, await r.text().catch(() => '')));
       return parseModelIds(await r.json());
     });

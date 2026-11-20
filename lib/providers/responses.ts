@@ -9,6 +9,7 @@ export interface ResponsesConfig {
   baseUrl: string;
   model: string;
   headers: () => Promise<Record<string, string>>;
+  explainNetworkFailure?: (url: string) => Promise<string>;
   /** Extra top-level request fields (e.g. reasoning settings). */
   body?: Record<string, unknown>;
   /** Tag stored on opaque parts so only this adapter replays them. */
@@ -93,7 +94,7 @@ export function createResponsesProvider(cfg: ResponsesConfig): Provider {
           include: ['reasoning.encrypted_content'],
           ...cfg.body,
         }),
-      });
+      }, cfg.explainNetworkFailure);
       if (!res.ok || !res.body) throw await httpError(res);
 
       const content: Part[] = [];
@@ -154,12 +155,12 @@ export function createResponsesProvider(cfg: ResponsesConfig): Provider {
               const reason = ev.response?.incomplete_details?.reason;
               if (status === 'incomplete' && reason === 'max_output_tokens') stopReason = 'max_tokens';
               else if (status === 'incomplete' && reason === 'content_filter') stopReason = 'refusal';
-              break;
+              return false;
             }
             case 'response.incomplete':
               sawTerminal = true;
               stopReason = ev.response?.incomplete_details?.reason === 'max_output_tokens' ? 'max_tokens' : 'other';
-              break;
+              return false;
             case 'response.failed':
               throw streamedError(ev.response?.error);
             case 'error':

@@ -411,6 +411,9 @@ export function ModelPicker({
                       <span className="model-group-meta" title={cache.error}>could not list</span>
                     ) : null}
                   </div>
+                  {!refreshing.has(g.connection.id) && cache?.error && (
+                    <div className="model-group-none" role="status">{cache.error}</div>
+                  )}
                   {mine.map(renderOption)}
                   {mine.length === 0 && (
                     <div className="model-group-none">
