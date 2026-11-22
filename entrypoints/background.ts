@@ -66,7 +66,7 @@ import {
   THINKING_FALLBACK_PANEL_NOTE,
   type ThinkingLevel,
 } from '@/lib/thinking';
-import { actionClickPlan, resolveScope, sidePanelAvailable, windowPanelPlan } from '@/lib/sidepanel';
+import { actionClickPlan, resolveScope, sidePanelAvailable, sidebarActionOpen, windowPanelPlan } from '@/lib/sidepanel';
 import { DEFAULT_CONTEXT_BUDGET } from '@/lib/types';
 import type { SidePanelScope } from '@/lib/types';
 import { looksLikeZip, parseTampermonkeyJson, parseTampermonkeyZipEntries, type TmScript } from '@/lib/tampermonkey';
@@ -112,7 +112,7 @@ export default defineBackground(() => {
   void recoverRuns();
 
   /**
-   * Open the panel on the clicked tab alone.
+   * Open the panel on the clicked tab alone — or, on Firefox, open the browser-level sidebar.
    *
    * This listener only ever fires under 'tab' scope: under 'window', openPanelOnActionClick is on
    * and Chrome opens the window panel itself without firing onClicked.
@@ -125,12 +125,20 @@ export default defineBackground(() => {
    * under 'window' scope Chrome would not have fired onClicked at all, because openPanelOnActionClick
    * is part of Chrome's own persisted state for the extension and survives the worker sleeping. So
    * a click reaching this listener is already evidence the scope is 'tab'.
+   *
+   * On Firefox the plan is the browser-level sidebar instead: `sidebarAction.open()` is the only
+   * open, and there is no per-tab variant for scope or tabId to reach.
    */
   chrome.action.onClicked.addListener((tab) => {
+    const plan = actionClickPlan(panelScope, tab.id);
+    if (plan.sidebarOpen) {
+      // Firefox: the click is the gesture.
+      sidebarActionOpen().catch((e: unknown) => console.warn('[usermods] sidebarAction.open', e));
+      return;
+    }
     // With a popup in the manifest (Safari) the click opens the popup and this never fires; the
     // guard is for the case where a build has neither.
     if (!sidePanelAvailable()) return;
-    const plan = actionClickPlan(panelScope, tab.id);
     if (!plan.setOptions || !plan.open) return;
     // No await between these two: setOptions is fire-and-forget so open() stays in the gesture.
     // Chrome queues extension API calls from one context in order, so the options are in place by

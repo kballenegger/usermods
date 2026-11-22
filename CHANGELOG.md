@@ -6,6 +6,17 @@ All notable changes to usermods are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Firefox support.** The extension now builds and installs on Firefox (136+): `npm run
+  build:firefox` + `npm run zip:firefox` produce `usermods-<version>-firefox.xpi` (plus the source
+  zip WXT writes for Firefox by default). The manifest carries the Firefox shapes — `userScripts` in
+  `optional_permissions` with an "Enable user scripts" Settings row that calls `permissions.request()`
+  (or about:addons → usermods → Permissions tab), `sidebar_action` for the browser-level sidebar,
+  `browser_specific_settings.gecko` id + minimum version, and the AMO-required
+  `data_collection_permissions` declaration. The setup banner and the exec probe now speak Firefox,
+  and Firefox toolbar clicks open the browser-level sidebar. See [docs/browsers.md](docs/browsers.md).
+
 ### Fixed
 
 - A thinking model on an OpenAI-compatible server could look stuck and then end with nothing. Four

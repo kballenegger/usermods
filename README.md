@@ -24,7 +24,7 @@ https://github.com/user-attachments/assets/b2102d80-e0ff-447f-a1c9-9c62583c4786
 
 ## Status
 
-Early, and working end to end: chat, page inspection, live testing, propose, save, run on load, edit an installed mod in chat, import and export. Version 0.1.1 is live on the [Chrome Web Store](https://chromewebstore.google.com/detail/usermods/dhmdjekbeinhhnfhcgnkgdpgdafpboic); the Safari build runs on Mac, iPhone and iPad. See [Roadmap](docs/roadmap.md).
+Early, and working end to end: chat, page inspection, live testing, propose, save, run on load, edit an installed mod in chat, import and export. Version 0.1.1 is live on the [Chrome Web Store](https://chromewebstore.google.com/detail/usermods/dhmdjekbeinhhnfhcgnkgdpgdafpboic); the Safari build runs on Mac, iPhone and iPad. The Firefox build runs on Firefox 136+ and installs as a normal extension — see [Firefox](#install-on-firefox) below. See [Roadmap](docs/roadmap.md).
 
 ## Screenshots
 
@@ -73,6 +73,7 @@ More, including every screen in both themes and the iPhone build: **[docs/screen
 - **Drafts with versions** — each chat keeps one draft mod with a version strip, line diffs and an undoable roll back.
 - **Dashboard** — every chat and every mod across every site in a full tab, with search, bulk actions and a source editor.
 - **Safari** — the same extension on Mac, iPhone and iPad, subscription sign-in included.
+- **Firefox** — the same extension on Firefox 136+: user scripts as an optional permission, the browser-level sidebar, and the `.xpi` package (see [Install on Firefox](#install-on-firefox)).
 
 ## Install from the Chrome Web Store
 
@@ -100,6 +101,18 @@ Then in Chrome:
 3. Click the usermods icon to open the side panel **on that tab**. Go to **Settings**, click a preset under **Add provider**, and paste a key (or a local server URL). It saves as you type. Back in **Chat**, the model is the chip in the chat bar.
 
 For Safari, `node scripts/safari-xcode.mjs doctor` says what your Xcode allows, and `simulator` / `mac` build it. One app, one extension, both platforms, subscription sign-in included — **[docs/safari.md](docs/safari.md)** has the build, the install steps, the limitations and what has actually been seen running.
+
+### Install on Firefox
+
+Requires Firefox 136+ and Node 22+.
+
+```sh
+npm install
+npm run build:firefox
+npm run zip:firefox
+```
+
+The artifact is `.output/usermods-<version>-firefox.xpi` — install it via **about:addons → Install from file**. Firefox needs user scripts granted before mods run: open usermods Settings and turn on **Enable user scripts** (Firefox also lists the toggle from about:addons → usermods → Permissions tab).
 
 ## Learn more
 

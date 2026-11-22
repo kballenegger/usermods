@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { SUBSCRIPTIONS_OFF } from '@/lib/buildflags';
 import { commitContextBudget, loadSettings, MIN_CONTEXT_BUDGET, savePrefs } from '@/lib/settings';
-import { resolveScope } from '@/lib/sidepanel';
+import { resolveScope, sidebarAvailable, userScriptsPending } from '@/lib/sidepanel';
 import { applyTheme } from '@/lib/theme';
 import { DEFAULT_CONTEXT_BUDGET, type Prefs, type Settings, type SidePanelScope, type ThemeChoice } from '@/lib/types';
 import { ProvidersSection } from './ProvidersSection';
@@ -36,6 +36,8 @@ export function SettingsView({ onReviewNotice }: { onReviewNotice?: () => void }
    * applied to a half-typed number — the whole of the user's third report.
    */
   const [budget, setBudget] = useState<string | null>(null);
+  /** Firefox: `permissions.request()` is in flight from the Enable user scripts button. */
+  const [enabling, setEnabling] = useState(false);
 
   useEffect(() => {
     void loadSettings().then(setS);
@@ -75,6 +77,22 @@ export function SettingsView({ onReviewNotice }: { onReviewNotice?: () => void }
   }
 
   /**
+   * Turn on Firefox's userScripts permission.
+   *
+   * `permissions.request()` is the sanctioned grant path and must come from a user gesture — the
+   * button click is one. Chrome never gets here: the manifest asks for the permission at install, so
+   * `userScriptsPending()` is false there. After the grant, the panel's setup-banner poll clears.
+   */
+  async function enableUserScripts() {
+    setEnabling(true);
+    try {
+      await chrome.permissions.request({ permissions: ['userScripts'] });
+    } finally {
+      setEnabling(false);
+    }
+  }
+
+  /**
    * A draft the user typed and then closed the panel on still counts. The side panel is closed
    * constantly, and a number typed but not blurred would otherwise be dropped silently — which is
    * the same class of complaint as the clamping was.
@@ -101,6 +119,23 @@ export function SettingsView({ onReviewNotice }: { onReviewNotice?: () => void }
   return (
     <div className="view view-form">
       <ProvidersSection view={providers} onSaving={setProvidersSaving} />
+
+      {/*
+        Firefox only: usermods' userScripts permission is optional there (on Chrome it is install-time,
+        and the setup banner explains that). Turn it on here, or from about:addons → usermods →
+        Permissions tab — Firefox also lets the user do it there by hand.
+      */}
+      {userScriptsPending() && (
+        <label className="field">
+          <span className="toggle" style={{ marginBottom: 'var(--sp-1)' }}>
+            <button className="linklike" disabled={enabling} onClick={enableUserScripts}>Enable user scripts</button>
+          </span>
+          <span>
+            Firefox needs this on for mods to run. It can also be turned on from about:addons → usermods →
+            Permissions tab.
+          </span>
+        </label>
+      )}
 
       <div className="label">Preferences</div>
 
@@ -202,6 +237,12 @@ export function SettingsView({ onReviewNotice }: { onReviewNotice?: () => void }
           panel, which follows you until you close it. Either way, closing is the ✕ in the panel's
           own header — the toolbar icon opens it and cannot close it again.
         </span>
+        {sidebarAvailable() && (
+          <span>
+            {' '}On Firefox the sidebar is the browser's, so the choice does not change anything: the
+            toolbar click opens it, and there is no per-tab variant.
+          </span>
+        )}
       </label>
 
       {/*

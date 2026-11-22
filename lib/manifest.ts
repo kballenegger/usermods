@@ -15,11 +15,19 @@
  *    harmless there, so it is dropped rather than left in and ignored.
  *  - **`sidePanel`**: Chrome only. Safari has no sidebar surface for extensions at all, so the panel
  *    becomes a toolbar popup, set by `action.default_popup`, which on iOS is the extension's whole UI.
+ *    Firefox replaces it with its own browser-level `sidebar_action` (the equivalent, per
+ *    docs/browsers.md) — and its toolbar click is the open; there is no per-tab variant, so the
+ *    click listener in entrypoints/background.ts branches on `sidebarAction` there.
  *  - **`minimum_chrome_version`**: meaningless outside Chrome.
  *  - **`browser_specific_settings.safari.strict_min_version`**: 16.4, set by the newest API the
  *    extension actually calls. `scripting.executeScript` and `declarativeNetRequest.updateDynamicRules`
  *    both land at 15.4, but an MV3 background in Safari is a service worker, and that is 16.4. iOS
  *    16.4 shipped March 2023.
+ *  - **`browser_specific_settings.gecko`**: id + strict_min_version (136, where userScripts ships),
+ *    and the AMO-required `data_collection_permissions` (an honest declaration of what the extension
+ *    sends; MDN documents the taxonomy). Absent from Chrome. There is no `sidePanel`-shaped key on
+ *    Firefox at all: WXT generates `sidebar_action` itself for Firefox from the sidepanel entrypoint
+ *    and overwrites any user value.
  */
 
 /** Manifest keys this module sets. Structural, so the module imports nothing and node can load it. */
@@ -33,17 +41,44 @@ export interface BuiltManifest {
     default_icon: Record<string, string>;
     default_popup?: string;
   };
+  sidebar_action?: { default_panel: string; default_icon?: Record<string, string>; default_title?: string };
   options_ui: { page: string; open_in_tab: boolean };
   web_accessible_resources: { resources: string[]; matches: string[] }[];
   minimum_chrome_version?: string;
-  browser_specific_settings?: { safari?: { strict_min_version: string } };
+  optional_permissions?: string[];
+  browser_specific_settings?: {
+    safari?: { strict_min_version: string };
+    gecko?: { id: string; strict_min_version: string; data_collection_permissions?: { required: string[]; optional: string[] } };
+  };
 }
 
 export const CHROME_MIN_VERSION = '135';
 export const SAFARI_MIN_VERSION = '16.4';
 
+/**
+ * Firefox floor for the userScripts engine. MDN compat data: userScripts, Firefox 136 (desktop).
+ * Windows the sidebar-panel story behind the same floor (docs/browsers.md, the sidePanel vs
+ * sidebar_action section).
+ */
+export const FIREFOX_MIN_VERSION = '136';
+
+/**
+ * The extension ID in the Firefox build. AMO requires `browser_specific_settings.gecko.id` when
+ * submitting there; this placeholder installs fine for a local load. Change it to the AMO-issued ID
+ * when the extension is listed.
+ */
+export const FIREFOX_ID = '@usermods';
+
 /** The popup document. Safari's only UI surface, and never built for Chrome. */
 export const POPUP_PATH = 'popup.html';
+
+/**
+ * The Firefox sidebar document: the page `sidebar_action.default_panel` names (docs/browsers.md,
+ * the sidePanel vs sidebar_action section). Same page as the sidepanel; its constant lives in
+ * lib/sidepanel.ts, but this module stays import-free, so the string is spelled out here like
+ * POPUP_PATH above.
+ */
+export const FIREFOX_SIDEBAR_PATH = 'sidepanel.html';
 
 /**
  * Icon sizes only Safari has a use for.
@@ -75,6 +110,10 @@ export function isSafariTarget(browser: string): boolean {
   return browser === 'safari';
 }
 
+export function isFirefoxTarget(browser: string): boolean {
+  return browser === 'firefox';
+}
+
 /**
  * The permission list for a target.
  *
@@ -91,8 +130,21 @@ export function isSafariTarget(browser: string): boolean {
  * it: its host access is granted per site by the user, so there the permission still adds something.
  */
 export function permissionsFor(browser: string): string[] {
-  if (isSafariTarget(browser)) return [...BASE_PERMISSIONS];
+  if (isSafariTarget(browser) || isFirefoxTarget(browser)) return [...BASE_PERMISSIONS];
   return ['sidePanel', 'storage', 'scripting', 'userScripts', 'declarativeNetRequest'];
+}
+
+/**
+ * Optional permissions per target.
+ *
+ * Chrome never asks at runtime: `userScripts` is install-time there, with the "Allow User Scripts"
+ * toggle. On Firefox it is `optional_permissions` — W3C issue #740: it must not be in `permissions`
+ * there, or the user could not decline it, so the user enables it from Settings (a
+ * `permissions.request()` call from a user gesture) or from about:addons, and the exec probe
+ * reads the granted state off the `userScripts` namespace.
+ */
+export function optionalPermissionsFor(browser: string): string[] {
+  return isFirefoxTarget(browser) ? ['userScripts'] : [];
 }
 
 /**
@@ -122,6 +174,7 @@ export function actionFor(browser: string): BuiltManifest['action'] {
 }
 
 export function buildManifest(browser: string): BuiltManifest {
+  if (isFirefoxTarget(browser)) return firefoxManifest();
   const safari = isSafariTarget(browser);
   return {
     name: 'usermods',
@@ -140,5 +193,53 @@ export function buildManifest(browser: string): BuiltManifest {
     // The .user.js redirect rule sends navigations to this page, so it must be web accessible.
     web_accessible_resources: [{ resources: ['install.html'], matches: ['<all_urls>'] }],
     ...(safari ? { browser_specific_settings: { safari: { strict_min_version: SAFARI_MIN_VERSION } } } : {}),
+  };
+}
+
+/** The Firefox manifest: the Chrome one with the per-browser differences docs/browsers.md tracks. */
+function firefoxManifest(): BuiltManifest {
+  return {
+    name: 'usermods',
+    description: 'Vibe-code userscripts in place. Customize any website by chatting with any LLM.',
+    permissions: permissionsFor('firefox'),
+    optional_permissions: optionalPermissionsFor('firefox'),
+    host_permissions: ['<all_urls>'],
+    action: actionFor('firefox'),
+    // Firefox's equivalent of Chrome's side panel (docs/browsers.md, the sidePanel vs
+    // sidebar_action section): a browser-level sidebar the user opens with the toolbar click. WXT
+    // generates its own `sidebar_action` for Firefox from the sidepanel entrypoint and overwrites
+    // this one, so the shape here is what the manifest means — the entrypoint wiring is the source
+    // of truth when one is being built.
+    sidebar_action: {
+      default_panel: FIREFOX_SIDEBAR_PATH,
+      default_icon: {
+        16: 'icon/16.png',
+        32: 'icon/32.png',
+        48: 'icon/48.png',
+        128: 'icon/128.png',
+      } as unknown as Record<string, string>,
+      default_title: 'Open usermods',
+    },
+    // The dashboard doubles as the options page, as on Chrome (see buildManifest above).
+    options_ui: { page: 'dashboard.html', open_in_tab: true },
+    web_accessible_resources: [{ resources: ['install.html'], matches: ['<all_urls>'] }],
+    // No minimum_chrome_version: it is a Chrome key, and Firefox accepts unknown manifest keys as
+    // warnings — dropping it keeps the Firefox package clean.
+    browser_specific_settings: {
+      gecko: {
+        id: FIREFOX_ID,
+        strict_min_version: FIREFOX_MIN_VERSION,
+        // Required from November 3, 2025 for new AMO submissions (MDN
+        // browser_specific_settings.gecko.data_collection_permissions). The values are an honest
+        // declaration of what the extension sends: the page address and title, the pruned HTML and
+        // element details it reads (websiteActivity + websiteContent), the user's API keys and
+        // chats (authenticationInfo + personalCommunications) — see PRIVACY.md. Adjust at
+        // submission time, since only the owner can declare the real list.
+        data_collection_permissions: {
+          required: ['websiteActivity', 'websiteContent'],
+          optional: ['authenticationInfo', 'personalCommunications'],
+        },
+      },
+    },
   };
 }
