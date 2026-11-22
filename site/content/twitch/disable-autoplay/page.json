@@ -1,0 +1,55 @@
+{
+  "slug": "disable-autoplay",
+  "title": "Stop Twitch front page autoplay",
+  "question": "How do I stop the Twitch front page from autoplaying a stream?",
+  "answer": "Twitch starts a muted stream in the featured carousel at the top of its front page as soon as the page loads. The usermods script on this page pauses that featured stream whenever it starts on its own, and lets it play once you click or press a key in the carousel. Install it with usermods or any userscript manager. Without an extension, bookmark twitch.tv/directory instead of the front page; the Browse page has no featured player.",
+  "prompt": "Stop the stream on the Twitch front page from playing by itself until I click it.",
+  "details": "The script listens for videos in the front page carousel starting to play and pauses them straight away. It only acts on videos inside that carousel, so channel pages, clips and VODs play as usual.\n\nAny click or key press inside the carousel, including on its arrows, counts as you starting it: from then on the script leaves the carousel alone until the page is reloaded. The check loads the logged-out front page and does not click anything.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Start on the Browse page",
+      "body": "Bookmark `https://www.twitch.tv/directory` instead of the front page. It lists live channels and categories with no featured player."
+    }
+  ],
+  "related": [
+    "twitch/hide-sidebar",
+    "twitch/scroll-volume"
+  ],
+  "demand": {
+    "score": 48,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/406877",
+        "note": "Anti-Autoplay on Twitch (1680 total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/378068",
+        "note": "Twitch Stop Autoplay (471 total installs)"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/ellafikcjlakbpanbejcpcgacedleoeo",
+        "note": "twitch stop autolay (817 users)"
+      },
+      {
+        "type": "forum",
+        "url": "https://webapps.stackexchange.com/questions/106764",
+        "note": "Can I mute or disable autoplay for Twitch's featured streams?"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.twitch.tv/"
+    ],
+    "loggedOut": true,
+    "waitFor": "[data-a-target=\"front-page-carousel\"] video",
+    "settleMs": 6000,
+    "baseline": "(() => { const v = document.querySelector('[data-a-target=\"front-page-carousel\"] video'); return !!v && !v.paused && v.currentTime > 1; })()",
+    "expect": "new Promise((done) => setTimeout(() => { const vs = [...document.querySelectorAll('[data-a-target=\"front-page-carousel\"] video')]; done(vs.length > 0 && vs.every((v) => v.paused && v.currentTime < 1)); }, 3000))",
+    "intact": "(() => { const v = document.querySelector('[data-a-target=\"front-page-carousel\"] video'); return !!v && v.checkVisibility() && [...document.querySelectorAll('[data-a-target=\"side-nav-card-metadata\"], article')].filter((a) => a.checkVisibility()).length >= 5; })()"
+  }
+}

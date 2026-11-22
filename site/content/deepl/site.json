@@ -1,0 +1,7 @@
+{
+  "slug": "deepl",
+  "name": "DeepL",
+  "domains": ["deepl.com", "www.deepl.com"],
+  "category": "work",
+  "intro": "Userscripts for the DeepL web translator: a dark theme, a shorter page without the upsells and a keyboard shortcut to swap languages."
+}

@@ -1,0 +1,36 @@
+{
+  "slug": "clean-homepage",
+  "title": "Clean up the Bing homepage",
+  "question": "How do I remove the news feed and clutter from the Bing homepage?",
+  "answer": "Bing has a setting for this: open the menu at the top right of bing.com, choose Customize your homepage and turn off Show feed. It is stored in your browser, so it comes back when cookies are cleared. The usermods script on this page hides the trending news carousel, the homepage quiz, the image caption bar and the news and weather feed on every visit, and leaves the search box, the header links and the image in place.",
+  "prompt": "Remove the news feed, trending stories and quiz from the Bing homepage so only the search box and background image are left.",
+  "details": "The carousel, the quiz and the MSN feed all sit in one container, `#scroll_cont`, and the script hides it with CSS before the page draws. It only runs on the homepage (`www.bing.com/`), not on search results. The caption bar over the image, with its previous and next arrows, is in the same container and goes too.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Bing's Show feed switch",
+      "body": "Click the menu icon at the top right of bing.com, open **Customize your homepage** and turn off **Show feed**. The same menu has **Show homepage image** and **Show menu bar**. The choice is kept in a cookie for that browser."
+    },
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filter",
+      "body": "The same selector as the script. Our check runs the script, not this filter.\n\n```\nwww.bing.com###scroll_cont\n```"
+    }
+  ],
+  "related": [],
+  "demand": {
+    "score": 58,
+    "evidence": [
+      { "type": "greasyfork", "url": "https://greasyfork.org/en/scripts/430997", "note": "Greasy Fork total installs: \"Bing homepage optimisation\" (read via api.greasyfork.org, 2026-11-17)" }
+    ]
+  },
+  "check": {
+    "urls": ["https://www.bing.com/?cc=us&setlang=en"],
+    "loggedOut": true,
+    "waitFor": "#scroll_cont",
+    "settleMs": 5000,
+    "baseline": "document.querySelector('#scroll_cont').checkVisibility() && [...document.querySelectorAll('#scroll_cont a[href]')].filter((a) => a.checkVisibility()).length >= 5",
+    "expect": "(() => { const c = document.querySelector('#scroll_cont'); return c !== null && c.querySelectorAll('a[href]').length >= 5 && !c.checkVisibility(); })()",
+    "intact": "document.querySelector('#sb_form_q').checkVisibility() && document.querySelector('#hdr').checkVisibility()"
+  }
+}

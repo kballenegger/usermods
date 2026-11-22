@@ -1,0 +1,39 @@
+{
+  "slug": "image-download-button",
+  "title": "Add a full-size image button to Bing Images",
+  "question": "How do I download full-size images from Bing Images?",
+  "answer": "Bing Images has no download link on its results grid, and saving a thumbnail gets you Bing's small preview, not the original. The usermods script on this page puts a Full size button on every thumbnail that opens the original image from the source site in a new tab, where you can save it with right-click, Save image as. Bing's own viewer still opens when you click the thumbnail itself.",
+  "prompt": "On Bing Images, add a button to each thumbnail that opens the full-size original image in a new tab.",
+  "details": "Bing stores each result's original image address in the thumbnail's `m` attribute (the `murl` field). The script reads it and adds a link in the top right corner of the thumbnail. A MutationObserver adds buttons to results that load as you scroll.\n\nThe button opens the image on the site that hosts it. Browsers don't let a page force a download from another site, so save it from the new tab. Some sites block direct image links or have taken the image down since Bing indexed it; the link then shows their error page.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Through the source page",
+      "body": "Click the thumbnail to open Bing's image viewer, follow it to the page the image came from, and save the image from that page."
+    }
+  ],
+  "related": [
+    "bing/clean-homepage"
+  ],
+  "demand": {
+    "score": 56,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/35070",
+        "note": "Greasy Fork total installs: \"Bing Image Download Button\" (read via api.greasyfork.org, 2026-11-17)"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.bing.com/images/search?q=mountain&setlang=en&cc=us"
+    ],
+    "loggedOut": true,
+    "waitFor": "a.iusc[m]",
+    "settleMs": 4000,
+    "baseline": "(() => { const t = [...document.querySelectorAll('a.iusc[m]')].filter((a) => a.checkVisibility() && JSON.parse(a.getAttribute('m')).murl); return t.length >= 10 && document.querySelectorAll('.usermods-fullsize').length === 0; })()",
+    "expect": "(() => { const t = [...document.querySelectorAll('a.iusc[m]')].filter((a) => a.checkVisibility()); return t.length >= 10 && t.every((a) => { const b = a.parentElement.querySelector(':scope > .usermods-fullsize'); return b !== null && b.checkVisibility() && b.href === new URL(JSON.parse(a.getAttribute('m')).murl).href; }); })()",
+    "intact": "[...document.querySelectorAll('a.iusc img')].filter((i) => i.checkVisibility()).length >= 10"
+  }
+}

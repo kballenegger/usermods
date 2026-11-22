@@ -1,0 +1,66 @@
+{
+  "slug": "latest-version-redirect",
+  "title": "Redirect Python 2 docs to Python 3",
+  "question": "How do I always land on the Python 3 docs instead of Python 2?",
+  "answer": "Search results still link to Python 2 pages on docs.python.org, and the site has no setting to send you to Python 3; old pages only show a notice at the top and a version menu. The usermods script on this page catches any Python 2 docs page, at /2/ or /2.7/, and opens the same page under /3/, the current stable Python 3 docs. Python 3 pages are left alone. Without a script, change 2 to 3 in the address by hand.",
+  "prompt": "Redirect docs.python.org Python 2 pages to the same page in the Python 3 docs.",
+  "details": "At `document-start` the script matches paths like `/2/library/os.html`, `/2.7/library/os.html` or a translated `/fr/2.7/...`, and replaces the version with `/3/`. It keeps the rest of the path and the `#anchor`, and uses `location.replace` so the Python 2 page is not left in the back history.\n\nSome Python 2 modules were renamed or removed in Python 3 (`urllib2`, `ConfigParser`), so those pages land on a \"not found\" page. Pinned Python 3 versions such as `/3.12/` are not changed.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Version menu",
+      "body": "Every docs page has a version menu in the header. Picking the current version opens the same page there."
+    },
+    {
+      "kind": "other",
+      "title": "Edit the address",
+      "body": "Change `/2/` or `/2.7/` to `/3/` in the URL."
+    }
+  ],
+  "check": {
+    "urls": [
+      "https://docs.python.org/2/library/os.html"
+    ],
+    "loggedOut": true,
+    "waitFor": "h1",
+    "settleMs": 2000,
+    "baseline": "location.pathname === '/2/library/os.html' && /Python 2\\.7/.test(document.title)",
+    "expect": "location.pathname === '/3/library/os.html' && /Python 3\\.\\d+/.test(document.title)",
+    "intact": "(() => { const h = document.querySelector('h1'); return !!h && h.checkVisibility() && /\\bos\\b/.test(h.innerText) && document.querySelectorAll('dl.py.function').length >= 20; })()"
+  },
+  "demand": {
+    "score": 39,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/27249",
+        "note": "Lastest Doc Redirector (python, django, ruby) (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/3400",
+        "note": "Show Python 3 documentation by default (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/26235",
+        "note": "Py3Direct (total installs)"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/nomnkbngkijpffepcgbbofhcnafpkiep",
+        "note": "DocVersionRedirector (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=python%203%20docs",
+        "note": "returns \"python 3 docs\"; suggestions: python 3 docs | python 3 docstring | python 3 docstring best practices | python 3 documentation | python 3 documentation pdf"
+      },
+      {
+        "type": "forum",
+        "url": "https://webapps.stackexchange.com/questions/85170/how-do-i-tell-google-that-i-prefer-python3-results",
+        "note": "Web Apps SE: \"How do I tell Google that I prefer Python3 results?\" (asks to land on Python 3 docs)"
+      }
+    ]
+  }
+}

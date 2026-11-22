@@ -1,0 +1,7 @@
+{
+  "slug": "duckduckgo",
+  "name": "DuckDuckGo",
+  "domains": ["duckduckgo.com"],
+  "category": "search",
+  "intro": "Userscripts for DuckDuckGo search results, checked against the live site while logged out."
+}

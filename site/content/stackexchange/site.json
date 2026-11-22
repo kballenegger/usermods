@@ -1,0 +1,7 @@
+{
+  "slug": "stackexchange",
+  "name": "Stack Exchange",
+  "domains": ["stackexchange.com", "superuser.com", "serverfault.com", "askubuntu.com", "mathoverflow.net"],
+  "category": "reference",
+  "intro": "Userscripts for the Stack Exchange network sites (Super User, Server Fault, Ask Ubuntu, MathOverflow and every *.stackexchange.com site), checked logged out. Stack Overflow has its own section."
+}

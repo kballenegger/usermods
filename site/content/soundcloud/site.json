@@ -1,0 +1,7 @@
+{
+  "slug": "soundcloud",
+  "name": "SoundCloud",
+  "domains": ["soundcloud.com"],
+  "category": "other",
+  "intro": "Userscripts for soundcloud.com: direct outbound links, full-size cover art and a profile view without reposts."
+}

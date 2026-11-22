@@ -1,0 +1,50 @@
+{
+  "slug": "declutter",
+  "title": "Remove ads and clutter from weather.com",
+  "question": "How do I see just the forecast on weather.com?",
+  "answer": "weather.com has no setting for a forecast-only view. The usermods script on this page hides every block weather.com labels as an advertisement, the Your News, Trending Now and Editor's Pick blocks, and the sponsored links at the bottom, then removes the right-hand column so the forecast sits in one centred column. Current conditions, today's outlook, the daily forecast, the weather details and the radar map stay. Without a userscript, a content blocker such as uBlock Origin removes most of the ads.",
+  "prompt": "On weather.com, hide the ads, news, trending and sponsored blocks and the right sidebar so only the forecast is left.",
+  "details": "Each block on weather.com carries an `aria-label`, and every ad slot is a `section` labelled `Advertisement`, so the script hides blocks by those labels with CSS injected before the page draws. The sponsored block has no label; it is found by the Taboola tiles inside it. The right-hand column is hidden and the main column is limited to 860 pixels and centred.\n\nThe check loads the Today page for New York, scrolls through it until every one of these blocks has loaded, and checks that each one is shown without the script and hidden with it. The same rules apply to the Hourly, 10 Day and other forecast pages, which use the same blocks, but the check doesn't load them. Video and pop-up ads that weather.com adds outside these blocks are not covered.",
+  "alternatives": [
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin",
+      "body": "uBlock Origin's default lists block most weather.com ads, though the empty ad boxes and news blocks stay. These filters hide the same labelled blocks as the script. Our check runs the script, not these filters.\n\n```\nweather.com##section[aria-label=\"Advertisement\"]\nweather.com##section[aria-label=\"Your News\"]\nweather.com##section[aria-label=\"Trending Now\"]\nweather.com##section[aria-label=\"Editor's Pick\"]\n```"
+    }
+  ],
+  "related": [
+    "weather/dark-mode"
+  ],
+  "demand": {
+    "score": 40,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/428121",
+        "note": "IBM-Weather-UI (205 total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/462267",
+        "note": "Weather only view (33 total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=weather.com%20ad%20blocker",
+        "note": "suggestions: weather.com ad blocker"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://weather.com/weather/today/l/40.71,-74.01"
+    ],
+    "loggedOut": true,
+    "waitFor": "section[data-testid=\"daily-forecast\"]",
+    "settleMs": 4000,
+    "actions": "const T = ['section[aria-label=\"Advertisement\"]', 'section[aria-label=\"Your News\"]', 'section[aria-label=\"Trending Now\"]', 'section[aria-label=\"Editor\\'s Pick\"]', '.thumbBlock', 'main .grid > [style*=\"grid-area:sidebar\"]']; const ready = () => T.every((s) => document.querySelector(s)) && document.querySelectorAll(T[0]).length >= 3; for (let i = 0; i < 40 && !ready(); i++) { window.scrollTo(0, (i % 10 + 1) * document.documentElement.scrollHeight / 10); await new Promise((r) => setTimeout(r, 500)); } window.scrollTo(0, 0); await new Promise((r) => setTimeout(r, 500));",
+    "baseline": "(() => { const T = ['section[aria-label=\"Advertisement\"]', 'section[aria-label=\"Your News\"]', 'section[aria-label=\"Trending Now\"]', 'section[aria-label=\"Editor\\'s Pick\"]', '.thumbBlock', 'main .grid > [style*=\"grid-area:sidebar\"]']; const v = (s) => [...document.querySelectorAll(s)].filter((e) => e.checkVisibility()).length; return v(T[0]) >= 3 && T.slice(1).every((s) => v(s) >= 1); })()",
+    "expect": "(() => { const T = ['section[aria-label=\"Advertisement\"]', 'section[aria-label=\"Your News\"]', 'section[aria-label=\"Trending Now\"]', 'section[aria-label=\"Editor\\'s Pick\"]', '.thumbBlock', 'main .grid > [style*=\"grid-area:sidebar\"]']; const all = (s) => [...document.querySelectorAll(s)]; return all(T[0]).length >= 3 && T.every((s) => all(s).length > 0 && all(s).every((e) => !e.checkVisibility())); })()",
+    "intact": "(() => { const v = (s) => [...document.querySelectorAll(s)].filter((e) => e.checkVisibility()).length; return v('section[data-testid=\"current-conditions\"]') === 1 && v('section[data-testid=\"daily-forecast\"]') === 1 && v('section[data-testid=\"daily-forecast\"] [data-testid=\"TemperatureValue\"]') >= 10 && document.querySelector('section[data-testid=\"daily-forecast\"]').getBoundingClientRect().width > 600; })()"
+  }
+}

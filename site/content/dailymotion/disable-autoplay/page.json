@@ -1,0 +1,45 @@
+{
+  "slug": "disable-autoplay",
+  "title": "Stop Dailymotion autoplay",
+  "question": "How do I turn off autoplay on Dailymotion?",
+  "answer": "Install a userscript that pauses videos when they start on their own. A logged-out visitor gets no autoplay switch on Dailymotion's watch page, and videos start muted as soon as the page opens. The usermods script on this page pauses each video the first time it starts on its own, and the ad in front of it if one plays, so nothing runs until you press play. The next video in the queue gets the same treatment.",
+  "prompt": "Stop Dailymotion videos from playing automatically when I open a video page.",
+  "details": "The player sits in an iframe on geo.dailymotion.com, so the script does not touch it directly. It uses the player API that Dailymotion's own page loads (`window.dailymotion`): when a video or ad starts, it calls `pause()` once for that video, then leaves the player alone so your play button works normally.\n\nIf your browser already blocks autoplay, the first start is your own click. The script sees the click move focus into the player and lets that video play instead of pausing it.\n\nThe check opens a video page and confirms the video is paused near the start, then plays it to confirm playback still works. It does not cover the click case, the queue's next video or embedded players on other sites.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Browser autoplay setting",
+      "body": "Firefox can block audio and video autoplay per site: **Settings** > **Privacy & Security** > **Permissions** > **Autoplay**. Dailymotion starts videos muted, and Firefox's default setting only blocks autoplay with sound, so choose **Block Audio and Video**."
+    }
+  ],
+  "related": [
+    "dailymotion/force-quality",
+    "dailymotion/full-window-player"
+  ],
+  "demand": {
+    "score": 48,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/33276",
+        "note": "Greasy Fork total installs: \"Dailymotion disable autoplay\" (774)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=dailymotion%20disable%20autoplay",
+        "note": "Google suggests: dailymotion disable autoplay, dailymotion embed disable autoplay"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.dailymotion.com/video/x7tgad0"
+    ],
+    "loggedOut": true,
+    "waitFor": "#player-wrapper iframe.dailymotion-player",
+    "settleMs": 6000,
+    "baseline": "(async () => { const s = await (await dailymotion.getPlayer()).getState(); return s.videoId === 'x7tgad0' && (s.playerIsPlaying || s.adIsPlaying) && s.videoTime + s.adTime > 1; })()",
+    "expect": "(async () => { const s = await (await dailymotion.getPlayer()).getState(); return s.videoId === 'x7tgad0' && !s.playerIsPlaying && !s.adIsPlaying && s.videoTime < 3 && !s.playerError; })()",
+    "intact": "(async () => { const p = await dailymotion.getPlayer(); p.play(); await new Promise((r) => setTimeout(r, 4000)); const s = await p.getState(); return s.playerIsPlaying || s.adIsPlaying; })()"
+  }
+}

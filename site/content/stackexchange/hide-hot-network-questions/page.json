@@ -1,0 +1,55 @@
+{
+  "slug": "hide-hot-network-questions",
+  "title": "Hide Hot Network Questions on Stack Exchange",
+  "question": "How do I hide the Hot Network Questions sidebar on Stack Exchange sites?",
+  "answer": "With an account, each site has an option under Settings, then Preferences, to hide Hot Network Questions. Logged out there is no switch. The usermods script on this page hides the Hot Network Questions list in the sidebar on every *.stackexchange.com site, Super User, Server Fault, Ask Ubuntu and MathOverflow, and leaves linked and related questions in place. A uBlock Origin filter with the same selector also works.",
+  "prompt": "Hide the Hot Network Questions list on all Stack Exchange sites.",
+  "details": "The list has the same id on every site of the network, `#hot-network-questions`, so one CSS rule hides it before it shows. Stack Overflow has its own page and script. The check loads a Super User question and a Web Applications Stack Exchange question.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Preferences",
+      "body": "Logged in: **Settings** > **Preferences**, then the option to hide the Hot Network Questions. It applies to that site's account."
+    },
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filter",
+      "body": "Works on every Stack Exchange site. Our check runs the script, not this filter.\n\n```\n###hot-network-questions\n```"
+    }
+  ],
+  "related": [
+    "stackoverflow/hide-hot-network-questions"
+  ],
+  "check": {
+    "urls": [
+      "https://superuser.com/questions/1157967/how-to-block-hot-network-questions-in-the-sidebar-of-stack-exchange-network",
+      "https://webapps.stackexchange.com/questions/97983/permanently-exclude-blacklist-site-from-search-results-on-duckduckgo"
+    ],
+    "loggedOut": true,
+    "waitFor": "#question",
+    "settleMs": 4000,
+    "baseline": "(() => { const h = document.querySelector('#hot-network-questions'); return !!h && h.checkVisibility() && /Hot Network Questions/.test(h.textContent); })()",
+    "expect": "(() => { const h = document.querySelector('#hot-network-questions'); const related = document.querySelector('#sidebar .sidebar-related'); return !!h && /Hot Network Questions/.test(h.textContent) && !h.checkVisibility() && !!related && related.checkVisibility(); })()",
+    "intact": "(() => { const q = document.querySelector('#question .s-prose'); const answers = [...document.querySelectorAll('#answers .answer')].filter((a) => a.checkVisibility()); return !!q && q.checkVisibility() && answers.length >= 1; })()"
+  },
+  "demand": {
+    "score": 31,
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/ibbknnfapdceeimnbmfhmjfolmifcmcf",
+        "note": "Anti-distractor for Stack Exchange (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=stack%20exchange%20hot%20network%20questions",
+        "note": "returns the query; suggestions: hot network questions | stack overflow hot network questions | stack exchange hot network questions | what are the basic networking questions | hot questions meaning"
+      },
+      {
+        "type": "forum",
+        "url": "https://superuser.com/questions/1157967/how-to-block-hot-network-questions-in-the-sidebar-of-stack-exchange-network",
+        "note": "superuser.com question: How to block Hot Network Questions in the sidebar of Stack Exchange network?"
+      }
+    ]
+  }
+}

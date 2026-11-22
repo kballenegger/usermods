@@ -1,0 +1,12 @@
+{
+  "slug": "only-fails",
+  "title": "Remove sidebar",
+  "question": "How do I Remove sidebar on forum?",
+  "answer": "Install the usermods script on this page to Remove sidebar. It hides the element with injected CSS and keeps working as the page loads more content. Without usermods, a uBlock Origin cosmetic filter does the same job.",
+  "prompt": "Remove sidebar on this site.",
+  "details": "Hides **one** element. Leaves the rest alone.",
+  "alternatives": [{ "kind": "ublock", "title": "Filter", "body": "```\nforum.example##.thing\n```" }],
+  "related": ["tube/hide-shorts"],
+  "check": { "urls": ["https://forum.example/"], "loggedOut": true, "settleMs": 100,
+    "baseline": "!!document.querySelector('.thing')", "expect": "!document.querySelector('.thing')", "intact": "true" }
+}

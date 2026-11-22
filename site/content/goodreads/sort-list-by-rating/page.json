@@ -1,0 +1,47 @@
+{
+  "slug": "sort-list-by-rating",
+  "title": "Sort Goodreads lists by rating",
+  "question": "Can I sort a Goodreads list by average rating?",
+  "answer": "Goodreads lists have no sort option; books are always shown in order of list score, which comes from votes. The usermods script on this page adds three buttons above the list: Average rating, Number of ratings and List order. Clicking one reorders the 100 books on the current page. It does not fetch other pages, so a long list is sorted one page at a time. Without a script, the list itself cannot be re-sorted.",
+  "prompt": "Add buttons to Goodreads lists that sort the books on the page by average rating or number of ratings.",
+  "details": "The script reads the \"avg rating\" and \"ratings\" numbers already printed under each book and moves the table rows. Books with the same average are ordered by number of ratings. List order puts the rows back as Goodreads sent them. The choice is not remembered; each page opens in list order.\n\nOnly the books on the page you are viewing are sorted, because getting the rest of the list would mean fetching every page.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Shelves instead of lists",
+      "body": "Your own shelves (My Books) can be sorted by average rating. Lists made by other people cannot."
+    }
+  ],
+  "related": [
+    "goodreads/library-links",
+    "goodreads/series-primary-works",
+    "goodreads/wide-layout"
+  ],
+  "demand": {
+    "score": 47,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/11620",
+        "note": "Goodreads - Sort lists by rating or votes (631 total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=goodreads%20sort%20list%20by%20rating",
+        "note": "suggestions: goodreads sort list by rating, goodreads top rated all time, goodreads sort by number of ratings, goodreads average rating"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.goodreads.com/list/show/1.Best_Books_Ever"
+    ],
+    "loggedOut": true,
+    "waitFor": "table.tableList .minirating",
+    "settleMs": 2000,
+    "actions": "document.querySelector('.um-sort-bar button[data-um-sort=\"rating\"]')?.click();",
+    "baseline": "(() => { const v = [...document.querySelectorAll('table.tableList tr')].filter((r) => r.checkVisibility()).map((r) => parseFloat((r.querySelector('.minirating')?.textContent.match(/([\\d.]+)\\s+avg rating/) || [])[1])); return v.length >= 50 && v.every((x) => x > 0) && v.some((x, i) => i > 0 && x > v[i - 1]); })()",
+    "expect": "(() => { const bar = document.querySelector('.um-sort-bar'); if (!bar || !bar.checkVisibility() || bar.querySelector('[data-um-sort=\"rating\"]').getAttribute('aria-pressed') !== 'true') return false; const v = [...document.querySelectorAll('table.tableList tr')].filter((r) => r.checkVisibility()).map((r) => parseFloat((r.querySelector('.minirating')?.textContent.match(/([\\d.]+)\\s+avg rating/) || [])[1])); return v.length >= 50 && v.every((x, i) => x > 0 && (i === 0 || x <= v[i - 1])) && v[0] > v[v.length - 1]; })()",
+    "intact": "[...document.querySelectorAll('table.tableList tr a.bookTitle')].filter((a) => a.checkVisibility()).length === document.querySelectorAll('table.tableList tr').length && document.querySelectorAll('table.tableList tr').length >= 50"
+  }
+}

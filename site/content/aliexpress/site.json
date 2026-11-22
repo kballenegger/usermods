@@ -1,0 +1,7 @@
+{
+  "slug": "aliexpress",
+  "name": "AliExpress",
+  "domains": ["aliexpress.com", "www.aliexpress.com"],
+  "category": "shopping",
+  "intro": "Userscripts for shopping on AliExpress in a desktop browser: shorter links and less of the site getting in the way."
+}

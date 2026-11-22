@@ -1,0 +1,51 @@
+{
+  "slug": "declutter",
+  "title": "Declutter DuckDuckGo search results",
+  "question": "How do I make DuckDuckGo results cleaner?",
+  "answer": "DuckDuckGo's settings can turn off ads, Search Assist and some instant answers, but not the page furniture around the results. The usermods script on this page hides the Private badge above the results, the floating Share Feedback button, the \"Was this helpful?\" prompts and, when it appears, the \"Protection. Privacy. Peace of mind.\" slogan in the header. Results, tabs, filters and the search box stay as they are.",
+  "prompt": "Clean up DuckDuckGo results: hide the slogan, the Private badge and the feedback buttons.",
+  "details": "One CSS rule, applied before the page draws. DuckDuckGo's class names are generated, so the rule picks elements by their `data-testid` and, for the slogan, by its link to `/compare-privacy`.\n\nIt leaves the results, the tab bar, the region, safe search and date filters, and the search box alone. Ads and AI answers have their own scripts on this site.\n\nDuckDuckGo does not show the slogan on every load, so the check requires the badge and the feedback button and checks the slogan only when it is there.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "DuckDuckGo settings",
+      "body": "At duckduckgo.com/settings you can turn off ads and change which answers appear. Those settings don't cover the slogan, the badge or the feedback prompts."
+    },
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filters",
+      "body": "The same selectors as filters. Our check runs the script, not these filters.\n\n```\nduckduckgo.com##.header--aside__item:has(> a[href=\"/compare-privacy\"])\nduckduckgo.com##[data-testid=\"privacy-reminder\"]\nduckduckgo.com##[data-testid=\"floating-feedback-prompt\"]\nduckduckgo.com##[data-testid=\"feedback-prompt\"]\n```"
+    }
+  ],
+  "related": [
+    "duckduckgo/remove-ads",
+    "duckduckgo/hide-ai",
+    "duckduckgo/google-button"
+  ],
+  "demand": {
+    "score": 46,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/373583",
+        "note": "Greasy Fork total installs: \"DuckDuckGo layout cleaner\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/371791",
+        "note": "Greasy Fork total installs: \"DuckDuckGo Meaningless Things Remover\" (read via api.greasyfork.org, 2026-11-17)"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://duckduckgo.com/?q=how+to+bake+bread&kl=us-en"
+    ],
+    "loggedOut": true,
+    "waitFor": "[data-testid=\"result\"]",
+    "settleMs": 4000,
+    "baseline": "(() => { const badge = document.querySelector('[data-testid=\"privacy-reminder\"]'); const fb = document.querySelector('[data-testid=\"floating-feedback-prompt\"]'); return !!badge && badge.checkVisibility() && !!fb && fb.checkVisibility() && /Share Feedback/.test(fb.textContent); })()",
+    "expect": "(() => { const els = [document.querySelector('[data-testid=\"privacy-reminder\"]'), document.querySelector('[data-testid=\"floating-feedback-prompt\"]'), ...document.querySelectorAll('[data-testid=\"feedback-prompt\"], .header--aside a[href=\"/compare-privacy\"]')]; return els.length >= 3 && els.every((e) => e && !e.checkVisibility()); })()",
+    "intact": "(() => { const results = [...document.querySelectorAll('[data-testid=\"result\"]')].filter((r) => r.checkVisibility()); const tabs = document.querySelector('[data-testid=\"duckbar\"] nav'); const box = document.querySelector('#search_form_input'); return results.length >= 5 && !!tabs && tabs.checkVisibility() && !!box && box.checkVisibility(); })()"
+  }
+}

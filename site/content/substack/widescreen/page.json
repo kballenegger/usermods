@@ -1,0 +1,31 @@
+{
+  "slug": "widescreen",
+  "title": "Make Substack posts wider",
+  "question": "How do I make Substack articles use more of the screen?",
+  "answer": "Substack has no reader setting for the width of a post; the text column is fixed at 728 pixels whatever the size of your window. The usermods script on this page widens that column to as much as 1100 pixels, with the title, body text and images following it, and keeps a margin on narrower windows. Without a script, zooming the browser in also makes the column wider on screen, but the text gets bigger with it.",
+  "prompt": "Make Substack posts use more of the screen width.",
+  "details": "The script sets the width of `.single-post-container > .container`, the box that holds a Substack post, to 1100 pixels or the window width minus 64 pixels, whichever is smaller. The post header, body, images and comments inherit the new width. Line length grows with it; if lines feel too long, edit `1100px` in the script to a smaller number.\n\nIt loads on every page of a `*.substack.com` publication, because Substack opens a post from the home page without a full page load, but the selector only exists on post pages (`/p/...`), so nothing else changes. Publications on their own domain need that domain added as an extra `@match` line. The check loads one post directly, logged out; it does not cover opening a post from the home page.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Firefox reader view",
+      "body": "Firefox reader view re-flows a Substack post into its own layout, where the text settings include content width."
+    }
+  ],
+  "related": ["substack/dismiss-popups", "substack/disable-quote-popup"],
+  "demand": {
+    "score": 30,
+    "evidence": [
+      { "type": "greasyfork", "url": "https://greasyfork.org/en/scripts/542170", "note": "Greasy Fork total installs: \"Blog Widescreen Responsive\" (101)" }
+    ]
+  },
+  "check": {
+    "urls": ["https://garymarcus.substack.com/p/report-from-the-vatican"],
+    "loggedOut": true,
+    "waitFor": ".body.markup p",
+    "settleMs": 3000,
+    "baseline": "(() => { const a = document.querySelector('article.post'); return !!a && a.getBoundingClientRect().width <= 760; })()",
+    "expect": "(() => { const a = document.querySelector('article.post'); const r = a && a.getBoundingClientRect(); return !!r && r.width >= 1000 && r.left >= 0 && r.right <= window.innerWidth; })()",
+    "intact": "(() => { const ps = [...document.querySelectorAll('.body.markup p')].filter((p) => p.checkVisibility()); return ps.length >= 5 && ps[0].getBoundingClientRect().width >= 1000 && !!document.querySelector('h1.post-title')?.checkVisibility(); })()"
+  }
+}

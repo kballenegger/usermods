@@ -1,0 +1,47 @@
+{
+  "slug": "hide-unused-languages",
+  "title": "Hide unused languages on Wikipedia",
+  "question": "How do I show only my languages in Wikipedia's language list?",
+  "answer": "Wikipedia has no setting that limits the language menu to your languages; it lists every edition of the article, with a short suggested list at the top. The usermods script on this page hides every entry in the language menu except the languages you list at the top of the script and the ones set in your browser. The menu, its search box and the article stay as they are. Without an extension, type the language's name into the menu's search box.",
+  "prompt": "On Wikipedia, hide every language in the languages menu except German, French and Spanish.",
+  "details": "Each entry in the language menu is a list item with a class naming its wiki, such as `interwiki-de`. The script builds one CSS rule that hides every entry whose code is not in its list, so it works in both the menu dialog and the plain list Wikipedia shows before its scripts load. Edit `KEEP` at the top of the script to pick your languages; it uses the code from the wiki's address (`de` for de.wikipedia.org, `simple` for Simple English). Your browser's languages are added automatically. The count on the button (\"295 languages\") does not change. The check opens the language menu on the English article about the Moon.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Search in the language menu",
+      "body": "The language menu has a search box and a short list of suggested languages at the top. Neither hides the others."
+    },
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filter",
+      "body": "Keeps only German, French and Spanish. Our check runs the script, not this filter.\n\n```\nwikipedia.org##li.interlanguage-link:not(.interwiki-de):not(.interwiki-fr):not(.interwiki-es)\n```"
+    }
+  ],
+  "related": [
+    "wikipedia/full-width",
+    "wikipedia/dark-mode",
+    "wikipedia/old-layout"
+  ],
+  "demand": {
+    "score": 30,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/39535",
+        "note": "Greasy Fork total installs: \"Wikipedia hide unused languages\" (read via api.greasyfork.org, 2026-11-17)"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://en.wikipedia.org/wiki/Moon"
+    ],
+    "loggedOut": true,
+    "waitFor": "#p-lang-btn-checkbox",
+    "settleMs": 3000,
+    "actions": "document.querySelector('#p-lang-btn-checkbox').click();",
+    "baseline": "new Promise((r) => setTimeout(r, 3000)).then(() => [...document.querySelectorAll('li.interlanguage-link')].filter((e) => e.checkVisibility()).length >= 200)",
+    "expect": "new Promise((r) => setTimeout(r, 3000)).then(() => { const all = [...document.querySelectorAll('li.interlanguage-link')]; const vis = all.filter((e) => e.checkVisibility()); const codes = new Set(vis.map((e) => [...e.classList].find((c) => c.startsWith('interwiki-')))); return all.length >= 200 && vis.length >= 3 && [...codes].every((c) => ['interwiki-de', 'interwiki-fr', 'interwiki-es'].includes(c)) && codes.size === 3; })",
+    "intact": "(() => { const search = document.querySelector('.uls-rewrite input.cdx-text-input__input'); const paras = [...document.querySelectorAll('#mw-content-text p')].filter((p) => p.checkVisibility() && p.textContent.trim().length > 50); return document.querySelector('#firstHeading').checkVisibility() && !!search && search.checkVisibility() && paras.length >= 10; })()"
+  }
+}

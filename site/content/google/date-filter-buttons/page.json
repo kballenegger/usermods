@@ -1,0 +1,49 @@
+{
+  "slug": "date-filter-buttons",
+  "title": "Add one-click date filter buttons to Google Search",
+  "question": "How do I quickly filter Google results by date?",
+  "answer": "Google's date filter is under Tools, then Any time, under the search box, and it takes three clicks. The usermods script on this page adds a row of links above the results (Any time, Past hour, Past 24 hours, Past week, Past month and Past year) that reload the same search with that date range. Install it with usermods or any userscript manager. Without a script, adding &tbs=qdr:w to a search URL limits it to the past week.",
+  "prompt": "Add buttons for past hour, day, week, month and year above Google search results.",
+  "details": "Each link is the current search with Google's `tbs=qdr:` parameter set (`h`, `d`, `w`, `m` or `y`), the same parameter the Tools menu sets. The active range is shown in bold. Any time removes the parameter. Other filters in `tbs`, such as Verbatim, are dropped when you pick a range.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Tools menu",
+      "body": "Click **Tools** under the search box, then **Any time**, and pick a range."
+    },
+    {
+      "kind": "other",
+      "title": "URL parameter",
+      "body": "Add `&tbs=qdr:d` (day), `qdr:w` (week), `qdr:m` (month) or `qdr:y` (year) to a search URL. A custom search engine in your browser can use it by default."
+    }
+  ],
+  "related": [
+    "google/web-results-only"
+  ],
+  "demand": {
+    "score": 76,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/7543",
+        "note": "Greasy Fork total installs: \"Google Search Extra Buttons\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=google+search+filter+by+date",
+        "note": "suggests \"google search sort by date\""
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.google.com/search?q=how+to+bake+bread&hl=en&gl=us"
+    ],
+    "loggedOut": true,
+    "waitFor": "#rso",
+    "settleMs": 4000,
+    "baseline": "(() => { const tools = [...document.querySelectorAll('div, span')].some((e) => e.children.length === 0 && e.textContent.trim() === 'Tools' && e.checkVisibility()); const oneClick = [...document.querySelectorAll('a[href*=\"tbs=qdr\"]')].some((a) => a.checkVisibility()); return tools && !oneClick; })()",
+    "expect": "(() => { const bar = document.getElementById('usermods-date-bar'); if (!bar || !bar.checkVisibility()) return false; const want = { 'Past hour': 'qdr:h', 'Past 24 hours': 'qdr:d', 'Past week': 'qdr:w', 'Past month': 'qdr:m', 'Past year': 'qdr:y' }; const links = [...bar.querySelectorAll('a')]; return Object.entries(want).every(([label, tbs]) => links.some((a) => { const u = new URL(a.href); return a.textContent === label && a.checkVisibility() && u.pathname === '/search' && u.searchParams.get('q') === 'how to bake bread' && u.searchParams.get('tbs') === tbs; })); })()",
+    "intact": "[...document.querySelectorAll('#rso a h3')].filter((h) => h.checkVisibility() && !h.closest('[data-text-ad]')).length >= 5"
+  }
+}

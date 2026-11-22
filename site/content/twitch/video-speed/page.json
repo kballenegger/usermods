@@ -1,0 +1,52 @@
+{
+  "slug": "video-speed",
+  "title": "Change playback speed on Twitch",
+  "question": "How do I speed up or slow down Twitch VODs?",
+  "answer": "On a past broadcast or highlight, open the gear menu under the video and pick Playback Speed, which goes from 0.25x to 2x. Live streams have no speed option, and the player puts any change back to 1x. The usermods script on this page adds keyboard shortcuts for videos: Shift+. speeds up and Shift+, slows down in 0.25x steps, with the current speed shown briefly on the player. Install it with usermods or any userscript manager.",
+  "prompt": "Add keyboard shortcuts to speed up and slow down Twitch videos.",
+  "details": "Press Shift+. (the `>` key) to go 0.25x faster and Shift+, (the `<` key) to go 0.25x slower, between 0.25x and 2x. Twitch's player caps the speed at 2x and resets anything higher, so the script stops there. Keys typed into chat or the search box are ignored.\n\nThe check loads a highlight video, presses `>` three times and confirms the video plays at 1.75x. On live streams Twitch puts the speed back to 1x within a second, so the shortcuts have no lasting effect there.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Playback Speed menu on videos",
+      "body": "On past broadcasts, highlights and clips, click the gear icon under the video and choose Playback Speed. It offers 0.25x to 2x and is not available on live streams."
+    },
+    {
+      "kind": "extension",
+      "title": "Video speed extensions",
+      "body": "General video speed extensions such as Video Speed Controller change the speed of any HTML5 video, Twitch included."
+    }
+  ],
+  "related": [
+    "twitch/theater-mode",
+    "twitch/scroll-volume",
+    "twitch/disable-autoplay"
+  ],
+  "demand": {
+    "score": 47,
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/dgjocohogmiejchbpofpgkiggoandgal",
+        "note": "Twitching (642 users)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=twitch%20playback%20speed",
+        "note": "suggestions: twitch playback speed | twitch playback speed shortcut | twitch playback speed extension | twitch vod speed shortcut | twitch vod speed"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.twitch.tv/videos/1627844339"
+    ],
+    "loggedOut": true,
+    "waitFor": "video",
+    "settleMs": 5000,
+    "actions": "for (let i = 0; i < 3; i++) document.body.dispatchEvent(new KeyboardEvent('keydown', { key: '>', code: 'Period', shiftKey: true, bubbles: true }));",
+    "baseline": "(() => { const v = document.querySelector('video'); return !!v && v.checkVisibility() && v.readyState > 0 && v.playbackRate === 1; })()",
+    "expect": "(() => { const v = document.querySelector('video'); return !!v && v.playbackRate === 1.75; })()",
+    "intact": "(() => { const v = document.querySelector('video'); if (!v || !v.checkVisibility()) return false; const r = v.getBoundingClientRect(); return r.width > 500 && r.height > 250 && v.readyState > 0; })()"
+  }
+}

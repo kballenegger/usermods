@@ -1,0 +1,56 @@
+{
+  "slug": "dark-mode",
+  "title": "Force dark mode on Google Search",
+  "question": "How do I make Google Search dark mode?",
+  "answer": "Google Search has a dark theme. By default it follows your device theme, and the theme choice in Google's quick settings (the gear on a results page) turns it on for that browser, with or without an account. When Google still serves the light page, the usermods script on this page turns the results page dark by inverting its colours and turning pictures, video and maps back to normal. It checks the page's background first and leaves a page that Google already served dark alone.",
+  "prompt": "Make Google search results dark even when Google shows the light theme.",
+  "details": "Google decides light or dark on its server, so a script can't switch on Google's own dark styles. The script inverts the page with a CSS filter and rotates the hues back, so the white background turns dark grey-black and blue links stay blue. Images, video, canvas and background pictures get a second inversion so they look normal.\n\nBefore inverting, the script reads the page's background colour. If Google already served its dark theme, from your Google setting or your device theme, the background is dark and the script does nothing. It checks again when the device theme changes. The colours are an inversion, not Google's own dark palette, so some greys and accents differ from the real dark theme. It runs on search result pages, not the Google home page. The check covers the light page on a light device, not a page Google served dark.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Google's dark theme",
+      "body": "On a results page open the **Settings** gear and choose the dark theme there. Logged out, the choice is saved for that browser; signed in, it follows your account. The default follows your device theme."
+    },
+    {
+      "kind": "other",
+      "title": "Switch the device or browser to dark",
+      "body": "With Google's theme left on **Device default**, setting your operating system or browser to dark makes Google Search dark too."
+    }
+  ],
+  "related": [
+    "google/remove-ai-overview",
+    "google/hide-sponsored",
+    "google-maps/dark-mode"
+  ],
+  "demand": {
+    "score": 74,
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/dark-theme-for-google/apiabgjfojnkcepfmbdechlhfocpeenc",
+        "note": "Chrome Web Store users: \"Dark Theme for Google™\" (2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/371272",
+        "note": "Greasy Fork total installs: \"Google Search Dark Night Mode Theme\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=google+search+dark+mode",
+        "note": "suggests \"google search dark mode not working\""
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.google.com/search?q=how+to+bake+bread&hl=en&gl=us"
+    ],
+    "loggedOut": true,
+    "waitFor": "#rso",
+    "settleMs": 4000,
+    "baseline": "(() => { const lum = (c) => { const m = c.match(/\\d+/g).map(Number); return (m[0] + m[1] + m[2]) / 3; }; return lum(getComputedStyle(document.body).backgroundColor) > 200 && !/invert/.test(getComputedStyle(document.documentElement).filter); })()",
+    "expect": "(() => { const lum = (c) => { const m = c.match(/\\d+/g).map(Number); return (m[0] + m[1] + m[2]) / 3; }; const pageInverted = /invert\\(1\\)/.test(getComputedStyle(document.documentElement).filter); const bgLight = lum(getComputedStyle(document.body).backgroundColor) > 200; const imgs = [...document.querySelectorAll('#rso img')].filter((i) => i.checkVisibility()); return pageInverted && bgLight && imgs.length > 0 && imgs.every((i) => /invert\\(1\\)/.test(getComputedStyle(i).filter) || /invert\\(1\\)/.test(getComputedStyle(i.closest('picture, g-img, [style*=\"background-image\"]') || i).filter)); })()",
+    "intact": "[...document.querySelectorAll('#rso a h3')].filter((h) => h.checkVisibility()).length >= 5"
+  }
+}

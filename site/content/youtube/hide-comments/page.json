@@ -1,0 +1,56 @@
+{
+  "slug": "hide-comments",
+  "title": "Hide YouTube comments",
+  "question": "How do I hide the comments on YouTube videos?",
+  "answer": "YouTube has no setting that hides comments for viewers; only the channel owner can turn them off. The usermods script on this page hides the comments section under every video, including the comment count, sort menu and comment box, and the comments side panel in YouTube's newer watch layout. The video, description and recommended videos stay. Install it with usermods or any userscript manager.",
+  "prompt": "Hide the comments section under YouTube videos.",
+  "details": "The script is CSS only and loads before YouTube draws the page, so comments never flash on screen. Because the section is hidden before it scrolls into view, YouTube does not load the comments either.\n\nYouTube is testing two watch-page layouts: the classic one with comments under the video, and a newer one where comments open in a side panel. The script hides both. The check loads whichever layout YouTube serves that day, so a single run covers only one of them. Live chat on streams is a separate panel and stays.",
+  "alternatives": [
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filters",
+      "body": "Add these under *My filters* in uBlock Origin. They use the same selectors as the script; our check runs the script, not these filters.\n\n```\nwww.youtube.com##ytd-comments#comments\nwww.youtube.com##ytd-engagement-panel-section-list-renderer[target-id=\"engagement-panel-comments-section\"]\n```"
+    }
+  ],
+  "related": [
+    "youtube/hide-recommendations",
+    "youtube/hide-shorts"
+  ],
+  "demand": {
+    "score": 65,
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/bnbnjkiglooccambmgnmbepaofnjjjpl",
+        "note": "Turn Off YouTube Comments & Live Chat (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/bgeoifdgcnafonfffcmlcjbeldhocnpd",
+        "note": "Hide YouTube Comments (users, read on the store search page for 'hide youtube comments')"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=hide%20youtube%20comments",
+        "note": "returns the query; suggestions: hide youtube comments | hide youtube comments extension | hide youtube comments firefox | hide youtube comments extension firefox | hide youtube comments chrome extension"
+      },
+      {
+        "type": "thread",
+        "url": "https://webapps.stackexchange.com/questions/41340",
+        "note": "How do you show/hide comments on videos?"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    ],
+    "loggedOut": true,
+    "waitFor": "#movie_player video",
+    "settleMs": 4000,
+    "actions": "window.scrollTo(0, 900); await new Promise((r) => setTimeout(r, 5000));",
+    "baseline": "[...document.querySelectorAll('ytd-comment-thread-renderer')].filter((e) => e.checkVisibility()).length >= 3",
+    "expect": "(() => { const boxes = [...document.querySelectorAll('ytd-comments#comments, ytd-engagement-panel-section-list-renderer[target-id=\"engagement-panel-comments-section\"]')]; return boxes.length > 0 && boxes.every((b) => !b.checkVisibility()) && [...document.querySelectorAll('ytd-comment-thread-renderer')].every((e) => !e.checkVisibility()); })()",
+    "intact": "document.querySelector('#movie_player video').checkVisibility() && [...document.querySelectorAll('yt-lockup-view-model')].filter((e) => e.checkVisibility()).length >= 5"
+  }
+}

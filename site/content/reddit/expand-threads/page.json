@@ -1,0 +1,50 @@
+{
+  "slug": "expand-threads",
+  "title": "Expand all Reddit comments",
+  "question": "How do I expand all comments on a Reddit thread?",
+  "answer": "Reddit has no setting to load a whole comment thread at once; it hides deeper replies behind \"more replies\" buttons and later comments behind \"View more comments\". The usermods script on this page clicks those controls for you on every post page, and keeps going as new ones appear, until the full thread is loaded. Install it with usermods or any userscript manager. Without a userscript, you have to click each button by hand.",
+  "prompt": "On Reddit post pages, automatically load all the hidden replies and more comments so the whole thread is visible.",
+  "details": "Each \"N more replies\" and \"View more comments\" control on a post page is a `faceplate-partial` element that loads from Reddit's more-comments endpoint. The script clicks the button inside each one once, the same request a manual click makes, and watches the page so that controls inside newly loaded replies are clicked too. It only acts on `/comments/` pages and works across Reddit's in-page navigation.\n\nIt does not follow \"Continue this thread\" links, which open a separate page, and it does not reopen comments that Reddit collapses by default. On threads with thousands of comments it makes many requests in a row and the page gets long.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Sort and click by hand",
+      "body": "Without a script, each \"more replies\" button has to be clicked separately. Sorting by Top or Best keeps the most-voted replies in the part Reddit loads first."
+    }
+  ],
+  "related": [
+    "reddit/hide-promoted",
+    "reddit/remove-sidebar"
+  ],
+  "demand": {
+    "score": 59,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/5578",
+        "note": "Reddit - Load 'Continue this thread' inline (4,155 total installs)"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/njmimaecgocggclbecipdimilidimlpl",
+        "note": "Reddit Comment Collapser (4,000 users), the inverse control"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=reddit%20expand%20all%20comments",
+        "note": "suggestions: reddit expand all comments, reddit expand all comments extension, reddit expand all comments by default, reddit show all comments"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.reddit.com/r/AskReddit/comments/draola/how_would_you_feel_about_a_feature_where_if/"
+    ],
+    "loggedOut": true,
+    "waitFor": "shreddit-comment",
+    "settleMs": 10000,
+    "baseline": "[...document.querySelectorAll('faceplate-partial[src*=\"/more-comments/\"]')].some((p) => p.checkVisibility()) && document.querySelectorAll('shreddit-comment').length < 150",
+    "expect": "document.querySelectorAll('shreddit-comment').length >= 150",
+    "intact": "[...document.querySelectorAll('shreddit-comment')].filter((c) => c.checkVisibility()).length >= 150 && document.querySelector('shreddit-post')?.checkVisibility() === true"
+  }
+}

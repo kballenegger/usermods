@@ -1,0 +1,66 @@
+{
+  "slug": "always-theater-mode",
+  "title": "Always open YouTube in theater mode",
+  "question": "How do I make YouTube always use theater mode?",
+  "answer": "YouTube has no setting to always use theater mode. It remembers your last choice in a cookie, so the wider player is lost whenever cookies are cleared or you use a private window. The usermods script on this page clicks the player's theater button each time a video page opens, so every video starts in theater mode, and you can still switch back for one video. Without an extension, press T on a video page to toggle theater mode.",
+  "prompt": "Always open YouTube videos in theater mode.",
+  "details": "The script clicks the same theater button you would (the one the T key presses), so YouTube resizes the player and stores the choice its usual way. The player ignores clicks until it has finished loading, so the script tries again, at most once a second, until the page is in theater mode. It does this once for each video you open, including videos opened from inside YouTube without a page reload. If you switch back to the default view, that video stays that way; the next one opens in theater mode again. Full screen is left alone.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "The T key and the theater button",
+      "body": "Press **T** on a video page, or click the rectangle icon at the bottom right of the player. YouTube saves the choice in a `wide` cookie for that browser, so it lasts until the cookie is cleared."
+    },
+    {
+      "kind": "extension",
+      "title": "Theater mode extensions",
+      "body": "Extensions such as *Auto Theater Mode for Youtube* for Chrome do the same thing as this script."
+    }
+  ],
+  "related": [
+    "youtube/resize-player",
+    "youtube/disable-autoplay",
+    "youtube/expand-description"
+  ],
+  "demand": {
+    "score": 70,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/10523",
+        "note": "YouTube - Always Theater Mode (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/480701",
+        "note": "YouTube Theater Plus (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/dgognhgbpdoeidccnbfhohblklhbbomh",
+        "note": "Theater Mode for YouTube\u2122 (large player view) (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/faldmgebjochcokggcfifikdenfekkad",
+        "note": "Auto Theater Mode for Youtube (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20always%20theater%20mode",
+        "note": "returns the query; suggestions: youtube always theater mode | youtube always theater mode firefox | youtube always theatre mode | youtube always in cinema mode | how to make youtube always theater mode"
+      }
+    ]
+  },
+  "check": {
+    "loggedOut": true,
+    "urls": [
+      "https://www.youtube.com/watch?v=jNQXAC9IVRw"
+    ],
+    "waitFor": "#movie_player .ytp-size-button",
+    "settleMs": 4000,
+    "baseline": "!document.querySelector('ytd-watch-flexy').hasAttribute('theater') && document.querySelector('#movie_player').getBoundingClientRect().width < 1100",
+    "expect": "document.querySelector('ytd-watch-flexy').hasAttribute('theater') && document.querySelector('#movie_player').getBoundingClientRect().width > 1300",
+    "intact": "document.querySelector('#movie_player video').checkVisibility() && document.querySelector('ytd-watch-metadata h1').checkVisibility()"
+  }
+}

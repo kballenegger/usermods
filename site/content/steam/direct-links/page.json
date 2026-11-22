@@ -1,0 +1,48 @@
+{
+  "slug": "direct-links",
+  "title": "Skip Steam's link filter warning",
+  "question": "How do I skip the Steam 'you are leaving Steam' link filter page?",
+  "answer": "Steam has no setting to turn off its link filter, but a userscript can point the links straight at their destination. Steam sends outside links through steamcommunity.com/linkfilter, which can stop you on a \"You are about to leave Steam\" warning. The usermods script on this page rewrites those links on the Steam store and community to the real address, and if you open a link filter URL directly it goes straight to the destination.",
+  "prompt": "Make links on Steam go straight to the website instead of through Steam's link filter warning page.",
+  "details": "Steam wraps outside links as `https://steamcommunity.com/linkfilter/?u=<address>` (older ones use `?url=`). The script reads the address out of the link and puts it back as the link target, on page load and whenever new content appears. Only `http` and `https` addresses are followed.\n\nThe warning exists to catch scam and phishing links, which are common in Steam chat and comments. With the script, those links open without that pause.\n\nThe check loads a store game page and confirms the developer's website and social links point straight at their sites. It does not load community pages or a link filter URL.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Copy the address",
+      "body": "The destination is in the link itself, after `?u=`. Right-click, copy the link, and paste the part after `?u=` into the address bar (it is URL-encoded, so `%3A%2F%2F` stands for `://`)."
+    }
+  ],
+  "related": [
+    "steam/steamdb-link",
+    "steam/review-percentage"
+  ],
+  "demand": {
+    "score": 73,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/15857",
+        "note": "Greasy Fork total installs: \"Direct links out\" (36,460), a multi-site script"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/3247",
+        "note": "Greasy Fork total installs: \"Steam Linkfilter Redirector\" (1,261)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=steam%20linkfilter",
+        "note": "Google suggests: steam linkfilter"
+      }
+    ]
+  },
+  "check": {
+    "urls": ["https://store.steampowered.com/app/292030/"],
+    "loggedOut": true,
+    "waitFor": ".details_block",
+    "settleMs": 3000,
+    "baseline": "[...document.querySelectorAll('.details_block a')].filter((a) => a.href.includes('steamcommunity.com/linkfilter/') && a.checkVisibility()).length >= 3",
+    "expect": "(() => { const links = [...document.querySelectorAll('.details_block a')]; return document.querySelectorAll('a[href*=\"/linkfilter/\"]').length === 0 && links.some((a) => a.href === 'https://www.thewitcher.com/witcher3') && links.some((a) => a.href.startsWith('https://discord.gg/')); })()",
+    "intact": "(() => { const p = document.querySelector('#game_area_purchase'); const name = document.querySelector('#appHubAppName'); return !!p && p.checkVisibility() && !!name && /Witcher/.test(name.textContent); })()"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "slug": "hide-shorts",
+  "title": "Hide Shorts",
+  "question": "How do I Hide Shorts on tube?",
+  "answer": "Install the usermods script on this page to Hide Shorts. It hides the element with injected CSS and keeps working as the page loads more content. Without usermods, a uBlock Origin cosmetic filter does the same job.",
+  "prompt": "Hide Shorts on this site.",
+  "details": "Hides **one** element. Leaves the rest alone.",
+  "alternatives": [{ "kind": "ublock", "title": "Filter", "body": "```\ntube.example##.thing\n```" }],
+  "related": ["tube/blocked-later", "tube/never-checked", "tube/fails-now"],
+  "check": { "urls": ["https://tube.example/"], "loggedOut": true, "settleMs": 100,
+    "baseline": "!!document.querySelector('.thing')", "expect": "!document.querySelector('.thing')", "intact": "true" }
+}

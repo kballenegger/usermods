@@ -1,0 +1,61 @@
+{
+  "slug": "open-full-size-image",
+  "title": "Open full-size Instagram images",
+  "question": "How do I view Instagram photos in full size?",
+  "answer": "Instagram already loads a post's photo at full size in the browser, up to 1440 pixels wide, but it covers the photo with an invisible layer, so right-click shows no image options. The usermods script on this page lets clicks pass through that empty layer. Right-click the photo on a post page and choose Open image in new tab or Save image as to get the full-size file. Without an extension, open the browser's developer tools and find the image address in the page source.",
+  "prompt": "On Instagram, let me right-click a photo and open the full-size image in a new tab.",
+  "details": "The script looks at every large photo on screen, asks the browser what sits on top of its center, and makes empty layers there let clicks through. Layers that contain anything, such as carousel arrows, tags and buttons, are left alone, so carousels still work.\n\nOn a post page the photo Instagram loads is the full-size one. In the profile grid and feed, Instagram loads smaller versions, so open the post first. Thumbnails in the grid stay links to their post.\n\nThe check opens a photo post logged out and confirms the photo itself is under the pointer and loaded at 1000 pixels wide or more.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Developer tools",
+      "body": "Right-click the photo and choose **Inspect**. The empty `<div>` that covers the photo is selected; the photo's `<img>` element sits next to it in the same post. Its `src` is the full-size image address; open it in a new tab."
+    },
+    {
+      "kind": "extension",
+      "title": "Image extensions for Instagram",
+      "body": "Extensions such as *Full Size Images for IG* in the Chrome Web Store open Instagram photos at full size. They are not run by our check."
+    }
+  ],
+  "related": [
+    "instagram/remove-login-popup",
+    "instagram/video-controls"
+  ],
+  "demand": {
+    "score": 62,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/25380",
+        "note": "Big Instagram Images (total installs: 2718)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/396337",
+        "note": "Instagram full-size media scroll wall (total installs: 3430)"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/eanpijghoobafibemccmoleollpjhcgg",
+        "note": "Full Size Images for IG (6,000 users)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=instagram%20full%20size%20image",
+        "note": "suggestions: instagram full size image | instagram full size image downloader | instagram full size image viewer | instagram full size image url | instagram full size image upload"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.instagram.com/nasa/p/DfahZrMjAqq/"
+    ],
+    "loggedOut": true,
+    "waitFor": "main img",
+    "settleMs": 6000,
+    "actions": "document.querySelector('[role=\"dialog\"] svg[aria-label=\"Close\"]')?.closest('[role=\"button\"]')?.click(); await new Promise((r) => setTimeout(r, 1500));",
+    "baseline": "(() => { const img = [...document.querySelectorAll('main img')].find((i) => i.getBoundingClientRect().width > 400 && i.checkVisibility()); if (!img) return false; const r = img.getBoundingClientRect(); return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) !== img; })()",
+    "expect": "(() => { const img = [...document.querySelectorAll('main img')].find((i) => i.getBoundingClientRect().width > 400 && i.checkVisibility()); if (!img) return false; const r = img.getBoundingClientRect(); return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) === img && img.naturalWidth >= 1000; })()",
+    "intact": "[...document.querySelectorAll('svg[aria-label=\"Like\"]')].some((s) => s.checkVisibility()) && [...document.querySelectorAll('main a[href*=\"/p/\"], main a[href*=\"/reel/\"]')].filter((a) => a.checkVisibility()).length >= 3"
+  }
+}

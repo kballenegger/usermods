@@ -1,0 +1,49 @@
+{
+  "slug": "images-direct-links",
+  "title": "Open Google Images results directly",
+  "question": "How do I get direct image links in Google Images?",
+  "answer": "Google Images has no setting for direct links; clicking a result opens a preview panel, and the original file is a few more clicks away. The usermods script on this page adds a Full image link to the corner of each result that opens the original image file in a new tab, without the preview. Install it with usermods or any userscript manager. Without a script, open the preview and right-click the large image, then choose Open image in new tab.",
+  "prompt": "Add a link to the full-size image on each Google Images result.",
+  "details": "Google keeps each result's original image address in the page's own data. The script reads it from there and adds a link to every result in the first batch, about 100 images. Results that load as you scroll further down come from a later request the script can't read, so they get no link; reloading the page does not change that.\n\nClicking the link does not open Google's preview. Clicking anywhere else on the tile works as before. The check loads several of the linked files and confirms they are images with the same shape as the thumbnails.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Right-click the preview",
+      "body": "Click a result, wait for the large preview to load, then right-click it and choose **Open image in new tab** or **Copy image address**."
+    }
+  ],
+  "related": [
+    "google/show-image-size"
+  ],
+  "demand": {
+    "score": 67,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/3187",
+        "note": "Greasy Fork total installs: \"Google Images direct link\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/398802",
+        "note": "Greasy Fork total installs: \"Google Images direct links 2\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=google+search+direct+links",
+        "note": "suggests \"google image search direct link\""
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.google.com/search?q=mountain&udm=2&hl=en&gl=us"
+    ],
+    "loggedOut": true,
+    "waitFor": "[data-docid][data-lpage]",
+    "settleMs": 4000,
+    "baseline": "(() => { const tiles = [...document.querySelectorAll('[data-docid][data-lpage]')].filter((t) => t.checkVisibility()); const direct = tiles.some((t) => [...t.querySelectorAll('a[href]')].some((a) => !/(^|\\.)(google|gstatic)\\.com$/.test(a.hostname) && a.href !== t.dataset.lpage)); return tiles.length >= 20 && !direct; })()",
+    "expect": "(async () => { const tiles = [...document.querySelectorAll('[data-docid][data-lpage]')].filter((t) => t.checkVisibility()); const load = (src) => new Promise((ok) => { const i = new Image(); const t = setTimeout(() => ok(null), 15000); i.onload = () => { clearTimeout(t); ok(i); }; i.onerror = () => { clearTimeout(t); ok(null); }; i.src = src; }); const links = tiles.map((t) => [t, t.querySelector('a.usermods-direct')]).filter(([, a]) => a && a.checkVisibility() && /^https?:/.test(a.href)); if (links.length < 20) return false; let good = 0; for (const [t, a] of links.slice(0, 5)) { const thumb = t.querySelector('img'); const img = await load(a.href); if (img && thumb && thumb.naturalWidth > 1 && img.naturalWidth > thumb.naturalWidth && Math.abs(img.naturalWidth / img.naturalHeight - thumb.naturalWidth / thumb.naturalHeight) < 0.05) good++; } return good >= 3; })()",
+    "intact": "(() => { const tiles = [...document.querySelectorAll('[data-docid][data-lpage]')].filter((t) => t.checkVisibility()); return tiles.length >= 20 && tiles.filter((t) => { const i = t.querySelector('img'); return i && i.checkVisibility(); }).length >= 20; })()"
+  }
+}

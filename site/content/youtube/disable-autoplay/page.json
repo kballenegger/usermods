@@ -1,0 +1,76 @@
+{
+  "slug": "disable-autoplay",
+  "title": "Turn off YouTube autoplay",
+  "question": "How do I stop YouTube from autoplaying the next video?",
+  "answer": "Click the autoplay switch in the player's control bar, next to the captions button. Signed in, YouTube remembers that choice for your account; signed out, it comes back on in each new browser session. The usermods script on this page switches autoplay off for you each time YouTube loads, so the next video does not start when one ends. Install it with usermods or any userscript manager.",
+  "prompt": "Turn off YouTube autoplay every time I open YouTube.",
+  "details": "The script clicks YouTube's own autoplay switch, the same as you would, so YouTube stores the choice its usual way. The player can ignore or reset the switch while it is still loading, so the script tries again until the video is playing with autoplay off, then stops.\n\nIt does this once per page load. If you turn autoplay back on, it stays on until you reload or open YouTube again. It does not change playlists, which always play the next item, or the autoplay of the video you open.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "The autoplay switch",
+      "body": "Click the switch at the bottom right of the player, beside the **CC** button. When you are signed in, YouTube saves the setting to your account. Signed out, it resets with each new browser session."
+    }
+  ],
+  "related": [
+    "youtube/hide-end-screens",
+    "youtube/hide-recommendations",
+    "youtube/force-hd-quality"
+  ],
+  "demand": {
+    "score": 75,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/399862",
+        "note": "Kill YouTube Channel Video Autoplay (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/7893",
+        "note": "remove youtube autoplay (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/dinkeiniijmpjehejhedbciaedblhnnk",
+        "note": "Disable Autoplay for YouTube\u2122 (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/bhnhbmjfaanopkalgkjoiemhekdnhanh",
+        "note": "Stop AutoPlay Next for YouTube\u2122 (users, read on the store search page for 'disable youtube autoplay')"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=disable%20autoplay%20youtube",
+        "note": "returns the query; suggestions: disable autoplay youtube | disable autoplay youtube app | disable autoplay youtube music | disable autoplay youtube playlist | disable autoplay youtube extension"
+      },
+      {
+        "type": "thread",
+        "url": "https://webapps.stackexchange.com/questions/136658",
+        "note": "How do I permanently disable youtube autoplay feature?"
+      },
+      {
+        "type": "thread",
+        "url": "https://webapps.stackexchange.com/questions/75150",
+        "note": "Prevent YouTube autoplay"
+      },
+      {
+        "type": "thread",
+        "url": "https://webapps.stackexchange.com/questions/28297",
+        "note": "How do I disable autoplay on YouTube?"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.youtube.com/watch?v=jNQXAC9IVRw"
+    ],
+    "loggedOut": true,
+    "waitFor": "#movie_player .ytp-autonav-toggle-button",
+    "settleMs": 4000,
+    "baseline": "document.querySelector('#movie_player .ytp-autonav-toggle-button').getAttribute('aria-checked') === 'true'",
+    "expect": "document.querySelector('#movie_player .ytp-autonav-toggle-button').getAttribute('aria-checked') === 'false'",
+    "intact": "document.querySelector('#movie_player video').checkVisibility() && document.querySelector('ytd-watch-metadata h1').checkVisibility()"
+  }
+}

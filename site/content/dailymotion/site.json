@@ -1,0 +1,7 @@
+{
+  "slug": "dailymotion",
+  "name": "Dailymotion",
+  "domains": ["dailymotion.com", "www.dailymotion.com"],
+  "category": "video",
+  "intro": "Userscripts for dailymotion.com: a bigger player, no autoplay and a fixed video quality."
+}

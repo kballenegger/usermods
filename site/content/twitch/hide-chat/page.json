@@ -1,0 +1,45 @@
+{
+  "slug": "hide-chat",
+  "title": "Hide chat on Twitch",
+  "question": "How do I hide chat on Twitch?",
+  "answer": "Click the arrow at the top left of the chat column (Collapse Chat). Twitch remembers that in your browser, even logged out, so chat stays collapsed on other channels until you open it again with the arrow at the top right of the player. The usermods script on this page makes collapsed the default: it presses Collapse Chat on every channel page you open, so chat is closed even after you opened it on the last stream, and in a browser where you never collapsed it, such as a private window. Install it with usermods or any userscript manager.",
+  "prompt": "Hide the chat column on Twitch streams and make the video wider.",
+  "details": "Twitch saves whether chat is collapsed in your browser's local storage and applies it on every channel. Opening chat on one stream opens it everywhere. The script clicks Twitch's own **Collapse Chat** button once on each channel page where chat is open, so you can open chat for one stream and have it closed again on the next. Using Twitch's button, rather than hiding the chat with CSS, matters: Twitch only widens the player when it knows chat is closed.\n\nIf you open chat again, the script leaves it open until you move to another page. It does not change your Twitch account settings. The check loads a 24-hour channel logged out in a fresh browser, where chat starts open.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Collapse chat by hand",
+      "body": "Click the arrow at the top left of the chat column (**Collapse Chat**). Twitch keeps chat collapsed on other channels in the same browser until you click the arrow at the top right of the player to open it again."
+    }
+  ],
+  "related": [
+    "twitch/theater-mode",
+    "twitch/hide-sidebar"
+  ],
+  "demand": {
+    "score": 46,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/403168",
+        "note": "Remover Chat da Twitch (510 total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=twitch%20hide%20chat",
+        "note": "suggestions: twitch hide chat | twitch hide chat mobile | twitch hide chat replay | twitch hide chat shortcut"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.twitch.tv/caedrel247"
+    ],
+    "loggedOut": true,
+    "waitFor": "[data-a-target=\"right-column__toggle-collapse-btn\"]",
+    "settleMs": 4000,
+    "baseline": "(() => { const c = document.querySelector('section.chat-room'); const p = document.querySelector('[data-a-target=\"video-player\"]'); return !!c && c.checkVisibility() && c.offsetWidth > 200 && !!p && p.getBoundingClientRect().right < 1100; })()",
+    "expect": "(() => { const c = [...document.querySelectorAll('section.chat-room')]; const p = document.querySelector('[data-a-target=\"video-player\"]'); return c.length > 0 && c.every((e) => !e.checkVisibility()) && !!p && p.getBoundingClientRect().right > 1300; })()",
+    "intact": "new Promise((done) => { const v = document.querySelector('[data-a-target=\"video-player\"] video'); if (!v || !v.checkVisibility()) return done(false); const t0 = v.currentTime; const end = Date.now() + 10000; const tick = () => { if (!v.paused && v.currentTime > t0 + 0.5) return done(true); if (Date.now() > end) return done(false); setTimeout(tick, 250); }; tick(); })"
+  }
+}

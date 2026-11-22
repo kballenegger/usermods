@@ -103,6 +103,7 @@ For Safari, `node scripts/safari-xcode.mjs doctor` says what your Xcode allows, 
 
 ## Learn more
 
+- **[usermods.kennethballenegger.com](https://usermods.kennethballenegger.com)**: tested userscripts for common fixes on popular sites, and the guide. Its source and operator notes are in `site/` and [docs/site.md](docs/site.md).
 - **[docs/guide.md](docs/guide.md)** — using usermods: providers, picking the model and thinking level, subscriptions, editing a mod, importing and migrating, images, the dashboard, where the panel opens.
 - **[docs/gm-api.md](docs/gm-api.md)** — the `GM_*` compatibility table, `@connect`, and the page world.
 - **[docs/architecture.md](docs/architecture.md)** — how it works: the agent loop, drafts, compaction, storage, the test harness, security notes.

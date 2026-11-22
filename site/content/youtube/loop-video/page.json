@@ -1,0 +1,57 @@
+{
+  "slug": "loop-video",
+  "title": "Loop a YouTube video",
+  "question": "How do I put a YouTube video on repeat?",
+  "answer": "On desktop, right-click the video and choose Loop; YouTube then replays it from the start each time it ends. The option is only in that right-click menu, with no button on the player. The usermods script on this page adds a loop button next to the Settings gear that turns repeat on and off with one click and shows whether it is on. It uses the same setting as the right-click menu, so the two stay in step.",
+  "prompt": "Add a loop button to the YouTube player so I can put a video on repeat.",
+  "details": "The button turns on the `loop` flag of the player's video, which is what YouTube's right-click Loop item does. It is bright when loop is on and dimmed when it is off. While loop is on, the video restarts when it ends instead of autoplay moving on.\n\nThe button is put back if the player rebuilds its controls. The check turns loop on, jumps to two seconds before the end and confirms the video started again from the beginning.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Right-click menu",
+      "body": "Right-click the video (not the controls) and choose **Loop**. Right-click again and choose it once more to turn it off."
+    },
+    {
+      "kind": "extension",
+      "title": "Looper for YouTube",
+      "body": "The Looper for YouTube extension adds a loop button, with options to repeat a set number of times or loop part of a video."
+    }
+  ],
+  "related": [
+    "youtube/disable-autoplay",
+    "youtube/video-screenshot",
+    "youtube/default-playback-speed"
+  ],
+  "demand": {
+    "score": 89,
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/iggpfpnahkgpnindfkdncknoldgnccdg",
+        "note": "Looper for YouTube (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/lapfofmpmghklaegbdamgdojjninpnkg",
+        "note": "YouTube™ Repeat Button (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20loop%20video",
+        "note": "returns the query; suggestions: youtube loop video | youtube loop video meaning | youtube loop video not working | youtube loop video extension | youtube loop video section"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.youtube.com/watch?v=jNQXAC9IVRw"
+    ],
+    "loggedOut": true,
+    "waitFor": "#movie_player video",
+    "settleMs": 3000,
+    "actions": "const p = document.querySelector('#movie_player'); p.mute(); p.playVideo(); await new Promise((r) => setTimeout(r, 4000)); document.querySelector('#usermods-loop-button')?.click(); p.seekTo(p.getDuration() - 2); await new Promise((r) => setTimeout(r, 6000));",
+    "baseline": "(() => { const p = document.querySelector('#movie_player'); const labels = [...p.querySelectorAll('.ytp-chrome-bottom button')].map((b) => b.getAttribute('aria-label') || '').join(' '); return p.getPlayerState() === 0 && !p.querySelector('video').loop && !/loop|repeat/i.test(labels); })()",
+    "expect": "(() => { const p = document.querySelector('#movie_player'); const v = p.querySelector('video'); const b = document.querySelector('#usermods-loop-button'); return b && b.checkVisibility() && b.getAttribute('aria-pressed') === 'true' && v.loop && p.getPlayerState() === 1 && v.currentTime < 6 && v.currentTime > 0.5; })()",
+    "intact": "(() => { const p = document.querySelector('#movie_player'); return p.querySelector('.ytp-settings-button').checkVisibility() && p.getVideoData().video_id === 'jNQXAC9IVRw'; })()"
+  }
+}

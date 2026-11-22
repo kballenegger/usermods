@@ -1,0 +1,39 @@
+{
+  "slug": "dark-mode",
+  "title": "Use dark mode on arXiv",
+  "question": "Does arXiv have a dark mode?",
+  "answer": "arXiv has no dark mode setting, and its abstract, listing and search pages stay white even when your browser asks for a dark theme. The usermods script on this page gives arXiv a near-black background with light grey text and light blue links, covering the abstract box, the Labs tabs, the BibTeX pop-up and the footer, and keeps arXiv's dark header. Without a userscript, a browser-wide extension such as Dark Reader also works on arXiv.",
+  "prompt": "Give arXiv a dark theme with light text.",
+  "details": "The script injects CSS before the page draws, so there is no white flash. It recolours the page background, text, links, the abstract box, the arXivLabs tabs, the BibTeX citation pop-up and the footer, and keeps dates and subject lines a step dimmer than body text. The header with the arXiv logo is already dark and keeps its colours.\n\nPDFs open in the browser's own viewer and are not changed. The check loads an abstract page only. The rules also target listing and search pages, but the check does not cover those.",
+  "alternatives": [
+    {
+      "kind": "extension",
+      "title": "Dark Reader",
+      "body": "Dark Reader darkens every site, arXiv included, by computing a dark palette from the page's own colours."
+    }
+  ],
+  "related": [
+    "arxiv/open-in-alphaxiv"
+  ],
+  "demand": {
+    "score": 5,
+    "evidence": [
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=arxiv%20dark%20mode",
+        "note": "returns \"arxiv dark mode\"; suggestions: arxiv dark mode | arxiv dark theme | dark mode vs dark theme | shadows in dark mode"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://arxiv.org/abs/1706.03762"
+    ],
+    "loggedOut": true,
+    "waitFor": "blockquote.abstract",
+    "settleMs": 1500,
+    "baseline": "(() => { const lum = (c) => { const [r, g, b] = c.match(/\\d+/g).map(Number); return 0.2126 * r + 0.7152 * g + 0.0722 * b; }; return lum(getComputedStyle(document.body).backgroundColor) > 200 && lum(getComputedStyle(document.querySelector('blockquote.abstract')).color) < 60; })()",
+    "expect": "(() => { const lum = (c) => { const [r, g, b] = c.match(/\\d+/g).map(Number); return 0.2126 * r + 0.7152 * g + 0.0722 * b; }; const t = [document.querySelector('h1.title'), document.querySelector('blockquote.abstract'), ...document.querySelectorAll('.authors a')]; return lum(getComputedStyle(document.body).backgroundColor) < 40 && lum(getComputedStyle(document.querySelector('blockquote.abstract')).backgroundColor) < 40 && t.length > 2 && t.every((e) => lum(getComputedStyle(e).color) > 140); })()",
+    "intact": "document.querySelector('h1.title').checkVisibility() && document.querySelector('blockquote.abstract').checkVisibility() && document.querySelector('.full-text a.download-pdf').checkVisibility()"
+  }
+}

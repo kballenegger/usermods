@@ -1,0 +1,50 @@
+{
+  "slug": "hide-sidebars",
+  "title": "Hide the sidebars on DEV",
+  "question": "How do I read dev.to without the sidebars?",
+  "answer": "Logged out, DEV shows a left and a right sidebar on the home feed and on articles, and there is no switch to hide them. The usermods script on this page hides both: the navigation and tag list on the feed, and the reaction buttons and author card beside an article. The feed or article then sits alone in a centred column. Without an extension, narrowing the browser window makes DEV drop the sidebars on its own.",
+  "prompt": "Hide both sidebars on dev.to and centre the feed and articles.",
+  "details": "DEV builds its pages on a grid with named sidebar areas (`.crayons-layout__sidebar-left` and `.crayons-layout__sidebar-right`). The script hides both and makes the grid a single column at most 960px wide. On articles this also hides the reaction, comment-jump and bookmark buttons in the left rail; the comments under the article stay. The header, search and the article itself are not changed. The check covers the home feed and an article page.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Narrow the window",
+      "body": "DEV hides the sidebars by itself when the window is narrow, at the cost of a narrower article column."
+    },
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filter",
+      "body": "Hides the sidebars but leaves their empty columns. Our check runs the script, not this filter.\n\n```\ndev.to##.crayons-layout__sidebar-left\ndev.to##.crayons-layout__sidebar-right\n```"
+    }
+  ],
+  "related": [
+    "devto/table-of-contents"
+  ],
+  "check": {
+    "urls": [
+      "https://dev.to/",
+      "https://dev.to/unseenwizzard/learn-git-concepts-not-commands-4gjc"
+    ],
+    "loggedOut": true,
+    "waitFor": "main#main-content",
+    "settleMs": 3000,
+    "baseline": "[...document.querySelectorAll('.crayons-layout__sidebar-left, .crayons-layout__sidebar-right')].some((e) => e.checkVisibility() && e.getBoundingClientRect().width > 50)",
+    "expect": "(() => { const s = [...document.querySelectorAll('.crayons-layout__sidebar-left, .crayons-layout__sidebar-right')]; const m = document.querySelector('main#main-content').getBoundingClientRect(); return s.length > 0 && s.every((e) => !e.checkVisibility()) && Math.abs((m.left + m.right) / 2 - document.documentElement.clientWidth / 2) < 40; })()",
+    "intact": "(() => { const m = document.querySelector('main#main-content'); if (!m || !m.checkVisibility() || m.getBoundingClientRect().width < 600) return false; const body = document.querySelector('#article-body'); if (body) return body.checkVisibility(); return [...m.querySelectorAll('.crayons-story')].filter((s) => s.checkVisibility()).length >= 5; })()"
+  },
+  "demand": {
+    "score": 30,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/542170",
+        "note": "Blog Widescreen Responsive (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/378054",
+        "note": "DEV Zen mode (total installs)"
+      }
+    ]
+  }
+}

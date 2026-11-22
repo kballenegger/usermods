@@ -1,0 +1,40 @@
+{
+  "slug": "show-full-titles",
+  "title": "Show full video titles on YouTube",
+  "question": "How do I stop YouTube from cutting off video titles?",
+  "answer": "YouTube has no setting to show full video titles; long titles in its lists are cut off after two lines. The usermods script on this page removes that limit in search results, on the home page and in the list beside a video, so each title wraps onto as many lines as it needs. Without an extension, the only way to read a cut-off title is to open the video.",
+  "prompt": "Show the full titles of videos on YouTube instead of cutting them off.",
+  "details": "The script is CSS only. It lifts the two-line clamp and the fixed height on titles in search results, the home grid, the list beside a video and channel video grids. Thumbnails, channel names and view counts are unchanged; cards with long titles just get taller. The check loads a search results page and a video page; the home page and channel grids use the same rules but are not checked.",
+  "related": [
+    "youtube/more-videos-per-row",
+    "youtube/hide-shorts",
+    "youtube/hide-recommendations"
+  ],
+  "demand": {
+    "score": 65,
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/pgpdaocammeipkkgaeelifgakbhjoiel",
+        "note": "YouTube Full Title For Videos (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20full%20title",
+        "note": "returns the query; suggestions: youtube full title for videos | youtube full title extension | youtube full title | youtube full title for videos firefox | youtube full title for videos extension"
+      }
+    ]
+  },
+  "check": {
+    "loggedOut": true,
+    "urls": [
+      "https://www.youtube.com/results?search_query=minecraft",
+      "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    ],
+    "waitFor": "ytd-video-renderer #video-title, yt-lockup-view-model .ytLockupMetadataViewModelTitle",
+    "settleMs": 4000,
+    "baseline": "[...document.querySelectorAll('ytd-video-renderer #video-title, yt-lockup-view-model .ytLockupMetadataViewModelTitle')].filter((e) => e.checkVisibility()).some((e) => e.scrollHeight > e.clientHeight + 2)",
+    "expect": "(() => { const t = [...document.querySelectorAll('ytd-video-renderer #video-title, yt-lockup-view-model .ytLockupMetadataViewModelTitle')].filter((e) => e.checkVisibility()); return t.length >= 5 && t.every((e) => e.scrollHeight <= e.clientHeight + 2); })()",
+    "intact": "[...document.querySelectorAll('ytd-video-renderer, yt-lockup-view-model')].filter((e) => e.checkVisibility()).length >= 5"
+  }
+}

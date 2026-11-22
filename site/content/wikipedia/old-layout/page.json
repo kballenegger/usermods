@@ -1,0 +1,70 @@
+{
+  "slug": "old-layout",
+  "title": "Bring back the old Wikipedia layout",
+  "question": "How do I get the old Wikipedia layout back without an account?",
+  "answer": "Logged out, Wikipedia has no setting for the old layout; it is a preference for accounts only, under Appearance as Vector legacy (2010). Adding ?useskin=vector to a page's address shows that one page in the old layout. The usermods script on this page adds that parameter to every Wikipedia page you open and to the links you click, so the site stays in the old layout with the sidebar on the left and the tabs above the article.",
+  "prompt": "Show Wikipedia in the old Vector layout from before 2023 without logging in.",
+  "details": "MediaWiki chooses the skin from the `useskin` URL parameter when it is present. The script adds `useskin=vector` (Vector 2010, the layout Wikipedia used until January 2023) to article and `index.php` addresses on any `*.wikipedia.org` site. A page you open directly from a bookmark or a search engine loads once in the new layout and is replaced straight away; links you click inside Wikipedia get the parameter before you follow them. Addresses that already carry a `useskin` value are left alone, so `?useskin=vector-2022` still shows the new layout.\n\nThe check loads one English article and confirms it ends up in the old skin. It does not cover the mobile site.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Account preference",
+      "body": "With a Wikipedia account, open **Preferences > Appearance** and choose **Vector legacy (2010)**. To apply it on every language and sister project, set it under **Global preferences**."
+    },
+    {
+      "kind": "other",
+      "title": "The URL parameter by hand",
+      "body": "Add `?useskin=vector` to the end of an article address, for example `https://en.wikipedia.org/wiki/Moon?useskin=vector`. It only affects that page view."
+    }
+  ],
+  "related": [
+    "wikipedia/dark-mode",
+    "wikipedia/full-width"
+  ],
+  "check": {
+    "urls": [
+      "https://en.wikipedia.org/wiki/Moon"
+    ],
+    "loggedOut": true,
+    "waitFor": "#mw-content-text p",
+    "settleMs": 3000,
+    "baseline": "document.body.classList.contains('skin-vector-2022') && !document.body.classList.contains('skin-vector-legacy')",
+    "expect": "document.body.classList.contains('skin-vector-legacy') && new URLSearchParams(location.search).get('useskin') === 'vector' && document.querySelector('#mw-panel').checkVisibility()",
+    "intact": "location.pathname === '/wiki/Moon' && [...document.querySelectorAll('#mw-content-text p')].filter((p) => p.checkVisibility() && p.textContent.trim().length > 50).length >= 10"
+  },
+  "demand": {
+    "score": 64,
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/old-wiki/cphagceemhgokfclmbnkpfkmchbfnclb",
+        "note": "Chrome Web Store users: \"Old Wiki\" (2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/458501",
+        "note": "Greasy Fork total installs: \"Vector Layout For Wikipedia\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/458494",
+        "note": "Greasy Fork total installs: \"Old Wikipedia Layout\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=wikipedia+old+layout",
+        "note": "suggests \"old wikipedia layout extension\""
+      },
+      {
+        "type": "forum",
+        "url": "https://en.wikipedia.org/wiki/Wikipedia_talk:Vector_2022/Archive_1",
+        "note": "Wikipedia talk: readers asking for the old skin back"
+      },
+      {
+        "type": "forum",
+        "url": "https://news.ycombinator.com/item?id=34429175",
+        "note": "Hacker News 'Explore Wikipedia's New Look': readers don't want to log in to switch back"
+      }
+    ]
+  }
+}

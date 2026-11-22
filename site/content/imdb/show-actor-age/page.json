@@ -1,0 +1,37 @@
+{
+  "slug": "show-actor-age",
+  "title": "Show actors' ages on IMDb",
+  "question": "How do I see how old an actor was in a film on IMDb?",
+  "answer": "IMDb does not show an actor's age for each role; it lists the birth date and the year of each credit separately. The usermods script on this page reads the birth date on a person's IMDb page and adds their age in that year next to every credit in the filmography and the Known for cards, as a range such as age 56–57, because IMDb gives only the year. Without an extension, subtract the birth year from the credit's year.",
+  "prompt": "On IMDb actor pages, show how old the actor was next to each film in their filmography.",
+  "details": "The script runs on IMDb name pages (`/name/nm…`). It takes the year from the **Born** line and, for each credit year, adds the age range the person was in that year: someone born in 1937 is shown as age 56–57 for a 1994 film. A series that ran over several years uses its first year. It updates as the filmography loads and when you expand a section.\n\nIt shows nothing on pages without a birth date, and it does not add ages to the cast list on film pages. The check loads one actor's page.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Work it out from the page",
+      "body": "The person's IMDb page shows the birth date under **Born** near the top, and each credit lists its year. The age at the time is the credit year minus the birth year, or one less if the film came out before their birthday."
+    }
+  ],
+  "related": [],
+  "check": {
+    "urls": [
+      "https://www.imdb.com/name/nm0000151/"
+    ],
+    "loggedOut": true,
+    "waitFor": "li[data-testid^=\"cred_\"]",
+    "settleMs": 5000,
+    "baseline": "(() => { const rows = [...document.querySelectorAll('li[data-testid^=\"cred_\"]')]; const born = document.querySelector('[data-testid=\"birth-and-death-birthdate\"]'); return rows.length >= 10 && born && /\\b1937\\b/.test(born.textContent) && !rows.some((r) => /\\bage \\d+/.test(r.textContent)); })()",
+    "expect": "(() => { const card = document.querySelector('[data-testid=\"nm-flmg-title-year-tt0111161\"]'); const rows = [...document.querySelectorAll('li[data-testid^=\"cred_\"]')].filter((r) => /\\(age \\d+–\\d+\\)/.test(r.textContent)); return card && card.textContent.includes('(age 56–57)') && card.querySelector('.usermods-age').checkVisibility() && rows.length >= 10; })()",
+    "intact": "document.querySelector('h1').checkVisibility() && [...document.querySelectorAll('li[data-testid^=\"cred_\"]')].filter((r) => r.checkVisibility()).length >= 10"
+  },
+  "demand": {
+    "score": 45,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/2798",
+        "note": "Greasy Fork total installs: \"IMDBAge\" (read via api.greasyfork.org, 2026-11-17)"
+      }
+    ]
+  }
+}

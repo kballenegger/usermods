@@ -1,0 +1,41 @@
+{
+  "slug": "dark-mode",
+  "title": "Dark mode for Goodreads",
+  "question": "Does the Goodreads website have dark mode?",
+  "answer": "No. The Goodreads website has no dark mode or theme setting, and it ignores your system's dark mode. The usermods script on this page darkens every Goodreads page by inverting its colours and turning the hues back, so the white background becomes black, text turns light and the green buttons stay green. Book covers, author photos and avatars are flipped back so they look normal. Without a userscript, a dark mode extension such as Dark Reader does a similar job.",
+  "prompt": "Make Goodreads dark: dark background and light text, with book covers left as they are.",
+  "details": "The script is CSS injected before the page draws, so there is no white flash. It applies `invert(1) hue-rotate(180deg)` to the whole page and the same filter again to images, video and embedded frames, which flips them back to their real colours.\n\nIt works the same on the newer book pages and the older list, series and shelf pages because it does not depend on either design's class names. The check loads a book page. Colours are close to the originals but not exact: the green buttons come out a lighter green, and the dimmed backdrop behind popups turns light grey.",
+  "alternatives": [
+    {
+      "kind": "extension",
+      "title": "Dark Reader",
+      "body": "Dark Reader darkens every site, Goodreads included, by computing a dark palette from the page's own colours."
+    }
+  ],
+  "related": [
+    "goodreads/declutter",
+    "goodreads/wide-layout",
+    "hackernews/dark-mode"
+  ],
+  "demand": {
+    "score": 5,
+    "evidence": [
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=goodreads%20dark%20mode",
+        "note": "suggestions: goodreads dark mode, goodreads dark mode iphone, goodreads dark mode ios, goodreads dark mode extension, goodreads dark mode not working"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.goodreads.com/book/show/5907.The_Hobbit"
+    ],
+    "loggedOut": true,
+    "waitFor": ".BookPage__leftColumn .BookCover img",
+    "settleMs": 3000,
+    "baseline": "(() => { const lum = (c) => { const m = c.match(/\\d+/g).map(Number); return (m[0] + m[1] + m[2]) / 3; }; return lum(getComputedStyle(document.body).backgroundColor) > 200 && !/invert/.test(getComputedStyle(document.documentElement).filter) && lum(getComputedStyle(document.querySelector('h1[data-testid=\"bookTitle\"]')).color) < 80; })()",
+    "expect": "(() => { const lum = (c) => { const m = c.match(/\\d+/g).map(Number); return (m[0] + m[1] + m[2]) / 3; }; const root = getComputedStyle(document.documentElement).filter; const imgs = [...document.querySelectorAll('img')].filter((i) => i.checkVisibility()); return /invert\\(1\\)/.test(root) && /hue-rotate\\(180deg\\)/.test(root) && lum(getComputedStyle(document.body).backgroundColor) > 200 && lum(getComputedStyle(document.querySelector('h1[data-testid=\"bookTitle\"]')).color) < 80 && imgs.length >= 3 && imgs.every((i) => /invert\\(1\\)/.test(getComputedStyle(i).filter) || /invert\\(1\\)/.test(getComputedStyle(i.closest('picture, [style*=\"background-image\"]') || i).filter)); })()",
+    "intact": "(() => { const h = document.querySelector('h1[data-testid=\"bookTitle\"]'); const c = document.querySelector('.BookPage__leftColumn .BookCover img'); return h.checkVisibility() && c.checkVisibility() && [...document.querySelectorAll('.BookPageMetadataSection a')].filter((a) => a.checkVisibility()).length >= 5; })()"
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "slug": "download-cover",
+  "title": "Download full-size Spotify cover art",
+  "question": "How do I download album cover art from Spotify?",
+  "answer": "Spotify has no download button for cover art, and the album page shows a copy of 640 pixels at most. The usermods script on this page adds a Cover link to the button row on every album page. It opens a copy of the art more than 640 pixels wide from Spotify's image server in a new tab, where you can save it. Install it with usermods or any userscript manager. Without an extension, right-click the album art, open the image in a new tab, and change the four characters after ab67616d0000 in the address to 82c1.",
+  "prompt": "On Spotify album pages, add a link that opens the album cover at full size so I can save it.",
+  "details": "Spotify serves album art from `i.scdn.co` with the size coded into the address. The script reads the image address from the album header, swaps the size code for `82c1`, which serves a larger copy than the page shows, and puts a **Cover** link after the play, shuffle and more buttons. Browsers don't let a page force a download from another domain, so the link opens the image and you save it from there.\n\nIt works on album pages only, logged out or in. Playlist, artist and podcast images use a different address format and get no link.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Edit the image address by hand",
+      "body": "Right-click the cover in the album header and choose **Open image in new tab**. The address starts with `https://i.scdn.co/image/ab67616d0000`, followed by a four-character size code and a long hash. Replace those four characters with `82c1` and press Enter. That loads the same file the script links to."
+    }
+  ],
+  "related": [
+    "spotify/copy-track-info"
+  ],
+  "demand": {
+    "score": 46,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/498854",
+        "note": "Greasy Fork total installs, \"Spotify Web - Download Cover\" (api.greasyfork.org, 2026-11-17)"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://open.spotify.com/album/4LH4d3cOWNNsVw41Gqt2kv"
+    ],
+    "loggedOut": true,
+    "waitFor": "[data-testid=\"action-bar-row-actions\"]",
+    "settleMs": 3000,
+    "baseline": "[...document.querySelectorAll('[data-testid=\"entity-header\"] img')].some((i) => /^https:\\/\\/i\\.scdn\\.co\\/image\\/ab67616d0000(?!82c1)[0-9a-f]{4}[0-9a-f]{24}$/.test(i.src) && i.checkVisibility()) && !document.querySelector('a[href*=\"ab67616d000082c1\"]')",
+    "expect": "(async () => { const a = document.querySelector('[data-testid=\"action-bar-row-actions\"] a.usermods-cover-link'); if (!a || !a.checkVisibility()) return false; const hash = [...document.querySelectorAll('[data-testid=\"entity-header\"] img')].map((i) => i.src.match(/ab67616d0000[0-9a-f]{4}([0-9a-f]{24})$/)).find(Boolean)?.[1]; if (!hash || a.href !== 'https://i.scdn.co/image/ab67616d000082c1' + hash) return false; const img = new Image(); img.src = a.href; await img.decode(); return img.naturalWidth > 640; })()",
+    "intact": "!!document.querySelector('[data-testid=\"action-bar-row-actions\"] button[aria-label=\"Shuffle\"]')?.checkVisibility() && [...document.querySelectorAll('[data-testid=\"tracklist-row\"] a[data-testid=\"internal-track-link\"]')].filter((a) => a.checkVisibility()).length >= 5"
+  }
+}

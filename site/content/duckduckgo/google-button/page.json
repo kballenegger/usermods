@@ -1,0 +1,32 @@
+{
+  "slug": "google-button",
+  "title": "Add a Google button to DuckDuckGo",
+  "question": "How do I repeat a DuckDuckGo search on Google in one click?",
+  "answer": "Without an extension, add !g to your search: DuckDuckGo's bang sends the query straight to Google. To get a button instead, the usermods script on this page adds a Google tab to the DuckDuckGo tab bar, next to All, Images and Videos. It links to a Google search for the same words and follows along when you search again.",
+  "prompt": "Add a Google button to DuckDuckGo results that runs the same search on Google.",
+  "details": "The script reads the search from the `q` parameter in the address bar and links to `https://www.google.com/search?q=...`. DuckDuckGo redraws its tab bar on each new search, so a MutationObserver puts the button back and updates its link. It copies the style of an existing tab.\n\nIt only adds a link: nothing is sent to Google until you click it.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "The !g bang",
+      "body": "Type `!g` anywhere in a DuckDuckGo search, for example `bread recipe !g`, and DuckDuckGo forwards it to Google. Other bangs work the same way: `!b` for Bing, `!w` for Wikipedia."
+    }
+  ],
+  "related": ["duckduckgo/declutter", "duckduckgo/remove-ads", "duckduckgo/hide-ai"],
+  "demand": {
+    "score": 43,
+    "evidence": [
+      {"type": "greasyfork", "url": "https://greasyfork.org/en/scripts/376631", "note": "Greasy Fork total installs: \"DuckDuckGo to Google Button\" (read via api.greasyfork.org, 2026-11-17)"},
+      {"type": "greasyfork", "url": "https://greasyfork.org/en/scripts/373582", "note": "Greasy Fork total installs: \"Add 'Google' button to duckduckgo.com\" (read via api.greasyfork.org, 2026-11-17)"}
+    ]
+  },
+  "check": {
+    "urls": ["https://duckduckgo.com/?q=how+to+bake+bread&kl=us-en"],
+    "loggedOut": true,
+    "waitFor": "[data-testid=\"result\"]",
+    "settleMs": 4000,
+    "baseline": "(() => { const nav = document.querySelector('[data-testid=\"duckbar\"] nav'); return !!nav && nav.checkVisibility() && ![...nav.querySelectorAll('a')].some((a) => /google\\.com/.test(a.href)); })()",
+    "expect": "(() => { const links = [...document.querySelectorAll('[data-testid=\"duckbar\"] nav a')].filter((a) => a.href === 'https://www.google.com/search?q=how%20to%20bake%20bread'); return links.length === 1 && links[0].checkVisibility() && links[0].textContent.trim() === 'Google'; })()",
+    "intact": "(() => { const results = [...document.querySelectorAll('[data-testid=\"result\"]')].filter((r) => r.checkVisibility()); const all = [...document.querySelectorAll('[data-testid=\"duckbar\"] nav a')].find((a) => a.textContent.trim() === 'All'); return results.length >= 5 && !!all && all.checkVisibility(); })()"
+  }
+}

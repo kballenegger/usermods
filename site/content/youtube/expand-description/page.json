@@ -1,0 +1,39 @@
+{
+  "slug": "expand-description",
+  "title": "Show the full YouTube description",
+  "question": "How do I make YouTube always show the full video description?",
+  "answer": "YouTube has no setting to always show the full description; it shows a few lines and a \"...more\" button. The usermods script on this page clicks that button for you on every video page, so the whole description, its links and chapters are open as soon as the page loads. \"Show less\" still collapses it. Without an extension, click \"...more\" under the video title, or click anywhere in the grey description box.",
+  "prompt": "Always show the full description under YouTube videos.",
+  "details": "The script clicks YouTube's own \"...more\" button once for each video, including videos you open from inside YouTube without a page reload. YouTube then expands the description itself, so nothing else on the page changes. If you collapse the description with \"Show less\", it stays collapsed for that video.",
+  "related": [
+    "youtube/hide-comments",
+    "youtube/always-theater-mode",
+    "youtube/hide-recommendations"
+  ],
+  "demand": {
+    "score": 60,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/440613",
+        "note": "YouTube - Proper Description (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20expand%20description%20automatically",
+        "note": "does not return the query; suggestions: "
+      }
+    ]
+  },
+  "check": {
+    "loggedOut": true,
+    "urls": [
+      "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    ],
+    "waitFor": "ytd-watch-metadata ytd-text-inline-expander #expand",
+    "settleMs": 4000,
+    "baseline": "(() => { const x = document.querySelector('ytd-watch-metadata ytd-text-inline-expander'); return !x.hasAttribute('is-expanded') && x.querySelector('#expand').checkVisibility(); })()",
+    "expect": "(() => { const x = document.querySelector('ytd-watch-metadata ytd-text-inline-expander'); return x.hasAttribute('is-expanded') && x.querySelector('#collapse').checkVisibility() && !x.querySelector('#expand').checkVisibility(); })()",
+    "intact": "document.querySelector('#movie_player video').checkVisibility() && document.querySelector('ytd-watch-metadata h1').checkVisibility()"
+  }
+}

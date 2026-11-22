@@ -1,0 +1,61 @@
+{
+  "slug": "block-channels",
+  "title": "Block channels on YouTube",
+  "question": "How do I block a channel from showing up on YouTube?",
+  "answer": "YouTube has no way to block a channel from your search results. Signed in, \"Don't recommend channel\" in a video's menu on the home page only affects recommendations. The usermods script on this page adds a small Block button next to channel names, and once you click it, videos from that channel are hidden from search results. Install it with usermods or any userscript manager.",
+  "prompt": "Add a Block button next to channel names on YouTube that hides videos from that channel.",
+  "details": "Click **Block** next to a channel name and the script saves the channel's handle and name in your browser's storage for youtube.com, then hides its videos. It keeps checking as YouTube loads more results and as you move between pages.\n\nYou can also list channels in `const BLOCKED = []` at the top of the script, as handles (`'@SomeChannel'`) or names exactly as YouTube shows them. To unblock everything, run `localStorage.removeItem('usermods.blockedChannels')` in the browser console on youtube.com.\n\nThe check blocks a channel from a search results page and confirms its videos disappear while the rest stay. The script also tries to hide the channel's videos on the home page, in channel grids and in the list beside a video, matching by handle or, where only the name is shown, by name; the check does not load those pages. Shorts are not hidden: Shorts from a blocked channel still show in the Shorts shelf in search. The list lives in one browser and is not synced.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Don't recommend channel",
+      "body": "Signed in, open the three-dot menu on a video on the home page and choose **Don't recommend channel**. YouTube stops recommending it, but its videos still appear in search."
+    },
+    {
+      "kind": "extension",
+      "title": "Channel Blocker",
+      "body": "The Channel Blocker extension for Chrome and Firefox blocks channels by name, handle or keyword."
+    }
+  ],
+  "related": [
+    "youtube/hide-shorts",
+    "youtube/more-videos-per-row"
+  ],
+  "demand": {
+    "score": 80,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/11057",
+        "note": "Block Youtube Users (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/nfkmalbckemmklibjddenhnofgnfcdfp",
+        "note": "Channel Blocker (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/nedcanggplmbbgmlpcjiafgjcpdimpea",
+        "note": "YTBlock - Block any content from YouTube™ (users, read on the store search page for 'youtube channel blocker')"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=block%20youtube%20channel",
+        "note": "returns the query; suggestions: block youtube channel | block youtube channel extension | block youtube channels from showing up | block youtube channel on tv | block youtube channel for kids"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.youtube.com/results?search_query=minecraft"
+    ],
+    "loggedOut": true,
+    "waitFor": "ytd-video-renderer ytd-channel-name a",
+    "settleMs": 4000,
+    "actions": "const b = [...document.querySelectorAll('ytd-video-renderer .usermods-block-channel')].find((e) => e.checkVisibility()); if (b) { window.__blocked = b.closest('ytd-video-renderer').querySelector('#channel-info ytd-channel-name a').getAttribute('href'); b.click(); }",
+    "baseline": "[...document.querySelectorAll('ytd-video-renderer')].filter((v) => v.checkVisibility() && v.querySelector('#channel-info ytd-channel-name a[href^=\"/@\"]')).length >= 3",
+    "expect": "(() => { const h = window.__blocked; const items = [...document.querySelectorAll('ytd-video-renderer')].filter((v) => v.querySelector('#channel-info ytd-channel-name a')?.getAttribute('href') === h); return typeof h === 'string' && items.length > 0 && items.every((v) => !v.checkVisibility()); })()",
+    "intact": "(() => { const shown = [...document.querySelectorAll('ytd-video-renderer')].filter((v) => v.checkVisibility()); return shown.length >= 3 && shown.every((v) => v.querySelector('#channel-info ytd-channel-name a')?.getAttribute('href') !== window.__blocked && v.querySelector('.usermods-block-channel')?.checkVisibility()); })()"
+  }
+}

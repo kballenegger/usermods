@@ -1,0 +1,25 @@
+{
+  "slug": "disable-quote-popup",
+  "title": "Stop the Substack text-selection quote popup",
+  "question": "How do I stop Substack's popup when I select text?",
+  "answer": "Substack has no setting to turn off the box that pops up over a post when you select text. The usermods script on this page hides that floating Share box, so you can select and copy text from a post without it covering the line you are reading. Selecting and copying text work as before, and the rest of the post is left alone.",
+  "prompt": "Stop the Share popup that appears when I select text in a Substack post.",
+  "details": "When you select text in a post, Substack inserts a small floating box with a Share button that makes a quote card from the selection. The script hides that box with one CSS rule. It matches the box by the start of its class name (`popover-`) and its share icon, because the rest of the class name is a hash that changes between Substack builds.\n\nLogged-in readers may see more buttons in the same box (such as Restack); the whole box is hidden. The check is logged out: it selects a paragraph in a post and confirms the box is added but not shown. It runs on `*.substack.com` addresses; publications on their own domain need an extra `@match` line.",
+  "related": ["substack/dismiss-popups", "substack/widescreen"],
+  "demand": {
+    "score": 26,
+    "evidence": [
+      { "type": "greasyfork", "url": "https://greasyfork.org/en/scripts/471336", "note": "Greasy Fork total installs: \"Substack - Stop Text Selection Quote Popup\" (58)" }
+    ]
+  },
+  "check": {
+    "urls": ["https://garymarcus.substack.com/p/report-from-the-vatican"],
+    "loggedOut": true,
+    "waitFor": ".body.markup p",
+    "settleMs": 3000,
+    "actions": "const p = document.querySelector('.body.markup p'); p.scrollIntoView({ block: 'center' }); const r = document.createRange(); r.selectNodeContents(p); const s = getSelection(); s.removeAllRanges(); s.addRange(r); const b = p.getBoundingClientRect(); p.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: b.left + 5, clientY: b.top + 5 })); p.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, clientX: b.right - 5, clientY: b.top + 10 })); document.dispatchEvent(new Event('selectionchange')); await new Promise((res) => setTimeout(res, 1500));",
+    "baseline": "[...document.querySelectorAll('.available-content [class*=\"popover-\"]')].some((e) => e.querySelector('svg.lucide-share') && e.checkVisibility())",
+    "expect": "(() => { const l = [...document.querySelectorAll('.available-content [class*=\"popover-\"]')].filter((e) => e.querySelector('svg.lucide-share')); return l.length > 0 && l.every((e) => !e.checkVisibility()); })()",
+    "intact": "(() => { const ps = [...document.querySelectorAll('.body.markup p')].filter((p) => p.checkVisibility()); return ps.length >= 5 && getSelection().toString().length > 20; })()"
+  }
+}

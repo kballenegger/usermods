@@ -1,0 +1,50 @@
+{
+  "slug": "remove-ads",
+  "title": "Remove ads from Fandom wikis",
+  "question": "How do I remove ads on Fandom?",
+  "answer": "Fandom has no setting that turns its ads off. The usermods script on this page hides Fandom's ad slots, including the large banner above the wiki header and the in-article and bottom slots, and hides the video player at the top of articles. The wiki header, right rail and article are left as they are. A content blocker such as uBlock Origin also stops the ads from loading.",
+  "prompt": "Hide the ads and the autoplay video player on Fandom wikis.",
+  "details": "The script injects CSS before the page draws, so the ad spaces never show. It hides the leaderboard above the wiki header, the bottom ad block, Fandom's numbered ad slots (in-article, right rail and the sticky slot at the bottom of the window) and the featured video player.\n\nHiding the slots does not stop the ad scripts from downloading; a content blocker does that. To also remove the right rail, the left Fandom bar and pop-up notices, use the clutter script instead. The check loads one Harry Potter Wiki article.",
+  "alternatives": [
+    {
+      "kind": "extension",
+      "title": "uBlock Origin",
+      "body": "uBlock Origin's default filter lists block Fandom's ads before they load. These cosmetic filters hide the same slots as the script; our check runs the script, not these filters.\n\n```\nfandom.com##.top-ads-container\nfandom.com##.bottom-ads-container\nfandom.com##[id$=\"_leaderboard\"]\nfandom.com###featured-video__player-container\n```"
+    }
+  ],
+  "related": [
+    "fandom/remove-clutter",
+    "fandom/redirect-to-independent-wiki"
+  ],
+  "check": {
+    "urls": [
+      "https://harrypotter.fandom.com/wiki/Harry_Potter"
+    ],
+    "loggedOut": true,
+    "waitFor": ".mw-parser-output p",
+    "settleMs": 5000,
+    "baseline": "['.top-ads-container', '#top_leaderboard'].every((s) => { const e = document.querySelector(s); return e && e.checkVisibility() && e.getBoundingClientRect().height > 50; })",
+    "expect": "(() => { const els = ['.top-ads-container', '#top_leaderboard', '.bottom-ads-container', '#featured-video__player-container'].map((s) => document.querySelector(s)).filter(Boolean); return els.length >= 2 && els.every((e) => !e.checkVisibility()); })()",
+    "intact": "document.querySelector('#firstHeading').checkVisibility() && document.querySelector('.page__right-rail').checkVisibility() && [...document.querySelectorAll('.mw-parser-output > p')].filter((p) => p.checkVisibility() && p.textContent.trim().length > 50).length >= 10"
+  },
+  "demand": {
+    "score": 39,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/464705",
+        "note": "Greasy Fork total installs: \"Fandom Remove Ads\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/450903",
+        "note": "Greasy Fork total installs: \"Fandom Ad Remover\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=fandom+remove+ads",
+        "note": "suggests \"fandom wiki remove ads\""
+      }
+    ]
+  }
+}

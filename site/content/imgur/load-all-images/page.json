@@ -1,0 +1,29 @@
+{
+  "slug": "load-all-images",
+  "title": "Load every image in an Imgur album",
+  "question": "How do I make Imgur show all images in an album without clicking 'load more'?",
+  "answer": "Imgur has no setting to show every image of a long post at once; it shows the first few and a \"Load more images\" button. The usermods script on this page presses that button for you whenever it appears, so long posts and albums keep loading as you scroll with no clicks. It keeps working as you move between posts. Install it with usermods or any userscript manager. Without a script, click the button under the images by hand.",
+  "prompt": "On Imgur, automatically click \"Load more images\" so every image in a post shows at once.",
+  "details": "Imgur renders long posts in batches of 12 and puts a button reading \"Load 12 more images\" under each batch. It also keeps only the images near the screen in the page, so the button for the next batch appears as you scroll towards it. The script watches the page and presses the button each time it shows up, so you never see it. The \"Load more comments\" button uses the same style, and the script leaves it alone.\n\nThe check loads a long post and confirms that the first button is gone and the post has grown by the next batch of images. Later batches load the same way as you scroll; the check does not scroll through them.",
+  "demand": {
+    "score": 46,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/12444",
+        "note": "IMGUR Load \"remaining images\" AUTOMATICALLY (1,105 total installs)"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://imgur.com/gallery/carefully-curated-vol-1024-Frbqhg6"
+    ],
+    "loggedOut": true,
+    "waitFor": ".Gallery-Content--media",
+    "settleMs": 4000,
+    "baseline": "(() => { const b = [...document.querySelectorAll('button.loadMore')].filter((e) => e.checkVisibility() && /load \\d+ more image/i.test(e.textContent)); const c = document.querySelector('.Gallery-Content'); return b.length === 1 && !!c && c.getBoundingClientRect().height < 15000; })()",
+    "expect": "(() => { const b = [...document.querySelectorAll('button.loadMore')].filter((e) => e.checkVisibility() && /more image/i.test(e.textContent)); const c = document.querySelector('.Gallery-Content'); return b.length === 0 && !!c && c.getBoundingClientRect().height > 18000; })()",
+    "intact": "(() => { const imgs = [...document.querySelectorAll('.Gallery-Content--media img')].filter((i) => i.checkVisibility() && /i\\.imgur\\.com\\//.test(i.src)); return imgs.length >= 3 && !!document.querySelector('.Gallery-Title') && document.querySelector('.Gallery-Title').checkVisibility(); })()"
+  }
+}

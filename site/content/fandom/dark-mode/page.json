@@ -1,0 +1,51 @@
+{
+  "slug": "dark-mode",
+  "title": "Keep Fandom wikis in dark mode",
+  "question": "How do I turn on dark mode on Fandom?",
+  "answer": "Fandom has a dark theme: click the moon icon (Switch to Dark Theme) at the right of the wiki's header. Logged out, Fandom remembers that choice only until you close the browser. The usermods script on this page sets the same theme cookie for a year on all of fandom.com and reloads the page once, so every wiki opens in Fandom's own dark theme from then on. If you switch back to light, that holds until the browser closes.",
+  "prompt": "Make Fandom wikis always use the dark theme, even after I restart the browser.",
+  "details": "Fandom chooses the theme on its server from a `theme` cookie on `.fandom.com`. Its switch sets that cookie for the browser session only. The script runs before the page draws: if there is no `theme` cookie, it sets `theme=dark` for a year and reloads once. Because it uses Fandom's own dark theme, infoboxes, navigation and wiki colours stay as each wiki designed them for dark mode. Wikis whose own styles hard-code light colours in some templates keep those colours. The check loads one Harry Potter Wiki article.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Fandom's theme switch",
+      "body": "Click the moon icon (**Switch to Dark Theme**) at the right of the wiki header. Logged out, it lasts until the browser closes."
+    },
+    {
+      "kind": "extension",
+      "title": "Dark Reader",
+      "body": "Dark Reader darkens any site, Fandom included, by recolouring the page itself rather than using Fandom's dark theme."
+    }
+  ],
+  "related": [
+    "fandom/remove-clutter",
+    "fandom/wider-content",
+    "wikipedia/dark-mode"
+  ],
+  "demand": {
+    "score": 33,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/460098",
+        "note": "Greasy Fork total installs: \"Fandom auto Dark Mode switcher\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=fandom+dark+mode",
+        "note": "suggests \"fandom wiki dark mode\""
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://harrypotter.fandom.com/wiki/Harry_Potter"
+    ],
+    "loggedOut": true,
+    "waitFor": ".mw-parser-output p",
+    "settleMs": 5000,
+    "baseline": "(() => { const p = document.querySelector('.mw-parser-output > p'); const [r, g, b] = getComputedStyle(p).color.match(/\\d+/g).map(Number); return document.body.classList.contains('theme-fandomdesktop-light') && !/(?:^|;\\s*)theme=/.test(document.cookie) && r + g + b < 300; })()",
+    "expect": "(() => { const p = document.querySelector('.mw-parser-output > p'); const [r, g, b] = getComputedStyle(p).color.match(/\\d+/g).map(Number); return document.body.classList.contains('theme-fandomdesktop-dark') && /(?:^|;\\s*)theme=dark/.test(document.cookie) && r + g + b > 500; })()",
+    "intact": "document.querySelector('#firstHeading').checkVisibility() && document.querySelector('.community-header-wrapper').checkVisibility() && [...document.querySelectorAll('.mw-parser-output > p')].filter((p) => p.checkVisibility() && p.textContent.trim().length > 50).length >= 10"
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "slug": "open-results-new-tab",
+  "title": "Open Google search results in a new tab",
+  "question": "How do I make Google open search results in a new tab?",
+  "answer": "Google has its own setting for this: Search settings > Other settings > \"Results in a new window\", available signed in or out, but it opens each result in a new window. The usermods script on this page makes every link in the Google results list open in a new tab instead, and keeps the results page open in the current tab. Install it with usermods or any userscript manager. Without a script, Ctrl-click (Cmd-click on a Mac) or middle-click a result.",
+  "prompt": "Make Google search results open in a new tab.",
+  "details": "The script sets `target=\"_blank\"` on links in the results list that lead away from the results page, including Google's `/goto` and `/url` redirect links, and re-applies it as more results load. Tabs, the search box and links that stay on the results page (more results, related searches) open as before. The check clicks a result and confirms the results page stays put.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Google's \"Results in a new window\" setting",
+      "body": "Open [Search settings](https://www.google.com/preferences), choose **Other settings** and turn on **Results in a new window**. It works signed out too. Results open in a new browser window rather than a tab."
+    },
+    {
+      "kind": "other",
+      "title": "Ctrl-click or middle-click",
+      "body": "Hold **Ctrl** (**Cmd** on a Mac) while clicking a result, or click it with the middle mouse button."
+    }
+  ],
+  "related": [
+    "google/keyboard-shortcuts"
+  ],
+  "demand": {
+    "score": 60,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/397957",
+        "note": "Greasy Fork total installs: \"Google-open-in-new-tab\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=google+search+open+links+in+new+tab",
+        "note": "suggests \"how to make google always open search result links in new tabs\""
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.google.com/search?q=how+to+bake+bread&hl=en&gl=us"
+    ],
+    "loggedOut": true,
+    "waitFor": "#rso",
+    "settleMs": 4000,
+    "actions": "window.__usermodsStart = location.href; const first = [...document.querySelectorAll('#rso a[href]:has(h3)')].find((a) => a.checkVisibility()); if (first && first.target === '_blank') first.click();",
+    "baseline": "[...document.querySelectorAll('#rso a[href]:has(h3)')].some((a) => a.checkVisibility() && a.target !== '_blank')",
+    "expect": "(() => { const l = [...document.querySelectorAll('#rso a[href]:has(h3)')].filter((a) => a.checkVisibility()); return location.href === window.__usermodsStart && l.length > 0 && l.every((a) => a.target === '_blank'); })()",
+    "intact": "[...document.querySelectorAll('#rso a h3')].filter((h) => h.checkVisibility() && !h.closest('[data-text-ad]')).length >= 5"
+  }
+}

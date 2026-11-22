@@ -1,0 +1,7 @@
+{
+  "slug": "stackoverflow",
+  "name": "Stack Overflow",
+  "domains": ["stackoverflow.com"],
+  "category": "reference",
+  "intro": "Userscripts that tidy Stack Overflow question pages: banners, sidebars, dates and themes."
+}

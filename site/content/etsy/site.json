@@ -1,0 +1,7 @@
+{
+  "slug": "etsy",
+  "name": "Etsy",
+  "domains": ["etsy.com", "www.etsy.com"],
+  "category": "shopping",
+  "intro": "Userscripts for shopping on Etsy in a desktop browser: search results without paid placements."
+}

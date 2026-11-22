@@ -1,0 +1,29 @@
+{
+  "slug": "highlight-op",
+  "title": "Highlight the original poster on Hacker News",
+  "question": "How do I highlight the submitter's comments in a Hacker News thread?",
+  "answer": "Hacker News does not mark the person who submitted a story when they comment, and there is no setting for it; you have to compare each name with the \"by\" line at the top. The usermods script on this page finds the submitter's comments in the thread, puts their name on an orange background with an OP label and adds an orange bar beside the comment text. Other comments are unchanged.",
+  "prompt": "On Hacker News comment pages, highlight comments written by the person who posted the story.",
+  "details": "The script reads the submitter from the story's \"by\" line and compares it with the author link of every comment on the page. It only runs on item pages. When you open a single comment rather than a story, there is no submitter on the page and nothing is highlighted.\n\nThe check loads the Dropbox launch thread, where the submitter wrote 9 of the 71 comments.",
+  "related": [
+    "hackernews/mute-users",
+    "hackernews/collapse-comments",
+    "hackernews/absolute-dates"
+  ],
+  "demand": {
+    "score": 35,
+    "evidence": [
+      { "type": "greasyfork", "url": "https://greasyfork.org/en/scripts/2961", "note": "Hacker News Author Highlight (total installs, read from api.greasyfork.org/en/scripts/by-site)" },
+      { "type": "chrome-web-store", "url": "https://chromewebstore.google.com/detail/djkcnbncofmjekhlhemlkinfpkamlkaj", "note": "Hacker News Sorted (users, read on the detail page)" }
+    ]
+  },
+  "check": {
+    "urls": ["https://news.ycombinator.com/item?id=8863"],
+    "loggedOut": true,
+    "waitFor": "tr.comtr",
+    "settleMs": 2000,
+    "baseline": "(() => { const op = [...document.querySelectorAll('tr.comtr .comhead > a[href=\"user?id=dhouston\"]')]; return document.querySelector('.fatitem .subline a[href^=\"user?id=\"]')?.textContent === 'dhouston' && op.length >= 5 && op.every((a) => a.checkVisibility()) && !document.querySelector('.um-op-label'); })()",
+    "expect": "(() => { const rows = [...document.querySelectorAll('tr.comtr')]; const op = rows.filter((r) => r.querySelector('.comhead > a[href=\"user?id=dhouston\"]')); const rest = rows.filter((r) => !op.includes(r)); return op.length >= 5 && op.every((r) => { const l = r.querySelector('.um-op-label'); const bar = getComputedStyle(r.querySelector('.comment')).borderLeftStyle; return r.classList.contains('um-op') && !!l && l.checkVisibility() && l.textContent === 'OP' && bar === 'solid'; }) && rest.length >= 30 && rest.every((r) => !r.classList.contains('um-op') && !r.querySelector('.um-op-label')); })()",
+    "intact": "(() => { const c = [...document.querySelectorAll('.commtext')].filter((e) => e.checkVisibility()); return c.length >= 40 && document.querySelector('.fatitem .titleline > a').checkVisibility(); })()"
+  }
+}

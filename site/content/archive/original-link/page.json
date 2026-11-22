@@ -1,0 +1,44 @@
+{
+  "slug": "original-link",
+  "title": "Open the original page from the Wayback Machine",
+  "question": "How do I jump from a Wayback Machine snapshot to the live page?",
+  "answer": "There is no button for it: the Wayback Machine shows the original address in the toolbar's URL box, and you copy it into a new tab. The usermods script on this page adds a small Live page button to the bottom-right corner of every snapshot, linked to the original URL, so one click opens the live site. Without an extension, delete everything up to and including the timestamp from the snapshot's address.",
+  "prompt": "Add a button to Wayback Machine snapshots that opens the same URL on the live site.",
+  "details": "The script takes the original address from the snapshot URL (everything after the timestamp, query string included) and links to it from a button in its own shadow root, so the archived page's styles can't change it. The Wayback Machine's page script rewrites link clicks into snapshot URLs, so a plain left click on the button sets the address directly. Middle clicks and modifier clicks are left to the browser and may open the snapshot instead. The check confirms the button is there and points at the original URL; it does not click it.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Edit the address",
+      "body": "Delete `https://web.archive.org/web/<timestamp>/` from the start of the snapshot URL and press Enter."
+    },
+    {
+      "kind": "site-setting",
+      "title": "The toolbar's URL box",
+      "body": "The toolbar at the top shows the original address. Copy it and paste it into a new tab."
+    }
+  ],
+  "related": [
+    "archive/hide-wayback-toolbar"
+  ],
+  "check": {
+    "urls": [
+      "https://web.archive.org/web/2005/http://www.google.com/"
+    ],
+    "loggedOut": true,
+    "waitFor": "#wm-ipp-base",
+    "settleMs": 4000,
+    "baseline": "(() => { const t = document.getElementById('wm-ipp-base'); const live = [...document.querySelectorAll('a')].filter((a) => a.getAttribute('href') === 'http://www.google.com/' && a.checkVisibility()); return !!t && t.checkVisibility() && live.length === 0 && !document.getElementById('usermods-live-page'); })()",
+    "expect": "(() => { const host = document.getElementById('usermods-live-page'); const a = host && host.shadowRoot && host.shadowRoot.querySelector('a'); if (!a) return false; const r = a.getBoundingClientRect(); return a.checkVisibility() && a.getAttribute('href') === 'http://www.google.com/' && r.right <= window.innerWidth && r.bottom <= window.innerHeight && r.width > 40; })()",
+    "intact": "(() => { const t = document.getElementById('wm-ipp-base'); const logo = [...document.images].find((i) => /logo/.test(i.getAttribute('src') || '')); const q = document.querySelector('input[name=q]'); return !!t && t.checkVisibility() && !!logo && logo.checkVisibility() && !!q && q.checkVisibility(); })()"
+  },
+  "demand": {
+    "score": 37,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/17108",
+        "note": "Wayback Machine Original Button (total installs)"
+      }
+    ]
+  }
+}

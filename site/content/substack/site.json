@@ -1,0 +1,7 @@
+{
+  "slug": "substack",
+  "name": "Substack",
+  "domains": ["substack.com"],
+  "category": "news",
+  "intro": "Userscripts for reading Substack newsletters in the browser. Each one was run against a live publication logged out."
+}

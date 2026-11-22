@@ -1,0 +1,60 @@
+{
+  "slug": "hide-listings",
+  "title": "Hide Craigslist listings by keyword",
+  "question": "How do I hide or block certain posts on Craigslist?",
+  "answer": "Craigslist lets you hide one posting at a time with the hide button on each result, but it has no keyword filter. The usermods script on this page adds a small box to search pages where you type words separated by commas; every listing whose title contains one of them disappears, and the box shows how many were hidden. The words are saved in your browser. Without an extension, Craigslist's search accepts a minus sign before a word, such as -wanted, to leave it out of one search.",
+  "prompt": "On Craigslist search results, add a box where I can type words and hide every listing whose title contains one of them.",
+  "details": "The box sits in the bottom right corner of search pages. Matching ignores case and looks for each word anywhere in the title, so `iphone` also hides `iPhone 12`. The list is kept in `localStorage` for craigslist.org, so it applies to every search and city until you edit it; clear the box to show everything again.\n\nThe script keeps filtering as Craigslist loads more results. It doesn't read listing descriptions, prices or posters, and it doesn't touch Craigslist's own hidden postings. The check types a word from one listing's title into the box on the San Francisco Bay Area for-sale search and confirms those listings are hidden and the rest stay.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Hide posting button",
+      "body": "Each search result has a hide posting button. Craigslist remembers the postings you hide in your browser."
+    },
+    {
+      "kind": "other",
+      "title": "Exclude words in the search",
+      "body": "Put a minus sign before a word in the search box, for example `couch -sleeper`, to leave out listings with that word. It applies only to that search."
+    }
+  ],
+  "related": [
+    "craigslist/dark-mode"
+  ],
+  "demand": {
+    "score": 34,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/29453",
+        "note": "Craig's Unlister (80 total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/1746",
+        "note": "Craiglist hide items (78 total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/423272",
+        "note": "Craigslist Search Hide All (18 total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=craigslist%20hide%20posts",
+        "note": "suggestions: craigslist hide post, craigslist hidden post, craigslist show hidden posts"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://sfbay.craigslist.org/search/sss"
+    ],
+    "loggedOut": true,
+    "waitFor": ".cl-search-result[title]",
+    "settleMs": 3000,
+    "actions": "const t = [...document.querySelectorAll('.cl-search-result[title]')].map((r) => r.getAttribute('title').toLowerCase()); window.__usermodsWord = t.slice(4).flatMap((s) => s.split(/[^a-z0-9]+/)).find((w) => w.length >= 5 && t.filter((s) => s.includes(w)).length < t.length / 4); const box = document.getElementById('usermods-hide-words'); if (box) { box.value = window.__usermodsWord; box.dispatchEvent(new Event('input', { bubbles: true })); }",
+    "baseline": "(() => { const w = window.__usermodsWord; const r = [...document.querySelectorAll('.cl-search-result[title]')]; const hit = r.filter((e) => e.getAttribute('title').toLowerCase().includes(w)); return !!w && hit.length >= 1 && hit.every((e) => e.checkVisibility()) && !document.getElementById('usermods-hide-box'); })()",
+    "expect": "(() => { const w = window.__usermodsWord; const r = [...document.querySelectorAll('.cl-search-result[title]')]; const hit = r.filter((e) => e.getAttribute('title').toLowerCase().includes(w)); return !!w && document.getElementById('usermods-hide-box').checkVisibility() && hit.length >= 1 && hit.every((e) => !e.checkVisibility()) && document.getElementById('usermods-hide-count').textContent === ' (' + hit.length + ' hidden)'; })()",
+    "intact": "(() => { const w = window.__usermodsWord; return [...document.querySelectorAll('.cl-search-result[title]')].filter((e) => !e.getAttribute('title').toLowerCase().includes(w) && e.checkVisibility()).length >= 20; })()"
+  }
+}

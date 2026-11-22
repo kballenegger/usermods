@@ -1,0 +1,7 @@
+{
+  "slug": "devto",
+  "name": "DEV Community",
+  "domains": ["dev.to"],
+  "category": "social",
+  "intro": "Userscripts for reading articles on DEV (dev.to), checked against the live site while logged out."
+}

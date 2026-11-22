@@ -1,0 +1,46 @@
+{
+  "slug": "inline-footnotes",
+  "title": "Show Wikipedia footnotes inline",
+  "question": "How do I read Wikipedia footnotes without jumping to the bottom?",
+  "answer": "On desktop Wikipedia you can hover over a footnote number such as [1] to see the reference in a pop-up, but clicking it still jumps to the reference list at the bottom of the article. The usermods script on this page changes the click: the note opens in a box right after the number, inside the sentence you are reading, and a second click closes it. The page does not scroll. Without a script, hovering is the built-in way to read a note in place.",
+  "prompt": "When I click a footnote number on Wikipedia, show the note inline next to it instead of jumping to the references.",
+  "details": "The script copies the text of the reference from the list at the bottom, links included, into a small box after the footnote number. It handles plain clicks only; Ctrl-, Cmd- and Shift-clicks behave as before. The hover previews and the reference list are left as they are, and the box uses Wikipedia's own colours, so it follows the site's dark mode.\n\nIt works on any Wikipedia language edition. The check loads one English article and clicks the first footnote.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Reference previews",
+      "body": "Hovering over a footnote number shows the reference in a pop-up. It is on by default; logged out, you can turn previews on or off from the pop-up's settings link."
+    }
+  ],
+  "related": [
+    "wikipedia/full-width",
+    "wikipedia/dark-mode"
+  ],
+  "demand": {
+    "score": 42,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/476",
+        "note": "Wikipedia Inline Footnotes (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=wikipedia%20footnotes",
+        "note": "returns the query; suggestions: wikipedia footnotes | wikipedia style footnotes | what are the footnotes"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://en.wikipedia.org/wiki/Moon"
+    ],
+    "loggedOut": true,
+    "waitFor": "#mw-content-text sup.reference",
+    "settleMs": 3000,
+    "actions": "document.querySelector('#mw-content-text sup.reference > a[href^=\"#cite_note\"]').click(); await new Promise((r) => setTimeout(r, 500));",
+    "baseline": "location.hash.startsWith('#cite_note') && !document.querySelector('.um-inline-note')",
+    "expect": "(() => { const sup = document.querySelector('#mw-content-text sup.reference'); const box = sup.nextElementSibling; const note = document.getElementById(decodeURIComponent(sup.querySelector('a').hash.slice(1))).querySelector('.reference-text'); return location.hash === '' && !!box && box.classList.contains('um-inline-note') && box.checkVisibility() && box.textContent.trim().length > 5 && box.textContent.trim() === note.textContent.trim(); })()",
+    "intact": "[...document.querySelectorAll('#mw-content-text p')].filter((p) => p.checkVisibility() && p.textContent.trim().length > 50).length >= 10 && document.querySelectorAll('ol.references li[id^=\"cite_note\"]').length > 50"
+  }
+}

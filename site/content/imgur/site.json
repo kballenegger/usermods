@@ -1,0 +1,7 @@
+{
+  "slug": "imgur",
+  "name": "Imgur",
+  "domains": ["imgur.com", "i.imgur.com"],
+  "category": "social",
+  "intro": "Userscripts for Imgur on desktop: see whole posts at once and get to the images with fewer clicks."
+}

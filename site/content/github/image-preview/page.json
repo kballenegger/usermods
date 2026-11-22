@@ -1,0 +1,40 @@
+{
+  "slug": "image-preview",
+  "title": "Preview images in GitHub file lists",
+  "question": "How do I see image thumbnails when browsing a GitHub folder?",
+  "answer": "GitHub has no thumbnail view; folders list images by name with a generic file icon, and you have to open each file to see it. The usermods script on this page replaces that icon with a small thumbnail of the image in folder and repository file lists, and shows a larger preview when you hover over it. It covers PNG, JPEG, GIF, SVG, WebP, AVIF, BMP and ICO files. Without an extension, opening a file shows one image at a time.",
+  "prompt": "Show image thumbnails instead of file icons when I browse a folder on GitHub.",
+  "details": "For each image in the list, the script loads the file from raw.githubusercontent.com, the same address GitHub's Raw button uses. Thumbnails load lazily, so a folder of a thousand images only fetches the rows you scroll to. Hovering a thumbnail scales it up six times.\n\nThe file tree on the left and other file types keep their icons. Images in private repositories need a signed-in token in the raw URL, which the script does not add, so their thumbnails stay blank.",
+  "alternatives": [
+    {
+      "kind": "extension",
+      "title": "Image Preview for Git",
+      "body": "The Image Preview for Git (GitHub/GitLab) extension for Chrome shows previews on hover."
+    }
+  ],
+  "related": [
+    "github/file-icons",
+    "github/copy-raw-url",
+    "github/full-width"
+  ],
+  "check": {
+    "urls": [
+      "https://github.com/simple-icons/simple-icons/tree/develop/icons"
+    ],
+    "loggedOut": true,
+    "waitFor": "tr.react-directory-row a[href*=\"/blob/\"]",
+    "settleMs": 4000,
+    "baseline": "(() => { const cols = [...document.querySelectorAll('.react-directory-filename-column')].filter((c) => c.checkVisibility() && /\\.svg$/.test(c.querySelector('a[href*=\"/blob/\"]')?.getAttribute('href') || '')); return cols.length >= 100 && cols.every((c) => c.querySelector('svg.octicon-file')?.checkVisibility() && !c.querySelector('img')); })()",
+    "expect": "(() => { const cols = [...document.querySelectorAll('.react-directory-filename-column')].filter((c) => c.checkVisibility() && /\\.svg$/.test(c.querySelector('a[href*=\"/blob/\"]')?.getAttribute('href') || '')); if (cols.length < 100) return false; const thumbs = cols.map((c) => c.querySelector('img.usermods-thumb')); if (!thumbs.every((t) => t && t.checkVisibility())) return false; if (cols.some((c) => c.querySelector('svg.octicon-file')?.checkVisibility())) return false; const first = thumbs.slice(0, 8); return first.every((t) => t.complete && t.naturalWidth > 0 && t.src === 'https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/' + t.closest('.react-directory-filename-column').querySelector('a[href*=\"/blob/\"]').textContent.trim()); })()",
+    "intact": "[...document.querySelectorAll('tr.react-directory-row a[href*=\"/blob/\"]')].filter((a) => a.checkVisibility()).length >= 100"
+  },
+  "demand": {
+    "score": 51,
+    "evidence": [
+      { "type": "greasyfork", "url": "https://greasyfork.org/en/scripts/19773", "note": "Greasy Fork total installs, \"GitHub Image Preview\", 1,137 (api.greasyfork.org)" },
+      { "type": "greasyfork", "url": "https://greasyfork.org/en/scripts/6262", "note": "Greasy Fork total installs, \"Github Image Viewer\", 631 (api.greasyfork.org)" },
+      { "type": "cws", "url": "https://chromewebstore.google.com/detail/elbgjjbgjkachhhekinlpjkdidkkface", "note": "Chrome Web Store users, \"Image Preview for Git (GitHub/GitLab)\", 119" },
+      { "type": "autocomplete", "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=github%20image%20preview", "note": "Google suggests \"github image preview\" and \"github image preview extension\"" }
+    ]
+  }
+}

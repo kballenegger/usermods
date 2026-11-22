@@ -1,0 +1,66 @@
+{
+  "slug": "playback-speed",
+  "title": "Change Vimeo playback speed",
+  "question": "How do I speed up Vimeo videos?",
+  "answer": "Click the Speed button, the gauge icon in the Vimeo player's control bar, and pick a speed from 0.5x to 4x. Uploaders can hide that button. The usermods script on this page adds keyboard shortcuts instead: Shift+. speeds the video up and Shift+, slows it down in steps of 0.25, from 0.25x to 4x, with the new speed shown on screen. The shortcuts work whether or not the Speed button is there.",
+  "prompt": "Let me change the speed of Vimeo videos with the keyboard, even when the speed menu is hidden.",
+  "details": "Each key press steps from the video's current speed, so a speed picked in Vimeo's own menu is the starting point. The keys are ignored while you type in a comment or search box. The speed is not remembered between videos.\n\nThe script also runs on player.vimeo.com, which is the player inside videos embedded on other sites, but only when that player has keyboard focus; the check covers a video page on vimeo.com.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "The speed button",
+      "body": "The gauge icon in the player's control bar offers speeds from 0.5x to 4x, unless the uploader turned it off."
+    },
+    {
+      "kind": "extension",
+      "title": "Video speed extensions",
+      "body": "General video speed extensions for Chrome and Firefox, such as Video Speed Controller, also work on Vimeo."
+    }
+  ],
+  "related": [
+    "vimeo/theater-mode",
+    "youtube/faster-playback-speed"
+  ],
+  "check": {
+    "urls": [
+      "https://vimeo.com/76979871"
+    ],
+    "loggedOut": true,
+    "waitFor": "video",
+    "settleMs": 4000,
+    "actions": "const fire = (k) => document.body.dispatchEvent(new KeyboardEvent('keydown', { key: k, code: k === '>' ? 'Period' : 'Comma', shiftKey: true, bubbles: true, cancelable: true })); fire('>'); fire('>'); fire('>'); fire('>'); fire('<'); await new Promise((r) => setTimeout(r, 500));",
+    "baseline": "(() => { const v = document.querySelector('video'); return !!v && v.checkVisibility() && v.playbackRate === 1 && !document.getElementById('usermods-speed-badge'); })()",
+    "expect": "(() => { const v = document.querySelector('video'); const badge = document.getElementById('usermods-speed-badge'); return !!v && v.playbackRate === 1.75 && !!badge && badge.textContent === '1.75x'; })()",
+    "intact": "(() => { const v = document.querySelector('video'); const r = v.getBoundingClientRect(); return v.checkVisibility() && r.width > 800 && v.duration > 30 && !!document.querySelector('.vp-video-wrapper') && /Vimeo Player/i.test(document.title); })()"
+  },
+  "demand": {
+    "score": 63,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/30506",
+        "note": "Greasy Fork total installs, \"Video Speed Buttons\" (multi-site), 7,161"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/25525",
+        "note": "Greasy Fork total installs, \"Vimeo Player Speed Slider\", 397"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/cdnjpfijkhabobehbclcaoejipccgplk",
+        "note": "Chrome Web Store users, \"Vimeo / Bunny Instant Speed\", 171"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=vimeo%20playback%20speed",
+        "note": "Google suggests \"vimeo playback speed not showing\" and \"vimeo playback speed shortcut\""
+      },
+      {
+        "type": "forum",
+        "url": "https://webapps.stackexchange.com/questions/82220/adjust-playback-speed-on-vimeo-to-watch-videos-faster",
+        "note": "Web Apps Stack Exchange: \"Adjust playback speed on Vimeo to watch videos faster\", 10,662 views"
+      }
+    ]
+  }
+}

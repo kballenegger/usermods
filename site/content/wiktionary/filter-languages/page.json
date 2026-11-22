@@ -1,0 +1,38 @@
+{
+  "slug": "filter-languages",
+  "title": "Show only your languages on Wiktionary",
+  "question": "How do I hide other languages on a Wiktionary entry?",
+  "answer": "Wiktionary has no setting that hides other languages for logged-out readers; an entry like \"set\" lists dozens of languages one after another. The usermods script on this page hides every language section except English and Translingual, removes the hidden languages from the table of contents, and adds a Show all button at the top of the entry. You can edit the list of languages in the script. Logged in, the Tabbed Languages gadget in your preferences shows one language at a time instead.",
+  "prompt": "On Wiktionary, hide every language section except English and Translingual.",
+  "details": "Wiktionary entries are one long list: each language starts at a level-2 heading (English, French, Latin) and runs until the next. Once the page has loaded, the script tags everything under a language that isn't in its `KEEP` list and hides it with CSS, along with that language's line in the sidebar contents. A bar above the first language says how many languages are shown, and its button switches between your languages and all of them.\n\nTo keep other languages, add their names to `KEEP` at the top of the script, spelled exactly as in the headings, for example `'Old English'` or `'Chinese'`. If an entry has none of your languages, or only your languages, the script leaves it alone. It runs on English Wiktionary (`en.wiktionary.org`) entries; the check loads the entry for \"set\", which has 41 language sections.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Tabbed Languages gadget (account needed)",
+      "body": "Logged in, go to **Preferences → Gadgets** and turn on **Enable Tabbed Languages**. Each language then gets a tab and only one shows at a time. It needs a Wiktionary account."
+    },
+    {
+      "kind": "site-setting",
+      "title": "Jump with the contents",
+      "body": "The sidebar contents and the **Languages** box at the top of long entries link to each language section, so you can jump to English without hiding the rest."
+    }
+  ],
+  "related": ["wiktionary/dark-mode", "wikipedia/hide-unused-languages"],
+  "demand": {
+    "score": 28,
+    "evidence": [
+      { "type": "greasyfork", "url": "https://greasyfork.org/en/scripts/13178", "note": "WikiLang (70 total installs)" },
+      { "type": "greasyfork", "url": "https://greasyfork.org/en/scripts/405881", "note": "Auto-WikiLang (AWL) (29 total installs)" },
+      { "type": "greasyfork", "url": "https://greasyfork.org/en/scripts/460178", "note": "Wiktionary: Filter & Flags (17 total installs)" }
+    ]
+  },
+  "check": {
+    "urls": ["https://en.wiktionary.org/wiki/set"],
+    "loggedOut": true,
+    "waitFor": "#mw-content-text .mw-heading2 h2",
+    "settleMs": 2000,
+    "baseline": "(() => { const h = [...document.querySelectorAll('#mw-content-text .mw-heading2')]; return h.length >= 20 && h.every((e) => e.checkVisibility()) && document.querySelector('#Afrikaans').closest('.mw-heading2').nextElementSibling.checkVisibility(); })()",
+    "expect": "(() => { const h = [...document.querySelectorAll('#mw-content-text .mw-heading2')]; const keep = ['English', 'Translingual']; const others = h.filter((e) => !keep.includes(e.querySelector('h2').textContent.trim())); const toc = document.querySelector('#vector-toc a[href=\"#Afrikaans\"]'); return others.length >= 20 && others.every((e) => !e.checkVisibility() && (!e.nextElementSibling || e.nextElementSibling.matches('.mw-heading2') || !e.nextElementSibling.checkVisibility())) && document.querySelector('#English').checkVisibility() && document.querySelector('#Translingual').checkVisibility() && toc && !toc.checkVisibility(); })()",
+    "intact": "(() => { const en = document.querySelector('#English').closest('.mw-heading2'); let n = 0; for (let e = en.nextElementSibling; e && !e.matches('.mw-heading2'); e = e.nextElementSibling) if (e.matches('ol') && e.checkVisibility()) n += e.querySelectorAll(':scope > li').length; return n >= 20 && document.querySelector('.um-langfilter-bar button').checkVisibility(); })()"
+  }
+}

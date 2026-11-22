@@ -1,0 +1,37 @@
+{
+  "slug": "dismiss-popups",
+  "title": "Dismiss Substack subscribe popups",
+  "question": "How do I stop Substack's subscribe popup?",
+  "answer": "Substack has no reader setting to turn off the subscribe popup that covers a newsletter's home page when you are logged out. The usermods script on this page hides that full-screen popup before it draws and shows the newsletter's home page that Substack hides behind it, with scrolling working. Without a script, click \"No thanks\" under the email box whenever it appears.",
+  "prompt": "Hide the full-screen subscribe popup on Substack newsletters.",
+  "details": "The script injects CSS at page start. It hides `.intro-popup`, the full-screen welcome box with the email field, and undoes what Substack does to the page while that box is open: `overflow: hidden` on `<html>` and `visibility: hidden` on the home page content.\n\nIt runs on `*.substack.com` addresses only. Publications on their own domain (for example a newsletter at `www.example.com`) need that domain added as an extra `@match` line. It does not touch the subscribe buttons and boxes inside posts. The check loads one publication's home page logged out.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Click \"No thanks\"",
+      "body": "The popup has a \"No thanks\" link and a close button. Either one closes it and lets the page scroll."
+    },
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filter",
+      "body": "This hides the popup but leaves a blank page that can't scroll, because Substack also hides the content underneath. Not run by the check.\n\n```\nsubstack.com##.intro-popup\n```"
+    }
+  ],
+  "related": ["substack/widescreen", "substack/disable-quote-popup"],
+  "demand": {
+    "score": 34,
+    "evidence": [
+      { "type": "greasyfork", "url": "https://greasyfork.org/en/scripts/465222", "note": "Greasy Fork total installs: \"substack_popup_dismisser\" (175)" },
+      { "type": "greasyfork", "url": "https://greasyfork.org/en/scripts/594856", "note": "Greasy Fork total installs: \"Substack: Auto-close the subscribe, referral, and sign-in popups\" (7)" }
+    ]
+  },
+  "check": {
+    "urls": ["https://garymarcus.substack.com/"],
+    "loggedOut": true,
+    "waitFor": "a[href*=\"/p/\"]",
+    "settleMs": 4000,
+    "baseline": "(() => { const p = document.querySelector('.intro-popup'); return !!p && p.checkVisibility() && getComputedStyle(document.documentElement).overflowY === 'hidden'; })()",
+    "expect": "(() => { const p = document.querySelector('.intro-popup'); return !!p && !p.checkVisibility() && getComputedStyle(document.documentElement).overflowY !== 'hidden'; })()",
+    "intact": "[...document.querySelectorAll('a[href*=\"/p/\"]')].filter((a) => a.checkVisibility({ visibilityProperty: true }) && a.getBoundingClientRect().width > 0).length >= 5"
+  }
+}

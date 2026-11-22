@@ -1,0 +1,39 @@
+{
+  "slug": "table-of-contents",
+  "title": "Table of contents for DEV articles",
+  "question": "How do I get a table of contents on dev.to articles?",
+  "answer": "DEV does not build a table of contents for articles; you only get one when the author writes it by hand. The usermods script on this page lists the article's section headings in a \"Contents\" box at the top of the right sidebar, linked to DEV's own heading anchors, and the box stays in view as you scroll. Without an extension, every heading on DEV is a link, so you can copy a heading's link to jump back to that section.",
+  "prompt": "Add a table of contents to dev.to articles in the right sidebar, built from the article headings.",
+  "details": "The script reads the `h2` and `h3` headings inside `#article-body`; DEV gives each one an anchor such as `#overview`. Second-level headings are indented. Articles with fewer than two headings get no box. Nothing is fetched, and the article text and comments are not changed. The box sits in the right sidebar, so it is not shown on narrow windows where DEV hides that sidebar, and it disappears if you also use a script that hides the sidebars.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Heading links",
+      "body": "Hover a heading in a DEV article: it is a link to `#section-name`, which you can copy or bookmark."
+    }
+  ],
+  "related": [
+    "devto/hide-sidebars"
+  ],
+  "check": {
+    "urls": [
+      "https://dev.to/unseenwizzard/learn-git-concepts-not-commands-4gjc"
+    ],
+    "loggedOut": true,
+    "waitFor": "#article-body",
+    "settleMs": 3000,
+    "baseline": "(() => { const hs = [...document.querySelectorAll('#article-body h2 a[href^=\"#\"], #article-body h3 a[href^=\"#\"]')]; const aside = document.querySelector('aside.crayons-layout__sidebar-right'); return hs.length >= 10 && !!aside && aside.checkVisibility() && !document.querySelector('nav[aria-label=\"Table of contents\"]'); })()",
+    "expect": "(() => { const nav = document.querySelector('aside.crayons-layout__sidebar-right nav.usermods-toc'); if (!nav || !nav.checkVisibility()) return false; const links = [...nav.querySelectorAll('a')]; const heads = [...document.querySelectorAll('#article-body h2, #article-body h3')].filter((h) => h.querySelector('a[href^=\"#\"]')); return links.length === heads.length && links.length >= 10 && links.every((a) => a.checkVisibility()) && links.some((a) => a.getAttribute('href') === '#branching' && a.textContent.trim() === 'Branching'); })()",
+    "intact": "(() => { const b = document.querySelector('#article-body'); const h = document.querySelector('h1'); return !!b && b.checkVisibility() && b.getBoundingClientRect().width > 600 && !!h && h.checkVisibility(); })()"
+  },
+  "demand": {
+    "score": 58,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/406337",
+        "note": "Toc Bar, auto-generating table of content (total installs)"
+      }
+    ]
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "slug": "larger-font",
+  "title": "Make Hacker News text bigger",
+  "question": "How do I increase the font size on Hacker News?",
+  "answer": "Hacker News has no font size setting; its stylesheet fixes titles at 10 point, comments at 9 point and the line under each story at 7 point. The usermods script on this page raises each of those by about a third and adds line spacing to comments, so the front page and comment threads are easier to read without zooming the whole layout. Install it with usermods or any userscript manager. Without a userscript, browser zoom (Ctrl or Cmd and +) enlarges everything on the page.",
+  "prompt": "Make the text on Hacker News bigger, especially titles and comments.",
+  "details": "The script injects CSS that replaces Hacker News's fixed point sizes: 13pt for titles and body text, 12pt with 1.45 line height for comments, 10.5pt for comment headers and 10pt for the points-and-comments line. It changes no colours and no layout widths.\n\nThe check loads the front page and a comment thread.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Browser zoom",
+      "body": "Ctrl and + (Cmd and + on a Mac) zooms the whole page. Chrome and Firefox remember the zoom level per site, so it sticks for news.ycombinator.com."
+    },
+    {
+      "kind": "other",
+      "title": "Minimum font size",
+      "body": "Chrome's Settings, Appearance, Customize fonts has a minimum font size that lifts the smallest text on every site."
+    }
+  ],
+  "related": [
+    "hackernews/dark-mode",
+    "hackernews/collapse-comments",
+    "hackernews/open-links-new-tab"
+  ],
+  "demand": {
+    "score": 44,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/405014",
+        "note": "Increase HN Font Size (181 total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/397613",
+        "note": "Hacker News (ycombinator) more readable (183 total installs)"
+      },
+      {
+        "type": "forum",
+        "url": "https://news.ycombinator.com/item?id=12928513",
+        "note": "Increase Hacker News Font Size?"
+      },
+      {
+        "type": "forum",
+        "url": "https://news.ycombinator.com/item?id=12036162",
+        "note": "Why is the font on Hacker News so small?"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://news.ycombinator.com/",
+      "https://news.ycombinator.com/item?id=12036162"
+    ],
+    "loggedOut": true,
+    "waitFor": ".titleline",
+    "settleMs": 1500,
+    "baseline": "(() => { const fs = (s) => [...document.querySelectorAll(s)].map((e) => parseFloat(getComputedStyle(e).fontSize)); const t = fs('.titleline'), c = fs('.commtext'); return t.length > 0 && t.every((s) => s < 14) && c.every((s) => s < 13); })()",
+    "expect": "(() => { const fs = (s) => [...document.querySelectorAll(s)].map((e) => parseFloat(getComputedStyle(e).fontSize)); const t = fs('.titleline'), c = fs('.commtext'), m = fs('.subline, .comhead'); return t.length > 0 && t.every((s) => s >= 17) && c.every((s) => s >= 16) && m.length > 0 && m.every((s) => s >= 13); })()",
+    "intact": "[...document.querySelectorAll('tr.athing')].filter((r) => r.checkVisibility()).length >= 5"
+  }
+}

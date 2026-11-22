@@ -19,6 +19,7 @@
     "zip:safari:store": "USERMODS_STORE=1 wxt zip -b safari",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test test/*.test.ts",
+    "test:site": "node --test site/test/*.test.ts",
     "postinstall": "wxt prepare",
     "popover-size": "npm run build:safari && node scripts/safari-preview.mjs --popover-size",
     "safari-providers": "npm run build:safari && node scripts/safari-preview.mjs --providers",

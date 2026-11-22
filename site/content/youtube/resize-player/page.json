@@ -1,0 +1,70 @@
+{
+  "slug": "resize-player",
+  "title": "Make the YouTube player fill the window",
+  "question": "How do I make the YouTube player wider without full screen?",
+  "answer": "YouTube's theater mode, the rectangle button at the bottom right of the player or the T key, makes the player as wide as the window, but it still stops well short of the window's height. The usermods script on this page opens every video in theater mode and stretches the player to the full height below the top bar. Install it with usermods or any userscript manager. Without an extension, press T on each video for theater mode.",
+  "prompt": "Make the YouTube player fill the whole browser window below the top bar, without going full screen.",
+  "details": "Once the player has loaded a video, the script clicks YouTube's own theater mode button if theater mode is off, then one CSS rule gives the player the full window height below the top bar. The video keeps its shape; YouTube adds black bars when the window's shape doesn't match the video's.\n\nScroll down for the title, description, comments and related videos. Full screen works as before. Pressing T switches back to the default layout until the next video loads, when the script turns theater mode on again. The check loads a watch page directly; clicking through to another video inside YouTube uses the same player event but is not loaded by the check.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Theater mode",
+      "body": "Click the theater mode button (a wide rectangle, next to full screen) or press **T**. YouTube remembers the choice. The player spans the window's width but leaves about 170 px of the window's height to the page below it."
+    },
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filter",
+      "body": "With theater mode on, this filter gives the player the full height, like the script's CSS. Our check runs the script, not this filter.\n\n```\nwww.youtube.com##ytd-watch-flexy[theater]:not([fullscreen]) #full-bleed-container:style(height: calc(100vh - 56px) !important; max-height: none !important)\n```"
+    },
+    {
+      "kind": "extension",
+      "title": "Enhancer for YouTube",
+      "body": "Enhancer for YouTube has a player size option among many other features."
+    }
+  ],
+  "related": [
+    "youtube/default-playback-speed",
+    "youtube/hide-live-chat"
+  ],
+  "demand": {
+    "score": 90,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/811",
+        "note": "Resize YT To Window Size (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/10523",
+        "note": "YouTube - Always Theater Mode (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/dgognhgbpdoeidccnbfhohblklhbbomh",
+        "note": "Theater Mode for YouTube™ (large player view) (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/ponfpcnoihfmfllpaingbgckeeldkhle",
+        "note": "Enhancer for YouTube™ (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20theater%20mode%20full%20width",
+        "note": "does not return the exact query; suggestions: "
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.youtube.com/watch?v=jNQXAC9IVRw"
+    ],
+    "loggedOut": true,
+    "waitFor": "#movie_player video",
+    "settleMs": 4000,
+    "baseline": "(() => { const r = document.querySelector('#movie_player').getBoundingClientRect(); return r.width > 0 && r.width < innerWidth - 200 && r.height < innerHeight - 150; })()",
+    "expect": "(() => { const r = document.querySelector('#movie_player').getBoundingClientRect(); const head = document.querySelector('#masthead-container').getBoundingClientRect().height; return document.querySelector('ytd-watch-flexy').hasAttribute('theater') && Math.abs(r.width - document.documentElement.clientWidth) <= 2 && Math.abs(r.top - head) <= 2 && Math.abs(r.bottom - innerHeight) <= 2; })()",
+    "intact": "(() => { const v = document.querySelector('#movie_player video').getBoundingClientRect(); return v.height >= innerHeight - 60 && v.width > 900 && document.querySelector('ytd-watch-metadata h1')?.innerText.trim().length > 0; })()"
+  }
+}

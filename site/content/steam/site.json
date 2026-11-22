@@ -1,0 +1,7 @@
+{
+  "slug": "steam",
+  "name": "Steam",
+  "domains": ["store.steampowered.com", "steamcommunity.com"],
+  "category": "shopping",
+  "intro": "Userscripts for the Steam store and community: direct outbound links, a SteamDB button and review percentages you can read without hovering."
+}

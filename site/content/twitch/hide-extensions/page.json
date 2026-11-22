@@ -1,0 +1,46 @@
+{
+  "slug": "hide-extensions",
+  "title": "Hide extension overlays on Twitch",
+  "question": "How do I turn off extension overlays on Twitch streams?",
+  "answer": "Twitch's player settings menu has no option to turn extension overlays off, so a userscript is the simplest way. The usermods script on this page hides every overlay extension drawn on top of the video and the column of extension icons on the right edge of the player, on every channel. Extension panels in the About section under the stream stay where they are. Install it with usermods or any userscript manager.",
+  "prompt": "Hide the extension overlays and the extension icons on top of the Twitch video player.",
+  "details": "Twitch puts overlay extensions in transparent frames laid over the video, inside an element with the class `extensions-video-overlay-size-container`, and lists the channel's extensions as icons in a dock on the right edge of the player. The script hides both with CSS, along with the popovers and introduction balloons that open from the dock, so clicks reach the player again.\n\nExtension panels below the stream (leaderboards, schedules and the like in the About section) are left alone. The check loads a live channel that runs an overlay extension; channels without one look the same with or without the script.",
+  "alternatives": [
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filter",
+      "body": "The same rules as the script. Our check runs the script, not these filters.\n\n```\nwww.twitch.tv##.extensions-video-overlay-size-container\nwww.twitch.tv##.extensions-dock__layout\n```"
+    }
+  ],
+  "related": [
+    "twitch/theater-mode",
+    "twitch/hide-chat",
+    "twitch/hide-sidebar"
+  ],
+  "demand": {
+    "score": 59,
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/nmogopjdbhhnbkiklkdahphkdpbjfine",
+        "note": "Disable Twitch extensions (4,000 users)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=twitch%20hide%20extensions",
+        "note": "suggestions: twitch hide extensions | what are twitch extensions | twitch disable extensions | how to use extensions on twitch"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.twitch.tv/caseoh_"
+    ],
+    "loggedOut": true,
+    "waitFor": ".extensions-video-overlay-size-container iframe",
+    "settleMs": 5000,
+    "baseline": "(() => { const o = document.querySelector('.extensions-video-overlay-size-container'); const d = document.querySelector('.extensions-dock__layout'); return !!o && o.checkVisibility() && !!d && d.checkVisibility(); })()",
+    "expect": "(() => { const o = [...document.querySelectorAll('.extensions-video-overlay-size-container')]; return o.length > 0 && o.every((e) => !e.checkVisibility()) && [...document.querySelectorAll('.extensions-dock__layout, .extensions-dock-card')].every((e) => !e.checkVisibility()); })()",
+    "intact": "(() => { const v = document.querySelector('video'); if (!v || !v.checkVisibility()) return false; const r = v.getBoundingClientRect(); return r.width > 500 && r.height > 250; })()"
+  }
+}

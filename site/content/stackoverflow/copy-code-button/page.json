@@ -1,0 +1,42 @@
+{
+  "slug": "copy-code-button",
+  "title": "Add a copy button to code on Stack Overflow",
+  "question": "How do I add a copy button to code on Stack Overflow?",
+  "answer": "Stack Overflow has no copy button on ordinary code blocks and no setting to add one, so you have to select the code by hand. The usermods script on this page puts a Copy button in the top right corner of every code block in questions and answers. One click copies the whole block to the clipboard, and the button reads Copied for a moment. The code itself and the rest of the page are unchanged.",
+  "prompt": "Add a copy button to every code block on Stack Overflow.",
+  "details": "The script wraps each code block in a container and adds a button styled with Stack Overflow's own button classes, so it matches the light and dark themes. The button stays put when a long line makes the code scroll sideways. It copies the block's text as shown, without the syntax highlighting markup. If the browser refuses clipboard access, the button says Copy failed.\n\nA MutationObserver adds buttons to code that appears later, such as the live preview under the answer editor. The check loads a question page, confirms every code block has a button and clicks the first one. Runnable Stack Snippets keep their own buttons as well.",
+  "alternatives": [
+    {
+      "kind": "extension",
+      "title": "Code copy extensions",
+      "body": "General extensions that add copy buttons to code blocks on any site also work on Stack Overflow."
+    }
+  ],
+  "related": [
+    "stackoverflow/hide-hot-network-questions",
+    "stackoverflow/dark-mode",
+    "stackoverflow/wide-layout"
+  ],
+  "check": {
+    "urls": [
+      "https://stackoverflow.com/questions/11227809/why-is-processing-a-sorted-array-faster-than-processing-an-unsorted-array"
+    ],
+    "loggedOut": true,
+    "waitFor": "#question .s-prose pre",
+    "settleMs": 3000,
+    "actions": "const b = document.querySelector(\".um-copy\"); if (b) { b.click(); await new Promise((r) => setTimeout(r, 300)); }",
+    "baseline": "(() => { const p = [...document.querySelectorAll(\".s-prose pre\")]; return p.length >= 5 && p.every((x) => x.checkVisibility() && !x.parentElement.querySelector(\"button\")); })()",
+    "expect": "(() => { const p = [...document.querySelectorAll(\".s-prose pre\")]; const b = [...document.querySelectorAll(\".um-copy\")]; return p.length >= 5 && b.length === p.length && b.every((x) => x.checkVisibility() && x.parentElement.contains(x.parentElement.querySelector(\"pre\"))) && b[0].textContent === \"Copied\"; })()",
+    "intact": "(() => { const q = document.querySelector(\"#question .s-prose\"); const a = [...document.querySelectorAll(\"#answers .answer\")].filter((x) => x.checkVisibility()); return !!q && q.checkVisibility() && a.length >= 5 && [...document.querySelectorAll(\".s-prose pre\")].every((x) => x.checkVisibility() && x.textContent.length > 0); })()"
+  },
+  "demand": {
+    "score": 32,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/438065",
+        "note": "Greasy Fork total installs: \"Stackoverflow Add Button For Copy to clipboard\" (read via api.greasyfork.org, 2026-11-17) (140 total installs)"
+      }
+    ]
+  }
+}

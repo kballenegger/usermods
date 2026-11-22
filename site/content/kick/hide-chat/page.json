@@ -1,0 +1,46 @@
+{
+  "slug": "hide-chat",
+  "title": "Hide chat on Kick",
+  "question": "How do I hide the chat on Kick?",
+  "answer": "Kick's chat panel has a collapse button at its top left, but chat comes back on the next page load. The usermods script on this page hides the chat column on every Kick stream and VOD, including chat replay, and the player grows into the freed space. The rest of the page, including the channel info and the video list below the player, stays as it is. For a one-off, use the collapse button in the chat header.",
+  "prompt": "Hide the chat on Kick and let the video use the space.",
+  "details": "Kick's chat column has a fixed id, `#channel-chatroom`. One CSS rule hides it and the wrappers around it that hold nothing else, so nothing flashes on load and it keeps working as you move between channels. While the script is on there is no way to bring chat back on the page; turn the script off for that. Live channel pages wrap the chat differently from VOD pages and the rule covers both, but the check only loads a VOD page.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Collapse chat button",
+      "body": "The arrow icon at the top left of the chat panel collapses it. It lasts until you reload or open another channel."
+    },
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filter",
+      "body": "Hides the chat panel. Our check runs the script, not this filter.\n\n```\nkick.com###channel-chatroom\n```"
+    }
+  ],
+  "related": [
+    "kick/theater-mode",
+    "kick/click-to-pause"
+  ],
+  "check": {
+    "urls": [
+      "https://kick.com/lospollostv/videos/01a1d33b-ebd0-73ba-a568-6b54155cd924"
+    ],
+    "loggedOut": true,
+    "waitFor": "#channel-chatroom",
+    "settleMs": 5000,
+    "actions": "document.querySelector('[data-testid=mature]')?.click(); await new Promise((r) => setTimeout(r, 3000));",
+    "baseline": "(() => { const c = document.querySelector('#channel-chatroom'); return !!c && c.checkVisibility() && c.getBoundingClientRect().width > 200; })()",
+    "expect": "(() => { const c = document.querySelector('#channel-chatroom'); const v = document.querySelector('#video-player'); return !!c && !c.checkVisibility() && !!v && v.getBoundingClientRect().width > 1000; })()",
+    "intact": "(() => { const v = document.querySelector('#video-player'); return !!v && v.checkVisibility() && v.readyState >= 2 && !!document.querySelector('[data-theatre]'); })()"
+  },
+  "demand": {
+    "score": 5,
+    "evidence": [
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=kick%20hide%20chat",
+        "note": "returns \"kick hide chat\"; suggestions: kick hide chat | how to disable chat on kik | kick remove chat | how to hide chat on kik app | kick mobile hide chat"
+      }
+    ]
+  }
+}

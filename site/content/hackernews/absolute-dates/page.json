@@ -1,0 +1,30 @@
+{
+  "slug": "absolute-dates",
+  "title": "Show exact dates on Hacker News",
+  "question": "How do I see the exact date of a Hacker News post instead of \"3 hours ago\"?",
+  "answer": "Hover over the time on a Hacker News story or comment and the tooltip shows the exact time in UTC; there is no setting to show it on the page. The usermods script on this page replaces the relative times on stories and comments, such as \"3 hours ago\", with the full date and time in your own time zone, and keeps the relative text as the tooltip. Older posts already show a date, such as \"on Oct 22, 2020\".",
+  "prompt": "On Hacker News, show the exact date and time instead of \"3 hours ago\".",
+  "details": "Hacker News puts the UTC time of each story and comment in the `title` of its `span.age`. The script reads it, converts it to your time zone and writes it as `YYYY-MM-DD HH:MM` in place of the relative text. The link still goes to the item. The relative text moves to the link's tooltip.\n\nThe check loads the front page and the newest comments page. The script runs the same way on comment threads, user pages and the other story lists.",
+  "related": [
+    "hackernews/paywall-marker",
+    "hackernews/highlight-op",
+    "hackernews/collapse-comments"
+  ],
+  "demand": {
+    "score": 38,
+    "evidence": [
+      { "type": "greasyfork", "url": "https://greasyfork.org/en/scripts/23432", "note": "Hacker News Date Tooltips (total installs, read from api.greasyfork.org/en/scripts/by-site)" },
+      { "type": "forum", "url": "https://news.ycombinator.com/item?id=12835497", "note": "HN thread: Ask HN: How to get timestamp from HN comments?" },
+      { "type": "forum", "url": "https://news.ycombinator.com/item?id=1989384", "note": "HN thread: Ask PG: Timestamps on posts and comments?" }
+    ]
+  },
+  "check": {
+    "urls": ["https://news.ycombinator.com/", "https://news.ycombinator.com/newcomments"],
+    "loggedOut": true,
+    "waitFor": "span.age",
+    "settleMs": 2000,
+    "baseline": "(() => { const a = [...document.querySelectorAll('span.age a')]; return a.length >= 20 && a.filter((l) => / ago$/.test(l.textContent.trim())).length >= 20; })()",
+    "expect": "(() => { const ages = [...document.querySelectorAll('span.age[title]')]; return ages.length >= 20 && ages.every((s) => { const l = s.querySelector('a'); const d = new Date(s.title.split(' ')[0] + 'Z'); const p = (n) => String(n).padStart(2, '0'); const want = d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()); return l.textContent === want && / ago$/.test(l.title) && l.checkVisibility(); }); })()",
+    "intact": "(() => { const items = [...document.querySelectorAll('.titleline > a, .commtext')].filter((e) => e.checkVisibility()); return items.length >= 20 && [...document.querySelectorAll('span.age a')].every((l) => /item\\?id=\\d+/.test(l.getAttribute('href'))); })()"
+  }
+}

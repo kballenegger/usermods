@@ -1,0 +1,3086 @@
+[
+  {
+    "site": "google",
+    "siteName": "Google Search",
+    "domains": [
+      "google.com",
+      "www.google.com"
+    ],
+    "category": "search",
+    "task": "remove-ai-overview",
+    "title": "Remove the AI Overview from Google Search",
+    "question": "How do I turn off AI Overviews in Google Search?",
+    "queries": [
+      "hide ai overview google",
+      "how to turn off ai overview",
+      "remove ai overview from google search"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/hide-google-ai-overviews/neibhohkbmfjninidnaoacabkjonbahn",
+        "metric": 800000,
+        "note": "Chrome Web Store users: \"Hide Google AI Overviews\" (2026-11-17)"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/bye-bye-google-ai-turn-of/imllolhfajlbkpheaapjocclpppchggc",
+        "metric": 100000,
+        "note": "Chrome Web Store users: \"Bye Bye, Google AI\" (2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=hide+ai+overview+google",
+        "metric": null,
+        "note": "suggests \"hide ai overview google\""
+      },
+      {
+        "type": "forum",
+        "url": "https://support.google.com/websearch/thread/327544166/about-ai-overview?hl=en",
+        "metric": null,
+        "note": "Google Search Community: asks how to turn AI Overview off; answer: no setting"
+      },
+      {
+        "type": "forum",
+        "url": "https://support.google.com/websearch/thread/470923165/how-to-get-rid-of-ai-overview-for-good?hl=en-AU",
+        "metric": null,
+        "note": "Google Search Community: 'How to get rid of AI Overview for good'"
+      }
+    ],
+    "score": 99,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.google.com/search?q=how+to+bake+bread&hl=en",
+    "notes": "Google has no setting for this. AI Overviews may not render for logged-out headless sessions or some regions; E3 pilot already covers this task."
+  },
+  {
+    "site": "google",
+    "siteName": "Google Search",
+    "domains": [
+      "google.com",
+      "www.google.com"
+    ],
+    "category": "search",
+    "task": "block-sites",
+    "title": "Block sites from Google search results",
+    "question": "How do I block a website from showing up in Google search results?",
+    "queries": [
+      "block sites from google search results",
+      "block website from google search results"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/ublacklist/pncfbmialoiaghdehhbnbhkkgmjanfhe",
+        "metric": 200000,
+        "note": "Chrome Web Store users: \"uBlacklist\" (2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/1682",
+        "metric": 57092,
+        "note": "Greasy Fork total installs: \"Google Hit Hider by Domain (Search Filter / Block Sites)\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=block+sites+from+google+search+results",
+        "metric": null,
+        "note": "suggests \"block sites from google search results\""
+      },
+      {
+        "type": "forum",
+        "url": "https://news.ycombinator.com/item?id=29546433",
+        "metric": null,
+        "note": "Hacker News thread on uBlacklist; people asking to drop sites like Pinterest"
+      },
+      {
+        "type": "forum",
+        "url": "https://news.ycombinator.com/item?id=16613996",
+        "metric": null,
+        "note": "Hacker News: 'Pinterest needs to be removed from Google'"
+      }
+    ],
+    "score": 90,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.google.com/search?q=how+to+bake+bread&hl=en",
+    "notes": "Script keeps a domain list (GM storage) and hides matching results."
+  },
+  {
+    "site": "fandom",
+    "siteName": "Fandom",
+    "domains": [
+      "fandom.com"
+    ],
+    "category": "reference",
+    "task": "redirect-to-independent-wiki",
+    "title": "Redirect Fandom wikis to their independent versions",
+    "question": "How do I automatically go from Fandom to the independent wiki?",
+    "queries": [
+      "fandom redirect to wiki.gg",
+      "fandom wiki redirect"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/indie-wiki-buddy/fkagelmloambgokoeokbpihmgpkbgbfm",
+        "metric": 100000,
+        "note": "Chrome Web Store users: \"Indie Wiki Buddy\" (2026-11-17)"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/wikigg-redirect/cngoemokfjekjkmajenlaokhnmmiinca",
+        "metric": 10000,
+        "note": "Chrome Web Store users: \"wiki.gg Redirect\" (2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/476527",
+        "metric": 203,
+        "note": "Greasy Fork total installs: \"Fandom Redirect\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=fandom+wiki+redirect",
+        "metric": null,
+        "note": "suggests \"fandom wiki redirect extension\""
+      },
+      {
+        "type": "forum",
+        "url": "https://news.ycombinator.com/item?id=49604870",
+        "metric": null,
+        "note": "Hacker News 'Google Jail for independent wikis': users share redirect extensions"
+      },
+      {
+        "type": "forum",
+        "url": "https://news.ycombinator.com/item?id=42571619",
+        "metric": null,
+        "note": "Hacker News: Indie Wiki Buddy recommended to leave Fandom"
+      }
+    ],
+    "score": 85,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://minecraft.fandom.com/wiki/Creeper",
+    "notes": "Needs a mapping table of Fandom wikis to their new homes (e.g. minecraft.fandom.com to minecraft.wiki)."
+  },
+  {
+    "site": "duckduckgo",
+    "siteName": "DuckDuckGo",
+    "domains": [
+      "duckduckgo.com"
+    ],
+    "category": "search",
+    "task": "hide-ai",
+    "title": "Turn off AI answers on DuckDuckGo",
+    "question": "How do I turn off AI answers in DuckDuckGo?",
+    "queries": [
+      "duckduckgo turn off ai"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/duckduckgo-no-ai-search/faoilnlkccdjdkpljainiiimmijofmpd",
+        "metric": 40000,
+        "note": "Chrome Web Store users: \"DuckDuckGo No-AI Search\" (2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/540673",
+        "metric": 86,
+        "note": "Greasy Fork total installs: \"DuckDuckGo Remove AI\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=duckduckgo+turn+off+ai",
+        "metric": null,
+        "note": "suggests \"can you turn off ai in duckduckgo\""
+      },
+      {
+        "type": "forum",
+        "url": "https://news.ycombinator.com/item?id=48359130",
+        "metric": null,
+        "note": "Hacker News: complaints about DDG's AI popup"
+      },
+      {
+        "type": "forum",
+        "url": "https://windowsforum.com/threads/duckduckgo-no-ai-a-clear-opt-out-for-ai-free-search.399001/",
+        "metric": null,
+        "note": "WindowsForum thread on DuckDuckGo No AI opt-out"
+      }
+    ],
+    "score": 79,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://duckduckgo.com/?q=how+to+bake+bread",
+    "notes": "DDG has a setting and noai.duckduckgo.com; the script works without cookies or settings."
+  },
+  {
+    "site": "google",
+    "siteName": "Google Search",
+    "domains": [
+      "google.com",
+      "www.google.com"
+    ],
+    "category": "search",
+    "task": "date-filter-buttons",
+    "title": "Add one-click date filter buttons to Google Search",
+    "question": "How do I quickly filter Google results by date?",
+    "queries": [
+      "google search filter by date",
+      "google search sort by date"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/7543",
+        "metric": 57789,
+        "note": "Greasy Fork total installs: \"Google Search Extra Buttons\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=google+search+filter+by+date",
+        "metric": null,
+        "note": "suggests \"google search sort by date\""
+      }
+    ],
+    "score": 76,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.google.com/search?q=how+to+bake+bread&hl=en",
+    "notes": "The GF script adds past hour/day/week/month/year buttons; Google hides these under Tools."
+  },
+  {
+    "site": "amazon",
+    "siteName": "Amazon",
+    "domains": [
+      "amazon.com",
+      "www.amazon.com"
+    ],
+    "category": "shopping",
+    "task": "hide-rufus",
+    "title": "Hide Rufus (Alexa for Shopping) on Amazon",
+    "question": "How do I turn off Rufus on the Amazon website?",
+    "queries": [
+      "turn off rufus amazon",
+      "amazon remove rufus"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/adios-alexa-for-shopping/mieclgnidoedjdjgbkdbdeeighicndkk",
+        "metric": 20000,
+        "note": "Chrome Web Store users: \"Adios Alexa for Shopping (formerly Rufus Remover)\" (2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/556942",
+        "metric": 259,
+        "note": "Greasy Fork total installs: \"Amazon Rufus Remover\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=turn+off+rufus+amazon",
+        "metric": null,
+        "note": "suggests \"turn off rufus amazon website\""
+      },
+      {
+        "type": "forum",
+        "url": "https://sellercentral.amazon.com/seller-forums/discussions/t/ca5c82e8-5cdc-4d9b-b891-78d7e5fd1056",
+        "metric": null,
+        "note": "Amazon Seller Forums: 'On Amazon pages, how do I turn off Rufus?'"
+      },
+      {
+        "type": "forum",
+        "url": "https://www.bleepingcomputer.com/forums/t/812467/ai-chatbotrufus-on-amazon/",
+        "metric": null,
+        "note": "BleepingComputer forum: AI chatbot/Rufus on Amazon"
+      }
+    ],
+    "score": 75,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.amazon.com/s?k=usb+c+cable",
+    "notes": "Renamed 'Alexa for Shopping' in 2026. Not verified that the panel shows logged out; check with Browserbase."
+  },
+  {
+    "site": "google",
+    "siteName": "Google Search",
+    "domains": [
+      "google.com",
+      "www.google.com"
+    ],
+    "category": "search",
+    "task": "dark-mode",
+    "title": "Force dark mode on Google Search",
+    "question": "How do I make Google Search dark mode?",
+    "queries": [
+      "google search dark mode"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/dark-theme-for-google/apiabgjfojnkcepfmbdechlhfocpeenc",
+        "metric": 40000,
+        "note": "Chrome Web Store users: \"Dark Theme for Google™\" (2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/371272",
+        "metric": 2641,
+        "note": "Greasy Fork total installs: \"Google Search Dark Night Mode Theme\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=google+search+dark+mode",
+        "metric": null,
+        "note": "suggests \"google search dark mode not working\""
+      }
+    ],
+    "score": 74,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.google.com/search?q=how+to+bake+bread&hl=en",
+    "notes": "Google has a native dark theme; demand is for forcing it without signing in or when it doesn't stick."
+  },
+  {
+    "site": "imdb",
+    "siteName": "IMDb",
+    "domains": [
+      "imdb.com",
+      "www.imdb.com"
+    ],
+    "category": "reference",
+    "task": "show-other-ratings",
+    "title": "Show Rotten Tomatoes and Metacritic scores on IMDb",
+    "question": "How do I see Rotten Tomatoes scores on IMDb?",
+    "queries": [
+      "imdb rotten tomatoes score"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/7687",
+        "metric": 72784,
+        "note": "Greasy Fork total installs: \"MoreMovieRatings\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/7158",
+        "metric": 3084,
+        "note": "Greasy Fork total installs: \"IMDB - add Rottentomatoes info\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/15222",
+        "metric": 2593,
+        "note": "Greasy Fork total installs: \"IMDb Tomatoes\" (read via api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 73,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.imdb.com/title/tt0111161/",
+    "notes": "Needs cross-site fetches (GM_xmlhttpRequest) to RT/Metacritic; check usermods supports it. Autocomplete returns comparison queries, not this task, so no bonus."
+  },
+  {
+    "site": "wikipedia",
+    "siteName": "Wikipedia",
+    "domains": [
+      "wikipedia.org",
+      "en.wikipedia.org"
+    ],
+    "category": "reference",
+    "task": "dark-mode",
+    "title": "Dark mode for Wikipedia",
+    "question": "How do I turn on dark mode on Wikipedia?",
+    "queries": [
+      "wikipedia dark mode"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/wikipedia-night-mode/idhghjodolinkdhibgfgfoceackpcjfl",
+        "metric": 30000,
+        "note": "Chrome Web Store users: \"Wikipedia night mode\" (2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/382833",
+        "metric": 4467,
+        "note": "Greasy Fork total installs: \"Wikipedia Dark Theme\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=wikipedia+dark+mode",
+        "metric": null,
+        "note": "suggests \"wikipedia dark mode chrome\""
+      }
+    ],
+    "score": 72,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://en.wikipedia.org/wiki/Userscript",
+    "notes": "Wikipedia now has a native dark option; the script forces it without cookies or an account."
+  },
+  {
+    "site": "google",
+    "siteName": "Google Search",
+    "domains": [
+      "google.com",
+      "www.google.com"
+    ],
+    "category": "search",
+    "task": "hide-ai-mode",
+    "title": "Hide the AI Mode button in Google Search",
+    "question": "How do I turn off AI Mode in Google Search?",
+    "queries": [
+      "turn off ai mode google",
+      "turn off ai mode google search"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/disable-ai-mode-ai-overvi/ebefbfhaicjahbdopihcjonaokjjmchp",
+        "metric": 20000,
+        "note": "Chrome Web Store users: \"Disable AI Mode & AI Overview\" (2026-11-17)"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/ai-content-shield-hide-ai/eoghcliblbhjimkgnfemelcpfdnmiceo",
+        "metric": 20000,
+        "note": "Chrome Web Store users: \"AI Content Shield - Hide AI Overviews & AI Mode\" (2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=turn+off+ai+mode+google",
+        "metric": null,
+        "note": "suggests \"turn off ai mode google search\""
+      }
+    ],
+    "score": 70,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.google.com/search?q=how+to+bake+bread&hl=en",
+    "notes": "Both extensions also hide AI Overviews; the user count is shared demand."
+  },
+  {
+    "site": "amazon",
+    "siteName": "Amazon",
+    "domains": [
+      "amazon.com",
+      "www.amazon.com"
+    ],
+    "category": "shopping",
+    "task": "dark-mode",
+    "title": "Dark mode for Amazon",
+    "question": "How do I get dark mode on the Amazon website?",
+    "queries": [
+      "amazon dark mode"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/amazon-dark-mode/ngmmnefnjobcdhhodadfhbnkhfcpjjhd",
+        "metric": 20000,
+        "note": "Chrome Web Store users: \"Amazon Dark Mode\" (2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=amazon+dark+mode",
+        "metric": null,
+        "note": "suggests \"amazon dark mode extension\""
+      }
+    ],
+    "score": 70,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.amazon.com/s?k=usb+c+cable",
+    "notes": ""
+  },
+  {
+    "site": "amazon",
+    "siteName": "Amazon",
+    "domains": [
+      "amazon.com",
+      "www.amazon.com"
+    ],
+    "category": "shopping",
+    "task": "sort-by-review-count",
+    "title": "Sort Amazon search results by number of reviews",
+    "question": "How do I sort Amazon results by number of reviews?",
+    "queries": [
+      "amazon sort by number of reviews"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/amazon-sort-by-review-cou/olefkhnepnhckieapdkjebebogajcmel",
+        "metric": 9000,
+        "note": "Chrome Web Store users: \"Amazon Sort by Review Count\" (2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/23358",
+        "metric": 1944,
+        "note": "Greasy Fork total installs: \"Amazon: Sort by Review Count Rank\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=amazon+sort+by+number+of+reviews",
+        "metric": null,
+        "note": "suggests \"amazon sort by number of reviews extension\""
+      },
+      {
+        "type": "forum",
+        "url": "https://forums.redflagdeals.com/amazon-ca-removed-feature-sort-customer-reviews-2565950/",
+        "metric": null,
+        "note": "RedFlagDeals: Amazon removed sort by customer reviews"
+      },
+      {
+        "type": "forum",
+        "url": "https://talk.dallasmakerspace.org/t/how-to-sort-amazon-search-results-by-review-count/122103",
+        "metric": null,
+        "note": "Dallas Makerspace Talk: how to sort Amazon results by review count (sort=review-count-rank)"
+      }
+    ],
+    "score": 69,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.amazon.com/s?k=usb+c+cable",
+    "notes": ""
+  },
+  {
+    "site": "medium",
+    "siteName": "Medium",
+    "domains": [
+      "medium.com"
+    ],
+    "category": "news",
+    "task": "read-member-stories",
+    "title": "Open Medium member-only stories through a reader mirror",
+    "question": "How do I read Medium member-only stories?",
+    "queries": [
+      "medium bypass paywall",
+      "medium paywall"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/free-medium-reader/hjjiohdfdojggkogoakplkoahgdhmiec",
+        "metric": 8000,
+        "note": "Chrome Web Store users: \"Free Medium Reader\" (2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/418587",
+        "metric": 4058,
+        "note": "Greasy Fork total installs: \"medium.com: read unlimited stories\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/499886",
+        "metric": 276,
+        "note": "Greasy Fork total installs: \"Medium to Freedium\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=medium+paywall",
+        "metric": null,
+        "note": "suggests \"medium paywall bypass extension\""
+      },
+      {
+        "type": "forum",
+        "url": "https://news.ycombinator.com/item?id=27326251",
+        "metric": null,
+        "note": "Hacker News: Medium loginwall complaints, bypass extensions suggested"
+      },
+      {
+        "type": "forum",
+        "url": "https://news.ycombinator.com/item?id=38686548",
+        "metric": null,
+        "note": "Hacker News: Medium loginwall, mirrored links shared"
+      }
+    ],
+    "score": 69,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://medium.com/tag/javascript",
+    "notes": "Paywall workaround via a third-party mirror (e.g. Freedium); flag for Kenneth's call. Pick a member-only story for the check."
+  },
+  {
+    "site": "google",
+    "siteName": "Google Search",
+    "domains": [
+      "google.com",
+      "www.google.com"
+    ],
+    "category": "search",
+    "task": "images-direct-links",
+    "title": "Open Google Images results directly",
+    "question": "How do I get direct image links in Google Images?",
+    "queries": [
+      "google image search direct link"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/3187",
+        "metric": 12785,
+        "note": "Greasy Fork total installs: \"Google Images direct link\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/398802",
+        "metric": 1968,
+        "note": "Greasy Fork total installs: \"Google Images direct links 2\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=google+search+direct+links",
+        "metric": null,
+        "note": "suggests \"google image search direct link\""
+      }
+    ],
+    "score": 67,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.google.com/search?q=mountain&udm=2&hl=en",
+    "notes": ""
+  },
+  {
+    "site": "amazon",
+    "siteName": "Amazon",
+    "domains": [
+      "amazon.com",
+      "www.amazon.com"
+    ],
+    "category": "shopping",
+    "task": "show-seller",
+    "title": "Show who sells each Amazon product",
+    "question": "How do I see who the seller is on Amazon search results?",
+    "queries": [
+      "amazon see who the seller is"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/402064",
+        "metric": 6479,
+        "note": "Greasy Fork total installs: \"SoldBy - Reveal Sellers on Amazon\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=amazon+see+who+the+seller+is",
+        "metric": null,
+        "note": "suggests \"how do i see who the seller is on amazon\""
+      },
+      {
+        "type": "forum",
+        "url": "https://boards.straightdope.com/t/app-extension-to-filter-items-sold-by-amazon-not-third-parties/947960",
+        "metric": null,
+        "note": "Straight Dope: extension to filter items sold by Amazon"
+      },
+      {
+        "type": "forum",
+        "url": "https://forums.anandtech.com/threads/dang-it-all-is-there-a-way-to-filter-amazon-results-to-only-us-sellers.2343658",
+        "metric": null,
+        "note": "AnandTech: filter Amazon results to US sellers only"
+      }
+    ],
+    "score": 67,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.amazon.com/s?k=usb+c+cable",
+    "notes": "SoldBy fetches each product's offer page; same-origin fetches, no third party."
+  },
+  {
+    "site": "google",
+    "siteName": "Google Search",
+    "domains": [
+      "google.com",
+      "www.google.com"
+    ],
+    "category": "search",
+    "task": "old-layout",
+    "title": "Bring back the old Google Search layout",
+    "question": "How do I get the old Google Search layout back?",
+    "queries": [
+      "old google search layout"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/492193",
+        "metric": 12363,
+        "note": "Greasy Fork total installs: \"Gplex - Old Google Frontend\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=old+google+search+layout",
+        "metric": null,
+        "note": "suggests \"old google search layout extension\""
+      }
+    ],
+    "score": 66,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.google.com/search?q=how+to+bake+bread&hl=en",
+    "notes": ""
+  },
+  {
+    "site": "google",
+    "siteName": "Google Search",
+    "domains": [
+      "google.com",
+      "www.google.com"
+    ],
+    "category": "search",
+    "task": "hide-sponsored",
+    "title": "Hide sponsored results in Google Search",
+    "question": "How do I remove sponsored results from Google?",
+    "queries": [
+      "remove sponsored results google"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/unsponsored/pmbneaajfhcoecedlmkfkdnjemmebbcb",
+        "metric": 10000,
+        "note": "Chrome Web Store users: \"UnSponsored\" (2026-11-17)"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/google-search-ad-remover/pdhiefmcgnjohonhoobalejfnbminlkc",
+        "metric": 5000,
+        "note": "Chrome Web Store users: \"Google Search Ad Remover And Customizer\" (2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/462047",
+        "metric": 166,
+        "note": "Greasy Fork total installs: \"Google Search No Sponsors\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=remove+sponsored+results+google",
+        "metric": null,
+        "note": "suggests \"remove sponsored results google extension\""
+      }
+    ],
+    "score": 65,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.google.com/search?q=car+insurance+quote&hl=en",
+    "notes": "Use a commercial query so ads appear."
+  },
+  {
+    "site": "google",
+    "siteName": "Google Search",
+    "domains": [
+      "google.com",
+      "www.google.com"
+    ],
+    "category": "search",
+    "task": "keyboard-shortcuts",
+    "title": "Add keyboard shortcuts to Google Search results",
+    "question": "How do I navigate Google search results with the keyboard?",
+    "queries": [
+      "google search keyboard shortcuts"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/google-search-keyboard-sh/iobmefdldoplhmonnnkchglfdeepnfhd",
+        "metric": 9000,
+        "note": "Chrome Web Store users: \"Google Search Keyboard Shortcuts\" (2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=google+search+keyboard+shortcuts",
+        "metric": null,
+        "note": "suggests \"google search keyboard shortcuts extension\""
+      }
+    ],
+    "score": 64,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.google.com/search?q=how+to+bake+bread&hl=en",
+    "notes": ""
+  },
+  {
+    "site": "amazon",
+    "siteName": "Amazon",
+    "domains": [
+      "amazon.com",
+      "www.amazon.com"
+    ],
+    "category": "shopping",
+    "task": "hide-sponsored",
+    "title": "Hide sponsored products on Amazon",
+    "question": "How do I hide sponsored products in Amazon search?",
+    "queries": [
+      "amazon hide sponsored",
+      "amazon remove sponsored products"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/amazon-ad-sponsored-listi/lepiapjabmikggmkkefllaojbfijaffl",
+        "metric": 8000,
+        "note": "Chrome Web Store users: \"Amazon Ad & Sponsored Listing Blocker\" (2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/388822",
+        "metric": 3564,
+        "note": "Greasy Fork total installs: \"Amazon Sponsored Products remover\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/36512",
+        "metric": 1289,
+        "note": "Greasy Fork total installs: \"Amazon Sponsored Products / Ad block\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=amazon+hide+sponsored",
+        "metric": null,
+        "note": "suggests \"amazon hide sponsored results\""
+      }
+    ],
+    "score": 64,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.amazon.com/s?k=usb+c+cable",
+    "notes": "No Reddit/forum threads reachable (Reddit blocks crawlers)."
+  },
+  {
+    "site": "wikipedia",
+    "siteName": "Wikipedia",
+    "domains": [
+      "wikipedia.org",
+      "en.wikipedia.org"
+    ],
+    "category": "reference",
+    "task": "old-layout",
+    "title": "Bring back the old Wikipedia layout",
+    "question": "How do I get the old Wikipedia layout back without an account?",
+    "queries": [
+      "wikipedia old layout"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/old-wiki/cphagceemhgokfclmbnkpfkmchbfnclb",
+        "metric": 4000,
+        "note": "Chrome Web Store users: \"Old Wiki\" (2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/458501",
+        "metric": 2499,
+        "note": "Greasy Fork total installs: \"Vector Layout For Wikipedia\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/458494",
+        "metric": 1827,
+        "note": "Greasy Fork total installs: \"Old Wikipedia Layout\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=wikipedia+old+layout",
+        "metric": null,
+        "note": "suggests \"old wikipedia layout extension\""
+      },
+      {
+        "type": "forum",
+        "url": "https://en.wikipedia.org/wiki/Wikipedia_talk:Vector_2022/Archive_1",
+        "metric": null,
+        "note": "Wikipedia talk: readers asking for the old skin back"
+      },
+      {
+        "type": "forum",
+        "url": "https://news.ycombinator.com/item?id=34429175",
+        "metric": null,
+        "note": "Hacker News 'Explore Wikipedia's New Look': readers don't want to log in to switch back"
+      }
+    ],
+    "score": 64,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://en.wikipedia.org/wiki/Userscript",
+    "notes": "Script adds ?useskin=vector (Vector legacy 2010)."
+  },
+  {
+    "site": "bing",
+    "siteName": "Bing",
+    "domains": [
+      "bing.com",
+      "www.bing.com"
+    ],
+    "category": "search",
+    "task": "stop-scroll-to-top",
+    "title": "Stop Bing jumping back to the top of results",
+    "question": "Why does Bing scroll back to the top, and how do I stop it?",
+    "queries": [],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/461790",
+        "metric": 13478,
+        "note": "Greasy Fork total installs: \"FIX for \"Bing Search returns to the top\" !\" (read via api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 62,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.bing.com/search?q=how+to+bake+bread",
+    "notes": "Read the GF script to confirm the exact behaviour (likely the scroll-up-opens-Copilot/chat jump) before writing the page."
+  },
+  {
+    "site": "google",
+    "siteName": "Google Search",
+    "domains": [
+      "google.com",
+      "www.google.com"
+    ],
+    "category": "search",
+    "task": "show-image-size",
+    "title": "Show image dimensions in Google Images",
+    "question": "How do I see image sizes in Google Images results?",
+    "queries": [
+      "google images show image size"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/401432",
+        "metric": 11459,
+        "note": "Greasy Fork total installs: \"Google Image Search - Show Image Dimensions\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/41059",
+        "metric": 3794,
+        "note": "Greasy Fork total installs: \"Google Search - Always Show Image Size\" (read via api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 61,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.google.com/search?q=mountain&udm=2&hl=en",
+    "notes": ""
+  },
+  {
+    "site": "quora",
+    "siteName": "Quora",
+    "domains": [
+      "quora.com",
+      "www.quora.com"
+    ],
+    "category": "reference",
+    "task": "read-without-login",
+    "title": "Read Quora without the login wall",
+    "question": "How do I read Quora answers without logging in?",
+    "queries": [
+      "quora without login"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/5224",
+        "metric": 5449,
+        "note": "Greasy Fork total installs: \"Quora Unblocker\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/35260",
+        "metric": 1096,
+        "note": "Greasy Fork total installs: \"Quora - Remove SignUp Popup\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/406530",
+        "metric": 892,
+        "note": "Greasy Fork total installs: \"Quora Bypass Signup\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=quora+without+login",
+        "metric": null,
+        "note": "suggests \"quora without signing in\""
+      },
+      {
+        "type": "forum",
+        "url": "https://news.ycombinator.com/item?id=5218931",
+        "metric": null,
+        "note": "Hacker News: Quora login wall complaints"
+      }
+    ],
+    "score": 61,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.quora.com/What-is-the-best-programming-language-to-learn-first",
+    "notes": "Only one thread found. Test URL is a guess at a long-lived question; pick any question page."
+  },
+  {
+    "site": "nytimes",
+    "siteName": "The New York Times",
+    "domains": [
+      "nytimes.com",
+      "www.nytimes.com"
+    ],
+    "category": "news",
+    "task": "read-full-article",
+    "title": "Read full New York Times articles past the paywall overlay",
+    "question": "How do I get past the New York Times paywall?",
+    "queries": [
+      "nytimes bypass paywall"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/441034",
+        "metric": 5557,
+        "note": "Greasy Fork total installs: \"The New York Times Paywall Bypass\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/1567",
+        "metric": 2321,
+        "note": "Greasy Fork total installs: \"NY Times: load full article\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=nytimes+bypass+paywall",
+        "metric": null,
+        "note": "suggests \"nytimes bypass paywall reddit\""
+      }
+    ],
+    "score": 61,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.nytimes.com/",
+    "notes": "Paywall circumvention; flag for Kenneth's call. Whether the article text is in the logged-out HTML must be checked."
+  },
+  {
+    "site": "google",
+    "siteName": "Google Search",
+    "domains": [
+      "google.com",
+      "www.google.com"
+    ],
+    "category": "search",
+    "task": "open-results-new-tab",
+    "title": "Open Google search results in a new tab",
+    "question": "How do I make Google open search results in a new tab?",
+    "queries": [
+      "google search open links in new tab"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/397957",
+        "metric": 4978,
+        "note": "Greasy Fork total installs: \"Google-open-in-new-tab\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=google+search+open+links+in+new+tab",
+        "metric": null,
+        "note": "suggests \"how to make google always open search result links in new tabs\""
+      }
+    ],
+    "score": 60,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.google.com/search?q=how+to+bake+bread&hl=en",
+    "notes": "Google's own setting needs an account; a script works logged out."
+  },
+  {
+    "site": "fandom",
+    "siteName": "Fandom",
+    "domains": [
+      "fandom.com"
+    ],
+    "category": "reference",
+    "task": "remove-clutter",
+    "title": "Remove clutter from Fandom wikis",
+    "question": "How do I make Fandom wiki pages readable?",
+    "queries": [
+      "fandom remove clutter"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/431706",
+        "metric": 5004,
+        "note": "Greasy Fork total installs: \"Fandom.com --- Cleaner Wikis Userscript\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/403111",
+        "metric": 2470,
+        "note": "Greasy Fork total installs: \"Fandom - Remove Garbage\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "forum",
+        "url": "https://news.ycombinator.com/item?id=37635939",
+        "metric": null,
+        "note": "Hacker News 'Minecraft Wiki has decided to leave Fandom': Fandom unusable without blocker"
+      },
+      {
+        "type": "forum",
+        "url": "https://news.ycombinator.com/item?id=33067381",
+        "metric": null,
+        "note": "Hacker News: criticism of Fandom's ads and clutter"
+      }
+    ],
+    "score": 60,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://harrypotter.fandom.com/wiki/Harry_Potter",
+    "notes": ""
+  },
+  {
+    "site": "bing",
+    "siteName": "Bing",
+    "domains": [
+      "bing.com",
+      "www.bing.com"
+    ],
+    "category": "search",
+    "task": "clean-homepage",
+    "title": "Clean up the Bing homepage",
+    "question": "How do I remove the news feed and clutter from the Bing homepage?",
+    "queries": [
+      "bing homepage without news"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/430997",
+        "metric": 7385,
+        "note": "Greasy Fork total installs: \"Bing homepage optimisation\" (read via api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 58,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.bing.com/",
+    "notes": ""
+  },
+  {
+    "site": "google",
+    "siteName": "Google Search",
+    "domains": [
+      "google.com",
+      "www.google.com"
+    ],
+    "category": "search",
+    "task": "hide-people-also-ask",
+    "title": "Hide 'People also ask' in Google Search",
+    "question": "How do I remove the People also ask box from Google?",
+    "queries": [
+      "hide people also ask google",
+      "remove people also ask google"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/hide-people-also-asked-re/iebjhhajphjcmnjknbblnfidbeddpnnd",
+        "metric": 3000,
+        "note": "Chrome Web Store users: \"Hide \"People Also Asked\" Results\" (2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=hide+people+also+ask+google",
+        "metric": null,
+        "note": "suggests \"remove people also ask google\""
+      },
+      {
+        "type": "forum",
+        "url": "https://news.ycombinator.com/item?id=31693287",
+        "metric": null,
+        "note": "Hacker News: user asks how to hide the box that shifts results when going back"
+      }
+    ],
+    "score": 57,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.google.com/search?q=how+to+bake+bread&hl=en",
+    "notes": "Only one thread found, so no thread bonus."
+  },
+  {
+    "site": "aliexpress",
+    "siteName": "AliExpress",
+    "domains": [
+      "aliexpress.com",
+      "www.aliexpress.com"
+    ],
+    "category": "shopping",
+    "task": "clean-urls",
+    "title": "Clean AliExpress product links",
+    "question": "How do I get a clean AliExpress product link?",
+    "queries": [
+      "aliexpress clean url"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/26559",
+        "metric": 2941,
+        "note": "Greasy Fork total installs: \"Aliexpress URL Cleaner\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=aliexpress+clean+url",
+        "metric": null,
+        "note": "suggests \"aliexpress clean link\""
+      }
+    ],
+    "score": 57,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.aliexpress.com/w/wholesale-usb-c-cable.html",
+    "notes": ""
+  },
+  {
+    "site": "bing",
+    "siteName": "Bing",
+    "domains": [
+      "bing.com",
+      "www.bing.com"
+    ],
+    "category": "search",
+    "task": "image-download-button",
+    "title": "Add a download button to Bing Images",
+    "question": "How do I download full-size images from Bing Images?",
+    "queries": [
+      "bing images download"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/35070",
+        "metric": 5553,
+        "note": "Greasy Fork total installs: \"Bing Image Download Button\" (read via api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 56,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.bing.com/images/search?q=mountain",
+    "notes": ""
+  },
+  {
+    "site": "amazon",
+    "siteName": "Amazon",
+    "domains": [
+      "amazon.com",
+      "www.amazon.com"
+    ],
+    "category": "shopping",
+    "task": "show-country-of-origin",
+    "title": "Show country of origin on Amazon products",
+    "question": "How do I see where an Amazon product is made?",
+    "queries": [
+      "amazon country of origin"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/416635",
+        "metric": 2398,
+        "note": "Greasy Fork total installs: \"Country of origin for Amazon products\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/made-in-where/ajjhglddifjgmjilgjlcgafhjbhapebp",
+        "metric": 2000,
+        "note": "Chrome Web Store users: \"Made in Where\" (2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=amazon+country+of+origin",
+        "metric": null,
+        "note": "suggests \"amazon country of origin filter\""
+      }
+    ],
+    "score": 56,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.amazon.com/s?k=usb+c+cable",
+    "notes": ""
+  },
+  {
+    "site": "google",
+    "siteName": "Google Search",
+    "domains": [
+      "google.com",
+      "www.google.com"
+    ],
+    "category": "search",
+    "task": "web-results-only",
+    "title": "Always use Google's Web results (udm=14)",
+    "question": "How do I make Google show only web results without AI?",
+    "queries": [
+      "google web search only",
+      "google udm=14"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/google-udm-14-web-search/ilepebamdbjfokacbdamigokejjdlknb",
+        "metric": 1000,
+        "note": "Chrome Web Store users: \"Google UDM 14 Web search mode (no AI)\" (2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/497815",
+        "metric": 106,
+        "note": "Greasy Fork total installs: \"Google udm14\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=google+udm=14",
+        "metric": null,
+        "note": "suggests \"google udm=14 url\""
+      },
+      {
+        "type": "forum",
+        "url": "https://news.ycombinator.com/item?id=40427979",
+        "metric": null,
+        "note": "Hacker News: 'How to use Google Search without AI: the udm=14 work around'"
+      },
+      {
+        "type": "forum",
+        "url": "https://news.ycombinator.com/item?id=42446995",
+        "metric": null,
+        "note": "Hacker News: users share udm=14 defaults"
+      }
+    ],
+    "score": 55,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.google.com/search?q=how+to+bake+bread&hl=en",
+    "notes": "Script redirects /search to add udm=14; overlaps remove-ai-overview."
+  },
+  {
+    "site": "amazon",
+    "siteName": "Amazon",
+    "domains": [
+      "amazon.com",
+      "www.amazon.com"
+    ],
+    "category": "shopping",
+    "task": "price-history",
+    "title": "Show price history on Amazon product pages",
+    "question": "How do I see an Amazon product's price history?",
+    "queries": [
+      "amazon price history"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/24854",
+        "metric": 2233,
+        "note": "Greasy Fork total installs: \"Amazon Camel Graph Revived/Fixed\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=amazon+price+history",
+        "metric": null,
+        "note": "suggests \"amazon price history tracker\""
+      }
+    ],
+    "score": 55,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.amazon.com/s?k=usb+c+cable",
+    "notes": "Embeds a camelcamelcamel chart image; relies on that third party."
+  },
+  {
+    "site": "amazon",
+    "siteName": "Amazon",
+    "domains": [
+      "amazon.com",
+      "www.amazon.com"
+    ],
+    "category": "shopping",
+    "task": "short-url",
+    "title": "Copy a short, clean Amazon product link",
+    "question": "How do I get a short link to an Amazon product?",
+    "queries": [
+      "amazon short link"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/33227",
+        "metric": 1323,
+        "note": "Greasy Fork total installs: \"Amazon short URL\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/1162",
+        "metric": 1093,
+        "note": "Greasy Fork total installs: \"Amazon URL Cleaner\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=amazon+short+link",
+        "metric": null,
+        "note": "suggests \"amazon short link to product\""
+      }
+    ],
+    "score": 52,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.amazon.com/s?k=usb+c+cable",
+    "notes": ""
+  },
+  {
+    "site": "aliexpress",
+    "siteName": "AliExpress",
+    "domains": [
+      "aliexpress.com",
+      "www.aliexpress.com"
+    ],
+    "category": "shopping",
+    "task": "stay-on-global-site",
+    "title": "Stop AliExpress redirecting to a local site",
+    "question": "How do I stop AliExpress redirecting to my country's site?",
+    "queries": [],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/16734",
+        "metric": 3114,
+        "note": "Greasy Fork total installs: \"Aliexpress remove localized links\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/376152",
+        "metric": 715,
+        "note": "Greasy Fork total installs: \"Ali Auto Global\" (read via api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 52,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.aliexpress.com/w/wholesale-usb-c-cable.html",
+    "notes": ""
+  },
+  {
+    "site": "ebay",
+    "siteName": "eBay",
+    "domains": [
+      "ebay.com",
+      "www.ebay.com"
+    ],
+    "category": "shopping",
+    "task": "block-sellers",
+    "title": "Block sellers from eBay search results",
+    "question": "How do I block a seller from my eBay search results?",
+    "queries": [
+      "ebay block seller"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/8334",
+        "metric": 511,
+        "note": "Greasy Fork total installs: \"EBay: Custom Page Controls And Seller Block List\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/468324",
+        "metric": 110,
+        "note": "Greasy Fork total installs: \"eBay Seller Hider\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=ebay+block+seller",
+        "metric": null,
+        "note": "suggests \"ebay block seller from search results\""
+      },
+      {
+        "type": "forum",
+        "url": "https://community.ebay.com/t5/Ask-a-Mentor/Blocking-a-seller-from-searches/td-p/34333443",
+        "metric": null,
+        "note": "eBay Community: blocking a seller from searches"
+      },
+      {
+        "type": "forum",
+        "url": "https://community.ebay.com/t5/Buying/Is-there-a-way-to-block-sellers-when-searching/td-p/34735558/",
+        "metric": null,
+        "note": "eBay Community: is there a way to block sellers when searching?"
+      }
+    ],
+    "score": 51,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.ebay.com/sch/i.html?_nkw=usb+c+cable",
+    "notes": "eBay's own exclude filter caps at 10 sellers per search."
+  },
+  {
+    "site": "ebay",
+    "siteName": "eBay",
+    "domains": [
+      "ebay.com",
+      "www.ebay.com"
+    ],
+    "category": "shopping",
+    "task": "total-with-shipping",
+    "title": "Show eBay prices with shipping included",
+    "question": "How do I see eBay prices including shipping?",
+    "queries": [
+      "ebay price with shipping"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/5343",
+        "metric": 1127,
+        "note": "Greasy Fork total installs: \"eBay - Display Totals with Shipping\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/18250",
+        "metric": 721,
+        "note": "Greasy Fork total installs: \"eBay - Display Totals with Shipping\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=ebay+price+with+shipping",
+        "metric": null,
+        "note": "suggests \"ebay show price with shipping\""
+      }
+    ],
+    "score": 51,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.ebay.com/sch/i.html?_nkw=usb+c+cable",
+    "notes": ""
+  },
+  {
+    "site": "aliexpress",
+    "siteName": "AliExpress",
+    "domains": [
+      "aliexpress.com",
+      "www.aliexpress.com"
+    ],
+    "category": "shopping",
+    "task": "total-price",
+    "title": "Show AliExpress prices with shipping included",
+    "question": "How do I sort AliExpress by total price including shipping?",
+    "queries": [
+      "aliexpress total price with shipping"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/481268",
+        "metric": 1099,
+        "note": "Greasy Fork total installs: \"AliExpress Total Price\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/382601",
+        "metric": 664,
+        "note": "Greasy Fork total installs: \"Aliexpress Total Price Script\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=aliexpress+total+price+with+shipping",
+        "metric": null,
+        "note": "suggests \"aliexpress sort by total price with shipping\""
+      }
+    ],
+    "score": 51,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.aliexpress.com/w/wholesale-usb-c-cable.html",
+    "notes": ""
+  },
+  {
+    "site": "nytimes",
+    "siteName": "The New York Times",
+    "domains": [
+      "nytimes.com",
+      "www.nytimes.com"
+    ],
+    "category": "news",
+    "task": "hide-popups",
+    "title": "Hide New York Times popups and banners",
+    "question": "How do I stop New York Times popups?",
+    "queries": [
+      "nytimes remove popups"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/419337",
+        "metric": 1210,
+        "note": "Greasy Fork total installs: \"NyTimes Never bother me plz!\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=nytimes+popup",
+        "metric": null,
+        "note": "suggests \"nyt popup blocker\""
+      }
+    ],
+    "score": 51,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.nytimes.com/",
+    "notes": ""
+  },
+  {
+    "site": "duckduckgo",
+    "siteName": "DuckDuckGo",
+    "domains": [
+      "duckduckgo.com"
+    ],
+    "category": "search",
+    "task": "disable-safe-search",
+    "title": "Turn off SafeSearch on DuckDuckGo for good",
+    "question": "How do I permanently turn off SafeSearch on DuckDuckGo?",
+    "queries": [
+      "duckduckgo turn off safe search"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/33049",
+        "metric": 1029,
+        "note": "Greasy Fork total installs: \"DuckDuckGo unsafe search\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=duckduckgo+turn+off+safe+search",
+        "metric": null,
+        "note": "suggests \"duckduckgo safesearch won't turn off\""
+      }
+    ],
+    "score": 50,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://duckduckgo.com/?q=test",
+    "notes": "Script sets the kp=-2 URL parameter."
+  },
+  {
+    "site": "amazon",
+    "siteName": "Amazon",
+    "domains": [
+      "amazon.com",
+      "www.amazon.com"
+    ],
+    "category": "shopping",
+    "task": "unit-price",
+    "title": "Show and sort by unit price on Amazon",
+    "question": "How do I compare price per unit on Amazon?",
+    "queries": [
+      "amazon price per unit"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/amazon-unit-price/aggicbiihjlccnmafankkdfemoandjkj",
+        "metric": 1000,
+        "note": "Chrome Web Store users: \"Amazon Unit Price\" (2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/374252",
+        "metric": 161,
+        "note": "Greasy Fork total installs: \"Amazon - Price per weight\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=amazon+price+per+unit",
+        "metric": null,
+        "note": "suggests \"amazon price per unit search\""
+      }
+    ],
+    "score": 50,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.amazon.com/s?k=paper+towels",
+    "notes": ""
+  },
+  {
+    "site": "google",
+    "siteName": "Google Search",
+    "domains": [
+      "google.com",
+      "www.google.com"
+    ],
+    "category": "search",
+    "task": "direct-result-links",
+    "title": "Remove Google's redirect wrapper from result links",
+    "question": "How do I copy direct links from Google search results?",
+    "queries": [
+      "google search direct links"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/591392",
+        "metric": 848,
+        "note": "Greasy Fork total installs: \"Google Search Direct Links (Bypass /goto)\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=google+search+direct+links",
+        "metric": null,
+        "note": "suggests \"google search direct links\""
+      }
+    ],
+    "score": 49,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.google.com/search?q=how+to+bake+bread&hl=en",
+    "notes": ""
+  },
+  {
+    "site": "aliexpress",
+    "siteName": "AliExpress",
+    "domains": [
+      "aliexpress.com",
+      "www.aliexpress.com"
+    ],
+    "category": "shopping",
+    "task": "no-auto-translate",
+    "title": "Stop AliExpress auto-translating titles",
+    "question": "How do I stop AliExpress from machine-translating product titles?",
+    "queries": [],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/16430",
+        "metric": 1633,
+        "note": "Greasy Fork total installs: \"Aliexpress No Auto Translate\" (read via api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 48,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.aliexpress.com/w/wholesale-usb-c-cable.html",
+    "notes": ""
+  },
+  {
+    "site": "wikipedia",
+    "siteName": "Wikipedia",
+    "domains": [
+      "wikipedia.org",
+      "en.wikipedia.org"
+    ],
+    "category": "reference",
+    "task": "always-desktop",
+    "title": "Always open the desktop Wikipedia",
+    "question": "How do I stop Wikipedia opening the mobile site?",
+    "queries": [
+      "wikipedia always desktop"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/22673",
+        "metric": 589,
+        "note": "Greasy Fork total installs: \"Always desktop Wikipedia\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=wikipedia+desktop+version",
+        "metric": null,
+        "note": "suggests \"wikipedia desktop view\""
+      }
+    ],
+    "score": 47,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://en.m.wikipedia.org/wiki/Userscript",
+    "notes": ""
+  },
+  {
+    "site": "stackoverflow",
+    "siteName": "Stack Overflow",
+    "domains": [
+      "stackoverflow.com"
+    ],
+    "category": "reference",
+    "task": "hide-cookie-banner",
+    "title": "Hide the Stack Overflow cookie and privacy panel",
+    "question": "How do I hide the Stack Overflow cookie banner?",
+    "queries": [],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/426258",
+        "metric": 1360,
+        "note": "Greasy Fork total installs: \"Hide stackoverflow.com privacy panel\" (read via api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 47,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://stackoverflow.com/questions/11227809/why-is-processing-a-sorted-array-faster-than-processing-an-unsorted-array",
+    "notes": ""
+  },
+  {
+    "site": "duckduckgo",
+    "siteName": "DuckDuckGo",
+    "domains": [
+      "duckduckgo.com"
+    ],
+    "category": "search",
+    "task": "declutter",
+    "title": "Declutter DuckDuckGo search results",
+    "question": "How do I make DuckDuckGo results cleaner?",
+    "queries": [],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/373583",
+        "metric": 1087,
+        "note": "Greasy Fork total installs: \"DuckDuckGo layout cleaner\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/371791",
+        "metric": 1079,
+        "note": "Greasy Fork total installs: \"DuckDuckGo Meaningless Things Remover\" (read via api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 46,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://duckduckgo.com/?q=how+to+bake+bread",
+    "notes": ""
+  },
+  {
+    "site": "ebay",
+    "siteName": "eBay",
+    "domains": [
+      "ebay.com",
+      "www.ebay.com"
+    ],
+    "category": "shopping",
+    "task": "hide-sponsored",
+    "title": "Hide sponsored listings on eBay",
+    "question": "How do I hide sponsored listings on eBay?",
+    "queries": [
+      "ebay hide sponsored",
+      "ebay remove sponsored"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/396394",
+        "metric": 252,
+        "note": "Greasy Fork total installs: \"eBay.com NO sponsored ads\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/443487",
+        "metric": 128,
+        "note": "Greasy Fork total installs: \"ebay sponsored listings remover\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=ebay+remove+sponsored",
+        "metric": null,
+        "note": "suggests \"ebay hide sponsored items\""
+      },
+      {
+        "type": "forum",
+        "url": "https://community.ebay.com/t5/Bidding-Buying/How-do-I-hide-Sponsored-Listings/m-p/29904372",
+        "metric": null,
+        "note": "eBay Community: How do I hide Sponsored Listings?"
+      },
+      {
+        "type": "forum",
+        "url": "https://community.ebay.com/t5/Mobile-Apps/Sponsored-Items-Corrupting-Searches/td-p/30242921",
+        "metric": null,
+        "note": "eBay Community: Sponsored items corrupting searches"
+      }
+    ],
+    "score": 46,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.ebay.com/sch/i.html?_nkw=usb+c+cable",
+    "notes": ""
+  },
+  {
+    "site": "imdb",
+    "siteName": "IMDb",
+    "domains": [
+      "imdb.com",
+      "www.imdb.com"
+    ],
+    "category": "reference",
+    "task": "show-actor-age",
+    "title": "Show actors' ages on IMDb",
+    "question": "How do I see how old an actor was in a film on IMDb?",
+    "queries": [
+      "imdb show actor age"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/2798",
+        "metric": 958,
+        "note": "Greasy Fork total installs: \"IMDBAge\" (read via api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 45,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.imdb.com/name/nm0000151/",
+    "notes": ""
+  },
+  {
+    "site": "quora",
+    "siteName": "Quora",
+    "domains": [
+      "quora.com",
+      "www.quora.com"
+    ],
+    "category": "reference",
+    "task": "unblur-images",
+    "title": "Unblur images on Quora",
+    "question": "How do I unblur images on Quora?",
+    "queries": [
+      "quora unblur images"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/471116",
+        "metric": 394,
+        "note": "Greasy Fork total installs: \"Quora Unblur Images\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=quora+unblur+images",
+        "metric": null,
+        "note": "suggests \"quora unblur images\""
+      }
+    ],
+    "score": 44,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.quora.com/What-is-the-best-programming-language-to-learn-first",
+    "notes": ""
+  },
+  {
+    "site": "duckduckgo",
+    "siteName": "DuckDuckGo",
+    "domains": [
+      "duckduckgo.com"
+    ],
+    "category": "search",
+    "task": "google-button",
+    "title": "Add a 'search on Google' button to DuckDuckGo",
+    "question": "How do I repeat a DuckDuckGo search on Google in one click?",
+    "queries": [],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/376631",
+        "metric": 777,
+        "note": "Greasy Fork total installs: \"DuckDuckGo to Google Button\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/373582",
+        "metric": 529,
+        "note": "Greasy Fork total installs: \"Add 'Google' button to duckduckgo.com\" (read via api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 43,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://duckduckgo.com/?q=how+to+bake+bread",
+    "notes": ""
+  },
+  {
+    "site": "quora",
+    "siteName": "Quora",
+    "domains": [
+      "quora.com",
+      "www.quora.com"
+    ],
+    "category": "reference",
+    "task": "hide-promoted",
+    "title": "Hide promoted answers on Quora",
+    "question": "How do I hide promoted answers and ads on Quora?",
+    "queries": [
+      "quora hide promoted answers"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/374791",
+        "metric": 756,
+        "note": "Greasy Fork total installs: \"Quora: remove sponsored posts\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/425663",
+        "metric": 523,
+        "note": "Greasy Fork total installs: \"Remove promoted questions and answers on Quora\" (read via api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 43,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.quora.com/What-is-the-best-programming-language-to-learn-first",
+    "notes": ""
+  },
+  {
+    "site": "medium",
+    "siteName": "Medium",
+    "domains": [
+      "medium.com"
+    ],
+    "category": "news",
+    "task": "hide-member-only",
+    "title": "Hide member-only stories on Medium",
+    "question": "How do I hide member-only stories on Medium?",
+    "queries": [
+      "medium hide member only stories"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/medium-member-only-post-r/jbejhilkbegomejdgdhaakegbhfabdca",
+        "metric": 357,
+        "note": "Chrome Web Store users: \"Medium Member-Only Post Remover\" (2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=medium+hide+member+only+stories",
+        "metric": null,
+        "note": "suggests \"medium hide member only stories\""
+      }
+    ],
+    "score": 43,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://medium.com/tag/javascript",
+    "notes": ""
+  },
+  {
+    "site": "amazon",
+    "siteName": "Amazon",
+    "domains": [
+      "amazon.com",
+      "www.amazon.com"
+    ],
+    "category": "shopping",
+    "task": "exact-review-counts",
+    "title": "Show exact review counts on Amazon",
+    "question": "How do I see the exact number of reviews on Amazon search results?",
+    "queries": [],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/369355",
+        "metric": 653,
+        "note": "Greasy Fork total installs: \"Amazon - Show absolute review numbers\" (read via api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 42,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.amazon.com/s?k=usb+c+cable",
+    "notes": ""
+  },
+  {
+    "site": "imdb",
+    "siteName": "IMDb",
+    "domains": [
+      "imdb.com",
+      "www.imdb.com"
+    ],
+    "category": "reference",
+    "task": "show-letterboxd-rating",
+    "title": "Show Letterboxd ratings on IMDb",
+    "question": "How do I see the Letterboxd rating on an IMDb page?",
+    "queries": [
+      "imdb letterboxd rating"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/386219",
+        "metric": 629,
+        "note": "Greasy Fork total installs: \"Show Letterboxd rating\" (read via api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 42,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.imdb.com/title/tt0111161/",
+    "notes": "Cross-site fetch to Letterboxd."
+  },
+  {
+    "site": "bing",
+    "siteName": "Bing",
+    "domains": [
+      "bing.com",
+      "www.bing.com"
+    ],
+    "category": "search",
+    "task": "remove-copilot",
+    "title": "Remove Copilot from Bing search results",
+    "question": "How do I remove Copilot answers from Bing search?",
+    "queries": [
+      "remove copilot from bing",
+      "remove copilot from bing search"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/no-ai-bing/nmaocmphafeajfcbbjoneamegajbpchh",
+        "metric": 118,
+        "note": "Chrome Web Store users: \"No AI Bing\" (2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/490407",
+        "metric": 67,
+        "note": "Greasy Fork total installs: \"To prevent accidental activation of Copilot when using Bing search!\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=remove+copilot+from+bing",
+        "metric": null,
+        "note": "suggests \"remove copilot from bing search\""
+      },
+      {
+        "type": "forum",
+        "url": "https://learn.microsoft.com/en-us/answers/questions/2342625/how-do-you-remove-copilot-answers-from-search-resu",
+        "metric": null,
+        "note": "Microsoft Q&A: how do you remove Copilot answers from search results"
+      },
+      {
+        "type": "forum",
+        "url": "https://learn.microsoft.com/en-us/answers/questions/2342461/how-can-i-disable-copilot-in-bing-search-engine",
+        "metric": null,
+        "note": "Microsoft Q&A: how can I disable Copilot in Bing"
+      },
+      {
+        "type": "forum",
+        "url": "https://learn.microsoft.com/en-us/answers/questions/5618199/how-to-disable-copilot-responses-in-search-on-bing",
+        "metric": null,
+        "note": "Microsoft Q&A: disable Copilot responses on Bing in Firefox"
+      }
+    ],
+    "score": 41,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.bing.com/search?q=how+to+bake+bread",
+    "notes": "Microsoft has since shipped a preview 'Bing AI Search Choice' extension and a -ai suffix; demand is clear in threads, small in installs."
+  },
+  {
+    "site": "duckduckgo",
+    "siteName": "DuckDuckGo",
+    "domains": [
+      "duckduckgo.com"
+    ],
+    "category": "search",
+    "task": "remove-ads",
+    "title": "Remove ads from DuckDuckGo results",
+    "question": "How do I block ads in DuckDuckGo search results?",
+    "queries": [
+      "duckduckgo remove ads"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/424874",
+        "metric": 245,
+        "note": "Greasy Fork total installs: \"DuckDuckGo - Ad Remover\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=duckduckgo+remove+ads",
+        "metric": null,
+        "note": "suggests \"duckduckgo disable ads\""
+      }
+    ],
+    "score": 41,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://duckduckgo.com/?q=car+insurance+quote",
+    "notes": "DDG settings can turn ads off; demand persists."
+  },
+  {
+    "site": "ebay",
+    "siteName": "eBay",
+    "domains": [
+      "ebay.com",
+      "www.ebay.com"
+    ],
+    "category": "shopping",
+    "task": "hide-range-listings",
+    "title": "Hide eBay listings with price ranges",
+    "question": "How do I remove listings with price ranges from eBay search?",
+    "queries": [],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/370761",
+        "metric": 534,
+        "note": "Greasy Fork total installs: \"Ebay - Remove listings with multiple prices\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/34568",
+        "metric": 234,
+        "note": "Greasy Fork total installs: \"Hide ebay range listings\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "forum",
+        "url": "https://community.ebay.com/t5/Bidding-Buying/How-do-I-hide-Sponsored-Listings/m-p/29904372",
+        "metric": null,
+        "note": "Same eBay thread shares a bookmarklet that removes ranged-price listings"
+      }
+    ],
+    "score": 41,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.ebay.com/sch/i.html?_nkw=usb+c+cable",
+    "notes": ""
+  },
+  {
+    "site": "quora",
+    "siteName": "Quora",
+    "domains": [
+      "quora.com",
+      "www.quora.com"
+    ],
+    "category": "reference",
+    "task": "hide-related-answers",
+    "title": "Hide related answers on Quora question pages",
+    "question": "How do I stop Quora showing answers to other questions?",
+    "queries": [
+      "quora hide related answers"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/459555",
+        "metric": 219,
+        "note": "Greasy Fork total installs: \"Remove related answers from Quora questions\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/422208",
+        "metric": 267,
+        "note": "Greasy Fork total installs: \"quora original answers only\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=quora+related",
+        "metric": null,
+        "note": "suggests \"quora related answers annoying\""
+      }
+    ],
+    "score": 41,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.quora.com/What-is-the-best-programming-language-to-learn-first",
+    "notes": ""
+  },
+  {
+    "site": "fandom",
+    "siteName": "Fandom",
+    "domains": [
+      "fandom.com"
+    ],
+    "category": "reference",
+    "task": "old-layout",
+    "title": "Bring back the old Fandom layout",
+    "question": "How do I get the old Fandom wiki layout back?",
+    "queries": [
+      "fandom old layout"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/431477",
+        "metric": 245,
+        "note": "Greasy Fork total installs: \"Change fandom layout back to hydra\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=fandom+old+layout",
+        "metric": null,
+        "note": "suggests \"fandom wiki old layout\""
+      }
+    ],
+    "score": 41,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://harrypotter.fandom.com/wiki/Harry_Potter",
+    "notes": ""
+  },
+  {
+    "site": "ebay",
+    "siteName": "eBay",
+    "domains": [
+      "ebay.com",
+      "www.ebay.com"
+    ],
+    "category": "shopping",
+    "task": "show-seller-location",
+    "title": "Show seller location in eBay search results",
+    "question": "How do I see where an eBay seller is located from the search page?",
+    "queries": [
+      "ebay seller location"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/410587",
+        "metric": 218,
+        "note": "Greasy Fork total installs: \"eBay Seller Location\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=ebay+seller+location",
+        "metric": null,
+        "note": "suggests \"ebay seller location filter\""
+      }
+    ],
+    "score": 40,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.ebay.com/sch/i.html?_nkw=usb+c+cable",
+    "notes": ""
+  },
+  {
+    "site": "aliexpress",
+    "siteName": "AliExpress",
+    "domains": [
+      "aliexpress.com",
+      "www.aliexpress.com"
+    ],
+    "category": "shopping",
+    "task": "full-size-review-images",
+    "title": "Open AliExpress review photos at full size",
+    "question": "How do I see AliExpress review photos at full size?",
+    "queries": [
+      "aliexpress review photos"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/36910",
+        "metric": 453,
+        "note": "Greasy Fork total installs: \"Aliexpress feedback image original size\" (read via api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 40,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.aliexpress.com/w/wholesale-usb-c-cable.html",
+    "notes": ""
+  },
+  {
+    "site": "medium",
+    "siteName": "Medium",
+    "domains": [
+      "medium.com"
+    ],
+    "category": "news",
+    "task": "hide-sticky-bars",
+    "title": "Hide Medium's sticky header and footer bars",
+    "question": "How do I remove the sticky bars on Medium articles?",
+    "queries": [],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/35950",
+        "metric": 447,
+        "note": "Greasy Fork total installs: \"Sticky itens hider (medium.com, hackernoon)\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/377531",
+        "metric": 158,
+        "note": "Greasy Fork total installs: \"Remove medium Bar\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/374167",
+        "metric": 281,
+        "note": "Greasy Fork total installs: \"Medium cleanup\" (read via api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 40,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://medium.com/tag/javascript",
+    "notes": "Open any article from the tag page for the check."
+  },
+  {
+    "site": "fandom",
+    "siteName": "Fandom",
+    "domains": [
+      "fandom.com"
+    ],
+    "category": "reference",
+    "task": "remove-ads",
+    "title": "Remove ads from Fandom wikis",
+    "question": "How do I remove ads on Fandom?",
+    "queries": [
+      "fandom remove ads"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/464705",
+        "metric": 173,
+        "note": "Greasy Fork total installs: \"Fandom Remove Ads\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/450903",
+        "metric": 103,
+        "note": "Greasy Fork total installs: \"Fandom Ad Remover\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=fandom+remove+ads",
+        "metric": null,
+        "note": "suggests \"fandom wiki remove ads\""
+      }
+    ],
+    "score": 39,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://harrypotter.fandom.com/wiki/Harry_Potter",
+    "notes": "Overlaps remove-clutter; may merge."
+  },
+  {
+    "site": "etsy",
+    "siteName": "Etsy",
+    "domains": [
+      "etsy.com",
+      "www.etsy.com"
+    ],
+    "category": "shopping",
+    "task": "hide-ads",
+    "title": "Hide ads in Etsy search results",
+    "question": "How do I hide ads on Etsy search?",
+    "queries": [
+      "etsy hide ads"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/465085",
+        "metric": 168,
+        "note": "Greasy Fork total installs: \"Etsy - Sponsored Products remover\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/419644",
+        "metric": 147,
+        "note": "Greasy Fork total installs: \"Etsy - Remove Ads\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/etsy-ad-free/lkmidcopffikdeokfcmejoleakoaechf",
+        "metric": 52,
+        "note": "Chrome Web Store users: \"Etsy Ad-Free\" (2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=etsy+hide+ads",
+        "metric": null,
+        "note": "suggests \"block etsy ads\""
+      }
+    ],
+    "score": 38,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.etsy.com/search?q=mug",
+    "notes": "Etsy serves bot checks; may need Browserbase."
+  },
+  {
+    "site": "ebay",
+    "siteName": "eBay",
+    "domains": [
+      "ebay.com",
+      "www.ebay.com"
+    ],
+    "category": "shopping",
+    "task": "hide-duplicates",
+    "title": "Hide duplicate listings in eBay search",
+    "question": "How do I hide duplicate listings on eBay?",
+    "queries": [],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/27847",
+        "metric": 303,
+        "note": "Greasy Fork total installs: \"eBay hide duplicate results updated\" (read via api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 37,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.ebay.com/sch/i.html?_nkw=usb+c+cable",
+    "notes": ""
+  },
+  {
+    "site": "wikipedia",
+    "siteName": "Wikipedia",
+    "domains": [
+      "wikipedia.org",
+      "en.wikipedia.org"
+    ],
+    "category": "reference",
+    "task": "hide-donation-banner",
+    "title": "Hide Wikipedia's donation banner",
+    "question": "How do I hide the Wikipedia donation banner?",
+    "queries": [
+      "wikipedia remove donation banner"
+    ],
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/wikipedia-donation-banner/bepipiegehhghhpbcfmoancbffbgldjc",
+        "metric": 272,
+        "note": "Chrome Web Store users: \"Wikipedia Donation Banner Remover\" (2026-11-17)"
+      },
+      {
+        "type": "forum",
+        "url": "https://news.ycombinator.com/item?id=8802929",
+        "metric": null,
+        "note": "Hacker News: how to hide the donation campaign banners"
+      }
+    ],
+    "score": 37,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://en.wikipedia.org/wiki/Userscript",
+    "notes": "Banners run in campaigns; a logged-out check only sees one during a campaign."
+  },
+  {
+    "site": "quora",
+    "siteName": "Quora",
+    "domains": [
+      "quora.com",
+      "www.quora.com"
+    ],
+    "category": "reference",
+    "task": "expand-all",
+    "title": "Expand every answer on a Quora page",
+    "question": "How do I expand all 'more' links on Quora at once?",
+    "queries": [],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/422209",
+        "metric": 286,
+        "note": "Greasy Fork total installs: \"Quora expand all more buttons\" (read via api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 37,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.quora.com/What-is-the-best-programming-language-to-learn-first",
+    "notes": ""
+  },
+  {
+    "site": "stackoverflow",
+    "siteName": "Stack Overflow",
+    "domains": [
+      "stackoverflow.com"
+    ],
+    "category": "reference",
+    "task": "dark-mode",
+    "title": "Dark mode for Stack Overflow without logging in",
+    "question": "How do I get Stack Overflow dark mode without an account?",
+    "queries": [
+      "stack overflow dark mode"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/400254",
+        "metric": 123,
+        "note": "Greasy Fork total installs: \"StackOverflow Always Dark Theme\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/480700",
+        "metric": 52,
+        "note": "Greasy Fork total installs: \"Dark Theme Stackoverflow\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=stack+overflow+dark+mode",
+        "metric": null,
+        "note": "suggests \"stack overflow dark mode without login\""
+      }
+    ],
+    "score": 36,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://stackoverflow.com/questions/11227809/why-is-processing-a-sorted-array-faster-than-processing-an-unsorted-array",
+    "notes": "Native dark theme needs an account; logged out is the gap."
+  },
+  {
+    "site": "stackoverflow",
+    "siteName": "Stack Overflow",
+    "domains": [
+      "stackoverflow.com"
+    ],
+    "category": "reference",
+    "task": "iso-dates",
+    "title": "Show exact dates on Stack Overflow",
+    "question": "How do I see exact post dates on Stack Overflow?",
+    "queries": [],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/389674",
+        "metric": 204,
+        "note": "Greasy Fork total installs: \"ISO time format for StackOverflow\" (read via api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 35,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://stackoverflow.com/questions/11227809/why-is-processing-a-sorted-array-faster-than-processing-an-unsorted-array",
+    "notes": ""
+  },
+  {
+    "site": "etsy",
+    "siteName": "Etsy",
+    "domains": [
+      "etsy.com",
+      "www.etsy.com"
+    ],
+    "category": "shopping",
+    "task": "short-url",
+    "title": "Copy a short Etsy listing link",
+    "question": "How do I get a short link to an Etsy listing?",
+    "queries": [
+      "etsy short url"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/456795",
+        "metric": 90,
+        "note": "Greasy Fork total installs: \"Etsy URL Cleaner\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/375272",
+        "metric": 81,
+        "note": "Greasy Fork total installs: \"Etsy short URL\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=etsy+short+url",
+        "metric": null,
+        "note": "suggests \"etsy short url\""
+      }
+    ],
+    "score": 34,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.etsy.com/search?q=mug",
+    "notes": ""
+  },
+  {
+    "site": "stackoverflow",
+    "siteName": "Stack Overflow",
+    "domains": [
+      "stackoverflow.com"
+    ],
+    "category": "reference",
+    "task": "hide-sidebar",
+    "title": "Hide the Stack Overflow sidebar",
+    "question": "How do I remove the right sidebar on Stack Overflow?",
+    "queries": [
+      "stack overflow remove sidebar"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/382104",
+        "metric": 198,
+        "note": "Greasy Fork total installs: \"Remove Stackoverflow Sidebar\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/369524",
+        "metric": 83,
+        "note": "Greasy Fork total installs: \"Stackoverflow Right Sidebar Toggler\" (read via api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 34,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://stackoverflow.com/questions/11227809/why-is-processing-a-sorted-array-faster-than-processing-an-unsorted-array",
+    "notes": ""
+  },
+  {
+    "site": "substack",
+    "siteName": "Substack",
+    "domains": [
+      "substack.com"
+    ],
+    "category": "news",
+    "task": "dismiss-popups",
+    "title": "Dismiss Substack subscribe popups",
+    "question": "How do I stop Substack's subscribe popup?",
+    "queries": [
+      "substack dismiss subscribe popup"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/465222",
+        "metric": 175,
+        "note": "Greasy Fork total installs: \"substack_popup_dismisser\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/594856",
+        "metric": 7,
+        "note": "Greasy Fork total installs: \"Substack: Auto-close the subscribe, referral, and sign-in popups\" (read via api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 34,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://garymarcus.substack.com/",
+    "notes": "Pick a post page; popup appears on scroll for logged-out readers."
+  },
+  {
+    "site": "stackoverflow",
+    "siteName": "Stack Overflow",
+    "domains": [
+      "stackoverflow.com"
+    ],
+    "category": "reference",
+    "task": "hide-hot-network-questions",
+    "title": "Hide Hot Network Questions on Stack Overflow",
+    "question": "How do I hide Hot Network Questions on Stack Exchange?",
+    "queries": [
+      "stack overflow hide hot network questions"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/10540",
+        "metric": 79,
+        "note": "Greasy Fork total installs: \"Cold Network Questions\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "forum",
+        "url": "https://superuser.com/questions/1157967/how-to-block-hot-network-questions-in-the-sidebar-of-stack-exchange-network",
+        "metric": null,
+        "note": "Super User: how to block Hot Network Questions in the sidebar"
+      },
+      {
+        "type": "forum",
+        "url": "https://news.ycombinator.com/item?id=20512714",
+        "metric": null,
+        "note": "Hacker News: users share uBlock rules to hide HNQ"
+      }
+    ],
+    "score": 33,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://stackoverflow.com/questions/11227809/why-is-processing-a-sorted-array-faster-than-processing-an-unsorted-array",
+    "notes": "Profile preference exists but needs login."
+  },
+  {
+    "site": "fandom",
+    "siteName": "Fandom",
+    "domains": [
+      "fandom.com"
+    ],
+    "category": "reference",
+    "task": "dark-mode",
+    "title": "Dark mode for Fandom wikis",
+    "question": "How do I turn on dark mode on Fandom?",
+    "queries": [
+      "fandom dark mode"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/460098",
+        "metric": 74,
+        "note": "Greasy Fork total installs: \"Fandom auto Dark Mode switcher\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=fandom+dark+mode",
+        "metric": null,
+        "note": "suggests \"fandom wiki dark mode\""
+      }
+    ],
+    "score": 33,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://harrypotter.fandom.com/wiki/Harry_Potter",
+    "notes": ""
+  },
+  {
+    "site": "stackoverflow",
+    "siteName": "Stack Overflow",
+    "domains": [
+      "stackoverflow.com"
+    ],
+    "category": "reference",
+    "task": "copy-code-button",
+    "title": "Add a copy button to Stack Overflow code blocks",
+    "question": "How do I add a copy button to code on Stack Overflow?",
+    "queries": [
+      "stack overflow copy code button"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/438065",
+        "metric": 140,
+        "note": "Greasy Fork total installs: \"Stackoverflow Add Button For Copy to clipboard\" (read via api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 32,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://stackoverflow.com/questions/11227809/why-is-processing-a-sorted-array-faster-than-processing-an-unsorted-array",
+    "notes": ""
+  },
+  {
+    "site": "fandom",
+    "siteName": "Fandom",
+    "domains": [
+      "fandom.com"
+    ],
+    "category": "reference",
+    "task": "wider-content",
+    "title": "Widen the content area on Fandom",
+    "question": "How do I make Fandom wiki pages wider?",
+    "queries": [],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/436247",
+        "metric": 114,
+        "note": "Greasy Fork total installs: \"Improved Content Width - fandom.com\" (read via api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 31,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://harrypotter.fandom.com/wiki/Harry_Potter",
+    "notes": ""
+  },
+  {
+    "site": "wikipedia",
+    "siteName": "Wikipedia",
+    "domains": [
+      "wikipedia.org",
+      "en.wikipedia.org"
+    ],
+    "category": "reference",
+    "task": "hide-unused-languages",
+    "title": "Hide unused languages on Wikipedia",
+    "question": "How do I show only my languages in Wikipedia's language list?",
+    "queries": [],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/39535",
+        "metric": 107,
+        "note": "Greasy Fork total installs: \"Wikipedia hide unused languages\" (read via api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 30,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://en.wikipedia.org/wiki/Userscript",
+    "notes": ""
+  },
+  {
+    "site": "stackoverflow",
+    "siteName": "Stack Overflow",
+    "domains": [
+      "stackoverflow.com"
+    ],
+    "category": "reference",
+    "task": "wide-layout",
+    "title": "Make Stack Overflow wider",
+    "question": "How do I make Stack Overflow use the full width?",
+    "queries": [],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/373879",
+        "metric": 101,
+        "note": "Greasy Fork total installs: \"Wide easily readable StackOverflow\" (read via api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 30,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://stackoverflow.com/questions/11227809/why-is-processing-a-sorted-array-faster-than-processing-an-unsorted-array",
+    "notes": ""
+  },
+  {
+    "site": "substack",
+    "siteName": "Substack",
+    "domains": [
+      "substack.com"
+    ],
+    "category": "news",
+    "task": "widescreen",
+    "title": "Make Substack posts wider",
+    "question": "How do I make Substack articles use more of the screen?",
+    "queries": [],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/542170",
+        "metric": 101,
+        "note": "Greasy Fork total installs: \"Blog Widescreen Responsive\" (read via api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 30,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://garymarcus.substack.com/",
+    "notes": ""
+  },
+  {
+    "site": "bbc",
+    "siteName": "BBC News",
+    "domains": [
+      "bbc.com",
+      "www.bbc.com",
+      "bbc.co.uk"
+    ],
+    "category": "news",
+    "task": "stop-autoplay",
+    "title": "Stop BBC News videos from autoplaying",
+    "question": "How do I stop videos autoplaying on BBC News?",
+    "queries": [
+      "bbc news stop autoplay"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/375322",
+        "metric": 75,
+        "note": "Greasy Fork total installs: \"Disable BBC EMP Autoplay\" (read via api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 28,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.bbc.com/news",
+    "notes": ""
+  },
+  {
+    "site": "substack",
+    "siteName": "Substack",
+    "domains": [
+      "substack.com"
+    ],
+    "category": "news",
+    "task": "disable-quote-popup",
+    "title": "Stop the Substack text-selection quote popup",
+    "question": "How do I stop Substack's popup when I select text?",
+    "queries": [],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/471336",
+        "metric": 58,
+        "note": "Greasy Fork total installs: \"Substack - Stop Text Selection Quote Popup\" (read via api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 26,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://garymarcus.substack.com/",
+    "notes": ""
+  },
+  {
+    "site": "wikipedia",
+    "siteName": "Wikipedia",
+    "domains": [
+      "wikipedia.org",
+      "en.wikipedia.org"
+    ],
+    "category": "reference",
+    "task": "full-width",
+    "title": "Make Wikipedia full width",
+    "question": "How do I make Wikipedia use the full screen width?",
+    "queries": [
+      "wikipedia full width"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/547924",
+        "metric": 21,
+        "note": "Greasy Fork total installs: \"Wikipedia Large Wide Dark\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=wikipedia+full+width",
+        "metric": null,
+        "note": "suggests \"wikipedia full width\""
+      }
+    ],
+    "score": 25,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://en.wikipedia.org/wiki/Userscript",
+    "notes": "Vector 2022 has a width toggle, but it doesn't persist logged out without cookies."
+  },
+  {
+    "site": "cnn",
+    "siteName": "CNN",
+    "domains": [
+      "cnn.com",
+      "www.cnn.com"
+    ],
+    "category": "news",
+    "task": "declutter",
+    "title": "Declutter CNN pages",
+    "question": "How do I make CNN pages cleaner?",
+    "queries": [],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/498276",
+        "metric": 33,
+        "note": "Greasy Fork total installs: \"Clean CNN\" (read via api.greasyfork.org, 2026-11-17)"
+      }
+    ],
+    "score": 23,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.cnn.com/",
+    "notes": ""
+  },
+  {
+    "site": "bbc",
+    "siteName": "BBC News",
+    "domains": [
+      "bbc.com",
+      "www.bbc.com",
+      "bbc.co.uk"
+    ],
+    "category": "news",
+    "task": "dark-mode",
+    "title": "Dark mode for BBC News",
+    "question": "How do I get dark mode on the BBC News website?",
+    "queries": [
+      "bbc news dark mode"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/540168",
+        "metric": 11,
+        "note": "Greasy Fork total installs: \"BBC News Dark Mode\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=bbc+news+dark+mode",
+        "metric": null,
+        "note": "suggests \"bbc news dark mode website\""
+      }
+    ],
+    "score": 21,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.bbc.com/news",
+    "notes": ""
+  },
+  {
+    "site": "cnn",
+    "siteName": "CNN",
+    "domains": [
+      "cnn.com",
+      "www.cnn.com"
+    ],
+    "category": "news",
+    "task": "stop-autoplay",
+    "title": "Stop CNN videos from autoplaying",
+    "question": "How do I stop CNN videos from playing automatically?",
+    "queries": [
+      "cnn stop autoplay videos"
+    ],
+    "evidence": [
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=cnn+autoplay",
+        "metric": null,
+        "note": "suggests \"stop cnn autoplay\""
+      },
+      {
+        "type": "forum",
+        "url": "https://www.geekzone.co.nz/forums.asp?forumid=151&topicid=247783",
+        "metric": null,
+        "note": "Geekzone: 'At last: CNN autoplay disabled'"
+      },
+      {
+        "type": "forum",
+        "url": "https://forum.palemoon.org/viewtopic.php?t=23782",
+        "metric": null,
+        "note": "Pale Moon forum: CNN news video & autoplay"
+      },
+      {
+        "type": "forum",
+        "url": "https://forums.anandtech.com/threads/disable-video-autoplay.2577850",
+        "metric": null,
+        "note": "AnandTech: disable video autoplay, cnn.com named"
+      }
+    ],
+    "score": 10,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.cnn.com/",
+    "notes": "No single-purpose install count found; score is autocomplete + threads only."
+  }
+]

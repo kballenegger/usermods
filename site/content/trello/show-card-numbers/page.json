@@ -1,0 +1,52 @@
+{
+  "slug": "show-card-numbers",
+  "title": "Show card numbers in Trello",
+  "question": "How do I show card numbers on Trello cards?",
+  "answer": "Trello has no setting that shows card numbers on the board; the number only appears in the card's link, as in trello.com/c/abc123/42-card-title. The usermods script on this page reads that number from each card and shows it as #42 in front of the card title on every list. Install it with usermods or any userscript manager. Without an extension, open a card and read the number in the address bar after the card ID.",
+  "prompt": "Show each Trello card's number, like #42, in front of its title on the board.",
+  "details": "The number is the one Trello puts in every card link: trello.com/c/<id>/<number>-<title>. It counts up across the whole board, so it stays the same when a card moves between lists. The script only adds the #number label; card titles, links and dragging are unchanged.\n\nThe check runs on a public board while logged out. On your own boards the cards are built the same way, but the check does not cover them.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Read it from the card link",
+      "body": "Open a card. The address bar shows `trello.com/c/<id>/<number>-<title>`; the number before the first dash is the card number."
+    },
+    {
+      "kind": "extension",
+      "title": "Trello Card Numbers Plus",
+      "body": "A Chrome extension that shows card numbers on Trello boards."
+    }
+  ],
+  "related": [],
+  "demand": {
+    "score": 57,
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/ncibjlmfhjcjnphnpphgphbflpdpliei",
+        "note": "Chrome Web Store users, \"Trello Card Numbers Plus\"; count from CWS search page"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/17188",
+        "note": "Greasy Fork total installs, \"Trello Card Number\" (api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=trello%20card%20numbe",
+        "note": "Google suggests \"trello show card numbers\""
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://trello.com/b/nC8QJJoZ/trello-development-roadmap"
+    ],
+    "loggedOut": true,
+    "waitFor": "a[data-testid=\"card-name\"]",
+    "settleMs": 3000,
+    "baseline": "(() => { const l = [...document.querySelectorAll('a[data-testid=\"card-name\"][href*=\"/c/\"]')].filter((a) => a.checkVisibility() && /\\/c\\/[^/]+\\/\\d+-/.test(a.getAttribute('href'))); return l.length >= 10 && !document.querySelector('.usermods-card-number') && l.every((a) => !a.closest('li').innerText.includes('#' + a.getAttribute('href').match(/\\/c\\/[^/]+\\/(\\d+)-/)[1])); })()",
+    "expect": "(() => { const l = [...document.querySelectorAll('a[data-testid=\"card-name\"][href*=\"/c/\"]')].filter((a) => /\\/c\\/[^/]+\\/\\d+-/.test(a.getAttribute('href'))); return l.length >= 10 && document.querySelectorAll('.usermods-card-number').length === l.length && l.every((a) => { const tag = a.previousElementSibling; return !!tag && tag.classList.contains('usermods-card-number') && tag.checkVisibility() && tag.textContent === '#' + a.getAttribute('href').match(/\\/c\\/[^/]+\\/(\\d+)-/)[1]; }); })()",
+    "intact": "[...document.querySelectorAll('[data-testid=\"list-card\"]')].filter((c) => c.checkVisibility()).length >= 20 && [...document.querySelectorAll('a[data-testid=\"card-name\"][href*=\"/c/\"]')].filter((a) => a.checkVisibility() && a.innerText.trim().length > 0).length >= 20"
+  }
+}

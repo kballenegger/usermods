@@ -1,0 +1,47 @@
+{
+  "slug": "enable-text-selection",
+  "title": "Select text on Medium without the highlight menu",
+  "question": "How do I select text on Medium without the highlight popup?",
+  "answer": "Medium has no setting that turns off the menu that pops up when you select text. The usermods script on this page hides that Highlight and Share menu, so you can select and copy text from a story without it covering the line above. Your selection stays as it is, and copying with the keyboard or the right-click menu works as before. The rest of the story page is unchanged.",
+  "prompt": "Stop the Highlight and Share menu from popping up when I select text on Medium.",
+  "details": "Medium puts the menu in a floating toolbar labelled \"Selection actions\". One CSS rule hides it and the popup that holds it before it appears, so nothing flashes. Text selection, copying and the rest of the story page are left alone. The check runs logged out; any extra buttons Medium adds to that toolbar for signed-in readers are hidden with it, but the check doesn't load them.",
+  "alternatives": [
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filter",
+      "body": "Our check runs the script, not this filter.\n\n```\nmedium.com##[role=\"toolbar\"][aria-label=\"Selection actions\"]\n```"
+    }
+  ],
+  "related": [
+    "medium/dark-mode",
+    "medium/hide-paywall-popup",
+    "medium/hide-sticky-bars"
+  ],
+  "demand": {
+    "score": 33,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/423971",
+        "note": "Medium.com: Re-enable Text Selection (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=medium%20highlight%20disable",
+        "note": "does not return the query; suggestions: medium remove highlight | mini highlight vs partial highlight"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://medium.com/@karpathy/software-2-0-a64152b37c35"
+    ],
+    "loggedOut": true,
+    "waitFor": "article p",
+    "settleMs": 3000,
+    "actions": "const p = [...document.querySelectorAll('article p')].find((x) => x.textContent.length > 200); const rect = p.getBoundingClientRect(); const opts = { bubbles: true, cancelable: true, clientX: rect.left + 5, clientY: rect.top + 5, button: 0 }; p.dispatchEvent(new MouseEvent('mousedown', opts)); const r = document.createRange(); r.setStart(p.firstChild, 0); r.setEnd(p.firstChild, 60); const s = getSelection(); s.removeAllRanges(); s.addRange(r); p.dispatchEvent(new MouseEvent('mouseup', { ...opts, clientX: rect.left + 300 })); await new Promise((res) => setTimeout(res, 1500));",
+    "baseline": "(() => { const t = document.querySelector('[role=toolbar][aria-label=\"Selection actions\"]'); return getSelection().toString().length === 60 && !!t && t.checkVisibility() && /Highlight/.test(t.textContent); })()",
+    "expect": "(() => { const t = document.querySelector('[role=toolbar][aria-label=\"Selection actions\"]'); return getSelection().toString().length === 60 && !!t && /Highlight/.test(t.textContent) && !t.checkVisibility(); })()",
+    "intact": "(() => { const ps = [...document.querySelectorAll('article p')].filter((p) => p.checkVisibility()); const h = document.querySelector('article h1'); return ps.length >= 20 && !!h && h.checkVisibility(); })()"
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "slug": "iso-dates",
+  "title": "Show exact dates on Stack Overflow",
+  "question": "How do I see exact post dates on Stack Overflow?",
+  "answer": "Stack Overflow shows dates like 14 years, 4 months ago or Jun 27, 2012 at 13:51 and gives the exact time only when you hover over one. There is no setting to change the format. The usermods script on this page rewrites every date on question pages, for the question, answers, edits and comments, as an ISO date and time in UTC, such as 2012-06-27 13:51 UTC. Without an extension, hover over any date to see its exact timestamp.",
+  "prompt": "Show every date on Stack Overflow as an exact ISO date and time instead of \"x years ago\".",
+  "details": "Each date on the page carries its exact UTC timestamp in a tooltip attribute. The script reads that and writes it out as `YYYY-MM-DD HH:MM UTC`, so the time does not depend on your time zone. Comments loaded later with \"Show more comments\" are rewritten as they appear.\n\nThe check loads a question page. Question lists and user pages use the same tooltips, but the check does not load them.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Hover the date",
+      "body": "Hovering over any date on Stack Overflow shows a tooltip with the exact UTC timestamp."
+    }
+  ],
+  "related": [
+    "stackoverflow/hide-cookie-banner",
+    "stackoverflow/hide-sidebar",
+    "stackoverflow/hide-hot-network-questions"
+  ],
+  "check": {
+    "urls": [
+      "https://stackoverflow.com/questions/11227809/why-is-processing-a-sorted-array-faster-than-processing-an-unsorted-array"
+    ],
+    "loggedOut": true,
+    "waitFor": "#question",
+    "settleMs": 4000,
+    "baseline": "(() => { const re = /^\\d{4}-\\d\\d-\\d\\d \\d\\d:\\d\\d:\\d\\dZ/; const els = [...document.querySelectorAll('[title], time[datetime]')].filter((e) => e.children.length === 0 && re.test(e.getAttribute('datetime') || e.getAttribute('title') || '') && e.checkVisibility()); return els.filter((e) => !/^\\d{4}-\\d\\d-\\d\\d \\d\\d:\\d\\d UTC$/.test(e.textContent)).length >= 5 && els.some((e) => /ago/.test(e.textContent)); })()",
+    "expect": "(() => { const re = /^\\d{4}-\\d\\d-\\d\\d \\d\\d:\\d\\d:\\d\\dZ/; const els = [...document.querySelectorAll('[title], time[datetime]')].filter((e) => e.children.length === 0 && re.test(e.getAttribute('datetime') || e.getAttribute('title') || '') && e.checkVisibility()); return els.length >= 20 && els.every((e) => /^\\d{4}-\\d\\d-\\d\\d \\d\\d:\\d\\d UTC$/.test(e.textContent)) && document.querySelector('time[itemprop=\"dateCreated\"]').textContent === '2012-06-27 13:51 UTC'; })()",
+    "intact": "(() => { const q = document.querySelector('#question .s-prose'); const answers = [...document.querySelectorAll('#answers .answer')].filter((a) => a.checkVisibility()); return !!q && q.checkVisibility() && answers.length >= 5; })()"
+  },
+  "demand": {
+    "score": 35,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/389674",
+        "note": "Greasy Fork total installs: \"ISO time format for StackOverflow\" (read via api.greasyfork.org, 2026-11-17)"
+      }
+    ]
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "slug": "hide-comments",
+  "title": "Hide comments on the Guardian",
+  "question": "How do I hide the comments section on Guardian articles?",
+  "answer": "The Guardian has no setting that turns comments off; on articles open to comments, the thread sits below the article and the comment count shows next to the byline. The usermods script on this page hides the comments section and the comment count on every Guardian article, so the page ends with the article and the related links. The rest of the article is unchanged. Without a script, a uBlock Origin filter on the #comments block hides the thread.",
+  "prompt": "Hide the comments section and comment counts on Guardian articles.",
+  "details": "The Guardian builds each interactive part of a page as a `<gu-island>` element with a `name`. The script hides `#comments`, the `DiscussionWeb` island (the thread) and the `DiscussionMeta` island (the \"Comments\" heading and sign-in prompt above it), plus the `CommentCount` island (the count next to the byline). It is CSS injected at `document-start`, so the thread never shows.\n\nArticles without comments are not affected. The check loads an opinion article with comments and checks that the thread, its heading and the byline count are all hidden.",
+  "alternatives": [
+    {
+      "kind": "ublock",
+      "title": "uBlock Origin filter",
+      "body": "Hides the thread only. Our check runs the script, not this filter.\n\n```\ntheguardian.com###comments\n```"
+    }
+  ],
+  "check": {
+    "urls": [
+      "https://www.theguardian.com/commentisfree/2026/nov/16/donald-trump-benjamin-netanyahu-power-israel-pm"
+    ],
+    "loggedOut": true,
+    "waitFor": "article",
+    "settleMs": 3000,
+    "actions": "for (let i = 0; i < 14; i++) { window.scrollBy(0, 1500); await new Promise((r) => setTimeout(r, 500)); } await new Promise((r) => setTimeout(r, 4000));",
+    "baseline": "(() => { const c = document.querySelector('#comments'); const n = document.querySelector('gu-island[name=\"CommentCount\"]'); const m = document.querySelector('gu-island[name=\"DiscussionMeta\"]'); return !!c && c.checkVisibility() && /Comments/.test(c.innerText) && !!n && n.checkVisibility() && /\\d/.test(n.innerText) && !!m && m.checkVisibility(); })()",
+    "expect": "(() => { const c = document.querySelector('#comments'); const n = document.querySelector('gu-island[name=\"CommentCount\"]'); const m = document.querySelector('gu-island[name=\"DiscussionMeta\"]'); return !!c && /Comments/.test(c.textContent) && !c.checkVisibility() && !!n && /\\d/.test(n.textContent) && !n.checkVisibility() && !!m && !m.checkVisibility(); })()",
+    "intact": "[...document.querySelectorAll('article p')].filter((p) => p.checkVisibility() && p.innerText.length > 80).length >= 5"
+  },
+  "demand": {
+    "score": 27,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/258",
+        "note": "Don't Read Below the Line (total installs)"
+      }
+    ]
+  }
+}

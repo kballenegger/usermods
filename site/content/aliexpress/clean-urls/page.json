@@ -1,0 +1,46 @@
+{
+  "slug": "clean-urls",
+  "title": "Clean AliExpress product links",
+  "question": "How do I get a clean AliExpress product link?",
+  "answer": "A clean AliExpress product link is the item number alone: https://www.aliexpress.com/item/<number>.html, with everything after the question mark removed. AliExpress has no setting for this. The usermods script on this page strips the tracking parameters from every product link in search results and from the address bar on product pages, so whatever you copy or share is already short. Without an extension, delete everything from the \"?\" onward before sharing.",
+  "prompt": "On AliExpress, remove the tracking parameters from product links so they are just /item/<id>.html.",
+  "details": "Product links on AliExpress carry long query strings (`algo_pvid`, `pdp_npi`, `curPageLogUid`, `utparam-url` and more) that only serve tracking. The script rewrites every link whose path is `/item/<id>.html` to drop the query string, and does it again when results load as you scroll. On a product page it also replaces the address bar URL with the short one, without reloading.\n\nThe short link opens the same product. A colour or size you picked is not kept in it. The check loads a search results page; the address bar cleanup on product pages is not covered by it.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Trim the link by hand",
+      "body": "Copy the link and delete everything from the `?` onward. `https://www.aliexpress.com/item/1005001234567890.html` is all that is needed."
+    },
+    {
+      "kind": "extension",
+      "title": "ClearURLs",
+      "body": "The ClearURLs extension removes known tracking parameters from links on many sites."
+    }
+  ],
+  "demand": {
+    "score": 57,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/26559",
+        "note": "Greasy Fork total installs: \"Aliexpress URL Cleaner\" (read via api.greasyfork.org, 2026-11-17)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=aliexpress+clean+url",
+        "note": "suggests \"aliexpress clean link\""
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.aliexpress.com/w/wholesale-usb-c-cable.html"
+    ],
+    "loggedOut": true,
+    "waitFor": "a.search-card-item",
+    "settleMs": 4000,
+    "baseline": "[...document.querySelectorAll('a[href*=\"/item/\"]')].some((a) => /\\/item\\/\\d+\\.html\\?/.test(a.href))",
+    "expect": "(() => { const l = [...document.querySelectorAll('a[href*=\"/item/\"]')].filter((a) => /\\/item\\/\\d+\\.html/.test(a.href)); return l.length >= 5 && l.every((a) => /^https:\\/\\/[a-z.]*aliexpress\\.com\\/item\\/\\d+\\.html$/.test(a.href)); })()",
+    "intact": "[...document.querySelectorAll('a.search-card-item')].filter((a) => a.checkVisibility()).length >= 5"
+  }
+}

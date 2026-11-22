@@ -1,0 +1,38 @@
+{
+  "slug": "unblur-spoilers",
+  "title": "Reveal Reddit spoilers automatically",
+  "question": "How do I unblur spoilers on Reddit?",
+  "answer": "Reddit has no setting to show spoiler-tagged posts unblurred; each one needs a click on \"View spoiler\". The usermods script on this page presses that button for you, so the text and images of spoiler posts show unblurred in feeds and on post pages. It leaves NSFW blurs alone. Install it with usermods or any userscript manager. Without a userscript, click \"View spoiler\" on each post.",
+  "prompt": "On Reddit, automatically reveal spoiler-tagged posts so they are not blurred.",
+  "details": "Reddit puts the body or media of a spoiler-tagged post inside a `shreddit-blurred-container` element with `reason=\"spoiler\"`, and draws the blur and the \"View spoiler\" button inside that element's shadow root. The script clicks that button on every such container as it appears, which is what Reddit does when you click it yourself. The spoiler tag on the post stays visible.\n\nIt leaves NSFW blurs (`reason=\"nsfw\"`) alone and does not change inline spoiler text inside comments. The check loads a spoiler-tagged post page; the feed uses the same element but the check doesn't load a feed.",
+  "related": [
+    "reddit/hide-promoted",
+    "reddit/expand-threads"
+  ],
+  "demand": {
+    "score": 59,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/416091",
+        "note": "Reddit spoiler blur remover (4,160 total installs)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=reddit%20unblur%20spoilers",
+        "note": "suggestions: reddit unblur spoilers, how to unblur an image on reddit, reddit remove spoiler blur"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.reddit.com/r/movies/comments/1xy6xe1/what_was_heartland_and_why_is_jessica_chastain/"
+    ],
+    "loggedOut": true,
+    "waitFor": "shreddit-post",
+    "settleMs": 4000,
+    "baseline": "(() => { const c = [...document.querySelectorAll('shreddit-blurred-container[reason=\"spoiler\"]')]; return c.length > 0 && c.every((b) => b.checkVisibility() && getComputedStyle(b.shadowRoot.querySelector('.inner')).filter.includes('blur')); })()",
+    "expect": "(() => { const c = [...document.querySelectorAll('shreddit-blurred-container[reason=\"spoiler\"]')]; return c.length > 0 && c.every((b) => { const inner = b.shadowRoot && b.shadowRoot.querySelector('.inner'); return !b.hasAttribute('blurred') && (!inner || !getComputedStyle(inner).filter.includes('blur')); }); })()",
+    "intact": "document.querySelector('shreddit-post')?.checkVisibility() === true && [...document.querySelectorAll('shreddit-comment')].filter((c) => c.checkVisibility()).length >= 3"
+  }
+}

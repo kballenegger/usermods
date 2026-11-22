@@ -1,0 +1,46 @@
+{
+  "slug": "light-mode",
+  "title": "Use a light theme in the Spotify web player",
+  "question": "Can the Spotify web player use a light theme?",
+  "answer": "No. The Spotify web player and desktop app only come in the dark theme, and there is no setting to change it. The usermods script on this page inverts the colours of the web player at open.spotify.com, so the black panels turn light grey and the white text turns near black, then flips cover art, artist photos and video back so they look normal. Spotify green stays green. Without an extension, a browser-wide tool that changes page colours is the only route.",
+  "prompt": "Make the Spotify web player light: light grey backgrounds and dark text, with album covers unchanged.",
+  "details": "Spotify compiles most of its colours into generated class names, so the script doesn't recolour elements one by one. It applies `filter: invert(1) hue-rotate(180deg)` to the page, which turns dark into light while keeping hues roughly the same, and applies the same filter again to images, video and canvas so they come out as they were.\n\nThe album header gradient, which Spotify takes from the cover, comes out as a lighter tint of the same colour. The check loads an album page and confirms that the page is inverted, the cover art is not, and the track list is still there.",
+  "alternatives": [
+    {
+      "kind": "extension",
+      "title": "Stylus with a Spotify light style",
+      "body": "Stylus applies CSS you write or install to open.spotify.com. Styles that recolour Spotify's generated class names stop working when Spotify ships a new build."
+    }
+  ],
+  "related": [
+    "spotify/hide-upgrade-prompts",
+    "spotify/copy-track-info",
+    "spotify/open-in-app"
+  ],
+  "demand": {
+    "score": 48,
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/lengbgflhbbajjfklllkaiookcpkkdbl",
+        "note": "Spotify Light Mode (783 users)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=spotify%20web%20player%20theme",
+        "note": "suggestions: spotify web player theme"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://open.spotify.com/album/4LH4d3cOWNNsVw41Gqt2kv"
+    ],
+    "loggedOut": true,
+    "waitFor": "[data-testid=\"tracklist-row\"]",
+    "settleMs": 3000,
+    "baseline": "(() => { const lum = (c) => { const [r, g, b] = c.match(/[\\d.]+/g).map(Number); return 0.2126 * r + 0.7152 * g + 0.0722 * b; }; const inv = /invert\\(1\\)/.test(getComputedStyle(document.documentElement).filter); const t = document.querySelector('[data-testid=\"tracklist-row\"] [data-testid=\"internal-track-link\"]'); return !inv && lum(getComputedStyle(document.querySelector('footer, [data-testid=\"footer-div\"]')).backgroundColor) < 40 && lum(getComputedStyle(t).color) > 200; })()",
+    "expect": "(() => { const lum = (c) => { const [r, g, b] = c.match(/[\\d.]+/g).map(Number); return 0.2126 * r + 0.7152 * g + 0.0722 * b; }; const inv = /invert\\(1\\)/.test(getComputedStyle(document.documentElement).filter); const shown = (c) => inv ? 255 - lum(c) : lum(c); const t = document.querySelector('[data-testid=\"tracklist-row\"] [data-testid=\"internal-track-link\"]'); const cover = document.querySelector('[data-testid=\"entity-header\"] img'); return inv && shown(getComputedStyle(document.querySelector('[data-testid=\"footer-div\"]')).backgroundColor) > 215 && shown(getComputedStyle(t).color) < 60 && !!cover && /invert\\(1\\)/.test(getComputedStyle(cover).filter + getComputedStyle(cover.parentElement).filter); })()",
+    "intact": "[...document.querySelectorAll('[data-testid=\"tracklist-row\"]')].filter((r) => r.checkVisibility()).length >= 5 && !!document.querySelector('[data-testid=\"entity-header\"] img')?.checkVisibility()"
+  }
+}

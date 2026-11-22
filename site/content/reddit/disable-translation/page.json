@@ -1,0 +1,45 @@
+{
+  "slug": "disable-translation",
+  "title": "Stop Reddit auto-translating posts",
+  "question": "How do I stop Reddit auto-translating posts into my language?",
+  "answer": "Reddit translates a page when its address ends in a ?tl= parameter, which is what links from Google and other search engines carry, and every link on that page keeps the parameter. The usermods script on this page reloads such a page without ?tl= and strips it from links, so posts and comments show in their original language. Install it with usermods or any userscript manager. Without a userscript, delete ?tl= and the language code from the address bar and reload.",
+  "prompt": "Stop Reddit from translating posts: remove the tl= parameter from Reddit URLs and links.",
+  "details": "At page start the script checks the address for a `tl` parameter. If there is one, it replaces the page with the same address minus `tl`, keeping every other parameter. On untranslated pages it watches for links that still carry `tl=` and removes it from them, so moving around Reddit doesn't bring the translation back.\n\nThe check opens r/de with `?tl=en` and confirms the page ends up without the parameter and with no translated links.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Edit the address",
+      "body": "Remove `?tl=en` (or whatever language code follows `tl=`) from the address and reload. Links on the untranslated page don't carry it."
+    }
+  ],
+  "related": [
+    "reddit/hide-promoted",
+    "reddit/expand-threads"
+  ],
+  "demand": {
+    "score": 5,
+    "evidence": [
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=reddit%20disable%20auto%20translate",
+        "note": "suggestions: reddit disable auto translate, reddit disable auto translate extension, reddit disable auto translate google"
+      },
+      {
+        "type": "forum",
+        "url": "https://news.ycombinator.com/item?id=40941113",
+        "note": "Ask HN: Am I the only one annoyed by the Auto-Translated Reddit?"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.reddit.com/r/de/?tl=en"
+    ],
+    "loggedOut": true,
+    "waitFor": "shreddit-post",
+    "settleMs": 4000,
+    "baseline": "new URLSearchParams(location.search).get('tl') === 'en' && document.querySelectorAll('a[href*=\"tl=en\"]').length >= 10",
+    "expect": "location.pathname === '/r/de/' && !new URLSearchParams(location.search).has('tl') && document.querySelectorAll('a[href]').length > 50 && document.querySelectorAll('a[href*=\"tl=\"]').length === 0",
+    "intact": "[...document.querySelectorAll('shreddit-post[post-language=\"de\"]')].filter((p) => p.checkVisibility()).length >= 5"
+  }
+}

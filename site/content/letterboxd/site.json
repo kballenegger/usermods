@@ -1,0 +1,7 @@
+{
+  "slug": "letterboxd",
+  "name": "Letterboxd",
+  "domains": ["letterboxd.com"],
+  "category": "social",
+  "intro": "Userscripts for Letterboxd film pages: the exact average rating and runtimes in hours and minutes."
+}

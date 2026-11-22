@@ -1,0 +1,51 @@
+{
+  "slug": "theater-mode",
+  "title": "Open Kick in theatre mode",
+  "question": "How do I open Kick streams in theater mode?",
+  "answer": "Kick has no setting to open streams in theatre mode. The theatre button in the player and the T key switch it on, but every new page opens in the normal layout again. The usermods script on this page presses T for you once when a stream or VOD opens, so the player starts in theatre mode. Press T again to leave it on that page; the next stream you open starts in theatre mode again.",
+  "prompt": "Open every Kick stream and VOD in theatre mode.",
+  "details": "Kick marks the layout with a `data-theatre` attribute and toggles it from a T key handler on the document. Once per page, when the player (`#video-player`) is on screen and `data-theatre` is `false`, the script sends that key press. It does not fight you: leave theatre mode and it stays off until you open another stream or video. The check runs on a VOD page; live channel pages use the same player.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Theatre button or the T key",
+      "body": "The theatre button at the bottom right of the player, or **T** while the page has focus, switches theatre mode on for the current page. Kick does not remember it after a reload."
+    }
+  ],
+  "related": [
+    "kick/hide-chat",
+    "kick/click-to-pause"
+  ],
+  "check": {
+    "urls": [
+      "https://kick.com/lospollostv/videos/01a1d33b-ebd0-73ba-a568-6b54155cd924"
+    ],
+    "loggedOut": true,
+    "waitFor": "#video-player",
+    "settleMs": 6000,
+    "actions": "document.querySelector('[data-testid=mature]')?.click(); await new Promise((r) => setTimeout(r, 3000));",
+    "baseline": "(() => { const l = document.querySelector('[data-theatre]'); return !!l && l.dataset.theatre === 'false'; })()",
+    "expect": "(() => { const l = document.querySelector('[data-theatre]'); return !!l && l.dataset.theatre === 'true'; })()",
+    "intact": "(() => { const v = document.querySelector('#video-player'); return !!v && v.checkVisibility() && v.getBoundingClientRect().width > 1000 && v.readyState >= 2; })()"
+  },
+  "demand": {
+    "score": 40,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/530130",
+        "note": "Replace Kick Embed with Channel Page and Enable Theatre Mode (total installs)"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/dpicnonffkfkjlaapggkbfbddnmlkcdn",
+        "note": "Kick Advanced Player (130 users, read on the detail page); multi-purpose extension, not counted in the score"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=kick%20theater%20mode",
+        "note": "returns \"kick theater mode\"; suggestions: kick theater mode | kick theatre mode | what is movement in theatre"
+      }
+    ]
+  }
+}

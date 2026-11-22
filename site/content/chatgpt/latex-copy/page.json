@@ -1,0 +1,66 @@
+{
+  "slug": "latex-copy",
+  "title": "Copy math from ChatGPT as LaTeX",
+  "question": "How do I copy an equation from ChatGPT as LaTeX?",
+  "answer": "ChatGPT has no button to copy a single equation. The Copy button under a reply copies the whole reply as Markdown with the LaTeX in dollar signs, but selecting an equation and copying it gives you the rendered symbols. The usermods script on this page copies an equation's LaTeX source when you click it, and when you copy a selection that contains math it puts the LaTeX, wrapped in $...$ or $$...$$, in place of the rendered symbols.",
+  "prompt": "On ChatGPT, let me click an equation to copy its LaTeX, and keep the LaTeX when I copy text with math in it.",
+  "details": "ChatGPT draws math with KaTeX, which keeps the original LaTeX in a hidden `annotation` element. The script reads that element; it does not rebuild LaTeX from the rendered output.\n\n- **Click an equation** to copy its LaTeX without delimiters, ready for Overleaf, Word's equation editor or a Markdown file. The equation gets a green outline for a moment. A click that ends a text selection is ignored, so you can still select across math.\n- **Copy a selection** with Ctrl+C or Cmd+C: inline math becomes `$...$` and display math `$$...$$`. The script sets plain text only. If the selection has no math, the browser copies as usual.\n\nThe check sends a question logged out, clicks the display equation in the reply, and copies a sentence that contains inline math.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Copy button under the reply",
+      "body": "The **Copy** button under each reply copies the whole reply as Markdown, with equations as `$...$` and `$$...$$`. Paste it and delete what you don't need."
+    },
+    {
+      "kind": "extension",
+      "title": "LaTeX copy extensions",
+      "body": "Chrome extensions such as ChatGPT LaTeX Copy Tool add copy buttons to equations."
+    }
+  ],
+  "related": [
+    "chatgpt/export-chat",
+    "chatgpt/wide-chat"
+  ],
+  "demand": {
+    "score": 57,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/506742",
+        "note": "复制ChatGPT的LaTex公式（Word文档专用） (198 total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/527096",
+        "note": "复制LaTex公式，支持ChatGPT/DeepSeek/wikipedia/知乎等多个网站 (131 total installs)"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/okekmhopepdleiohbocckmjdmdmlgaij",
+        "note": "ChatGPT LaTeX Copy Tool (3,000 users)"
+      },
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/gnkhfcibcpijebfmamnanokjdepbggak",
+        "note": "ChatGPT LaTeX Copy Fix (592 users)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=chatgpt%20latex",
+        "note": "returns the query; suggestions: chatgpt latex | chatgpt latex editor | chatgpt latex is invalid | chatgpt latex not rendering | chatgpt latex copy tool"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://chatgpt.com/"
+    ],
+    "loggedOut": true,
+    "waitFor": "form textarea[name=\"prompt\"]",
+    "settleMs": 3000,
+    "actions": "const sleep = (ms) => new Promise((r) => setTimeout(r, ms)); const box = document.querySelector('form textarea[name=\"prompt\"]'); box.focus(); document.execCommand('insertText', false, 'State the Pythagorean theorem as display math, then write one sentence that mentions E=mc^2 as inline math.'); await sleep(500); box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true })); for (let i = 0; i < 50 && !document.querySelector('li[data-message-role=\"assistant\"][data-message-complete]'); i++) await sleep(500); await sleep(1500); window.__um = { written: [] }; navigator.clipboard.writeText = async (t) => { window.__um.written.push(t); }; const math = document.querySelector('li[data-message-role=\"assistant\"] [data-d-component=\"math\"][data-d-block]'); if (math) { window.__um.blockTex = math.querySelector('annotation').textContent.trim(); math.querySelector('.katex').dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window })); } await sleep(300); const p = [...document.querySelectorAll('li[data-message-role=\"assistant\"] p')].find((el) => el.querySelector('[data-d-component=\"math\"]:not([data-d-block])')); if (p) { window.__um.inlineTex = [...p.querySelectorAll('[data-d-component=\"math\"] annotation')].map((a) => a.textContent.trim()); const range = document.createRange(); range.selectNodeContents(p); getSelection().removeAllRanges(); getSelection().addRange(range); const dt = new DataTransfer(); p.dispatchEvent(new ClipboardEvent('copy', { clipboardData: dt, bubbles: true, cancelable: true })); window.__um.copied = dt.getData('text/plain'); getSelection().removeAllRanges(); }",
+    "baseline": "(() => { const u = window.__um; return !!u.blockTex && Array.isArray(u.inlineTex) && u.inlineTex.length > 0 && u.written.length === 0 && !u.inlineTex.some((t) => (u.copied || '').includes('$' + t + '$')); })()",
+    "expect": "(() => { const u = window.__um; return !!u.blockTex && u.written.length === 1 && u.written[0] === u.blockTex && Array.isArray(u.inlineTex) && u.inlineTex.length > 0 && u.inlineTex.every((t) => u.copied.includes('$' + t + '$')); })()",
+    "intact": "[...document.querySelectorAll('li[data-message-role]')].filter((m) => m.checkVisibility()).length >= 2 && [...document.querySelectorAll('li[data-message-role=\"assistant\"] .katex')].some((k) => k.checkVisibility()) && document.querySelector('form textarea[name=\"prompt\"]').checkVisibility()"
+  }
+}

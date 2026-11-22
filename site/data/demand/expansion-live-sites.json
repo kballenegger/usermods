@@ -1,0 +1,3402 @@
+[
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "video-screenshot",
+    "title": "Take a screenshot of a YouTube video",
+    "question": "How do I save the current YouTube frame as an image?",
+    "queries": [
+      "youtube screenshot",
+      "youtube screenshot extension"
+    ],
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/gjoijpfmdhbjkkgnmahganhoinjjpohk",
+        "metric": 500000,
+        "note": "Screenshot YouTube (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/lnaahdmijnjnmgaalacdgakieangpjgp",
+        "metric": 70000,
+        "note": "Screenshot YouTube Video (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/ehehmcocpegbmagfhajbmeofolnpdfla",
+        "metric": 20000,
+        "note": "YouTube Screenshot Button (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20screenshot",
+        "metric": null,
+        "note": "returns the query; suggestions: youtube screenshot | youtube screenshot extension | youtube screenshot generator | youtube screenshot chrome extension | youtube screenshot download"
+      }
+    ],
+    "score": 90,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    "notes": "Canvas drawImage of the video element; YouTube video is same-origin via blob so toBlob works."
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "loop-video",
+    "title": "Loop a YouTube video",
+    "question": "How do I put a YouTube video on repeat?",
+    "queries": [
+      "youtube loop video",
+      "youtube repeat button"
+    ],
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/iggpfpnahkgpnindfkdncknoldgnccdg",
+        "metric": 400000,
+        "note": "Looper for YouTube (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/lapfofmpmghklaegbdamgdojjninpnkg",
+        "metric": 10000,
+        "note": "YouTube™ Repeat Button (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20loop%20video",
+        "metric": null,
+        "note": "returns the query; suggestions: youtube loop video | youtube loop video meaning | youtube loop video not working | youtube loop video extension | youtube loop video section"
+      }
+    ],
+    "score": 89,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    "notes": "Adds a visible loop button / key; sets video.loop. Built-in loop exists only in the right-click menu."
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "faster-playback-speed",
+    "title": "Play YouTube faster than 2x",
+    "question": "How do I watch YouTube faster than 2x speed?",
+    "queries": [
+      "youtube speed more than 2x",
+      "youtube playback speed more than 2x"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/421670",
+        "metric": 9299,
+        "note": "YouTube More Speeds (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/30506",
+        "metric": 7161,
+        "note": "Video Speed Buttons (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/hdannnflhlmdablckfkjpleikpphncik",
+        "metric": 300000,
+        "note": "Youtube Playback Speed Control (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/naalfmaaomhjpbndelnlijacdniggpjn",
+        "metric": 50000,
+        "note": "YouTube Speed Controls (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20speed%20more%20than%202x",
+        "metric": null,
+        "note": "returns the query; suggestions: youtube speed more than 2x | youtube speed more than 2x extension | increase youtube speed more than 2x | change youtube speed more than 2x | youtube playback speed more than 2x"
+      },
+      {
+        "type": "forum",
+        "url": "https://webapps.stackexchange.com/questions/123389/watch-youtube-videos-faster-than-2x-speed",
+        "metric": null,
+        "note": "webapps.stackexchange question: Watch YouTube videos faster than 2x speed?"
+      }
+    ],
+    "score": 87,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    "notes": "Sets video.playbackRate above 2 with keys or buttons. Distinct from default-playback-speed (existing page)."
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "old-layout",
+    "title": "Restore the old YouTube layout",
+    "question": "How do I get the old YouTube layout back?",
+    "queries": [
+      "youtube old layout",
+      "youtube old layout extension"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/488254",
+        "metric": 17422,
+        "note": "Pre 2024 Youtube UI (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/453802",
+        "metric": 9637,
+        "note": "YouTube - Revert UI changes before late-2022 (Non-Rounded Design) (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/mdgdgieddpndgjlmeblhjgljejejkikf",
+        "metric": 100000,
+        "note": "YouTube Redux (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/iedffooliepgabiihipcbokboecnfcbe",
+        "metric": 30000,
+        "note": "CustomTube - Restore the Old YouTube Layout (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20old%20layout",
+        "metric": null,
+        "note": "returns the query; suggestions: youtube old layout | youtube old layout extension | youtube old layout firefox | youtube old layout reddit | youtube old layout extension firefox"
+      },
+      {
+        "type": "forum",
+        "url": "https://webapps.stackexchange.com/questions/118752/youtube-enable-old-layout",
+        "metric": null,
+        "note": "webapps.stackexchange question: YouTube enable old layout"
+      },
+      {
+        "type": "forum",
+        "url": "https://webapps.stackexchange.com/questions/17682/how-to-switch-back-to-old-youtube-layout",
+        "metric": null,
+        "note": "webapps.stackexchange question: How to switch back to old YouTube layout?"
+      }
+    ],
+    "score": 85,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    "notes": "Large CSS job; will need upkeep as YouTube changes."
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "rotate-video",
+    "title": "Rotate a YouTube video",
+    "question": "How do I rotate a sideways YouTube video?",
+    "queries": [
+      "rotate youtube video"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/375568",
+        "metric": 11064,
+        "note": "youtube player rotate (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/ijpcmpbcokpgmecfkmehleemljfkeimo",
+        "metric": 90000,
+        "note": "Rotate that Video Player (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/aealinghcnkgokkhdeijcejdimmeelho",
+        "metric": 20000,
+        "note": "YouTube Video Rotate (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=rotate%20youtube%20video",
+        "metric": null,
+        "note": "returns the query; suggestions: rotate youtube video | rotate youtube video on tv | rotate youtube video on iphone | rotate youtube video android | rotate youtube video online"
+      },
+      {
+        "type": "forum",
+        "url": "https://superuser.com/questions/1403979/is-it-possible-to-rotate-youtube-videos-while-watching-on-desktop-pc",
+        "metric": null,
+        "note": "superuser.com question: Is it possible to rotate YouTube videos while watching on desktop PC?"
+      },
+      {
+        "type": "forum",
+        "url": "https://superuser.com/questions/1765672/how-can-i-rotate-youtube-videos-as-if-on-a-mirror-not-90degree-rotations-by",
+        "metric": null,
+        "note": "superuser.com question: How can I rotate Youtube videos as if on a mirror? (!!Not 90degree rotations by ctrl+shift+arrow!!)"
+      }
+    ],
+    "score": 84,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    "notes": "CSS transform on the video element with a key or button."
+  },
+  {
+    "site": "wikipedia",
+    "siteName": "Wikipedia",
+    "domains": [
+      "wikipedia.org",
+      "en.wikipedia.org"
+    ],
+    "category": "reference",
+    "task": "redirect-to-wikiwand",
+    "title": "Open Wikipedia articles in Wikiwand",
+    "question": "How do I make Wikipedia links open in Wikiwand?",
+    "queries": [
+      "wikiwand redirect",
+      "wikiwand"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/13400",
+        "metric": 1537,
+        "note": "Wikipedia 2 Wikiwand (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/23047",
+        "metric": 1323,
+        "note": "Wikipedia 2 Wikiwand (Global) (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/emffkefkbkpkgpdeeooapgaicgmcbolj",
+        "metric": 200000,
+        "note": "Wikiwand - Wikipedia Modernized (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=wikiwand%20redirect",
+        "metric": null,
+        "note": "does not return the query; suggestions: "
+      }
+    ],
+    "score": 80,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://en.wikipedia.org/wiki/Moon",
+    "notes": "Wikiwand extension (200k) is the official one and does more than redirect."
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "disable-60fps",
+    "title": "Turn off 60fps video on YouTube",
+    "question": "How do I stop YouTube from playing videos at 60fps?",
+    "queries": [
+      "youtube disable 60fps",
+      "youtube turn off 60fps"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/23329",
+        "metric": 29255,
+        "note": "Disable YouTube 60 FPS (Force 30 FPS) (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/omkfmpieigblcllmkgbflkikinpkodlk",
+        "metric": 100000,
+        "note": "enhanced-h264ify (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20disable%2060fps",
+        "metric": null,
+        "note": "returns the query; suggestions: youtube disable 60fps | youtube turn off 60fps | youtube block 60fps | youtube revanced disable 60fps | disable 60fps youtube android"
+      }
+    ],
+    "score": 80,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    "notes": "Overrides MediaSource.isTypeSupported to refuse framerate>30. enhanced-h264ify (100k users) does this plus codec blocking."
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "show-video-tags",
+    "title": "Show a YouTube video's tags",
+    "question": "How can I see the tags on a YouTube video?",
+    "queries": [
+      "youtube tags viewer",
+      "youtube video tags viewer"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/1196",
+        "metric": 7481,
+        "note": "View YouTube tags (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/fffiogeaioiinfekkflcfebaoiohkkgp",
+        "metric": 80000,
+        "note": "YouTube Tags (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20tags%20viewer",
+        "metric": null,
+        "note": "returns the query; suggestions: youtube tags viewer | youtube tags viewer extension | youtube tags viewer firefox | youtube tags view | youtube tags reader"
+      }
+    ],
+    "score": 79,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    "notes": "Tags are in the page meta keywords and ytInitialPlayerResponse, so no network call is needed."
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "volume-boost",
+    "title": "Boost YouTube volume above 100%",
+    "question": "How do I make a quiet YouTube video louder than max volume?",
+    "queries": [
+      "youtube volume booster",
+      "youtube volume booster extension"
+    ],
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/camciclnnglajljifpjocnpmepnkajgi",
+        "metric": 90000,
+        "note": "Volume Booster for YouTube™ (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20volume%20booster",
+        "metric": null,
+        "note": "returns the query; suggestions: youtube volume booster | youtube volume booster extension | youtube volume booster firefox | youtube volume booster chrome extension | youtube volume booster iphone"
+      },
+      {
+        "type": "forum",
+        "url": "https://webapps.stackexchange.com/questions/6506/how-to-increase-the-volume-on-certain-youtube-videos",
+        "metric": null,
+        "note": "webapps.stackexchange question: How to increase the volume on certain YouTube videos"
+      }
+    ],
+    "score": 79,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    "notes": "Web Audio GainNode on the video element. Volume Booster (3M) is all-sites, so the YouTube-only one is cited."
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "disable-autopause",
+    "title": "Stop YouTube pausing when the tab is hidden",
+    "question": "Why does YouTube pause when I leave the tab, and how do I stop it?",
+    "queries": [
+      "youtube autopause",
+      "youtube auto pause blocker"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/457219",
+        "metric": 8156,
+        "note": "Disable YouTube AutoPause (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/kdmekoohmngfmmmmlflddplohklmmmoc",
+        "metric": 40000,
+        "note": "YouTube Auto Pause Blocker (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20autopause",
+        "metric": null,
+        "note": "returns the query; suggestions: youtube auto pause blocker extension | youtube autopause | youtube auto pause blocker | youtube auto pause blocker firefox | youtube auto pause problem"
+      }
+    ],
+    "score": 74,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    "notes": "Close to background-play; could merge into one page. Not the same as auto-continue-watching (the \"Continue watching?\" dialog, assigned)."
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "reverse-playlist",
+    "title": "Play a YouTube playlist in reverse order",
+    "question": "How do I play a YouTube playlist backwards, oldest first?",
+    "queries": [
+      "youtube reverse playlist",
+      "youtube reverse playlist order"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/404986",
+        "metric": 4456,
+        "note": "Play Youtube playlist in reverse order (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/fjhdhmikpmfcoonnnbheiloleihndlde",
+        "metric": 30000,
+        "note": "Youtube Playlist Reverser (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20reverse%20playlist",
+        "metric": null,
+        "note": "returns the query; suggestions: youtube reverse playlist | youtube reverse playlist order | youtube reverse playlist firefox | youtube reverse playlist extension | youtube reverse playlist order firefox"
+      },
+      {
+        "type": "forum",
+        "url": "https://webapps.stackexchange.com/questions/138663/is-it-possible-to-play-youtube-playlists-in-reverse-order",
+        "metric": null,
+        "note": "webapps.stackexchange question: Is it possible to play YouTube playlists in reverse order?"
+      }
+    ],
+    "score": 72,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/playlist?list=PLbpi6ZahtOH6Blw3RGYpWkSByi_T7Rygb",
+    "notes": "Playlist URL must be confirmed in the harness; on end, navigates to the previous item. Playlist URL fetched 200 (a YouTube trending playlist, whose contents change)."
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "always-theater-mode",
+    "title": "Always open YouTube in theater mode",
+    "question": "How do I make YouTube always use theater mode?",
+    "queries": [
+      "youtube always theater mode",
+      "always start youtube in theater mode"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/10523",
+        "metric": 5739,
+        "note": "YouTube - Always Theater Mode (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/480701",
+        "metric": 2019,
+        "note": "YouTube Theater Plus (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/dgognhgbpdoeidccnbfhohblklhbbomh",
+        "metric": 20000,
+        "note": "Theater Mode for YouTube™ (large player view) (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/faldmgebjochcokggcfifikdenfekkad",
+        "metric": 2000,
+        "note": "Auto Theater Mode for Youtube (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20always%20theater%20mode",
+        "metric": null,
+        "note": "returns the query; suggestions: youtube always theater mode | youtube always theater mode firefox | youtube always theatre mode | youtube always in cinema mode | how to make youtube always theater mode"
+      }
+    ],
+    "score": 70,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    "notes": "Logged out, theater mode does not persist across visits; script clicks the size button or sets the wide cookie."
+  },
+  {
+    "site": "google",
+    "siteName": "Google Search",
+    "domains": [
+      "google.com",
+      "www.google.com"
+    ],
+    "category": "search",
+    "task": "other-engines-buttons",
+    "title": "Add buttons to search the same query elsewhere",
+    "question": "How do I search my Google query on Bing or DuckDuckGo with one click?",
+    "queries": [
+      "search engine switcher"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/14856",
+        "metric": 15700,
+        "note": "soTab - Search Engine Switcher (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/446492",
+        "metric": 8604,
+        "note": "搜索引擎切换器 / Search Engine Switcher (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/8928",
+        "metric": 2315,
+        "note": "Alternative search engines 2 (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/akelhfnaodcdhfakigbacohhcklobpnp",
+        "metric": 703,
+        "note": "Search Engine Switch (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=search%20engine%20switcher",
+        "metric": null,
+        "note": "returns the query; suggestions: search engine switcher | search engine selector | search engine selector running in background | search engine selector android | search engine selector running in background samsung"
+      }
+    ],
+    "score": 68,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.google.com/search?q=how+to+bake+bread&hl=en&gl=us",
+    "notes": "Builds links from the q parameter; no network. Fetched 200; google search pages pass via Browserbase in checks.json."
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "background-play",
+    "title": "Keep YouTube playing in a background tab",
+    "question": "How do I stop YouTube from pausing when I switch tabs or minimize the window?",
+    "queries": [
+      "youtube background play",
+      "youtube keeps pausing when i switch tabs"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/371641",
+        "metric": 14893,
+        "note": "Video Background Play Fix (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/mflmkopdmkcjhdkcjlpgfnchkiochaio",
+        "metric": 668,
+        "note": "Youtube Background Play Fix (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20background%20play",
+        "metric": null,
+        "note": "returns the query; suggestions: youtube background play | youtube background play not working | youtube background play not working with premium | youtube background play app | youtube background play stops after a few seconds"
+      }
+    ],
+    "score": 68,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    "notes": "Spoofs document.hidden/visibilityState. The check can assert the overridden properties."
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "clean-description-links",
+    "title": "Skip YouTube's link redirect page",
+    "question": "How do I stop YouTube links from going through the redirect warning page?",
+    "queries": [
+      "youtube remove redirect links",
+      "youtube leaving youtube warning"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/15857",
+        "metric": 36460,
+        "note": "Direct links out (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20remove%20redirect%20links",
+        "metric": null,
+        "note": "does not return the query; suggestions: "
+      }
+    ],
+    "score": 68,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    "notes": "Rewrites youtube.com/redirect?q= links to the target. Direct links out (36,460) also covers other sites."
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "like-keyboard-shortcut",
+    "title": "Like YouTube videos with a keyboard shortcut",
+    "question": "Is there a keyboard shortcut to like a YouTube video?",
+    "queries": [
+      "youtube like shortcut",
+      "youtube like keyboard shortcut"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/413965",
+        "metric": 5741,
+        "note": "Youtube like/dislike video and skip ad keyboard shortcuts (fork from n (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/fdkpkpelkkdkjhpacficichkfifijipc",
+        "metric": 3000,
+        "note": "YouTube Like-Dislike Shortcut (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20like%20shortcut",
+        "metric": null,
+        "note": "returns the query; suggestions: youtube like shortcut | youtube like shortcut key | youtube shortcut like video | youtube as shortcut | youtube like dislike shortcut"
+      },
+      {
+        "type": "forum",
+        "url": "https://webapps.stackexchange.com/questions/129428/youtube-keyboard-shortcut-to-like-or-dislike-thumbs-up-or-thumbs-down",
+        "metric": null,
+        "note": "webapps.stackexchange question: YouTube keyboard shortcut to like or dislike (thumbs-up or thumbs-down)?"
+      },
+      {
+        "type": "forum",
+        "url": "https://webapps.stackexchange.com/questions/102383/how-do-i-like-a-youtube-video-while-in-full-screen-mode",
+        "metric": null,
+        "note": "webapps.stackexchange question: How do I like a YouTube video while in full screen mode?"
+      }
+    ],
+    "score": 66,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    "notes": "Liking needs sign-in; logged out the check can only assert the key triggers the like button (which opens the sign-in prompt). Weak fit."
+  },
+  {
+    "site": "reddit",
+    "siteName": "Reddit",
+    "domains": [
+      "reddit.com",
+      "www.reddit.com",
+      "old.reddit.com"
+    ],
+    "category": "social",
+    "task": "image-viewer",
+    "title": "Open Reddit images full size",
+    "question": "How do I open a Reddit image directly at full size?",
+    "queries": [
+      "reddit image viewer",
+      "reddit image viewer extension"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/432718",
+        "metric": 3166,
+        "note": "Better Reddit Image Previews (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/iffnacikcgjlndahdgnckeekdefoafbn",
+        "metric": 10000,
+        "note": "Reddit Image Opener (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/ifcbbmfoblmmckaacfoeillbkchclfpe",
+        "metric": 6000,
+        "note": "view reddit images directly (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=reddit%20image%20viewer",
+        "metric": null,
+        "note": "returns the query; suggestions: reddit image viewer | reddit image viewer scroll | reddit image viewer extension | reddit image viewer online | reddit image viewer website"
+      }
+    ],
+    "score": 65,
+    "loginRequired": false,
+    "loggedOutTestUrl": null,
+    "notes": "Rewrite preview.redd.it to i.redd.it links / click to open original. No test URL: needs a subreddit image post; Reddit is unreachable from this host so none was fetched."
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "disable-channel-autoplay",
+    "title": "Stop the channel trailer autoplaying on YouTube",
+    "question": "How do I stop YouTube channel pages from autoplaying the trailer?",
+    "queries": [
+      "youtube channel autoplay",
+      "youtube channel trailer autoplay"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/399862",
+        "metric": 10544,
+        "note": "Kill YouTube Channel Video Autoplay (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/555488",
+        "metric": 1579,
+        "note": "YouTube - Block Autoplay Preview Thumbnail and Channel Trailer (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20channel%20autoplay",
+        "metric": null,
+        "note": "returns the query; suggestions: youtube channel autoplay | youtube channel video autoplay | youtube channel trailer autoplay | youtube stop channel autoplay | youtube block channel from autoplay"
+      }
+    ],
+    "score": 65,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/@MrBeast",
+    "notes": "Needs a channel with a featured video; check URL must show one logged out."
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "scroll-volume",
+    "title": "Change YouTube volume with the mouse wheel",
+    "question": "How do I control YouTube volume by scrolling?",
+    "queries": [
+      "youtube volume scroll",
+      "youtube volume scroll extension"
+    ],
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/agadcopafaojndinhloilcanpfpbonbk",
+        "metric": 10000,
+        "note": "Youtube Volume Scroll (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20volume%20scroll",
+        "metric": null,
+        "note": "returns the query; suggestions: youtube volume scroll | youtube volume scroll extension | firefox youtube volume scroll | youtube volume scroll extension firefox | youtube volume scroll chrome"
+      }
+    ],
+    "score": 65,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    "notes": "Same idea as twitch/scroll-volume (existing page)."
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "show-full-titles",
+    "title": "Show full video titles on YouTube",
+    "question": "How do I stop YouTube from cutting off video titles?",
+    "queries": [
+      "youtube full title",
+      "youtube full title for videos"
+    ],
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/pgpdaocammeipkkgaeelifgakbhjoiel",
+        "metric": 10000,
+        "note": "YouTube Full Title For Videos (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20full%20title",
+        "metric": null,
+        "note": "returns the query; suggestions: youtube full title for videos | youtube full title extension | youtube full title | youtube full title for videos firefox | youtube full title for videos extension"
+      }
+    ],
+    "score": 65,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/results?search_query=minecraft",
+    "notes": "CSS: remove line-clamp on title elements."
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "view-thumbnail",
+    "title": "Open a YouTube video's thumbnail",
+    "question": "How do I see the full-size thumbnail of a YouTube video?",
+    "queries": [
+      "youtube thumbnail viewer",
+      "youtube thumbnail viewer hd"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/420140",
+        "metric": 6413,
+        "note": "Youtube Cover (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/nbpcbacmemknaffckhckoaophpnmdchb",
+        "metric": 9000,
+        "note": "Youtube™ Thumbnail Preview (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/lnkbdmjocdiomabiedmflmgikjlifham",
+        "metric": 6000,
+        "note": "PrevYou — YouTube Thumbnail Previewer (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20thumbnail%20viewer",
+        "metric": null,
+        "note": "returns the query; suggestions: youtube thumbnail viewer | youtube thumbnail viewer online | youtube thumbnail viewer extension | youtube thumbnail viewer hd | youtube thumbnail viewer and downloader"
+      }
+    ],
+    "score": 64,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    "notes": "Link to i.ytimg.com/vi/<id>/maxresdefault.jpg built from the video id."
+  },
+  {
+    "site": "github",
+    "siteName": "GitHub",
+    "domains": [
+      "github.com"
+    ],
+    "category": "work",
+    "task": "readme-toc",
+    "title": "Add a table of contents to GitHub READMEs",
+    "question": "How do I get a table of contents sidebar for a GitHub README?",
+    "queries": [
+      "github readme table of contents",
+      "github markdown toc"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/18344",
+        "metric": 723,
+        "note": "GitHub Table of Contents (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/406337",
+        "metric": 7038,
+        "note": "Toc Bar, auto-generating table of content (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/cdiiikhamhampcninkmmpgejjbgdgdnn",
+        "metric": 157,
+        "note": "GitHub TOC Sidebar (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=github%20readme%20table%20of%20contents",
+        "metric": null,
+        "note": "returns the query; suggestions: github readme table of contents | github readme table of contents example | github markdown table of contents | github markdown table of contents generator | git markdown table of contents"
+      }
+    ],
+    "score": 63,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://github.com/react/react",
+    "notes": "GitHub has a built-in outline button; script makes a persistent sidebar. Toc Bar (7,038) is multi-site."
+  },
+  {
+    "site": "google",
+    "siteName": "Google Search",
+    "domains": [
+      "google.com",
+      "www.google.com"
+    ],
+    "category": "search",
+    "task": "disable-safe-search",
+    "title": "Turn off SafeSearch on Google",
+    "question": "How do I keep Google SafeSearch off without signing in?",
+    "queries": [
+      "google safesearch off",
+      "disable google safesearch"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/25286",
+        "metric": 3523,
+        "note": "Google Disable SafeSearch automatically (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/480846",
+        "metric": 534,
+        "note": "Disable Google SafeSearch automatically (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=google%20safesearch%20off",
+        "metric": null,
+        "note": "returns the query; suggestions: google safesearch off | google safesearch off iphone | google safesearch off chrome | google safe search off still filters | google safe search off on my phone"
+      },
+      {
+        "type": "forum",
+        "url": "https://superuser.com/questions/1277067/i-cannot-turn-google-safesearch-off",
+        "metric": null,
+        "note": "superuser.com question: I cannot turn Google Safesearch off"
+      },
+      {
+        "type": "forum",
+        "url": "https://superuser.com/questions/1674357/google-safesearch-is-on-for-every-browser",
+        "metric": null,
+        "note": "superuser.com question: Google safesearch is on for every browser"
+      }
+    ],
+    "score": 63,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.google.com/search?q=how+to+bake+bread&hl=en&gl=us",
+    "notes": "Adds safe=off to search URLs. Logged-out users may be locked by region or network. Fetched 200; google search pages pass via Browserbase in checks.json."
+  },
+  {
+    "site": "medium",
+    "siteName": "Medium",
+    "domains": [
+      "medium.com"
+    ],
+    "category": "news",
+    "task": "redirect-freedium",
+    "title": "Open Medium articles through Freedium",
+    "question": "How do I open a Medium link in Freedium automatically?",
+    "queries": [
+      "freedium",
+      "freedium extension"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/484854",
+        "metric": 594,
+        "note": "Medium to Freedium (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/499886",
+        "metric": 276,
+        "note": "Medium to Freedium (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/enocadmdedhoajldcnlajbjaihpkccml",
+        "metric": 6000,
+        "note": "Freedium Link Converter (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/mekhnoeggfbmpeplcghndggjnnaabhfg",
+        "metric": 850,
+        "note": "Freedium (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=freedium",
+        "metric": null,
+        "note": "returns the query; suggestions: freedium | freedium medium | freedium extension | freedium github | freedium app"
+      }
+    ],
+    "score": 62,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://medium.com/@karpathy/software-2-0-a64152b37c35",
+    "notes": "Overlaps medium/read-member-stories (assigned); may be the same page. curl got a Cloudflare 403 on medium.com; needs a Browserbase check."
+  },
+  {
+    "site": "pinterest",
+    "siteName": "Pinterest",
+    "domains": [
+      "pinterest.com",
+      "www.pinterest.com"
+    ],
+    "category": "social",
+    "task": "declutter",
+    "title": "Declutter Pinterest",
+    "question": "How do I remove clutter from Pinterest pages?",
+    "queries": [
+      "pinterest declutter"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/512469",
+        "metric": 1929,
+        "note": "Declutter Pinterest (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/30839",
+        "metric": 13073,
+        "note": "Pinterest Plus (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=pinterest%20declutter",
+        "metric": null,
+        "note": "does not return the query; suggestions: pinterest clean girl aesthetic | pinterest clean girl | pinterest cleaning schedule | pinterest clean girl nails | pinterest clean girl wallpaper"
+      }
+    ],
+    "score": 62,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.pinterest.com/search/pins/?q=living%20room%20ideas",
+    "notes": "Pinterest Plus (13,073) does more than declutter."
+  },
+  {
+    "site": "reddit",
+    "siteName": "Reddit",
+    "domains": [
+      "reddit.com",
+      "www.reddit.com",
+      "old.reddit.com"
+    ],
+    "category": "social",
+    "task": "remove-nsfw-blur",
+    "title": "Unblur NSFW images on Reddit",
+    "question": "How do I stop Reddit from blurring NSFW posts?",
+    "queries": [
+      "reddit nsfw unblur",
+      "reddit nsfw blur"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/485608",
+        "metric": 11133,
+        "note": "Reddit NSFW Unblur (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/499945",
+        "metric": 1303,
+        "note": "Remove reddit nsfw block (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=reddit%20nsfw%20blur",
+        "metric": null,
+        "note": "does not return the query; suggestions: "
+      }
+    ],
+    "score": 61,
+    "loginRequired": false,
+    "loggedOutTestUrl": null,
+    "notes": "Logged out, NSFW subreddits show an age gate; test page must carry a blurred post. CWS cite is a blocker (opposite intent), so not used for score. No test URL: needs a logged-out page with a blurred NSFW post."
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "start-from-beginning",
+    "title": "Start YouTube videos from the beginning",
+    "question": "How do I stop YouTube from resuming where I left off?",
+    "queries": [
+      "youtube start from beginning",
+      "youtube start video from beginning"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/40462",
+        "metric": 5698,
+        "note": "YouTube No Resume (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20start%20from%20beginning",
+        "metric": null,
+        "note": "returns the query; suggestions: youtube start from beginning | youtube start from beginning shortcut | youtube tv start from beginning not working | youtube tv start from beginning | youtube live start from beginning"
+      }
+    ],
+    "score": 61,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    "notes": "Logged out, resume uses local watch history; script seeks to 0 unless the URL has t=."
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "expand-description",
+    "title": "Show the full YouTube description",
+    "question": "How do I make YouTube always show the full video description?",
+    "queries": [
+      "youtube expand description automatically",
+      "youtube show full description"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/440613",
+        "metric": 10115,
+        "note": "YouTube - Proper Description (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20expand%20description%20automatically",
+        "metric": null,
+        "note": "does not return the query; suggestions: "
+      }
+    ],
+    "score": 60,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    "notes": "No single-purpose Chrome extension found; Greasy Fork only."
+  },
+  {
+    "site": "chatgpt",
+    "siteName": "ChatGPT",
+    "domains": [
+      "chatgpt.com"
+    ],
+    "category": "work",
+    "task": "rtl-support",
+    "title": "Right-to-left text in ChatGPT",
+    "question": "How do I make ChatGPT show Persian, Arabic or Hebrew right to left?",
+    "queries": [
+      "chatgpt rtl",
+      "chatgpt rtl extension"
+    ],
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/fjhcbdccgkekaflpomnjjcfcfpmgjijf",
+        "metric": 4000,
+        "note": "ChatGPT RTL (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/igfnpdinafnhaidnnkedokcabfgeknnn",
+        "metric": 4000,
+        "note": "ChatGPT RTL Support (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/ljfnhokapbmbchbfpgdkedekmfeodoie",
+        "metric": 3000,
+        "note": "ChatGPT RTL Support (Farsi/Arabic) (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=chatgpt%20rtl",
+        "metric": null,
+        "note": "returns the query; suggestions: chatgpt rtl | chatgpt rtl extension | chatgpt rtl extension chrome | chatgpt rtl (persian/farsi) | chatgpt rtl support"
+      }
+    ],
+    "score": 59,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://chatgpt.com/",
+    "notes": "Sets dir=auto on message blocks. Several separate extensions with 3,000-4,000 users each."
+  },
+  {
+    "site": "duckduckgo",
+    "siteName": "DuckDuckGo",
+    "domains": [
+      "duckduckgo.com"
+    ],
+    "category": "search",
+    "task": "block-domains",
+    "title": "Block sites from DuckDuckGo results",
+    "question": "How do I block a website from showing up in DuckDuckGo?",
+    "queries": [
+      "duckduckgo block sites",
+      "duckduckgo block websites"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/436428",
+        "metric": 4109,
+        "note": "DuckDuckGo Enhancements (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/28730",
+        "metric": 722,
+        "note": "Web Search Result Domain Filter (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=duckduckgo%20block%20sites",
+        "metric": null,
+        "note": "returns the query; suggestions: duckduckgo block sites | duckduckgo block websites | does duckduckgo block sites | how to block duckduckgo | does duckduckgo block trackers"
+      },
+      {
+        "type": "forum",
+        "url": "https://webapps.stackexchange.com/questions/97983/permanently-exclude-blacklist-site-from-search-results-on-duckduckgo",
+        "metric": null,
+        "note": "webapps.stackexchange question: Permanently exclude / blacklist site from search results on DuckDuckGo"
+      }
+    ],
+    "score": 59,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://duckduckgo.com/?q=how+to+bake+bread&kl=us-en",
+    "notes": "The 4M-user DuckDuckGo extension is unrelated, so not used for score."
+  },
+  {
+    "site": "imdb",
+    "siteName": "IMDb",
+    "domains": [
+      "imdb.com",
+      "www.imdb.com"
+    ],
+    "category": "reference",
+    "task": "external-links",
+    "title": "Add links to other movie sites on IMDb",
+    "question": "How do I jump from an IMDb page to Letterboxd, Rotten Tomatoes or TMDb?",
+    "queries": [
+      "imdb links",
+      "imdb external links"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/17154",
+        "metric": 3844,
+        "note": "IMDb: Link 'em all! (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/3399",
+        "metric": 1961,
+        "note": "IMDB+ (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/ifinopelnonfmkeadpclelgkbdpmgoll",
+        "metric": 791,
+        "note": "IMDB++ (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=imdb%20links",
+        "metric": null,
+        "note": "returns the query; suggestions: imdb links | imdb links of justice | imdb movie links | imdb sneaky links | stream imdb links"
+      }
+    ],
+    "score": 59,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.imdb.com/title/tt0111161/",
+    "notes": "Search links built from title and year; no fetch. Torrent-link scripts (IMDb Scout Mod 16,321) left out. curl got an AWS WAF 202 challenge; imdb/show-actor-age passes via Browserbase in checks.json."
+  },
+  {
+    "site": "twitch",
+    "siteName": "Twitch",
+    "domains": [
+      "twitch.tv",
+      "www.twitch.tv"
+    ],
+    "category": "video",
+    "task": "hide-extensions",
+    "title": "Hide extension overlays on Twitch",
+    "question": "How do I turn off extension overlays on Twitch streams?",
+    "queries": [
+      "twitch hide extensions",
+      "twitch disable extensions"
+    ],
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/nmogopjdbhhnbkiklkdahphkdpbjfine",
+        "metric": 4000,
+        "note": "Disable Twitch extensions (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=twitch%20hide%20extensions",
+        "metric": null,
+        "note": "returns the query; suggestions: twitch hide extensions | what are twitch extensions | twitch disable extensions | how to use extensions on twitch"
+      }
+    ],
+    "score": 59,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.twitch.tv/caedrel247",
+    "notes": "Needs a live channel with an overlay extension at check time. Channel fetched 200 and was live at research time; the check needs it live."
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "hide-paid-promotion",
+    "title": "Hide the \"Includes paid promotion\" label on YouTube",
+    "question": "How do I remove the \"Includes paid promotion\" overlay on YouTube?",
+    "queries": [
+      "youtube hide includes paid promotion",
+      "youtube remove includes paid promotion"
+    ],
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/aogjfjongkoccofipcpolhonhgnmfgjl",
+        "metric": 4000,
+        "note": "YouTube paid promotion hider (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20hide%20includes%20paid%20promotion",
+        "metric": null,
+        "note": "returns the query; suggestions: youtube hide includes paid promotion | youtube remove includes paid promotion | youtube remove includes paid promotion on thumbnail | youtube disable includes paid promotion button | youtube remove includes paid promotion overlay"
+      }
+    ],
+    "score": 59,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    "notes": "Check URL needs a video that carries the label; find one before writing the page."
+  },
+  {
+    "site": "reddit",
+    "siteName": "Reddit",
+    "domains": [
+      "reddit.com",
+      "www.reddit.com",
+      "old.reddit.com"
+    ],
+    "category": "social",
+    "task": "hide-mature-popup",
+    "title": "Remove Reddit's mature content login popup",
+    "question": "How do I view Reddit mature content posts without the login popup?",
+    "queries": [
+      "reddit mature content",
+      "reddit mature content popup"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/469076",
+        "metric": 6989,
+        "note": "Remove Reddit Over 18 Login Requirement Popup (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/540384",
+        "metric": 2548,
+        "note": "Bypass login on mature posts (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/578445",
+        "metric": 1119,
+        "note": "Reddit Mature Content Bypass (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=reddit%20mature%20content",
+        "metric": null,
+        "note": "does not return the query; suggestions: "
+      }
+    ],
+    "score": 58,
+    "loginRequired": false,
+    "loggedOutTestUrl": null,
+    "notes": "Overlaps reddit/remove-login-popup (assigned); differs on over-18 posts. Test URL must be an over-18 post. No test URL: needs an over-18 post URL."
+  },
+  {
+    "site": "chatgpt",
+    "siteName": "ChatGPT",
+    "domains": [
+      "chatgpt.com"
+    ],
+    "category": "work",
+    "task": "latex-copy",
+    "title": "Copy math from ChatGPT as LaTeX",
+    "question": "How do I copy an equation from ChatGPT as LaTeX?",
+    "queries": [
+      "chatgpt latex",
+      "chatgpt latex copy"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/506742",
+        "metric": 198,
+        "note": "复制ChatGPT的LaTex公式（Word文档专用） (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/527096",
+        "metric": 131,
+        "note": "复制LaTex公式，支持ChatGPT/DeepSeek/wikipedia/知乎等多个网站 (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/okekmhopepdleiohbocckmjdmdmlgaij",
+        "metric": 3000,
+        "note": "ChatGPT LaTeX Copy Tool (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/gnkhfcibcpijebfmamnanokjdepbggak",
+        "metric": 592,
+        "note": "ChatGPT LaTeX Copy Fix (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=chatgpt%20latex",
+        "metric": null,
+        "note": "returns the query; suggestions: chatgpt latex | chatgpt latex editor | chatgpt latex is invalid | chatgpt latex not rendering | chatgpt latex copy tool"
+      }
+    ],
+    "score": 57,
+    "loginRequired": false,
+    "loggedOutTestUrl": null,
+    "notes": "KaTeX keeps the source in annotation elements; click to copy. Needs a share page with math. No test URL: needs a public share link containing math."
+  },
+  {
+    "site": "spotify",
+    "siteName": "Spotify",
+    "domains": [
+      "open.spotify.com"
+    ],
+    "category": "other",
+    "task": "open-in-app",
+    "title": "Open Spotify links in the desktop app",
+    "question": "How do I make open.spotify.com links open in the Spotify app?",
+    "queries": [
+      "spotify open in app",
+      "spotify open in desktop app"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/38920",
+        "metric": 1677,
+        "note": "Spotify open in app (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/ccilmbdijoknlfpepncnebjkiclplhig",
+        "metric": 3000,
+        "note": "Open Spotify Desktop App (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=spotify%20open%20in%20app",
+        "metric": null,
+        "note": "returns the query; suggestions: spotify open in app | spotify open in app link | open spotify app in my phone | spotify open in desktop app | spotify open application"
+      }
+    ],
+    "score": 57,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://open.spotify.com/album/4LH4d3cOWNNsVw41Gqt2kv",
+    "notes": "Redirect to spotify: URI. Check can assert the attempted navigation, not the app opening."
+  },
+  {
+    "site": "twitch",
+    "siteName": "Twitch",
+    "domains": [
+      "twitch.tv",
+      "www.twitch.tv"
+    ],
+    "category": "video",
+    "task": "reload-on-error",
+    "title": "Reload the Twitch player after error #2000",
+    "question": "How do I fix Twitch error 2000 automatically?",
+    "queries": [
+      "twitch error 2000",
+      "twitch error 2000 constantly"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/472868",
+        "metric": 212,
+        "note": "Twitch, Auto reload when *k error (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/541294",
+        "metric": 132,
+        "note": "Twitch Auto Reload on Error #2000 (God Mode) (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/npnmdcgbeogghcoainjjnllinmcljmdf",
+        "metric": 3000,
+        "note": "Twitch player auto-reload (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=twitch%20error%202000",
+        "metric": null,
+        "note": "returns the query; suggestions: twitch error 2000 | twitch error 2000 constantly | twitch error 2000 only on one stream | twitch error 2000 chrome | twitch error 2000 fix"
+      }
+    ],
+    "score": 57,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.twitch.tv/caedrel247",
+    "notes": "Hard to check: the error must happen during the check. Baseline can only prove the player exists. Channel fetched 200 and was live at research time; the check needs it live."
+  },
+  {
+    "site": "reddit",
+    "siteName": "Reddit",
+    "domains": [
+      "reddit.com",
+      "www.reddit.com",
+      "old.reddit.com"
+    ],
+    "category": "social",
+    "task": "multi-column",
+    "title": "Show Reddit posts in a grid",
+    "question": "How do I show Reddit in multiple columns or a grid?",
+    "queries": [
+      "reddit grid view",
+      "reddit multi column"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/371490",
+        "metric": 2189,
+        "note": "Reddit Multi Column (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/cnmkjpfehcebihkadcikjgkoefjcknpm",
+        "metric": 398,
+        "note": "Reddit Multi-Column (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=reddit%20grid%20view",
+        "metric": null,
+        "note": "returns the query; suggestions: reddit grid view | reddit grid viewer | what happened to reddit grid view"
+      }
+    ],
+    "score": 55,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.reddit.com/r/AskReddit/",
+    "notes": "CSS grid on the feed container. Test URL not fetched here (Reddit is unreachable from this host); it is a URL the harness loaded logged out in checks.json."
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "open-links-new-tab",
+    "title": "Open YouTube videos in a new tab",
+    "question": "How do I make YouTube open videos in a new tab?",
+    "queries": [
+      "youtube open video in new tab",
+      "youtube open in new tab"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/23010",
+        "metric": 2218,
+        "note": "Open Youtube video links in new tab (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20open%20in%20new%20tab",
+        "metric": null,
+        "note": "returns the query; suggestions: youtube open in new tab | youtube open in new tab not working | youtube open in new tab not working chrome | youtube studio open in new tab | youtube open video in new tab"
+      }
+    ],
+    "score": 55,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/results?search_query=minecraft",
+    "notes": "YouTube SPA links ignore plain middle-click in places; script forces target=_blank."
+  },
+  {
+    "site": "google",
+    "siteName": "Google Search",
+    "domains": [
+      "google.com",
+      "www.google.com"
+    ],
+    "category": "search",
+    "task": "show-favicons",
+    "title": "Show site icons in Google results",
+    "question": "How do I get favicons next to every Google result?",
+    "queries": [
+      "google search favicons"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/12395",
+        "metric": 1815,
+        "note": "Google Favicons (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/icmnmooidimjccialmobcnablaiicgob",
+        "metric": 1000,
+        "note": "Search favicons for G**gle (NOT AFFILIATED) (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=google%20favicons",
+        "metric": null,
+        "note": "returns the query; suggestions: google favicons | google favicons api | google favicons service | google s2 favicons | google chrome favicons"
+      }
+    ],
+    "score": 54,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.google.com/search?q=how+to+bake+bread&hl=en&gl=us",
+    "notes": "Google shows favicons on most results already; script fills the gaps by <img> to the site /favicon.ico (an image request, not a script fetch). Fetched 200; google search pages pass via Browserbase in checks.json."
+  },
+  {
+    "site": "reddit",
+    "siteName": "Reddit",
+    "domains": [
+      "reddit.com",
+      "www.reddit.com",
+      "old.reddit.com"
+    ],
+    "category": "social",
+    "task": "load-more-comments",
+    "title": "Load collapsed Reddit comment threads inline",
+    "question": "How do I make Reddit load \"continue this thread\" comments on the same page?",
+    "queries": [
+      "reddit load more comments automatically",
+      "reddit continue this thread"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/5578",
+        "metric": 4155,
+        "note": "Reddit - Load 'Continue this thread' inline (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/10387",
+        "metric": 633,
+        "note": "Reddit - Auto Load More Comments (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/djifpbcmaphjihhelcdeannijfelfnbh",
+        "metric": 715,
+        "note": "Reddit All Comments Viewer (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=reddit%20load%20more%20comments%20automatically",
+        "metric": null,
+        "note": "does not return the query; suggestions: "
+      }
+    ],
+    "score": 54,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.reddit.com/r/AskReddit/comments/draola/how_would_you_feel_about_a_feature_where_if/",
+    "notes": "Clicks \"more replies\" buttons; overlaps reddit/expand-threads (existing). Could merge. Test URL not fetched here (Reddit is unreachable from this host); it is a URL the harness loaded logged out in checks.json."
+  },
+  {
+    "site": "bing",
+    "siteName": "Bing",
+    "domains": [
+      "bing.com",
+      "www.bing.com"
+    ],
+    "category": "search",
+    "task": "disable-safe-search",
+    "title": "Turn off SafeSearch on Bing",
+    "question": "How do I turn off Bing SafeSearch without an account?",
+    "queries": [
+      "bing safesearch off",
+      "bing safesearch turn off"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/470188",
+        "metric": 1667,
+        "note": "Disable safesearch (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=bing%20safesearch%20off",
+        "metric": null,
+        "note": "returns the query; suggestions: bing safesearch off | bing safesearch off not working | bing safesearch turn off | bing images safesearch off | turn bing safe search off"
+      }
+    ],
+    "score": 53,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.bing.com/search?q=how+to+bake+bread&setlang=en&cc=us",
+    "notes": "Adds adlt=off. Disable safesearch (1,667) covers Bing, DuckDuckGo and others."
+  },
+  {
+    "site": "chatgpt",
+    "siteName": "ChatGPT",
+    "domains": [
+      "chatgpt.com"
+    ],
+    "category": "work",
+    "task": "message-navigator",
+    "title": "Jump between messages in long ChatGPT chats",
+    "question": "How do I navigate a long ChatGPT conversation?",
+    "queries": [
+      "chatgpt navigator",
+      "chatgpt navigation"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/545883",
+        "metric": 1645,
+        "note": "AI Conversation Navigator (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/546619",
+        "metric": 483,
+        "note": "AI Chat Scroll Navigator — ChatGPT, DeepSeek, Gemini, Grok, Qwen, Doub (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/bmhmlfpnagmndmnhcbpabndfgnegdfib",
+        "metric": 1000,
+        "note": "AI Chat Navigator: Navigation Sidebar, Mindmap & Export for ChatGPT & More (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/pchkljckekioepjocghikghmocnkbgcm",
+        "metric": 306,
+        "note": "ChatGPT Navigator (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=chatgpt%20navigator",
+        "metric": null,
+        "note": "returns the query; suggestions: chatgpt navigator | chatgpt navigator extension | chatgpt navigator archetype | chatgpt navigator minimap & conversation sidebar | chatgpt navigator firefox"
+      }
+    ],
+    "score": 53,
+    "loginRequired": false,
+    "loggedOutTestUrl": null,
+    "notes": "Test on a public share page (needs a real share link); logged-out new chats are short. No test URL: needs a public chatgpt.com/share/ link with a long chat."
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "disable-hover-preview",
+    "title": "Stop YouTube previews on hover",
+    "question": "How do I stop YouTube videos from playing when I hover over them?",
+    "queries": [
+      "youtube disable preview on hover",
+      "disable youtube auto preview"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/555488",
+        "metric": 1579,
+        "note": "YouTube - Block Autoplay Preview Thumbnail and Channel Trailer (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/ideedcbdjnpgbombplbbclpkpdhobjdi",
+        "metric": 378,
+        "note": "YouTube Autoplay Preventer - Stop Video Previews (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20disable%20preview%20on%20hover",
+        "metric": null,
+        "note": "returns the query; suggestions: youtube disable preview on hover | disable youtube auto preview | how to turn youtube preview off | can you turn off preview on youtube | how to turn off auto preview in youtube"
+      }
+    ],
+    "score": 53,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/results?search_query=minecraft",
+    "notes": "Logged out there is no settings toggle for inline playback. Preview Muter (2,000) mutes rather than blocks."
+  },
+  {
+    "site": "bing",
+    "siteName": "Bing",
+    "domains": [
+      "bing.com",
+      "www.bing.com"
+    ],
+    "category": "search",
+    "task": "redirect-to-google",
+    "title": "Send Bing searches to Google",
+    "question": "How do I redirect Bing searches to Google?",
+    "queries": [
+      "redirect bing search to google",
+      "bing to google redirect extension"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/11308",
+        "metric": 2823,
+        "note": "Bing to Google (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=bing%20to%20google%20redirect",
+        "metric": null,
+        "note": "does not return the query; suggestions: bing to google redirect extension | redirect bing search to google | edge redirect bing to google"
+      }
+    ],
+    "score": 52,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.bing.com/search?q=how+to+bake+bread&setlang=en&cc=us",
+    "notes": "Check: the expect is the final URL on google.com; harness must allow cross-origin navigation."
+  },
+  {
+    "site": "hackernews",
+    "siteName": "Hacker News",
+    "domains": [
+      "news.ycombinator.com"
+    ],
+    "category": "news",
+    "task": "paywall-marker",
+    "title": "Mark paywalled links on Hacker News",
+    "question": "How can I tell which Hacker News links are paywalled?",
+    "queries": [
+      "hacker news paywall"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/452024",
+        "metric": 612,
+        "note": "Hacker News Anti-Paywall (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=hacker%20news%20paywall",
+        "metric": null,
+        "note": "returns the query; suggestions: hacker news paywall"
+      },
+      {
+        "type": "forum",
+        "url": "https://news.ycombinator.com/item?id=41389094",
+        "metric": null,
+        "note": "HN thread: Is there any way HN can implement a 'paywall tag' to save wasted clicks?"
+      },
+      {
+        "type": "forum",
+        "url": "https://news.ycombinator.com/item?id=16860952",
+        "metric": null,
+        "note": "HN thread: Should we use [paywall] tag where applicable?"
+      }
+    ],
+    "score": 52,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://news.ycombinator.com/",
+    "notes": "Domain list in the script; no network."
+  },
+  {
+    "site": "github",
+    "siteName": "GitHub",
+    "domains": [
+      "github.com"
+    ],
+    "category": "work",
+    "task": "image-preview",
+    "title": "Preview images in GitHub file lists",
+    "question": "How do I see image thumbnails when browsing a GitHub folder?",
+    "queries": [
+      "github image preview",
+      "github image viewer"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/19773",
+        "metric": 1137,
+        "note": "GitHub Image Preview (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/6262",
+        "metric": 631,
+        "note": "Github Image Viewer (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/elbgjjbgjkachhhekinlpjkdidkkface",
+        "metric": 119,
+        "note": "Image Preview for Git (GitHub/GitLab) (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=github%20image%20preview",
+        "metric": null,
+        "note": "returns the query; suggestions: github image preview | github image preview extension | github image viewer | github image viewer windows | github image view"
+      }
+    ],
+    "score": 51,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://github.com/simple-icons/simple-icons/tree/develop/icons",
+    "notes": "Thumbnails from raw.githubusercontent URLs as <img>, no fetch."
+  },
+  {
+    "site": "github",
+    "siteName": "GitHub",
+    "domains": [
+      "github.com"
+    ],
+    "category": "work",
+    "task": "open-in-github1s",
+    "title": "Open a GitHub repo in a VS Code view",
+    "question": "How do I browse a GitHub repo in VS Code in the browser?",
+    "queries": [
+      "github1s",
+      "github1s extension"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/421509",
+        "metric": 816,
+        "note": "Github1s (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/iijaagbkdohcopmmohlgfkcloefoeaoj",
+        "metric": 1000,
+        "note": "Open in GitHub1s (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/gfcdbodapcbfckbfpmgeldfkkgjknceo",
+        "metric": 224,
+        "note": "shortcut to github1s (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=github1s",
+        "metric": null,
+        "note": "returns the query; suggestions: github1s | github1s alternative | github1s extension | github1s vs github dev | github1s vscode web"
+      }
+    ],
+    "score": 50,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://github.com/react/react",
+    "notes": "Adds a link button; github.dev (press .) needs sign-in, github1s does not."
+  },
+  {
+    "site": "imdb",
+    "siteName": "IMDb",
+    "domains": [
+      "imdb.com",
+      "www.imdb.com"
+    ],
+    "category": "reference",
+    "task": "remove-ads",
+    "title": "Remove ads on IMDb",
+    "question": "How do I get rid of ads and sponsored blocks on IMDb?",
+    "queries": [
+      "imdb ads"
+    ],
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/ingodbhkemojiibhhbfhjaeaciikbiik",
+        "metric": 1000,
+        "note": "Clean IMDb (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=imdb%20ads",
+        "metric": null,
+        "note": "returns the query; suggestions: imdb ads | imdb ads reddit | imdb ads pihole | imdb adsÄ±z aÅÄ±klar | ads imdb grand challenge"
+      }
+    ],
+    "score": 50,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.imdb.com/title/tt0111161/",
+    "notes": "Clean IMDb (1,000) also hides other clutter. curl got an AWS WAF 202 challenge; imdb/show-actor-age passes via Browserbase in checks.json."
+  },
+  {
+    "site": "youtube",
+    "siteName": "YouTube",
+    "domains": [
+      "youtube.com",
+      "www.youtube.com"
+    ],
+    "category": "video",
+    "task": "remaining-time",
+    "title": "Show remaining time on YouTube",
+    "question": "How do I see how much time is left in a YouTube video?",
+    "queries": [
+      "youtube remaining time",
+      "youtube show remaining time"
+    ],
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/mcmnojfmpbifbhilpeaeepbldmmlnccb",
+        "metric": 1000,
+        "note": "Youtube Time Remaining (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20remaining%20time",
+        "metric": null,
+        "note": "returns the query; suggestions: youtube remaining time extension | youtube remaining time | youtube current time | youtube current time url | youtube show remaining time"
+      }
+    ],
+    "score": 50,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    "notes": "Adds a time-left label next to the player clock, adjusted for playback speed."
+  },
+  {
+    "site": "github",
+    "siteName": "GitHub",
+    "domains": [
+      "github.com"
+    ],
+    "category": "work",
+    "task": "sort-tables",
+    "title": "Sort markdown tables on GitHub",
+    "question": "How do I sort a table in a GitHub README by a column?",
+    "queries": [
+      "github markdown table sort",
+      "github sortable table"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/21373",
+        "metric": 917,
+        "note": "GitHub Sort Content (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/ekjbdpnpokbkkebdgjgoadgpkegefkab",
+        "metric": 34,
+        "note": "Sortable Tables for GitHub (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=github%20markdown%20table%20sort",
+        "metric": null,
+        "note": "returns the query; suggestions: github sortable table | github markdown sortable table | github markdown table sort | github list branches"
+      }
+    ],
+    "score": 49,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://github.com/nodejs/Release",
+    "notes": "Click headers to sort rendered markdown tables."
+  },
+  {
+    "site": "medium",
+    "siteName": "Medium",
+    "domains": [
+      "medium.com"
+    ],
+    "category": "news",
+    "task": "hide-paywall-popup",
+    "title": "Hide Medium's member-only popups",
+    "question": "How do I get rid of Medium's \"become a member\" popups?",
+    "queries": [
+      "medium paywall"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/386568",
+        "metric": 830,
+        "note": "Mute Medium (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=medium%20paywall",
+        "metric": null,
+        "note": "returns the query; suggestions: medium paywall | medium paywall bypass extension | medium paywall bypass online | medium paywall bypass github | do you get paid for medium articles"
+      }
+    ],
+    "score": 49,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://medium.com/@karpathy/software-2-0-a64152b37c35",
+    "notes": "Readium (3,000) marks paywalled stories rather than hiding prompts; cited with that note. curl got a Cloudflare 403 on medium.com; needs a Browserbase check."
+  },
+  {
+    "site": "github",
+    "siteName": "GitHub",
+    "domains": [
+      "github.com"
+    ],
+    "category": "work",
+    "task": "code-folding",
+    "title": "Fold code blocks on GitHub",
+    "question": "Can I collapse functions when reading code on GitHub?",
+    "queries": [
+      "github code folding",
+      "github collapsible code"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/26109",
+        "metric": 722,
+        "note": "GitHub Code Folding (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/kkjejoecddgihebkjgkafmaghopgicoe",
+        "metric": 12,
+        "note": "Foldable View for GitHub (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=github%20code%20folding",
+        "metric": null,
+        "note": "returns the query; suggestions: github code folding | github collapsible code | github collapsible code block | github define code owner"
+      }
+    ],
+    "score": 48,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://github.com/react/react/blob/main/packages/react/src/ReactHooks.js",
+    "notes": "Folding in the new React code view is fragile; GitHub has partial built-in folding. GitHub rate-limited the blob URL to curl (429); the repo root fetched 200."
+  },
+  {
+    "site": "spotify",
+    "siteName": "Spotify",
+    "domains": [
+      "open.spotify.com"
+    ],
+    "category": "other",
+    "task": "light-mode",
+    "title": "Light theme for the Spotify web player",
+    "question": "Can the Spotify web player use a light theme?",
+    "queries": [
+      "spotify web player theme",
+      "spotify light mode"
+    ],
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/lengbgflhbbajjfklllkaiookcpkkdbl",
+        "metric": 783,
+        "note": "Spotify Light Mode (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=spotify%20web%20player%20theme",
+        "metric": null,
+        "note": "returns the query; suggestions: spotify web player theme | spotify web player not playing | spotify web player error | is spotify web player free | spotify web not playing"
+      }
+    ],
+    "score": 48,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://open.spotify.com/album/4LH4d3cOWNNsVw41Gqt2kv",
+    "notes": "SpoPlus (30,000) is a full theme editor; the light-mode one is cited."
+  },
+  {
+    "site": "trello",
+    "siteName": "Trello",
+    "domains": [
+      "trello.com"
+    ],
+    "category": "work",
+    "task": "wide-lists",
+    "title": "Make Trello lists wider",
+    "question": "How do I change the width of Trello lists?",
+    "queries": [
+      "trello list width",
+      "trello change list width"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/6777",
+        "metric": 374,
+        "note": "Trello - minimize lists (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/janhkoajdfpnebanjimdbgmenpfjiofh",
+        "metric": 732,
+        "note": "Get Wide for Trello (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=trello%20list%20width",
+        "metric": null,
+        "note": "returns the query; suggestions: trello list width | trello card width | trello change list width"
+      }
+    ],
+    "score": 48,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://trello.com/b/nC8QJJoZ/trello-development-roadmap",
+    "notes": ""
+  },
+  {
+    "site": "twitch",
+    "siteName": "Twitch",
+    "domains": [
+      "twitch.tv",
+      "www.twitch.tv"
+    ],
+    "category": "video",
+    "task": "hide-recommended-channels",
+    "title": "Hide recommended channels on Twitch",
+    "question": "How do I remove recommended channels from the Twitch sidebar?",
+    "queries": [
+      "twitch hide recommended channels",
+      "twitch remove recommended channels"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/425884",
+        "metric": 202,
+        "note": "Twitch - Hide Recommended Channels list (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/ljimojeoadeiidhochpjmkpaccmkboei",
+        "metric": 711,
+        "note": "Twitch Hide Recommended (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=twitch%20hide%20recommended%20channels",
+        "metric": null,
+        "note": "returns the query; suggestions: twitch hide recommended channels | twitch remove recommended channels | twitch remove recommended channels from sidebar | twitch hide suggested channels | twitch remove suggested channels"
+      },
+      {
+        "type": "forum",
+        "url": "https://webapps.stackexchange.com/questions/100216/how-to-remove-ban-a-twitch-stream-from-recommended",
+        "metric": null,
+        "note": "webapps.stackexchange question: How to remove (ban) a twitch stream from recommended?"
+      }
+    ],
+    "score": 48,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.twitch.tv/directory/all",
+    "notes": "Narrower than twitch/hide-sidebar (existing)."
+  },
+  {
+    "site": "github",
+    "siteName": "GitHub",
+    "domains": [
+      "github.com"
+    ],
+    "category": "work",
+    "task": "copy-raw-url",
+    "title": "Copy the raw URL of a GitHub file",
+    "question": "How do I get the raw link to a file on GitHub quickly?",
+    "queries": [
+      "github raw url",
+      "github copy raw link"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/505501",
+        "metric": 641,
+        "note": "Github Copy Raw File URL and Download File (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=github%20raw%20url",
+        "metric": null,
+        "note": "returns the query; suggestions: github raw url | github raw url token | github raw url token expiration | github raw url converter | github raw link"
+      }
+    ],
+    "score": 47,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://github.com/react/react/blob/main/packages/react/src/ReactHooks.js",
+    "notes": "Raw button exists; script adds copy-raw-URL to file lists. GitHub rate-limited the blob URL to curl (429); the repo root fetched 200."
+  },
+  {
+    "site": "twitch",
+    "siteName": "Twitch",
+    "domains": [
+      "twitch.tv",
+      "www.twitch.tv"
+    ],
+    "category": "video",
+    "task": "video-speed",
+    "title": "Change playback speed on Twitch",
+    "question": "How do I speed up Twitch VODs or slow down a stream?",
+    "queries": [
+      "twitch playback speed",
+      "twitch vod speed"
+    ],
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/dgjocohogmiejchbpofpgkiggoandgal",
+        "metric": 642,
+        "note": "Twitching (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=twitch%20playback%20speed",
+        "metric": null,
+        "note": "returns the query; suggestions: twitch playback speed | twitch playback speed shortcut | twitch playback speed extension | twitch vod speed shortcut | twitch vod speed"
+      }
+    ],
+    "score": 47,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.twitch.tv/caedrel247",
+    "notes": "VODs have a speed menu; live does not. Video Speed Buttons (7,161) is listed under youtube.com and also covers other video sites. Check needs a VOD URL. Channel fetched 200 and was live at research time; the check needs it live."
+  },
+  {
+    "site": "bing",
+    "siteName": "Bing",
+    "domains": [
+      "bing.com",
+      "www.bing.com"
+    ],
+    "category": "search",
+    "task": "remove-redirect-links",
+    "title": "Remove Bing's tracking redirects from results",
+    "question": "How do I get direct links in Bing results instead of bing.com/ck links?",
+    "queries": [
+      "bing redirect link"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/490999",
+        "metric": 1252,
+        "note": "Faster Bing (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/483444",
+        "metric": 614,
+        "note": "Bing remove redirect link (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=bing%20redirect%20links",
+        "metric": null,
+        "note": "does not return the query; suggestions: bing redirect link"
+      }
+    ],
+    "score": 46,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.bing.com/search?q=how+to+bake+bread&setlang=en&cc=us",
+    "notes": "Decodes the u= parameter of bing.com/ck/a links."
+  },
+  {
+    "site": "pinterest",
+    "siteName": "Pinterest",
+    "domains": [
+      "pinterest.com",
+      "www.pinterest.com"
+    ],
+    "category": "social",
+    "task": "hide-shopping",
+    "title": "Hide shopping pins on Pinterest",
+    "question": "How do I hide shopping and product pins on Pinterest?",
+    "queries": [
+      "pinterest hide shopping"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/379452",
+        "metric": 1127,
+        "note": "Pinterest no ads (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/hdjminbjmidmoeidhgokcgleidmcjfji",
+        "metric": 871,
+        "note": "Feed Cleaner for Pinterest – Ad Blocker (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=pinterest%20hide%20shopping",
+        "metric": null,
+        "note": "does not return the query; suggestions: "
+      }
+    ],
+    "score": 46,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.pinterest.com/search/pins/?q=living%20room%20ideas",
+    "notes": "Overlaps pinterest/hide-promoted-pins (assigned)."
+  },
+  {
+    "site": "bing",
+    "siteName": "Bing",
+    "domains": [
+      "bing.com",
+      "www.bing.com"
+    ],
+    "category": "search",
+    "task": "dark-mode",
+    "title": "Dark mode for Bing",
+    "question": "How do I put Bing search in dark mode?",
+    "queries": [
+      "bing dark mode",
+      "bing search dark mode"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/388612",
+        "metric": 478,
+        "note": "Bing Search Dark Night Mode Theme (grey not black) (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=bing%20dark%20mode",
+        "metric": null,
+        "note": "returns the query; suggestions: bing dark mode | bing dark theme | microsoft bing dark mode | bing maps dark mode | bing search dark mode"
+      }
+    ],
+    "score": 45,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.bing.com/search?q=how+to+bake+bread&setlang=en&cc=us",
+    "notes": "Bing has a dark theme setting that needs cookies; script forces it."
+  },
+  {
+    "site": "duckduckgo",
+    "siteName": "DuckDuckGo",
+    "domains": [
+      "duckduckgo.com"
+    ],
+    "category": "search",
+    "task": "dark-mode",
+    "title": "Dark mode for DuckDuckGo",
+    "question": "How do I make DuckDuckGo dark without changing settings each time?",
+    "queries": [
+      "duckduckgo dark mode",
+      "duckduckgo dark mode extension"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/388015",
+        "metric": 498,
+        "note": "DuckDuckGo Always Terminal Theme (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/plcaegpgnhgchmjcfdokejgahdbpmnga",
+        "metric": 7,
+        "note": "DuckDuckGo HTML Dark Theme (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=duckduckgo%20dark%20mode",
+        "metric": null,
+        "note": "returns the query; suggestions: duckduckgo dark mode | duckduckgo dark mode android | duckduckgo dark mode extension | duckduckgo night mode | duckduckgo dark theme"
+      }
+    ],
+    "score": 45,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://duckduckgo.com/?q=how+to+bake+bread&kl=us-en",
+    "notes": "DuckDuckGo has a theme setting (cookie or kae= URL param); script sets kae=d."
+  },
+  {
+    "site": "medium",
+    "siteName": "Medium",
+    "domains": [
+      "medium.com"
+    ],
+    "category": "news",
+    "task": "dark-mode",
+    "title": "Dark mode for Medium",
+    "question": "How do I read Medium in dark mode?",
+    "queries": [
+      "medium dark mode",
+      "medium dark mode extension"
+    ],
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/bbogakonmnncjkddneipiaogfmldcegn",
+        "metric": 378,
+        "note": "Medium Dark Mode Pro (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=medium%20dark%20mode",
+        "metric": null,
+        "note": "returns the query; suggestions: medium dark mode | medium dark mode web | medium dark mode extension | medium dark mode desktop | medium dark mode firefox"
+      }
+    ],
+    "score": 44,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://medium.com/@karpathy/software-2-0-a64152b37c35",
+    "notes": "Medium has no dark theme on the web. curl got a Cloudflare 403 on medium.com; needs a Browserbase check."
+  },
+  {
+    "site": "bing",
+    "siteName": "Bing",
+    "domains": [
+      "bing.com",
+      "www.bing.com"
+    ],
+    "category": "search",
+    "task": "two-columns",
+    "title": "Show Bing results in two columns",
+    "question": "How do I show Bing search results in two columns?",
+    "queries": [
+      "bing two columns"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/369836",
+        "metric": 686,
+        "note": "Bing search double column display (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=bing%20two%20columns",
+        "metric": null,
+        "note": "does not return the query; suggestions: "
+      }
+    ],
+    "score": 43,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.bing.com/search?q=how+to+bake+bread&setlang=en&cc=us",
+    "notes": "Low evidence."
+  },
+  {
+    "site": "github",
+    "siteName": "GitHub",
+    "domains": [
+      "github.com"
+    ],
+    "category": "work",
+    "task": "wrap-code-lines",
+    "title": "Wrap long lines in GitHub code views",
+    "question": "How do I turn on word wrap when viewing code on GitHub?",
+    "queries": [
+      "github code wrap",
+      "github word wrap code"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/18789",
+        "metric": 325,
+        "note": "GitHub Toggle Code Wrap (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/10284",
+        "metric": 44,
+        "note": "Github Word Wrapping for CODE blocks (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=github%20word%20wrap",
+        "metric": null,
+        "note": "returns the query; suggestions: github word wrap | github word wrap code | github line wrap | github line wrap mode | github markdown word wrap"
+      }
+    ],
+    "score": 43,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://github.com/react/react/blob/main/packages/react/src/ReactHooks.js",
+    "notes": "The blob view has a wrap toggle in some views; markdown code blocks do not. GitHub rate-limited the blob URL to curl (429); the repo root fetched 200."
+  },
+  {
+    "site": "wikipedia",
+    "siteName": "Wikipedia",
+    "domains": [
+      "wikipedia.org",
+      "en.wikipedia.org"
+    ],
+    "category": "reference",
+    "task": "inline-footnotes",
+    "title": "Show Wikipedia footnotes inline",
+    "question": "How do I read Wikipedia footnotes without jumping to the bottom?",
+    "queries": [
+      "wikipedia footnotes"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/476",
+        "metric": 295,
+        "note": "Wikipedia Inline Footnotes (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=wikipedia%20footnotes",
+        "metric": null,
+        "note": "returns the query; suggestions: wikipedia footnotes | wikipedia style footnotes | what are the footnotes"
+      }
+    ],
+    "score": 42,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://en.wikipedia.org/wiki/Moon",
+    "notes": "Reference Tooltips already show on hover for logged-out readers; script makes them click-to-expand inline."
+  },
+  {
+    "site": "imdb",
+    "siteName": "IMDb",
+    "domains": [
+      "imdb.com",
+      "www.imdb.com"
+    ],
+    "category": "reference",
+    "task": "larger-photos",
+    "title": "Open full-size photos on IMDb",
+    "question": "How do I see an IMDb photo at full resolution?",
+    "queries": [
+      "imdb full size image"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/10863",
+        "metric": 487,
+        "note": "IMDb Face Cake - Get a better look at actor images! (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/8844",
+        "metric": 321,
+        "note": "IMDB UTE: IMDB Ultimate Thumbnail Expander (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/jamdlbhbakiojceimbalabbcoigaceag",
+        "metric": 82,
+        "note": "IMDB Gallery Downloader (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=imdb%20full%20size%20image",
+        "metric": null,
+        "note": "does not return the query; suggestions: "
+      }
+    ],
+    "score": 40,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.imdb.com/title/tt0111161/",
+    "notes": "Strip the _V1_ size suffix from m.media-amazon.com image URLs. curl got an AWS WAF 202 challenge; imdb/show-actor-age passes via Browserbase in checks.json."
+  },
+  {
+    "site": "trello",
+    "siteName": "Trello",
+    "domains": [
+      "trello.com"
+    ],
+    "category": "work",
+    "task": "show-label-text",
+    "title": "Show label names on Trello cards",
+    "question": "How do I show label text on Trello cards instead of colored bars?",
+    "queries": [
+      "trello show label text",
+      "trello show label text on card"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/16061",
+        "metric": 197,
+        "note": "Trello styles by chapaev.css (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/pdknjplelficbiepgefgajmaamfimhde",
+        "metric": 57,
+        "note": "Trello Legacy Labels (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=trello%20show%20label%20text",
+        "metric": null,
+        "note": "returns the query; suggestions: trello show label text on card | trello show label text | trello view label text | trello app show label text"
+      }
+    ],
+    "score": 39,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://trello.com/b/nC8QJJoZ/trello-development-roadmap",
+    "notes": "Trello has a click-to-expand toggle; script keeps text visible."
+  },
+  {
+    "site": "twitch",
+    "siteName": "Twitch",
+    "domains": [
+      "twitch.tv",
+      "www.twitch.tv"
+    ],
+    "category": "video",
+    "task": "video-screenshot",
+    "title": "Take a screenshot of a Twitch stream",
+    "question": "How do I save a frame from a Twitch stream?",
+    "queries": [
+      "twitch screenshot"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/473705",
+        "metric": 183,
+        "note": "Twitch Screenshot (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=twitch%20screenshot",
+        "metric": null,
+        "note": "returns the query; suggestions: twitch screenshot | twitch screenshot extension | twitch screenshot notification | screenshot twitch stream | twitch chat screenshot"
+      }
+    ],
+    "score": 39,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.twitch.tv/caedrel247",
+    "notes": "Low evidence. Channel fetched 200 and was live at research time; the check needs it live."
+  },
+  {
+    "site": "duckduckgo",
+    "siteName": "DuckDuckGo",
+    "domains": [
+      "duckduckgo.com"
+    ],
+    "category": "search",
+    "task": "multi-column",
+    "title": "Show DuckDuckGo results in columns",
+    "question": "How do I see more DuckDuckGo results at once?",
+    "queries": [
+      "duckduckgo multiple columns"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/423337",
+        "metric": 332,
+        "note": "DuckDuckGo - Multi-Columns (ORGANIC) (USw) v.66 (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=duckduckgo%20multiple%20columns",
+        "metric": null,
+        "note": "does not return the query; suggestions: "
+      }
+    ],
+    "score": 38,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://duckduckgo.com/?q=how+to+bake+bread&kl=us-en",
+    "notes": "Low evidence."
+  },
+  {
+    "site": "hackernews",
+    "siteName": "Hacker News",
+    "domains": [
+      "news.ycombinator.com"
+    ],
+    "category": "news",
+    "task": "absolute-dates",
+    "title": "Show exact dates on Hacker News",
+    "question": "How do I see the exact date of a Hacker News post instead of \"3 hours ago\"?",
+    "queries": [
+      "hacker news timestamp",
+      "hacker news exact date"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/23432",
+        "metric": 150,
+        "note": "Hacker News Date Tooltips (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=hacker%20news%20timestamp",
+        "metric": null,
+        "note": "does not return the query; suggestions: "
+      },
+      {
+        "type": "forum",
+        "url": "https://news.ycombinator.com/item?id=12835497",
+        "metric": null,
+        "note": "HN thread: Ask HN: How to get timestamp from HN comments?"
+      },
+      {
+        "type": "forum",
+        "url": "https://news.ycombinator.com/item?id=1989384",
+        "metric": null,
+        "note": "HN thread: Ask PG: Timestamps on posts and comments?"
+      }
+    ],
+    "score": 38,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://news.ycombinator.com/",
+    "notes": "The span.age title attribute holds the ISO time."
+  },
+  {
+    "site": "hackernews",
+    "siteName": "Hacker News",
+    "domains": [
+      "news.ycombinator.com"
+    ],
+    "category": "news",
+    "task": "mobile-friendly",
+    "title": "Make Hacker News easier to use on a phone",
+    "question": "How do I make Hacker News readable on mobile?",
+    "queries": [
+      "hacker news mobile"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/449198",
+        "metric": 154,
+        "note": "Hackernews Modern (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/ofhiglbjpjpdodndhoblgnjgkakhfofi",
+        "metric": 9,
+        "note": "Fancy Hacker News (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=hacker%20news%20mobile",
+        "metric": null,
+        "note": "returns the query; suggestions: hacker news mobile | hacker news mobile app | hacker news phone | hacker news t mobile | hacker news dark mode mobile"
+      }
+    ],
+    "score": 38,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://news.ycombinator.com/",
+    "notes": "Larger tap targets and vote arrows; check at a narrow viewport."
+  },
+  {
+    "site": "hackernews",
+    "siteName": "Hacker News",
+    "domains": [
+      "news.ycombinator.com"
+    ],
+    "category": "news",
+    "task": "mute-users",
+    "title": "Mute users on Hacker News",
+    "question": "Can I block or mute a user on Hacker News?",
+    "queries": [
+      "hacker news block user",
+      "hacker news ignore user"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/18066",
+        "metric": 258,
+        "note": "Comments Owl for Hacker News (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/dkbnpfgpgljemihbcdmadffanebbjacc",
+        "metric": 21,
+        "note": "HN Follow/Block (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=hacker%20news%20block%20users",
+        "metric": null,
+        "note": "does not return the query; suggestions: hacker news block user | how can i block a hacker | grey hat hacker vs black hat hacker | code to block hackers"
+      }
+    ],
+    "score": 36,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://news.ycombinator.com/item?id=24862743",
+    "notes": "Comments Owl (258) also highlights new comments."
+  },
+  {
+    "site": "hackernews",
+    "siteName": "Hacker News",
+    "domains": [
+      "news.ycombinator.com"
+    ],
+    "category": "news",
+    "task": "highlight-op",
+    "title": "Highlight the original poster on Hacker News",
+    "question": "How do I highlight the submitter's comments in a Hacker News thread?",
+    "queries": [
+      "hacker news highlight op"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/2961",
+        "metric": 206,
+        "note": "Hacker News Author Highlight (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/djkcnbncofmjekhlhemlkinfpkamlkaj",
+        "metric": 113,
+        "note": "Hacker News Sorted (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=hacker%20news%20highlight%20op",
+        "metric": null,
+        "note": "does not return the query; suggestions: "
+      }
+    ],
+    "score": 35,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://news.ycombinator.com/item?id=24862743",
+    "notes": "Reads the submitter from .hnuser in the story header."
+  },
+  {
+    "site": "hackernews",
+    "siteName": "Hacker News",
+    "domains": [
+      "news.ycombinator.com"
+    ],
+    "category": "news",
+    "task": "highlight-new-stories",
+    "title": "Highlight stories you have not seen on Hacker News",
+    "question": "How do I mark Hacker News stories I have already seen?",
+    "queries": [
+      "hacker news hide read",
+      "hacker news mark read"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/39311",
+        "metric": 175,
+        "note": "Hacker News Highlighter (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/fghfahcbhpdeeaaofcefaoodmfejieok",
+        "metric": 52,
+        "note": "Hacker News: Mark All Read (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=hacker%20news%20hide%20read",
+        "metric": null,
+        "note": "does not return the query; suggestions: "
+      }
+    ],
+    "score": 34,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://news.ycombinator.com/",
+    "notes": "localStorage of seen ids; differs from highlight-new-comments (assigned)."
+  },
+  {
+    "site": "stackoverflow",
+    "siteName": "Stack Overflow",
+    "domains": [
+      "stackoverflow.com"
+    ],
+    "category": "reference",
+    "task": "printer-friendly",
+    "title": "Print a Stack Overflow question cleanly",
+    "question": "How do I print a Stack Overflow question without the sidebar and ads?",
+    "queries": [
+      "stack overflow print",
+      "stackprinter"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/12350",
+        "metric": 179,
+        "note": "Stack Overflow: StackPrinter (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/ephnhpaienodfmaldccgjjnohkbembni",
+        "metric": 172,
+        "note": "StackIt (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=stack%20overflow%20print",
+        "metric": null,
+        "note": "does not return the query; suggestions: buffer overflow printf | printf stack overflow | print stack overflow | stack overflow value | stack overflow example"
+      }
+    ],
+    "score": 34,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://stackoverflow.com/questions/11227809/why-is-processing-a-sorted-array-faster-than-processing-an-unsorted-array",
+    "notes": "Print stylesheet; StackPrinter (179) links out to a third-party site. curl got a Cloudflare 403; stackoverflow pages pass locally in checks.json."
+  },
+  {
+    "site": "medium",
+    "siteName": "Medium",
+    "domains": [
+      "medium.com"
+    ],
+    "category": "news",
+    "task": "enable-text-selection",
+    "title": "Select text on Medium without the highlight menu",
+    "question": "How do I select text on Medium without the highlight popup?",
+    "queries": [
+      "medium highlight disable"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/423971",
+        "metric": 151,
+        "note": "Medium.com: Re-enable Text Selection (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=medium%20highlight%20disable",
+        "metric": null,
+        "note": "does not return the query; suggestions: medium remove highlight | mini highlight vs partial highlight"
+      }
+    ],
+    "score": 33,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://medium.com/@karpathy/software-2-0-a64152b37c35",
+    "notes": "Low evidence. curl got a Cloudflare 403 on medium.com; needs a Browserbase check."
+  },
+  {
+    "site": "stackexchange",
+    "siteName": "Stack Exchange",
+    "domains": [
+      "stackexchange.com",
+      "superuser.com",
+      "serverfault.com",
+      "askubuntu.com",
+      "mathoverflow.net"
+    ],
+    "category": "reference",
+    "task": "hide-hot-network-questions",
+    "title": "Hide Hot Network Questions on Stack Exchange",
+    "question": "How do I hide the Hot Network Questions sidebar on Stack Exchange sites?",
+    "queries": [
+      "hot network questions",
+      "stack exchange hot network questions"
+    ],
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/ibbknnfapdceeimnbmfhmjfolmifcmcf",
+        "metric": 58,
+        "note": "Anti-distractor for Stack Exchange (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=stack%20exchange%20hot%20network%20questions",
+        "metric": null,
+        "note": "returns the query; suggestions: hot network questions | stack overflow hot network questions | stack exchange hot network questions | what are the basic networking questions | hot questions meaning"
+      },
+      {
+        "type": "forum",
+        "url": "https://superuser.com/questions/1157967/how-to-block-hot-network-questions-in-the-sidebar-of-stack-exchange-network",
+        "metric": null,
+        "note": "superuser.com question: How to block Hot Network Questions in the sidebar of Stack Exchange network?"
+      }
+    ],
+    "score": 31,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://superuser.com/questions/1157967/how-to-block-hot-network-questions-in-the-sidebar-of-stack-exchange-network",
+    "notes": "Same as stackoverflow/hide-hot-network-questions (existing) for *.stackexchange.com, superuser, serverfault, askubuntu. Many meta.stackexchange threads ask for it. curl got a Cloudflare 403; stackoverflow.com pages behind the same setup pass locally in checks.json."
+  },
+  {
+    "site": "chatgpt",
+    "siteName": "ChatGPT",
+    "domains": [
+      "chatgpt.com"
+    ],
+    "category": "work",
+    "task": "code-wrap",
+    "title": "Wrap long lines in ChatGPT code blocks",
+    "question": "How do I stop ChatGPT code blocks from scrolling sideways?",
+    "queries": [
+      "chatgpt code block wrap"
+    ],
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/plhjikjpniajpkfigoidcoghndkfmnkf",
+        "metric": 94,
+        "note": "ChatGPT Code Wrap (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=chatgpt%20code%20block%20wrap",
+        "metric": null,
+        "note": "does not return the query; suggestions: "
+      }
+    ],
+    "score": 30,
+    "loginRequired": false,
+    "loggedOutTestUrl": null,
+    "notes": "Needs a share page with a code block. No test URL: needs a public share link containing a long code line."
+  },
+  {
+    "site": "google",
+    "siteName": "Google Search",
+    "domains": [
+      "google.com",
+      "www.google.com"
+    ],
+    "category": "search",
+    "task": "verbatim-default",
+    "title": "Use Verbatim search on Google by default",
+    "question": "How do I make Google always search my exact words?",
+    "queries": [
+      "google verbatim by default",
+      "google search verbatim by default"
+    ],
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/mddnpcindcdchjjehpkphgpblepljgad",
+        "metric": 102,
+        "note": "Pol's Verbatim Search (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/bgmnbehecipfaiimhmicmjbhgcjjkhoc",
+        "metric": 61,
+        "note": "Google Verbatim Search (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=google%20verbatim%20by%20default",
+        "metric": null,
+        "note": "does not return the query; suggestions: google search verbatim by default | google verbatim default"
+      }
+    ],
+    "score": 30,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://www.google.com/search?q=how+to+bake+bread&hl=en&gl=us",
+    "notes": "Adds tbs=li:1 to searches. Fetched 200; google search pages pass via Browserbase in checks.json."
+  },
+  {
+    "site": "stackoverflow",
+    "siteName": "Stack Overflow",
+    "domains": [
+      "stackoverflow.com"
+    ],
+    "category": "reference",
+    "task": "sort-answers-by-votes",
+    "title": "Sort Stack Overflow answers by score",
+    "question": "How do I make Stack Overflow always sort answers by highest score?",
+    "queries": [
+      "stack overflow sort answers by votes"
+    ],
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/jafbgebfjkfejghbdeohaadmfghkmjlo",
+        "metric": 106,
+        "note": "Upvote First for StackOverflow (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=stack%20overflow%20sort%20answers%20by%20votes",
+        "metric": null,
+        "note": "does not return the query; suggestions: "
+      }
+    ],
+    "score": 30,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://stackoverflow.com/questions/11227809/why-is-processing-a-sorted-array-faster-than-processing-an-unsorted-array",
+    "notes": "Logged out the sort choice does not persist; script appends ?answertab=votes. curl got a Cloudflare 403; stackoverflow pages pass locally in checks.json."
+  },
+  {
+    "site": "chatgpt",
+    "siteName": "ChatGPT",
+    "domains": [
+      "chatgpt.com"
+    ],
+    "category": "work",
+    "task": "hide-login-popup",
+    "title": "Close ChatGPT's sign-in popup",
+    "question": "How do I use ChatGPT without the \"log in or sign up\" popup?",
+    "queries": [
+      "chatgpt without login"
+    ],
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/jahonnpbpnmaomcoplhabafhdkmjcphd",
+        "metric": 35,
+        "note": "ChatGPT Upgrade-Popup Blocker (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=chatgpt%20without%20login",
+        "metric": null,
+        "note": "returns the query; suggestions: chatgpt without login | chatgpt without login free | chatgpt without login limit | chatgpt without login image generator | chatgpt without login and sign up"
+      }
+    ],
+    "score": 28,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://chatgpt.com/",
+    "notes": "Logged-out chatgpt.com shows a sign-up modal after a few messages; check needs actions to trigger it. Evidence is thin."
+  },
+  {
+    "site": "wikipedia",
+    "siteName": "Wikipedia",
+    "domains": [
+      "wikipedia.org",
+      "en.wikipedia.org"
+    ],
+    "category": "reference",
+    "task": "larger-font",
+    "title": "Make Wikipedia text bigger",
+    "question": "How do I increase the font size on Wikipedia?",
+    "queries": [
+      "wikipedia font size",
+      "wikipedia font size too small"
+    ],
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/dkcfmmedajaacimlkhcgnfdnjchefjhh",
+        "metric": 36,
+        "note": "Wiki Refined (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=wikipedia%20font%20size",
+        "metric": null,
+        "note": "returns the query; suggestions: wikipedia font size | wikipedia font size change | wikipedia font size too small | wiki font size | wikipedia text size"
+      }
+    ],
+    "score": 28,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://en.wikipedia.org/wiki/Moon",
+    "notes": "Vector 2022 has a text-size control for logged-out readers that does not persist without cookies in some setups."
+  },
+  {
+    "site": "wikipedia",
+    "siteName": "Wikipedia",
+    "domains": [
+      "wikipedia.org",
+      "en.wikipedia.org"
+    ],
+    "category": "reference",
+    "task": "multi-column",
+    "title": "Read Wikipedia in columns",
+    "question": "How do I show Wikipedia articles in multiple columns?",
+    "queries": [
+      "wikipedia multi column"
+    ],
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/408604",
+        "metric": 54,
+        "note": "Wikipedia Multi-Column Layout (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=wikipedia%20multi%20column",
+        "metric": null,
+        "note": "does not return the query; suggestions: "
+      }
+    ],
+    "score": 26,
+    "loginRequired": false,
+    "loggedOutTestUrl": "https://en.wikipedia.org/wiki/Moon",
+    "notes": "Low evidence; CSS columns on the content."
+  }
+]

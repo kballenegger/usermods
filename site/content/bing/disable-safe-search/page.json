@@ -1,0 +1,51 @@
+{
+  "slug": "disable-safe-search",
+  "title": "Turn off SafeSearch on Bing",
+  "question": "How do I turn off Bing SafeSearch without an account?",
+  "answer": "Bing's settings page lets you set SafeSearch to Off without an account, but the choice lives in a cookie and is lost when cookies are cleared or in a private window. The usermods script on this page adds adlt=off to every Bing web, image and video search, and Bing then runs that search with SafeSearch Off; its own SafeSearch filter on image results reads Off instead of Moderate. Without a script, add &adlt=off to the search URL by hand.",
+  "prompt": "Turn off SafeSearch on Bing for every search.",
+  "details": "At `document-start` the script checks the address. If `adlt` is not `off`, it reloads the same search with `adlt=off`, so a search you start from the Bing box loads twice. It runs on `/search`, `/images/search` and `/videos/search`. The check loads an image search, where Bing shows its SafeSearch level in the filter bar, and checks that it reads Moderate without the script and Off with it. Web and video searches get the same parameter but the check doesn't load them.\n\nIt does not touch the SafeSearch cookie or your Bing settings. Some networks and countries force strict filtering (school or work DNS, or a country rule); a URL parameter can't get past that.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Bing settings",
+      "body": "Open **Settings** > **More** (bing.com/account/general), pick **Off** under SafeSearch and save. It is stored in a cookie, so it has to be set again after clearing cookies."
+    },
+    {
+      "kind": "other",
+      "title": "URL parameter",
+      "body": "Add `&adlt=off` to a Bing search URL. To make it stick in a browser, add a custom search engine with the URL `https://www.bing.com/search?q=%s&adlt=off`."
+    }
+  ],
+  "related": [
+    "bing/remove-redirect-links",
+    "bing/clean-homepage",
+    "duckduckgo/disable-safe-search"
+  ],
+  "check": {
+    "urls": [
+      "https://www.bing.com/images/search?q=python+list+comprehension&setlang=en&cc=us"
+    ],
+    "loggedOut": true,
+    "waitFor": "#ftr_ss_hl",
+    "settleMs": 3000,
+    "baseline": "(() => { const s = document.querySelector('#ftr_ss_hl'); return !!s && s.checkVisibility() && s.innerText.trim() === 'Moderate'; })()",
+    "expect": "(() => { const s = document.querySelector('#ftr_ss_hl'); return new URL(location.href).searchParams.get('adlt') === 'off' && !!s && s.checkVisibility() && s.innerText.trim() === 'Off'; })()",
+    "intact": "[...document.querySelectorAll('a.iusc img')].filter((i) => i.checkVisibility()).length >= 10"
+  },
+  "demand": {
+    "score": 53,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/470188",
+        "note": "Disable safesearch (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=bing%20safesearch%20off",
+        "note": "returns the query; suggestions: bing safesearch off | bing safesearch off not working | bing safesearch turn off | bing images safesearch off | turn bing safe search off"
+      }
+    ]
+  }
+}

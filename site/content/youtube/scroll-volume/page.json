@@ -1,0 +1,40 @@
+{
+  "slug": "scroll-volume",
+  "title": "Change YouTube volume with the mouse wheel",
+  "question": "How do I control YouTube volume by scrolling?",
+  "answer": "YouTube has no setting to change the volume with the mouse wheel; scrolling over a video just scrolls the page. The usermods script on this page turns scrolling over the video player into volume control: each wheel notch up or down moves the volume by 5 out of 100 using YouTube's own volume control, and the page stays still while the pointer is on the video. Without an extension, use the Up and Down arrow keys, which change the volume by 5 when the player is focused.",
+  "prompt": "Let me change the volume on YouTube by scrolling the mouse wheel over the video.",
+  "details": "Each 100 pixels of scrolling (one notch on most mice) changes the volume by 5 points. Trackpad scrolling adds up in small steps, so a swipe changes the volume gradually. Scrolling up on a muted video unmutes it first. The script uses the player's own volume API, so the slider and mute button stay in step.\n\nScrolling inside the player's settings menu still scrolls the menu, and scrolling anywhere outside the player scrolls the page as usual. Scrolling with Ctrl, Shift, Alt or Cmd held, and trackpad pinch, are left to the browser, so zooming over the video still zooms the page; the check confirms a Ctrl+scroll leaves the volume alone.",
+  "related": [
+    "youtube/default-playback-speed",
+    "youtube/disable-autoplay",
+    "youtube/always-theater-mode"
+  ],
+  "demand": {
+    "score": 65,
+    "evidence": [
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/agadcopafaojndinhloilcanpfpbonbk",
+        "note": "Youtube Volume Scroll (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20volume%20scroll",
+        "note": "returns the query; suggestions: youtube volume scroll | youtube volume scroll extension | firefox youtube volume scroll | youtube volume scroll extension firefox | youtube volume scroll chrome"
+      }
+    ]
+  },
+  "check": {
+    "loggedOut": true,
+    "urls": [
+      "https://www.youtube.com/watch?v=jNQXAC9IVRw"
+    ],
+    "waitFor": "#movie_player video",
+    "settleMs": 4000,
+    "actions": "const v = document.querySelector('#movie_player video'); window.__startVolume = document.querySelector('#movie_player').getVolume(); window.__prevented = []; for (let i = 0; i < 2; i++) { const e = new WheelEvent('wheel', { deltaY: 100, deltaMode: 0, bubbles: true, cancelable: true }); v.dispatchEvent(e); window.__prevented.push(e.defaultPrevented); } const z = new WheelEvent('wheel', { deltaY: 100, deltaMode: 0, ctrlKey: true, bubbles: true, cancelable: true }); v.dispatchEvent(z); window.__zoomPrevented = z.defaultPrevented; await new Promise((r) => setTimeout(r, 500));",
+    "baseline": "window.__startVolume > 20 && document.querySelector('#movie_player').getVolume() === window.__startVolume && !window.__prevented.some(Boolean)",
+    "expect": "document.querySelector('#movie_player').getVolume() === window.__startVolume - 10 && window.__prevented.every(Boolean) && !window.__zoomPrevented",
+    "intact": "document.querySelector('#movie_player video').checkVisibility() && document.querySelector('ytd-watch-metadata h1').checkVisibility()"
+  }
+}

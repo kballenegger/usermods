@@ -1,0 +1,55 @@
+{
+  "slug": "like-keyboard-shortcut",
+  "title": "Like YouTube videos with a keyboard shortcut",
+  "question": "Is there a keyboard shortcut to like a YouTube video?",
+  "answer": "No, YouTube has no keyboard shortcut for the like button; its shortcuts cover playback, volume, captions and full screen. The usermods script on this page adds one: press Shift+L on a video page and it presses the like button under the video, and pressing it again removes the like. It ignores keys typed into search or comment boxes. Without an extension, press Tab until the like button is focused and press Enter.",
+  "prompt": "Add a keyboard shortcut, Shift+L, that likes the YouTube video I'm watching.",
+  "details": "Shift+L clicks the like button under the video, so YouTube records the like exactly as if you had clicked it. The script stops the key from reaching YouTube, so the plain L shortcut (skip ahead 10 seconds) doesn't fire as well. Keys typed into any text field are left alone.\n\nThe check runs signed out, where YouTube answers a like with its \"Like this video? Sign in\" prompt; it proves the shortcut presses the like button, not that a like is saved. The script has no dislike shortcut.",
+  "related": [
+    "youtube/disable-autoplay",
+    "youtube/default-playback-speed",
+    "youtube/always-theater-mode"
+  ],
+  "demand": {
+    "score": 66,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/413965",
+        "note": "Youtube like/dislike video and skip ad keyboard shortcuts (fork from n (total installs, read from api.greasyfork.org/en/scripts/by-site)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/fdkpkpelkkdkjhpacficichkfifijipc",
+        "note": "YouTube Like-Dislike Shortcut (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20like%20shortcut",
+        "note": "returns the query; suggestions: youtube like shortcut | youtube like shortcut key | youtube shortcut like video | youtube as shortcut | youtube like dislike shortcut"
+      },
+      {
+        "type": "forum",
+        "url": "https://webapps.stackexchange.com/questions/129428/youtube-keyboard-shortcut-to-like-or-dislike-thumbs-up-or-thumbs-down",
+        "note": "webapps.stackexchange question: YouTube keyboard shortcut to like or dislike (thumbs-up or thumbs-down)?"
+      },
+      {
+        "type": "forum",
+        "url": "https://webapps.stackexchange.com/questions/102383/how-do-i-like-a-youtube-video-while-in-full-screen-mode",
+        "note": "webapps.stackexchange question: How do I like a YouTube video while in full screen mode?"
+      }
+    ]
+  },
+  "check": {
+    "loggedOut": true,
+    "urls": [
+      "https://www.youtube.com/watch?v=jNQXAC9IVRw"
+    ],
+    "waitFor": "ytd-watch-metadata like-button-view-model button",
+    "settleMs": 4000,
+    "actions": "document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'L', code: 'KeyL', shiftKey: true, bubbles: true, cancelable: true })); await new Promise((r) => setTimeout(r, 1500));",
+    "baseline": "document.querySelector('ytd-watch-metadata like-button-view-model button').checkVisibility() && ![...document.querySelectorAll('ytd-modal-with-title-and-button-renderer')].some((m) => m.checkVisibility() && m.textContent.includes('Like this video?'))",
+    "expect": "[...document.querySelectorAll('ytd-modal-with-title-and-button-renderer')].some((m) => m.checkVisibility() && m.textContent.includes('Like this video?'))",
+    "intact": "document.querySelector('#movie_player video').checkVisibility() && document.querySelector('ytd-watch-metadata h1').checkVisibility()"
+  }
+}

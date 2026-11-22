@@ -1,0 +1,60 @@
+{
+  "slug": "absolute-dates",
+  "title": "Show absolute dates on GitHub",
+  "question": "How do I show real dates instead of '3 days ago' on GitHub?",
+  "answer": "GitHub has no setting for this; it shows relative times like 3 days ago and gives the exact date only when you hover over one. The usermods script on this page makes GitHub's date elements show the calendar date instead, such as Nov 14, 2026, in issue and pull request lists, file lists, commits and comments. Hovering still shows the full time. Without an extension, hovering over a relative time is the only way to see the date.",
+  "prompt": "Show real dates instead of \"3 days ago\" everywhere on GitHub.",
+  "details": "GitHub prints dates with its own relative-time element, which carries the exact timestamp. The script sets that element's format to a calendar date, so GitHub's own code does the formatting in your browser's locale and time zone. Lists that load or re-render later are handled as they appear.\n\nIt shows the date without the time of day. The check loads a pull request list; file lists, commits and comments use the same element.",
+  "alternatives": [
+    {
+      "kind": "other",
+      "title": "Hover the date",
+      "body": "Hovering over any relative time on GitHub shows a tooltip with the full date and time."
+    },
+    {
+      "kind": "extension",
+      "title": "Absolute Dates Plugin for GitHub",
+      "body": "A Chrome extension that does the same replacement."
+    }
+  ],
+  "related": [
+    "github/full-width",
+    "github/translate-interface"
+  ],
+  "check": {
+    "urls": [
+      "https://github.com/facebook/react/pulls"
+    ],
+    "loggedOut": true,
+    "waitFor": "relative-time",
+    "settleMs": 4000,
+    "baseline": "(() => { const r = [...document.querySelectorAll('relative-time')].filter((e) => e.checkVisibility()); return r.filter((e) => /\\b(ago|yesterday|last|now)\\b/.test(e.shadowRoot?.textContent || '')).length >= 3; })()",
+    "expect": "(() => { const r = [...document.querySelectorAll('relative-time')].filter((e) => e.checkVisibility()); const texts = r.map((e) => e.shadowRoot?.textContent || ''); return r.length >= 10 && texts.every((t) => /\\b20\\d\\d\\b/.test(t) && !/\\b(ago|yesterday|last)\\b/.test(t)); })()",
+    "intact": "[...document.querySelectorAll('a[data-testid=\"listitem-title-link\"][href*=\"/pull/\"]')].filter((a) => a.checkVisibility()).length >= 10"
+  },
+  "demand": {
+    "score": 47,
+    "evidence": [
+      {
+        "type": "cws",
+        "url": "https://chromewebstore.google.com/detail/fmceohllpeampmclkldblmkhippchgck",
+        "note": "Chrome Web Store users, \"Absolute Dates Plugin for GitHub\"; count from CWS search page"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&gl=us&q=github%20absolute%20dat",
+        "note": "Google suggests \"github absolute dates\""
+      },
+      {
+        "type": "search",
+        "url": "https://gist.github.com/jftuga/5b552b008c24860c73a14d5c0f36b2c5",
+        "note": "Bookmarklet gist for absolute dates"
+      },
+      {
+        "type": "search",
+        "url": "https://shanedowling.com/posts/github-userscript-absolute-dates/",
+        "note": "Blog post with a userscript for absolute dates"
+      }
+    ]
+  }
+}

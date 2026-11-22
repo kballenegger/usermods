@@ -1,0 +1,39 @@
+{
+  "slug": "spaces-fullscreen",
+  "title": "Full-screen Hugging Face Spaces",
+  "question": "How do I make a Hugging Face Space fill the window?",
+  "answer": "A Space on huggingface.co already fills the window except for a header bar with its name and the App, Files and Community tabs. To lose that bar too, open the app on its own address, owner-name.hf.space, which the Embed this Space option shows. The usermods script on this page hides the header bar on Space pages so the app takes the whole window, and adds a small Show header button in the bottom corner to bring the bar back.",
+  "prompt": "On Hugging Face Spaces, hide the header so the app fills the whole window.",
+  "details": "The script hides the page's header bar only while a running app (`iframe.space-iframe`) is on the page, so the Files and Community tabs look as before. The app frame then grows into the free space. The **Show header** button in the bottom-right corner toggles the bar; the setting is not remembered between pages.\n\nThe check loads a small Gradio demo Space and confirms the header is hidden and the app frame starts at the top of the window and fills it.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Open the app directly",
+      "body": "Every Space app also runs on its own address, `https://<owner>-<space-name>.hf.space`. The three-dot menu on a Space page has **Embed this Space**, which shows that direct URL."
+    },
+    {
+      "kind": "other",
+      "title": "Browser full screen",
+      "body": "F11 on Windows and Linux, or Control-Command-F on a Mac, hides the browser's own toolbars. The Space header stays."
+    }
+  ],
+  "related": [
+    "huggingface/dark-mode",
+    "huggingface/copy-download-command"
+  ],
+  "demand": {
+    "score": 25,
+    "evidence": [
+      { "type": "greasyfork", "url": "https://greasyfork.org/en/scripts/488343", "note": "Spaces Full Screener (total installs)" }
+    ]
+  },
+  "check": {
+    "urls": ["https://huggingface.co/spaces/gradio/hello_world"],
+    "loggedOut": true,
+    "waitFor": "iframe.space-iframe",
+    "settleMs": 3000,
+    "baseline": "(() => { const h = document.querySelector('header'); const f = document.querySelector('iframe.space-iframe'); return !!h && h.checkVisibility() && /hello_world/.test(h.innerText) && f.getBoundingClientRect().top >= 40; })()",
+    "expect": "(() => { const h = document.querySelector('header'); const f = document.querySelector('iframe.space-iframe').getBoundingClientRect(); const b = document.querySelector('.um-space-toggle'); return !!h && /hello_world/.test(h.textContent) && !h.checkVisibility() && f.top === 0 && f.height >= innerHeight - 2 && !!b && b.checkVisibility(); })()",
+    "intact": "(() => { const f = document.querySelector('iframe.space-iframe'); return !!f && f.checkVisibility() && /\\.hf\\.space\\//.test(f.src) && f.getBoundingClientRect().width >= 1300; })()"
+  }
+}

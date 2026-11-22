@@ -1,0 +1,37 @@
+{
+  "slug": "dark-mode",
+  "title": "Dark mode for Wiktionary",
+  "question": "Does Wiktionary have dark mode?",
+  "answer": "Yes. Wiktionary has a dark mode built in: in the Appearance menu at the right of an entry, pick Dark under Color. Logged out, that choice is kept by your browser for that one language edition of Wiktionary only, and private windows or cleared site data lose it. The usermods script on this page switches on the same dark theme on every Wiktionary page as it loads, so it never resets and needs no account.",
+  "prompt": "Always show Wiktionary in dark mode, even when I'm logged out.",
+  "details": "The script swaps the theme class on the page's root element from `skin-theme-clientpref-day` to `skin-theme-clientpref-night`, the same switch the Appearance menu makes. The colours are Wiktionary's own, so inflection tables and templates are styled by the site. It keeps the class set while the page loads, because the site's startup code rewrites it from the saved preference.\n\nWhile the script is on, the Light and Automatic choices in the Appearance menu have no effect. Some templates with hand-picked colours may still look light; logged-in users can turn on the AutoContrastFixer gadget for those. The script matches every `*.wiktionary.org` page; the check loads one English entry in the desktop layout.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Appearance menu",
+      "body": "On desktop, the **Appearance** menu sits at the right of the page (or behind the glasses icon at the top when unpinned). Choose **Dark** under **Color**, or **Automatic** to follow your system setting. Logged in, the choice is saved to your account. Logged out, it is stored in your browser for that language edition only."
+    },
+    {
+      "kind": "other",
+      "title": "Your system's dark setting",
+      "body": "With **Automatic** picked in the Appearance menu, Wiktionary follows your operating system's dark mode."
+    }
+  ],
+  "related": ["wiktionary/filter-languages", "wikipedia/dark-mode"],
+  "demand": {
+    "score": 25,
+    "evidence": [
+      { "type": "greasyfork", "url": "https://greasyfork.org/en/scripts/564037", "note": "Force Wikimedia dark mode (23 total installs)" },
+      { "type": "autocomplete", "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=wiktionary%20dark%20mode", "note": "returns \"wiktionary dark mode\"; suggestions: wiktionary dark mode | dark mode on or off | turn on dark mode word | enable dark mode word | opposite of dark mode" }
+    ]
+  },
+  "check": {
+    "urls": ["https://en.wiktionary.org/wiki/set"],
+    "loggedOut": true,
+    "waitFor": "#mw-content-text .mw-heading2 h2",
+    "settleMs": 3000,
+    "baseline": "(() => { const [r, g, b] = getComputedStyle(document.body).backgroundColor.match(/\\d+/g).map(Number); return r + g + b > 600; })()",
+    "expect": "(() => { const [r, g, b] = getComputedStyle(document.body).backgroundColor.match(/\\d+/g).map(Number); const [tr, tg, tb] = getComputedStyle(document.querySelector('#mw-content-text ol > li')).color.match(/\\d+/g).map(Number); return document.documentElement.classList.contains('skin-theme-clientpref-night') && r + g + b < 150 && tr + tg + tb > 450; })()",
+    "intact": "[...document.querySelectorAll('#mw-content-text ol > li')].filter((li) => li.checkVisibility() && li.textContent.trim().length > 20).length >= 50"
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "slug": "default-playback-speed",
+  "title": "Set a default YouTube playback speed",
+  "question": "How do I make YouTube always play at 1.5x speed?",
+  "answer": "YouTube's desktop site has no setting for a default playback speed. Picking a speed in the player's Settings menu, or with Shift+> and Shift+<, is not saved as a default. The usermods script on this page starts every video at 1.5x, and you can change the number at the top of the script. You can still change the speed by hand during a video. Without an extension, press Shift+> twice at the start of a video.",
+  "prompt": "Make every YouTube video start at 1.5x playback speed.",
+  "details": "The script waits for each new video to load in the player and sets its speed through YouTube's own player, so the Settings menu shows the new speed. It runs again when you click through to the next video without a reload.\n\nTo use another speed, edit `const SPEED = 1.5;` at the top of the script. YouTube's menu goes from 0.25 to 2.\n\nIt only acts when a new video loads, so a speed you pick by hand stays until the next video.",
+  "alternatives": [
+    {
+      "kind": "site-setting",
+      "title": "Keyboard shortcuts",
+      "body": "Shift+> speeds the video up by 0.25 and Shift+< slows it down. From 1x, two presses of Shift+> give 1.5x. You have to do it on every video."
+    },
+    {
+      "kind": "extension",
+      "title": "Video Speed Controller",
+      "body": "The Video Speed Controller extension for Chrome and Firefox sets speed on any HTML5 video, with keyboard shortcuts and a remembered speed."
+    }
+  ],
+  "related": [
+    "youtube/disable-autoplay",
+    "youtube/resize-player"
+  ],
+  "demand": {
+    "score": 92,
+    "evidence": [
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/421670",
+        "note": "YouTube More Speeds (total installs)"
+      },
+      {
+        "type": "greasyfork",
+        "url": "https://greasyfork.org/en/scripts/30506",
+        "note": "Video Speed Buttons (total installs)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/hdannnflhlmdablckfkjpleikpphncik",
+        "note": "Youtube Playback Speed Control (users, read on the detail page)"
+      },
+      {
+        "type": "chrome-web-store",
+        "url": "https://chromewebstore.google.com/detail/bcogakegjkeopbkokbkkaopnclmhhfmp",
+        "note": "YouTube Default Playback Speed (users, read on the detail page)"
+      },
+      {
+        "type": "autocomplete",
+        "url": "https://suggestqueries.google.com/complete/search?client=firefox&hl=en&q=youtube%20default%20playback%20speed",
+        "note": "returns the query; suggestions: youtube default playback speed | youtube default playback speed firefox | youtube default playback speed extension | youtube default playback speed android | youtube default playback speed change"
+      },
+      {
+        "type": "thread",
+        "url": "https://webapps.stackexchange.com/questions/9948",
+        "note": "Speed up YouTube Playback?"
+      },
+      {
+        "type": "thread",
+        "url": "https://news.ycombinator.com/item?id=37713316",
+        "note": "Ask HN: Automatic YouTube Playback Speed Adjustment Based on Language"
+      }
+    ]
+  },
+  "check": {
+    "urls": [
+      "https://www.youtube.com/watch?v=jNQXAC9IVRw"
+    ],
+    "loggedOut": true,
+    "waitFor": "#movie_player video",
+    "settleMs": 5000,
+    "baseline": "(() => { const v = document.querySelector('#movie_player video'); return v.readyState >= 1 && v.playbackRate === 1; })()",
+    "expect": "(() => { const p = document.querySelector('#movie_player'); const v = p.querySelector('video'); return v.readyState >= 1 && v.playbackRate === 1.5 && p.getPlaybackRate() === 1.5; })()",
+    "intact": "(() => { const p = document.querySelector('#movie_player'); const v = p.querySelector('video'); return p.checkVisibility() && v.currentSrc !== '' && !p.querySelector('.ytp-error')?.checkVisibility(); })()"
+  }
+}
