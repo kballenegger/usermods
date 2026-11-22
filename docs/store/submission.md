@@ -21,8 +21,15 @@
   restores the old build. Steps are under [Submitting 0.1.2](#submitting-012).
 - **2026-11-09: 0.1.2 submitted, pending review.** Package, description, host-permission
   justification and test instructions replaced; the reviewer key was checked first and lists
-  `ornith-1.5-35b`. The submit dialog ticks "Publish automatically" by default: untick it every time.
-- Automatic publication is **off**: an approved item waits for Publish to be pressed.
+  `ornith-1.5-35b`. Submitted with "Publish automatically" unticked.
+- **2026-11-11: 0.1.2 accepted, "Ready to publish"** (must be published before 2026-12-10).
+  Subscription sign-in in the store build passed review. It went through in about two days and
+  no mail arrived, again: check the dashboard Status tab. Published the same day; the dashboard
+  read "Published - public" right after.
+- Automatic publication is **on** from 0.1.3 (Kenneth, 2026-11-11): leave "Publish automatically"
+  ticked in the submit dialog (it is ticked by default). To see whether an update has gone out,
+  check the version on the [public listing](https://chromewebstore.google.com/detail/usermods/dhmdjekbeinhhnfhcgnkgdpgdafpboic);
+  it needs no sign-in, unlike the dashboard.
 
 Things the dashboard turned out to do differently from Google's docs, learned on the first
 submission:
@@ -124,7 +131,7 @@ and read a page's text. None of it changes the permissions or what the listing h
 4. **Test instructions → Additional instructions** → replace with the block in
    [reviewer-notes.md](reviewer-notes.md#test-instructions). It now names the model id the reviewer
    key allows.
-5. **Submit for review.** Leave automatic publication off.
+5. **Submit for review.** (At the time it went with automatic publication off; from 0.1.3 leave it on.)
 
 Do not upload again while it is in review. Check the listing as well as the mailbox.
 
@@ -151,7 +158,7 @@ In the dashboard, on the item above. Nothing here needs a decision; it is upload
    [reviewer-notes.md](reviewer-notes.md#test-instructions).
 7. Leave everything else as it is: category, language, icon, promo tiles, URLs, data-usage
    checkboxes, the three certifications, the privacy policy URL, distribution.
-8. **Submit for review.** Do not tick automatic publication.
+8. **Submit for review.** Leave "Publish automatically" ticked.
 
 Before pressing Submit:
 
