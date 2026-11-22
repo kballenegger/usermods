@@ -5,11 +5,15 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { CHROME_MIN_VERSION, POPUP_PATH, SAFARI_MIN_VERSION, SAFARI_ONLY_ICON_SIZES, actionFor, buildManifest, isSafariOnlyIcon, isSafariTarget, permissionsFor } from '../lib/manifest.ts';
+import { CHROME_MIN_VERSION, FIREFOX_MIN_VERSION, POPUP_PATH, SAFARI_MIN_VERSION, SAFARI_ONLY_ICON_SIZES, actionFor, buildManifest, isFirefoxTarget, isSafariOnlyIcon, isSafariTarget, optionalPermissionsFor, permissionsFor } from '../lib/manifest.ts';
 
-test('only safari is the safari target', () => {
+test('only safari is the safari target, and firefox is the firefox target', () => {
   assert.equal(isSafariTarget('safari'), true);
-  for (const b of ['chrome', 'firefox', 'edge', 'chromium', '']) assert.equal(isSafariTarget(b), false);
+  assert.equal(isFirefoxTarget('firefox'), true);
+  for (const b of ['chrome', 'edge', 'chromium', '']) {
+    assert.equal(isSafariTarget(b), false);
+    assert.equal(isFirefoxTarget(b), false);
+  }
 });
 
 test('safari is not asked for permissions it does not have', () => {
@@ -56,24 +60,56 @@ test('the action keeps one title and its four icon sizes on both', () => {
 test('each build states its own minimum and not the other one', () => {
   const chrome = buildManifest('chrome');
   const safari = buildManifest('safari');
+  const firefox = buildManifest('firefox');
   assert.equal(chrome.minimum_chrome_version, CHROME_MIN_VERSION);
   assert.equal(chrome.browser_specific_settings, undefined);
   assert.equal(safari.minimum_chrome_version, undefined);
   // 16.4 is where Safari got the MV3 service-worker background. The rest of what the Safari build
   // uses bottoms out at 15.4; the background is the binding constraint.
   assert.equal(safari.browser_specific_settings?.safari?.strict_min_version, SAFARI_MIN_VERSION);
+  // No minimum_chrome_version on Firefox: it is a Chrome key, and Firefox accepts unknown keys as
+  // warnings. The binding constraint there is userScripts, at 136.
+  assert.equal(firefox.minimum_chrome_version, undefined);
+  assert.equal(firefox.browser_specific_settings?.gecko?.strict_min_version, FIREFOX_MIN_VERSION);
+  // The AMO-required data-collection declaration (MDN: browser_specific_settings.gecko.data_collection_permissions).
+  assert.deepEqual(firefox.browser_specific_settings?.gecko?.data_collection_permissions, {
+    required: ['websiteActivity', 'websiteContent'],
+    optional: ['authenticationInfo', 'personalCommunications'],
+  });
 });
 
-test('what both builds share is shared', () => {
+test('what every build shares is shared', () => {
   const chrome = buildManifest('chrome');
   const safari = buildManifest('safari');
-  for (const m of [chrome, safari]) {
+  const firefox = buildManifest('firefox');
+  for (const m of [chrome, safari, firefox]) {
     assert.equal(m.name, 'usermods');
     assert.deepEqual(m.host_permissions, ['<all_urls>']);
     assert.equal(m.options_ui?.page, 'dashboard.html');
     assert.equal(m.options_ui?.open_in_tab, true);
     assert.deepEqual(m.web_accessible_resources?.[0]?.resources, ['install.html']);
   }
+});
+
+test('firefox asks for user scripts as an optional permission, not a required one', () => {
+  // Firefox: userScripts is optional (W3C issue #740 — putting it in `permissions` there would let
+  // the user never decline it); Chrome asks for it at install instead.
+  assert.deepEqual(permissionsFor('firefox'), ['storage', 'scripting', 'tabs', 'declarativeNetRequest']);
+  assert.deepEqual(optionalPermissionsFor('firefox'), ['userScripts']);
+  assert.ok(!permissionsFor('firefox').includes('userScripts'));
+  assert.deepEqual(optionalPermissionsFor('chrome'), []);
+  assert.deepEqual(optionalPermissionsFor('safari'), []);
+});
+
+test('firefox gets the browser-level sidebar and the gecko marker, and chrome gets neither', () => {
+  const firefox = buildManifest('firefox');
+  assert.equal(firefox.sidebar_action?.default_panel, 'sidepanel.html');
+  assert.ok(firefox.browser_specific_settings?.gecko?.id);
+  const chrome = buildManifest('chrome');
+  assert.equal(chrome.sidebar_action, undefined);
+  assert.equal(chrome.browser_specific_settings, undefined);
+  const safari = buildManifest('safari');
+  assert.equal(safari.sidebar_action, undefined);
 });
 
 test('the chrome manifest keeps the key order it shipped with', () => {

@@ -15,6 +15,7 @@
     "build:store": "USERMODS_STORE=1 wxt build",
     "zip": "wxt zip",
     "zip:store": "USERMODS_STORE=1 wxt zip",
+    "zip:firefox": "wxt zip -b firefox && node scripts/firefox-xpi.mjs",
     "zip:safari": "wxt zip -b safari",
     "zip:safari:store": "USERMODS_STORE=1 wxt zip -b safari",
     "typecheck": "tsc --noEmit",

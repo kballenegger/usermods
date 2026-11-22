@@ -6,7 +6,7 @@
 // tab navigating — is covered by `npm run smoke:panelscope`.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { actionClickPlan, openChatPlan, PANEL_PATH, resolveScope, windowPanelPlan } from '../lib/sidepanel.ts';
+import { actionClickPlan, openChatPlan, PANEL_PATH, resolveScope, sidebarAvailable, windowPanelPlan } from '../lib/sidepanel.ts';
 import { DEFAULT_SETTINGS } from '../lib/types.ts';
 
 // ---------- which scope a stored profile runs under ----------
@@ -59,6 +59,7 @@ test('a toolbar click configures the clicked tab and then opens it, in that orde
   const plan = actionClickPlan('tab', 42);
   assert.deepEqual(plan.setOptions, { tabId: 42, path: PANEL_PATH, enabled: true });
   assert.deepEqual(plan.open, { tabId: 42 });
+  assert.equal(plan.sidebarOpen, false);
 });
 
 test('the click never names a tab other than the one clicked', () => {
@@ -70,10 +71,23 @@ test('under window scope the listener does nothing: Chrome opens the panel itsel
   const plan = actionClickPlan('window', 42);
   assert.equal(plan.setOptions, null);
   assert.equal(plan.open, null);
+  assert.equal(plan.sidebarOpen, false);
 });
 
 test('a click Chrome could not attribute to a tab opens nothing rather than guessing', () => {
-  assert.deepEqual(actionClickPlan('tab', undefined), { setOptions: null, open: null });
+  assert.deepEqual(actionClickPlan('tab', undefined), { setOptions: null, open: null, sidebarOpen: false });
+});
+
+test('on Firefox the click opens the browser-level sidebar, and the scope does not change it', () => {
+  // Pass `firefox: true`: the default reads `sidebarAvailable()`, which needs a runtime and is
+  // false in node.
+  assert.deepEqual(actionClickPlan('tab', 42, true), { setOptions: null, open: null, sidebarOpen: true });
+  assert.deepEqual(actionClickPlan('window', 42, true), { setOptions: null, open: null, sidebarOpen: true });
+  assert.equal(actionClickPlan('tab', 7, true).sidebarOpen, true);
+});
+
+test('sidebarAvailable is false in node, where there is no runtime', () => {
+  assert.equal(sidebarAvailable(), false);
 });
 
 // ---------- the dashboard's Open button ----------

@@ -29,11 +29,13 @@ export type ExecEngine = 'user-scripts' | 'content-script';
 export interface RuntimeProbe {
   /** This build is a `userScripts` build: its manifest asks for the permission. */
   api: boolean;
-  /** The API can be called now. On Chrome that is the "Allow User Scripts" toggle being on. */
+  /** The API can be called now. On Chrome that is the "Allow User Scripts" toggle being on; on Firefox, the granted namespace. */
   permitted: boolean;
   /** `sidePanel` exists. False on Safari and Firefox; the popup is the surface there. */
   sidePanel: boolean;
-  /** UA string, only used to word Chrome's setup instructions. */
+  /** This runtime is Firefox (its manifest carries a `browser_specific_settings.gecko` marker). */
+  firefox: boolean;
+  /** UA string, only used to word the setup instructions. */
   userAgent: string;
 }
 
@@ -46,7 +48,13 @@ export interface ExecStatus {
 
 /** The slice of `chrome` the probe reads, so node can stand in for each state a profile can be in. */
 export interface ProbeSource {
-  runtime?: { getManifest?: () => { permissions?: readonly string[] } };
+  runtime?: {
+    getManifest?: () => {
+      permissions?: readonly string[];
+      optional_permissions?: readonly string[];
+      browser_specific_settings?: { gecko?: unknown };
+    };
+  };
   userScripts?: { getScripts?: () => unknown };
   sidePanel?: unknown;
 }
@@ -65,8 +73,14 @@ export interface ProbeSource {
  */
 export function readProbe(c: ProbeSource | undefined, userAgent: string): RuntimeProbe {
   let api = false;
+  let firefox = false;
   try {
-    api = !!c?.runtime?.getManifest?.().permissions?.includes('userScripts');
+    const m = c?.runtime?.getManifest?.();
+    // Chrome: userScripts is a required manifest permission. Firefox: it is `optional_permissions`
+    // (W3C issue #740 — it must not be in `permissions` there), so `api` reads true even while
+    // `permitted` is false; the granted state is read off the namespace in the probe below.
+    api = !!m?.permissions?.includes('userScripts') || !!m?.optional_permissions?.includes('userScripts');
+    firefox = !!m?.browser_specific_settings?.gecko;
   } catch {
     // WXT imports the background at build time against a fake browser whose getManifest throws.
     // Nothing runs there, so which engine that import picks does not matter; it must not crash.
@@ -75,7 +89,10 @@ export function readProbe(c: ProbeSource | undefined, userAgent: string): Runtim
   let permitted = false;
   if (api) {
     try {
-      // Throws when the toggle is off: a TypeError on the missing namespace, or Chrome's own error.
+      // Throws when the permission is not held: a TypeError on the missing namespace, or
+      // Chrome's own error. On Firefox the namespace appears when the permission is granted
+      // (MDN's userScripts page: "check the availability of the userScripts API namespace"), so
+      // the same probe covers both.
       const asked = c!.userScripts!.getScripts!();
       // The answer itself is not wanted; a rejection of it must not surface as unhandled.
       (asked as Promise<unknown> | undefined)?.catch?.(() => {});
@@ -84,7 +101,7 @@ export function readProbe(c: ProbeSource | undefined, userAgent: string): Runtim
       permitted = false;
     }
   }
-  return { api, permitted, sidePanel: typeof c?.sidePanel !== 'undefined', userAgent };
+  return { api, permitted, sidePanel: typeof c?.sidePanel !== 'undefined', firefox, userAgent };
 }
 
 /**
@@ -125,7 +142,20 @@ export function execStatus(probe: RuntimeProbe): ExecStatus {
   const engine = pickEngine(probe);
   if (engine === 'content-script') return { available: true, message: '', engine };
   if (probe.permitted) return { available: true, message: '', engine };
-  return { available: false, message: chromeSetupMessage(probe.userAgent), engine };
+  return { available: false, message: probe.firefox ? firefoxSetupMessage() : chromeSetupMessage(probe.userAgent), engine };
+}
+
+/**
+ * Firefox's setup instructions.
+ *
+ * Firefox has no browser-chrome toggle for user scripts: the user grants them from about:addons,
+ * or the user turns on the Settings row that calls `permissions.request()` (SettingsView.tsx), so
+ * both routes are named — Settings, and about:addons. The poll in the panel re-reads the status
+ * every two seconds while the notice shows, so the moment the user has enabled one of the routes
+ * the notice clears.
+ */
+function firefoxSetupMessage(): string {
+  return 'usermods needs user scripts enabled.\n1. Open usermods Settings\n2. Turn on "Enable user scripts"\n(On about:addons, Firefox also lists it: usermods → Permissions tab)';
 }
 
 /**

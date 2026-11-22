@@ -1,14 +1,15 @@
 # Browser support: Firefox and Safari
 
 usermods ships on Chrome (manifest requires **Chrome 135+**, for the "Allow User Scripts" toggle
-`chrome.userScripts` needs) and has a Safari build for iOS and macOS. That build has been run in an
-iPhone 15 iOS 17.5 simulator; no physical iPhone or iPad run is claimed here, and no run as a loaded
-Safari extension on macOS is claimed either. This is a from-primary-sources look at what shipping on
-Firefox and Safari takes, API by API, plus effort estimates and a verdict for each.
+`chrome.userScripts` needs), has a Safari build for iOS and macOS, and runs on **Firefox 136+**.
+This is a from-primary-sources look at what shipping on each of them takes, API by API, plus effort
+estimates and a verdict for each.
 
 The Safari port is built. Read [docs/safari.md](safari.md) for how it works, how to build and install
-it, what its isolation guarantees are and what it cannot do. This page is the research the port came
-out of; it is kept as written, with the Safari verdict updated to match what shipped.
+it, what its isolation guarantees are and what it cannot do. The Firefox port is built too —
+`npm run build:firefox` + `npm run zip:firefox` produce `usermods-<version>-firefox.xpi` (branch
+`feat/firefox-implementation`). This page is the research the ports came out of; it is kept as
+written, with the verdicts updated to match what shipped.
 
 Method: `grep -rn 'chrome\.' entrypoints/ lib/` for the exact call sites, then each API's support,
 minimum version and behavioral differences checked against MDN's webextensions browser-compat-data
@@ -185,76 +186,64 @@ flows with plain `fetch`, no `chrome.identity`), so there's nothing to port for 
 
 ---
 
-## Firefox: effort estimate and port plan
+## Firefox: the port
 
-**Verdict: feasible, moderate effort.** Every API usermods calls either exists on Firefox in
+**Verdict: built — untested on a real Firefox.** Every API usermods calls either exists on Firefox in
 close-to-identical shape (`userScripts`, `onUserScriptMessage`/`onUserScriptConnect`,
 `declarativeNetRequest`, `scripting.executeScript`, `storage.*`, `tabs.captureVisibleTab`) or has a
-well-documented Firefox-native equivalent that needs a real adapter (`sidePanel` → `sidebarAction`).
-`userScripts` landed in Firefox 136 (March 2025), so the floor is recent but stable — this is not
-waiting on an unshipped API anymore, which is presumably why the [roadmap](roadmap.md) entry ("Firefox,
-once its side panel story is settled") predates Firefox 136 shipping `userScripts` at all; the
-side-panel gap is now the only structural blocker, not the userscript execution model.
+well-documented Firefox-native equivalent that needed a real adapter (`sidePanel` → `sidebarAction`).
+`userScripts` landed in Firefox 136 (March 2025), so the floor is recent but stable. This page
+describes the port as built on branch `feat/firefox-implementation`: `npm run build:firefox` +
+`npm run zip:firefox` produce `usermods-<version>-firefox.xpi`.
 
-**Build target:** `npx wxt build -b firefox` (WXT's Firefox target handles the `manifest_version`/
-`browser_specific_settings` shape and the `chrome.*` → `browser.*` promise-based namespace via its
-built-in polyfill, so most of `lib/` and `entrypoints/` need zero change).
+**What the port does:**
 
-**What needs a Firefox-specific code path (not just a version bump):**
+1. **Manifest per target** (`lib/manifest.ts`). Firefox drops `sidePanel` (Firefox has no such API —
+   WXT generates `sidebar_action` for Firefox itself from the sidepanel entrypoint), drops
+   `minimum_chrome_version` (a Chrome key), puts `userScripts` in `optional_permissions` instead of
+   `permissions` (W3C issue #740), and adds `browser_specific_settings.gecko` — `id`,
+   `strict_min_version: 136`, and the AMO-required `data_collection_permissions` declaration (an
+   honest list of what the extension sends: page address, pruned HTML and element details, the user's
+   API keys and chats). Chrome's manifest is byte-for-byte what it was (pinned by
+   `test/manifest.test.ts`).
 
-1. **Side panel → sidebar.** The one real architecture change. `chrome.sidePanel.setPanelBehavior({
-   openPanelOnActionClick: true })` (`background.ts:24`) has no Firefox counterpart; replace with
-   `browser.action.onClicked.addListener(() => browser.sidebarAction.open())` behind a
-   `browser.sidePanel ? ... : ...` feature check (or a build-time `import.meta.env.FIREFOX` branch,
-   which WXT provides). The panel's own React code (`entrypoints/sidepanel/`) is unaffected — it's
-   the same page, opened differently. `entrypoints/sidepanel/App.tsx`'s `tabs.onActivated`/
-   `tabs.onUpdated` listeners (used to track which tab's chat to show) work unchanged since
-   `sidebarAction` panels, like `sidePanel`, are long-lived pages that can listen for tab events.
+2. **Sidebar adapter.** Firefox has no per-tab panel, so the two layers of `chrome.sidePanel` become
+   one browser-level `sidebar_action`: the action click opens it (`sidebarAction.open()` inside the
+   click's gesture), and the dashboard's Open button does the same. `lib/sidepanel.ts` gained
+   `sidebarAvailable()`/`sidebarActionOpen()` and an extended `actionClickPlan` (`sidebarOpen`), and
+   both call sites in `entrypoints/background.ts` and `entrypoints/dashboard/ChatsSection.tsx` branch
+   on the plan. The scope setting ('on this tab only' / 'on every tab') has no Firefox equivalent —
+   the sidebar is browser-level — so both behave the same there (`SettingsView.tsx` says so).
 
-2. **`userScripts` permission request flow.** Chrome's model is a static manifest permission plus an
-   out-of-band browser-chrome toggle, which `userScriptsStatus()` already detects and surfaces as an
-   error message with instructions. Firefox's model is `optional_permissions: ['userScripts']` in the
-   manifest plus a runtime `browser.permissions.request(...)` call that must originate from a user
-   gesture in the extension's own UI (e.g. a "Enable user scripts" button in Settings, not an
-   automatic call on load). This replaces the toggle-detection logic with a request-and-await flow;
-   size: small, self-contained in `background.ts` + a Settings UI affordance.
+3. **`userScripts` permission request flow.** Chrome asks for the permission at install (the "Allow
+   User Scripts" toggle). Firefox puts it in `optional_permissions`: the exec probe
+   (`lib/exec/engine.ts`) reads the granted state off the `userScripts` namespace, the setup banner
+   says how to enable it (Settings → "Enable user scripts", or about:addons → usermods → Permissions
+   tab), and `SettingsView.tsx`'s button calls `permissions.request({permissions: ['userScripts']})`
+   from a user gesture — the sanctioned grant path on Firefox. The poll in the panel clears the
+   notice the moment the user has enabled one of the routes.
 
-3. **`chrome.*` → cross-browser namespace.** WXT's polyfill covers this for the promise-based APIs
-   used throughout `lib/` and `entrypoints/`. The one spot to check by hand:
-   `lib/gm.ts`'s generated wrapper code is a **string template injected into registered user
-   scripts**, not bundled application code — it calls `chrome.runtime.sendMessage`/`connect`
-   directly (`typeof chrome !== 'undefined'` checks already present) because that's what
-   `chrome.userScripts.register()`'s `js: [{code}]` executes into, and WXT's bundler-level polyfill
-   doesn't touch strings interpreted at runtime inside the browser. Firefox exposes `chrome.*` as an
-   alias for `browser.*` in extension contexts including the `USER_SCRIPT` world (both are
-   Promise/callback-dual APIs there), so the existing `chrome.runtime.sendMessage(msg, callback)`
-   callback-style calls in the generated GM shim should work verbatim — worth a direct Firefox smoke
-   test of `GM_setValue`/`GM_addValueChangeListener` specifically, since this is the one code path
-   that bypasses the polyfill by construction.
+4. **`chrome.*` → cross-browser namespace.** WXT's polyfill covers this for the promise-based APIs
+   used throughout `lib/` and `entrypoints/`. The one spot to check by hand: `lib/gm.ts`'s generated
+   wrapper code is a **string template injected into registered user scripts**, not bundled
+   application code — it calls `chrome.runtime.sendMessage`/`connect` directly (`typeof chrome
+   !== 'undefined'` checks already present) because that's what `chrome.userScripts.register()`'s
+   `js: [{code}]` executes into. Firefox exposes `chrome.*` as an alias for `browser.*` in extension
+   contexts including the `USER_SCRIPT` world (both are Promise/callback-dual APIs there), so the
+   existing `chrome.runtime.sendMessage(msg, callback)` callback-style calls in the generated GM
+   shim should work verbatim — worth a direct Firefox smoke test of `GM_setValue`/
+   `GM_addValueChangeListener` specifically, since this is the one code path that bypasses the
+   polyfill by construction.
 
-4. **AMO listing language for the `userScripts` policy.** Not code — the review-facing description
-   needs to frame usermods within "user script manager" terms (explicit install action via Save,
-   visible/removable list in the Mods tab, both true today) and be ready to explain the Try/run-once
-   flow (`chrome.userScripts.execute` on an unsaved draft) if a reviewer asks, since it's arguably
-   outside "managing installed scripts." Doesn't block submission on its own, but is worth having an
-   answer for before submitting rather than after a rejection.
+5. **AMO listing** — separate from the Chrome Web Store one, plus screenshots if the sidebar chrome
+   looks different from the side panel. `data_collection_permissions` is declared in the manifest
+   (above); the owner reviews it at submission, and the listing language follows the user script
+   manager framing (explicit install via Save, visible/removable list in the Mods tab) that
+   governs usermods' Try flow too.
 
-5. **Regenerate store assets / manifest metadata** — `browser_specific_settings.gecko.id` and
-   `strict_min_version` (`136` for MV3 `userScripts`), an AMO listing separate from the Chrome Web
-   Store one, and updated screenshots if the sidebar chrome looks different from the side panel
-   (cosmetic, not architectural).
-
-**Not needed:** any change to the agent loop, provider adapters, mod header parsing, GM API surface,
-Tampermonkey import, or the install-page `.user.js` redirect — all of that is either pure TypeScript
-with no `chrome.*` calls or calls into APIs Firefox already matches.
-
-**Rough sizing:** the sidebar adapter and permission-request flow are each a day or so of focused
-work plus testing; the GM-shim namespace check is a few hours of manual verification, not new code;
-AMO listing copy and screenshots are a documentation task. Call it a small-to-medium single-session
-port, not a rearchitecture — bounded mostly by how much manual testing of `userScripts`/GM API
-parity on real Firefox is warranted before shipping, since that surface is exactly the part that
-can't be typechecked or unit-tested (`npm test` covers header/backup parsing only; there's no browser
-integration harness for `chrome.userScripts` and none is planned by this doc).
+**Not done:** manual testing of `userScripts`/GM API parity on real Firefox — `npm test` cannot
+cover `chrome.userScripts` (`npm test` covers header/backup parsing only; there is no browser
+integration harness for the userScripts API, and none is planned by this doc).
 
 ## Safari verdict
 

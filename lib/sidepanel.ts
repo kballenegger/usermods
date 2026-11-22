@@ -42,6 +42,43 @@ export function sidePanelAvailable(): boolean {
 }
 
 /**
+ * Does this runtime have Firefox's `sidebarAction`? Firefox's equivalent of Chrome's `sidePanel`
+ * (docs/browsers.md, the sidePanel vs sidebar_action section) — a browser-level sidebar instead of
+ * a per-tab one. Safari and Chrome have no `sidebarAction`, so on them this is false.
+ */
+export function sidebarAvailable(): boolean {
+  return typeof chrome !== 'undefined' && typeof (chrome as { sidebarAction?: unknown }).sidebarAction !== 'undefined';
+}
+
+/**
+ * Open Firefox's browser-level sidebar (`sidebar_action.open()`).
+ *
+ * Only call this where `sidebarAvailable()` is true, and inside a user gesture — the action-click
+ * listener in entrypoints/background.ts and the dashboard's Open button are both gestures.
+ */
+export function sidebarActionOpen(): Promise<void> {
+  return (chrome as unknown as { sidebarAction: { open(): Promise<void> } }).sidebarAction.open();
+}
+
+/**
+ * Is Firefox's `userScripts` permission still missing while it is optional?
+ *
+ * Firefox declares `userScripts` in `optional_permissions` (W3C issue #740 — it must not be in
+ * `permissions` there); Chrome asks for it at install, so this is always false there. The granted
+ * signal is the availability of the `userScripts` namespace (MDN's userScripts page: "Your extension
+ * must check that the permission has been granted by checking the availability of the userScripts
+ * API namespace or using permissions.contains()"). The Settings row that turns it on is rendered
+ * while this is true (SettingsView.tsx).
+ */
+export function userScriptsPending(): boolean {
+  try {
+    return !!chrome.runtime.getManifest().optional_permissions?.includes('userScripts') && typeof chrome.userScripts === 'undefined';
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Which scope a stored profile runs under.
  *
  * Unlike the theme, an existing profile is NOT pinned to the old behaviour: per-tab is what the
@@ -91,22 +128,36 @@ export function windowPanelPlan(scope: SidePanelScope): WindowPanelPlan {
  * response to a user action" — and `setOptions` must come first so the tab has a panel to open.
  * Returning the plan rather than making the calls keeps the ordering testable.
  *
+ * On Firefox (`firefox`: `sidebarAvailable()`) the plan is the browser-level sidebar instead, and
+ * the caller opens it with `sidebarActionOpen()` — there is no per-tab variant, and the click
+ * itself is the gesture.
+ *
  * There is no close(): the API exposes no way to close a panel it opened, so a second click cannot
  * toggle it shut. The user closes the panel with its own X. Nothing here pretends otherwise — a
  * fake close (disabling the tab's options) would make the panel vanish but also make the NEXT click
  * a no-op until the options were restored, which is worse than one honest direction.
  */
-export function actionClickPlan(scope: SidePanelScope, tabId: number | undefined): {
+export interface ActionClickPlan {
+  /** Chrome/Safari: the clicked tab's per-tab panel options. Null on Firefox — it has no per-tab panels. */
   setOptions: { tabId: number; path: string; enabled: boolean } | null;
+  /** Chrome/Safari: open the clicked tab's panel. Null on Firefox. */
   open: { tabId: number } | null;
-} {
+  /** Firefox: open the browser-level sidebar. */
+  sidebarOpen: boolean;
+}
+
+export function actionClickPlan(scope: SidePanelScope, tabId: number | undefined, firefox: boolean = sidebarAvailable()): ActionClickPlan {
+  // Firefox: the sidebar is the browser-level sidebar, so the click itself opens it; there is no
+  // per-tab variant for scope or tabId to reach.
+  if (firefox) return { setOptions: null, open: null, sidebarOpen: true };
   // Window scope is handled by Chrome itself through openPanelOnActionClick, so onClicked does not
   // even fire; a tabless click (no tab id, which Chrome does deliver on some internal pages) has
   // nothing to attach a panel to.
-  if (scope !== 'tab' || tabId == null) return { setOptions: null, open: null };
+  if (scope !== 'tab' || tabId == null) return { setOptions: null, open: null, sidebarOpen: false };
   return {
     setOptions: { tabId, path: PANEL_PATH, enabled: true },
     open: { tabId },
+    sidebarOpen: false,
   };
 }
 
