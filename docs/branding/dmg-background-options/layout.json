@@ -1,0 +1,17 @@
+{
+  "aspect_ratio": "3:2",
+  "suggested_content_points": {
+    "width": 768,
+    "height": 512
+  },
+  "app_center_percent": {
+    "x": 28,
+    "y": 55
+  },
+  "applications_center_percent": {
+    "x": 72,
+    "y": 55
+  },
+  "suggested_icon_points": 96,
+  "note": "Illustrative positioning guide; preview overlays are not baked into the backgrounds."
+}

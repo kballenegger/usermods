@@ -1,0 +1,102 @@
+[
+  {
+    "number": "01",
+    "name": "Classic BBS",
+    "file": "01-classic-bbs.png",
+    "source": "/Users/kenneth/.codex/generated_images/01a0b49c-0399-7db0-b6e1-d663c4160547/exec-95ff734b-7982-4949-940e-249d9b6e87a2.png",
+    "generation_mode": "Built-in image_gen",
+    "width": 1536,
+    "height": 1024,
+    "bytes": 1445444
+  },
+  {
+    "number": "02",
+    "name": "Night Terminal",
+    "file": "02-night-terminal.png",
+    "source": "/Users/kenneth/.codex/generated_images/01a0b49c-0399-7db0-b6e1-d663c4160547/exec-afde8c65-8e31-42cb-b922-0e2e3c74969b.png",
+    "generation_mode": "Built-in image_gen",
+    "width": 1536,
+    "height": 1024,
+    "bytes": 1621736
+  },
+  {
+    "number": "03",
+    "name": "Goblin Guide",
+    "file": "03-goblin-guide.png",
+    "source": "/Users/kenneth/.codex/generated_images/01a0b49c-0399-7db0-b6e1-d663c4160547/exec-3c033860-9acc-4c81-86d2-d6dfcc38b9ff.png",
+    "generation_mode": "Built-in image_gen",
+    "width": 1536,
+    "height": 1024,
+    "bytes": 1404818
+  },
+  {
+    "number": "04",
+    "name": "Midnight Coast",
+    "file": "04-midnight-coast.png",
+    "source": "/Users/kenneth/.codex/generated_images/01a0b49c-0399-7db0-b6e1-d663c4160547/exec-f8cc7690-71ad-47f7-b2c2-a277e3d9627c.png",
+    "generation_mode": "Built-in image_gen",
+    "width": 1536,
+    "height": 1024,
+    "bytes": 1324182
+  },
+  {
+    "number": "05",
+    "name": "Modular Pixels",
+    "file": "05-modular-pixels.png",
+    "source": "/Users/kenneth/.codex/generated_images/01a0b49c-0399-7db0-b6e1-d663c4160547/exec-40c44e38-3c98-4f19-99d7-4f162df16471.png",
+    "generation_mode": "Built-in image_gen",
+    "width": 1536,
+    "height": 1024,
+    "bytes": 1467659
+  },
+  {
+    "number": "06",
+    "name": "BBS Masthead",
+    "file": "06-bbs-masthead.png",
+    "source": "/Users/kenneth/.codex/generated_images/01a0b49c-0399-7db0-b6e1-d663c4160547/exec-945b2c7c-7a29-424d-bd73-8cf704da9637.png",
+    "generation_mode": "Built-in image_gen",
+    "width": 1536,
+    "height": 1024,
+    "bytes": 1541201
+  },
+  {
+    "number": "07",
+    "name": "Cyan Daylight",
+    "file": "07-cyan-daylight.png",
+    "source": "/Users/kenneth/.codex/generated_images/01a0b49c-0399-7db0-b6e1-d663c4160547/exec-29cf672f-dbd6-4bd8-9f38-57bfd4793771.png",
+    "generation_mode": "Built-in image_gen",
+    "width": 1536,
+    "height": 1024,
+    "bytes": 1439167
+  },
+  {
+    "number": "08",
+    "name": "Magenta Circuit",
+    "file": "08-magenta-circuit.png",
+    "source": "/Users/kenneth/.codex/generated_images/01a0b49c-0399-7db0-b6e1-d663c4160547/exec-c3a1a8ab-bfd8-4b5f-b78d-08f4a022305c.png",
+    "generation_mode": "Built-in image_gen",
+    "width": 1536,
+    "height": 1024,
+    "bytes": 1348412
+  },
+  {
+    "number": "09",
+    "name": "Lime Cartridge",
+    "file": "09-lime-cartridge.png",
+    "source": "/Users/kenneth/.codex/generated_images/01a0b49c-0399-7db0-b6e1-d663c4160547/exec-8fff18e7-c7cb-418a-956c-168a03133485.png",
+    "generation_mode": "Built-in image_gen",
+    "width": 1536,
+    "height": 1024,
+    "bytes": 1514256
+  },
+  {
+    "number": "10",
+    "name": "Quiet Pixels",
+    "file": "10-quiet-pixels.png",
+    "source": "/Users/kenneth/.codex/generated_images/01a0b49c-0399-7db0-b6e1-d663c4160547/exec-facd78a6-25f6-487a-a781-5b98c3dfa3d5.png",
+    "generation_mode": "Built-in image_gen",
+    "width": 1536,
+    "height": 1024,
+    "bytes": 1147847
+  }
+]

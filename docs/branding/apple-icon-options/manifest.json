@@ -1,0 +1,52 @@
+[
+  {
+    "number": "01",
+    "name": "BBS Classic",
+    "file": "01-bbs-classic.png",
+    "source": "/Users/kenneth/.codex/generated_images/01a0b49c-0399-7db0-b6e1-d663c4160547/exec-6be358a7-6454-47f0-ba6a-408d16e1c65d.png",
+    "generation_mode": "Built-in image_gen",
+    "width": 1254,
+    "height": 1254,
+    "bytes": 907731
+  },
+  {
+    "number": "02",
+    "name": "Pixel Relief",
+    "file": "02-pixel-relief.png",
+    "source": "/Users/kenneth/.codex/generated_images/01a0b49c-0399-7db0-b6e1-d663c4160547/exec-86f2c4f2-69ad-48a2-895d-d95ec171c385.png",
+    "generation_mode": "Built-in image_gen",
+    "width": 1254,
+    "height": 1254,
+    "bytes": 910024
+  },
+  {
+    "number": "03",
+    "name": "Night Terminal",
+    "file": "03-night-terminal.png",
+    "source": "/Users/kenneth/.codex/generated_images/01a0b49c-0399-7db0-b6e1-d663c4160547/exec-74b1a797-89da-40b8-bde3-fe77a3bf97ae.png",
+    "generation_mode": "Built-in image_gen",
+    "width": 1254,
+    "height": 1254,
+    "bytes": 876465
+  },
+  {
+    "number": "04",
+    "name": "Browser Badge",
+    "file": "04-browser-badge.png",
+    "source": "/Users/kenneth/.codex/generated_images/01a0b49c-0399-7db0-b6e1-d663c4160547/exec-d86cb061-2d82-4cc1-8bfb-36598c2660b3.png",
+    "generation_mode": "Built-in image_gen",
+    "width": 1254,
+    "height": 1254,
+    "bytes": 910982
+  },
+  {
+    "number": "05",
+    "name": "Modular U",
+    "file": "05-modular-u.png",
+    "source": "/Users/kenneth/.codex/generated_images/01a0b49c-0399-7db0-b6e1-d663c4160547/exec-48656583-0458-4019-bb9c-3e43202179d2.png",
+    "generation_mode": "Built-in image_gen",
+    "width": 1254,
+    "height": 1254,
+    "bytes": 916366
+  }
+]
